@@ -1,11 +1,13 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { authMiddleware } from "@clerk/nextjs";
 
-export default clerkMiddleware({
-  publicRoutes: ["/"], // La page d'accueil reste publique
+export default authMiddleware({
+  // La page d'accueil reste publique
+  publicRoutes: ["/"],
 });
 
 export const config = {
   matcher: [
+    // Toutes les routes, sauf les assets statiques et _next
     "/((?!.*\\..*|_next).*)",
     "/",
   ],
