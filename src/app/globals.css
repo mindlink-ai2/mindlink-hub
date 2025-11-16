@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
+/* 🔥 Mode sombre forcé : on met TOUT en dark dans :root */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;   /* fond sombre */
+  --foreground: #ededed;   /* texte clair */
 }
 
 @theme inline {
@@ -12,12 +13,10 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* ❌ SUPPRIMÉ : plus de mode clair, plus de détection du système */
+/*
+@media (prefers-color-scheme: dark) { ... }
+*/
 
 body {
   background: var(--background);
