@@ -1,13 +1,24 @@
-import { authMiddleware } from "@clerk/nextjs";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-export default authMiddleware({
-  // La page d'accueil reste publique
-  publicRoutes: ["/"],
+// Routes publiques (accessibles sans être connecté)
+const isPublicRoute = createRouteMatcher([
+  "/",            // page d'accueil
+  "/sign-in(.*)", // pages de login Clerk
+  "/sign-up(.*)", // pages de création de compte Clerk
+]);
+
+export default clerkMiddleware(async (auth, req) => {
+  // Si la route est publique → on ne protège pas
+  if (isPublicRoute(req)) {
+    return;
+  }
+
+  // Sinon, on protège (utilisateur doit être connecté)
+  await auth.protect();
 });
 
 export const config = {
   matcher: [
-    // Toutes les routes, sauf les assets statiques et _next
     "/((?!.*\\..*|_next).*)",
     "/",
   ],
