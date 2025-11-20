@@ -1,18 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import TraiteCheckbox from "./TraiteCheckbox"; // ✅ ajout
+import TraiteCheckbox from "./TraiteCheckbox";
 
-// ✅ Signature standard avec searchParams
-export default async function LeadsPage({
-  searchParams,
-}: {
-  searchParams?: { [key: string]: string | string[] | undefined };
-}) {
+export default async function LeadsPage() {
   const { userId } = await auth();
-  if (!userId) {
-    redirect("/sign-in");
-  }
+  if (!userId) redirect("/sign-in");
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,334 +13,191 @@ export default async function LeadsPage({
   );
 
   // 1️⃣ Récup client
-  const { data: client, error: clientError } = await supabase
+  const { data: client } = await supabase
     .from("clients")
     .select("*")
     .eq("clerk_user_id", userId)
     .single();
 
-  if (clientError || !client) {
-    console.error("Client not found:", clientError);
+  if (!client) {
     return (
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Leads générés</h1>
-        <p className="text-sm text-red-400">
-          Impossible de récupérer votre profil client.
-        </p>
+      <div className="text-red-400 text-sm">
+        Impossible de récupérer votre profil client.
       </div>
     );
   }
 
   const clientId = client.id;
 
-  // 2️⃣ Récup leads (ajout de "traite")
-  const { data: leadsData, error: leadsError } = await supabase
+  // 2️⃣ Récup leads avec location + traite
+  const { data: leads } = await supabase
     .from("leads")
     .select(
-      "id, client_id, Name, FirstName, LastName, Company, LinkedInURL, created_at, traite"
+      "id, Name, FirstName, LastName, Company, LinkedInURL, location, created_at, traite"
     )
     .eq("client_id", clientId)
     .order("created_at", { ascending: false });
 
-  const leads = leadsData ?? [];
+  const safeLeads = leads ?? [];
 
-  if (leadsError) {
-    console.error("Leads error:", leadsError);
-    return (
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Leads générés</h1>
-        <p className="text-sm text-red-400">
-          Erreur lors du chargement des leads.
-        </p>
-      </div>
-    );
-  }
-
-  // 3️⃣ KPIs globaux
-  const total = leads.length;
-
+  // KPIs
+  const total = safeLeads.length;
   const thisMonth =
-    leads.filter((l) => {
-      if (!l.created_at) return false;
-      const d = new Date(l.created_at);
+    safeLeads.filter((l) => {
+      const d = l.created_at ? new Date(l.created_at) : null;
       const now = new Date();
       return (
-        d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+        d &&
+        d.getMonth() === now.getMonth() &&
+        d.getFullYear() === now.getFullYear()
       );
     }).length ?? 0;
 
   const lastLead =
-    leads.length > 0 && leads[0].created_at
-      ? new Date(leads[0].created_at).toLocaleString("fr-FR")
-      : null;
+    safeLeads.length > 0 && safeLeads[0].created_at
+      ? new Date(safeLeads[0].created_at).toLocaleString("fr-FR")
+      : "—";
 
-  // 4️⃣ Filtrage / recherche
-  const rawQ = searchParams?.q;
-  const rawPeriod = searchParams?.period;
-
-  const qRaw = Array.isArray(rawQ) ? rawQ[0] ?? "" : rawQ ?? "";
-  const q = qRaw.toString().trim().toLowerCase();
-
-  const periodRaw = Array.isArray(rawPeriod) ? rawPeriod[0] ?? "" : rawPeriod ?? "all";
-  const period = periodRaw.toString() || "all";
-
-  let filteredLeads = [...leads];
-
-  if (q) {
-    filteredLeads = filteredLeads.filter((l) => {
-      const haystack = [
-        l.FirstName ?? "",
-        l.LastName ?? "",
-        l.Name ?? "",
-        l.Company ?? "",
-        l.LinkedInURL ?? "",
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(q);
-    });
-  }
-
-  if (period !== "all") {
-    const now = new Date();
-    const days =
-      period === "7d" ? 7 : period === "30d" ? 30 : period === "90d" ? 90 : 0;
-    if (days > 0) {
-      const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-      filteredLeads = filteredLeads.filter(
-        (l) => l.created_at && new Date(l.created_at) >= since
-      );
-    }
-  }
-
-  // 5️⃣ UI
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+    <div className="space-y-10">
+
+      {/* HEADER */}
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-semibold">Leads générés</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Vos leads issus des automatisations Mindlink.
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
+            Leads générés
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">
+            Tous vos prospects qualifiés, importés automatiquement par Mindlink.
           </p>
         </div>
 
         <a
           href="/api/leads/export"
-          className="text-xs rounded-full border border-slate-700 px-4 py-2 hover:bg-slate-800/70 transition flex items-center gap-2 bg-slate-900/70"
+          className="px-4 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 transition"
         >
-          Exporter en CSV
+          Exporter CSV
         </a>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-950 to-slate-900 p-6 shadow-sm flex flex-col items-center justify-center text-center gap-1">
-          <div className="text-[11px] uppercase tracking-wide text-slate-400">
-            Total leads
-          </div>
-          <div className="text-3xl font-semibold text-slate-50">{total}</div>
-          <p className="text-[11px] text-slate-500">
-            Tous les leads générés par vos automatisations.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-slfate-800 bg-gradient-to-br from-slate-950 to-slate-900 p-6 shadow-sm flex flex-col items-center justify-center text-center gap-1">
-          <div className="text-[11px] uppercase tracking-wide text-slate-400">
-            Ce mois-ci
-          </div>
-          <div className="text-3xl font-semibold text-slate-50">
-            {thisMonth}
-          </div>
-          <p className="text-[11px] text-slate-500">
-            Leads générés sur le mois en cours.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-950 to-slate-900 p-6 shadow-sm flex flex-col items-center justify-center text-center gap-1">
-          <div className="text-[11px] uppercase tracking-wide text-slate-400">
-            Dernier lead
-          </div>
-          <div className="text-sm text-slate-50">
-            {lastLead ?? "Aucun lead pour le moment"}
-          </div>
-          <p className="text-[11px] text-slate-500">
-            Date et heure du dernier lead reçu.
-          </p>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <KPI title="Total leads" value={total} text="Leads totaux générés" />
+        <KPI title="Ce mois-ci" value={thisMonth} text="Leads générés ce mois" />
+        <KPI title="Dernier lead" value={lastLead} text="Dernière importation" />
       </div>
 
-      {/* Carte unique */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-950/90 overflow-hidden shadow-sm mt-8">
-        {/* Header de la carte */}
-        <div className="px-6 py-3 border-b border-slate-800 flex items-center justify-between gap-3">
+      {/* TABLE CARD */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-950/90 shadow-md overflow-hidden">
+
+        {/* TOP BAR */}
+        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
           <div>
-            <p className="text-sm font-medium text-slate-100">Liste des leads</p>
+            <h2 className="text-slate-100 text-sm font-medium">Liste des leads</h2>
             <p className="text-[11px] text-slate-500">
-              Tous les leads générés, du plus récent au plus ancien.
+              Tous vos leads triés du plus récent au plus ancien.
             </p>
           </div>
-          <div className="text-[11px] text-slate-400 whitespace-nowrap">
-            {filteredLeads.length} lead(s) affiché(s)
-            {filteredLeads.length !== total && <> / {total} au total</>}
+          <div className="text-[11px] text-slate-400">
+            {safeLeads.length} lead(s)
           </div>
         </div>
 
-        {/* Filtres */}
-        <form
-          className="px-6 py-2 border-b border-slate-800 flex flex-wrap items-center gap-2"
-          method="get"
-        >
-          <select
-            name="period"
-            defaultValue={period}
-            className="rounded-full bg-slate-900 border border-slate-800 px-3 py-1 text-[11px] text-slate-100"
-          >
-            <option value="all">Toute la période</option>
-            <option value="7d">7 jours</option>
-            <option value="30d">30 jours</option>
-            <option value="90d">90 jours</option>
-          </select>
-
-          <input
-            type="text"
-            name="q"
-            placeholder="Nom, entreprise, LinkedIn..."
-            defaultValue={q}
-            className="flex-1 rounded-full bg-slate-900 border border-slate-800 px-3 py-1 text-[11px] text-slate-100"
-          />
-
-          <button
-            type="submit"
-            className="rounded-full bg-sky-500 px-3 py-1 text-[11px] font-medium text-slate-950"
-          >
-            Filtrer
-          </button>
-        </form>
-
-        {/* Tableau */}
+        {/* TABLE */}
         <div className="overflow-x-auto">
-          <div className="min-w-full flex justify-center">
-            <table className="w-full max-w-5xl mx-auto text-xs md:text-sm border-separate border-spacing-0">
-              <thead>
+          <table className="w-full text-sm border-separate border-spacing-0">
+            <thead>
+              <tr className="bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide">
+                <th className="py-3 px-4 border-b border-slate-800">Traité</th>
+                <th className="py-3 px-4 border-b border-slate-800 text-left">Nom</th>
+                <th className="py-3 px-4 border-b border-slate-800 text-left">Entreprise</th>
+                <th className="py-3 px-4 border-b border-slate-800 text-left">Localisation</th>
+                <th className="py-3 px-4 border-b border-slate-800 text-left">LinkedIn</th>
+                <th className="py-3 px-4 border-b border-slate-800 text-center">Date</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {safeLeads.length === 0 ? (
                 <tr>
-                  {/* colSpan passe à 5 avec la nouvelle colonne */}
-                  <th
-                    colSpan={5}
-                    className="pt-6 pb-3 px-6 text-center"
-                  >
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                      DÉTAILS DES LEADS
-                    </span>
-                  </th>
+                  <td colSpan={6} className="py-10 text-center text-slate-500">
+                    Aucun lead pour le moment.
+                  </td>
                 </tr>
+              ) : (
+                safeLeads.map((lead) => {
+                  const fullName =
+                    `${lead.FirstName ?? ""} ${lead.LastName ?? ""}`.trim() ||
+                    lead.Name ||
+                    "—";
 
-                <tr className="bg-slate-900/95 text-slate-100">
-                  {/* Colonne cases à cocher */}
-                  <th className="w-[40px] py-4 text-center uppercase border-t border-b border-slate-800">
-                    {/* Traité */}
-                  </th>
-
-                  <th className="w-1/4 py-4 text-center uppercase border-t border-b border-slate-800">
-                    Nom
-                  </th>
-                  <th className="w-1/4 py-4 text-center uppercase border-t border-b border-l border-slate-800">
-                    Entreprise
-                  </th>
-                  <th className="w-1/4 py-4 text-center uppercase border-t border-b border-l border-slate-800">
-                    LinkedIn
-                  </th>
-                  <th className="w-1/4 py-4 text-center uppercase border-t border-b border-l border-slate-800">
-                    Date
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredLeads.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="py-10 text-center text-slate-500 text-sm"
+                  return (
+                    <tr
+                      key={lead.id}
+                      className="border-b border-slate-900 hover:bg-slate-900/70 transition"
                     >
-                      Aucun lead pour l’instant 🚀
-                    </td>
-                  </tr>
-                ) : (
-                  filteredLeads.map((lead, index) => {
-                    const isNew =
-                      lead.created_at &&
-                      new Date().getTime() -
-                        new Date(lead.created_at).getTime() <
-                        48 * 60 * 60 * 1000;
+                      {/* TRAITÉ */}
+                      <td className="py-3 px-4 text-center">
+                        <TraiteCheckbox
+                          leadId={lead.id}
+                          defaultChecked={Boolean(lead.traite)}
+                        />
+                      </td>
 
-                    const rowBg =
-                      index % 2 === 0 ? "bg-slate-950/80" : "bg-slate-950/40";
+                      {/* NOM */}
+                      <td className="py-3 px-4 text-slate-50">{fullName}</td>
 
-                    const fullName =
-                      `${lead.FirstName ?? ""} ${lead.LastName ?? ""}`.trim();
+                      {/* ENTREPRISE */}
+                      <td className="py-3 px-4 text-slate-300">
+                        {lead.Company || "—"}
+                      </td>
 
-                    return (
-                      <tr
-                        key={lead.id}
-                        className={`${rowBg} border-b border-slate-900 hover:bg-slate-900/80`}
-                      >
-                        {/* ✅ Checkbox reliée à la colonne "traite" */}
-                        <td className="py-3 text-center border-r border-slate-900">
-                          <TraiteCheckbox
-                            leadId={lead.id}
-                            defaultChecked={Boolean(lead.traite)}
-                          />
-                        </td>
+                      {/* LOCALISATION */}
+                      <td className="py-3 px-4 text-slate-300">
+                        {lead.location || "—"}
+                      </td>
 
-                        <td className="py-3 text-center border-r border-slate-900">
-                          <div className="flex items-center justify-center gap-2">
-                            <span className="truncate max-w-[260px] text-center">
-                              {fullName || lead.Name || "—"}
-                            </span>
-                            {isNew && (
-                              <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                Nouveau
-                              </span>
-                            )}
-                          </div>
-                        </td>
+                      {/* LINKEDIN */}
+                      <td className="py-3 px-4">
+                        {lead.LinkedInURL ? (
+                          <a
+                            href={lead.LinkedInURL}
+                            target="_blank"
+                            className="text-sky-400 hover:underline"
+                          >
+                            Voir profil
+                          </a>
+                        ) : (
+                          <span className="text-slate-500">—</span>
+                        )}
+                      </td>
 
-                        <td className="py-3 text-center border-r border-slate-900">
-                          {lead.Company ?? "—"}
-                        </td>
-
-                        <td className="py-3 text-center border-r border-slate-900">
-                          {lead.LinkedInURL ? (
-                            <a
-                              href={lead.LinkedInURL}
-                              className="text-xs text-sky-400 hover:underline"
-                              target="_blank"
-                            >
-                              Voir le profil
-                            </a>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-
-                        <td className="py-3 text-center">
-                          {lead.created_at
-                            ? new Date(
-                                lead.created_at
-                              ).toLocaleDateString("fr-FR")
-                            : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                      {/* DATE */}
+                      <td className="py-3 px-4 text-center text-slate-400">
+                        {lead.created_at
+                          ? new Date(lead.created_at).toLocaleDateString("fr-FR")
+                          : "—"}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
+
       </div>
+    </div>
+  );
+}
+
+/* 🔹 KPI Component */
+function KPI({ title, value, text }: { title: string; value: any; text: string }) {
+  return (
+    <div className="rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center">
+      <div className="text-[11px] text-slate-500 uppercase tracking-wide">{title}</div>
+      <div className="text-3xl font-semibold text-slate-50 mt-1">{value}</div>
+      <p className="text-[11px] text-slate-500 mt-1">{text}</p>
     </div>
   );
 }

@@ -2,36 +2,52 @@
 
 import { useState } from "react";
 
-type Props = {
+export default function TraiteCheckbox({
+  leadId,
+  defaultChecked = false,
+}: {
   leadId: number;
-  defaultChecked: boolean | null;
-};
+  defaultChecked: boolean;
+}) {
+  const [checked, setChecked] = useState(defaultChecked);
+  const [loading, setLoading] = useState(false);
 
-export default function TraiteCheckbox({ leadId, defaultChecked }: Props) {
-  const [checked, setChecked] = useState<boolean>(!!defaultChecked);
+  async function handleChange() {
+    const newValue = !checked;
 
-  const handleChange = async () => {
-    const next = !checked;
-    setChecked(next); // UI optimiste
+    // Optimistic update
+    setChecked(newValue);
+    setLoading(true);
 
     try {
-      await fetch("/api/leads/traite", {
+      const res = await fetch("/api/leads/update-traite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId, traite: next }),
+        body: JSON.stringify({
+          id: leadId,
+          traite: newValue,
+        }),
       });
+
+      if (!res.ok) {
+        throw new Error("Erreur mise à jour traite");
+      }
     } catch (e) {
       console.error(e);
-      setChecked(checked); // rollback si gros souci réseau
+      // rollback si erreur
+      setChecked(!newValue);
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
   return (
     <input
       type="checkbox"
-      className="h-4 w-4 rounded border-slate-700 bg-slate-900"
       checked={checked}
       onChange={handleChange}
+      disabled={loading}
+      className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-0"
     />
   );
 }
