@@ -48,6 +48,13 @@ export default function RootLayout({
                       >
                         Dashboard
                       </Link>
+                      {/* 👇 Nouveau lien Leads */}
+                      <Link
+                        href="/dashboard/leads"
+                        className="hover:text-slate-100 transition"
+                      >
+                        Leads
+                      </Link>
                       {/* plus tard : /integrations, /billing, etc. */}
                     </nav>
 
