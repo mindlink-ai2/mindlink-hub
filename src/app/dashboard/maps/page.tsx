@@ -2,35 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import TraiteCheckbox from "./TraiteCheckbox";
-
-"use client";
-import { useState } from "react";
-
-// 🔥 CLICK TO REVEAL PHONE
-function RevealPhone({ phone }: { phone: string | null }) {
-  const [revealed, setRevealed] = useState(false);
-
-  if (!phone) return <span className="text-slate-500">—</span>;
-
-  return (
-    <button
-      onClick={() => setRevealed(!revealed)}
-      className="text-left text-slate-300 hover:text-slate-100 transition"
-    >
-      {revealed ? (
-        <span>
-          {phone}{" "}
-          <span className="text-sky-400 text-xs ml-1">(Masquer)</span>
-        </span>
-      ) : (
-        <span>
-          ••••••••••••{" "}
-          <span className="text-sky-400 text-xs ml-1">(Afficher)</span>
-        </span>
-      )}
-    </button>
-  );
-}
+import RevealPhone from "./RevealPhone"; // ✅ NOUVEAU
 
 export default async function MapsPage() {
   const { userId } = await auth();
@@ -41,7 +13,6 @@ export default async function MapsPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // 1️⃣ Récupération client
   const { data: client } = await supabase
     .from("clients")
     .select("*")
@@ -58,7 +29,6 @@ export default async function MapsPage() {
 
   const clientId = client.id;
 
-  // 2️⃣ Récupération des leads Google Maps
   const { data: mapsLeads } = await supabase
     .from("map_leads")
     .select(
@@ -69,7 +39,6 @@ export default async function MapsPage() {
 
   const safeLeads = mapsLeads ?? [];
 
-  // KPIs
   const total = safeLeads.length;
   const treatedCount = safeLeads.filter((l) => l.traite).length;
   const remainingToTreat = total - treatedCount;
@@ -85,12 +54,6 @@ export default async function MapsPage() {
       );
     }).length ?? 0;
 
-  const lastLead =
-    safeLeads.length > 0 && safeLeads[0].created_at
-      ? new Date(lead.created_at).toLocaleString("fr-FR")
-      : "—";
-
-  // Prochaine importation automatique
   const now = new Date();
   const nextImport = new Date();
   nextImport.setHours(8, 0, 0, 0);
@@ -106,7 +69,6 @@ export default async function MapsPage() {
 
   return (
     <div className="space-y-10">
-      {/* HEADER */}
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
@@ -125,7 +87,6 @@ export default async function MapsPage() {
         </a>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <KPI title="Total leads" value={total} text="Leads importés" />
         <KPI
@@ -140,7 +101,6 @@ export default async function MapsPage() {
         />
       </div>
 
-      {/* TABLE CARD */}
       <div className="rounded-2xl border border-slate-800 bg-slate-950/90 shadow-md overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
           <div>
@@ -195,7 +155,6 @@ export default async function MapsPage() {
                     key={lead.id}
                     className="border-b border-slate-900 hover:bg-slate-900/70 transition"
                   >
-                    {/* TRAITÉ */}
                     <td className="py-3 px-4 text-center">
                       <TraiteCheckbox
                         leadId={lead.id}
@@ -203,22 +162,18 @@ export default async function MapsPage() {
                       />
                     </td>
 
-                    {/* NOM */}
                     <td className="py-3 px-4 text-slate-50 whitespace-nowrap overflow-hidden text-ellipsis max-w-[240px]">
                       {lead.title || "—"}
                     </td>
 
-                    {/* ADRESSE */}
                     <td className="py-3 px-4 text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis max-w-[280px]">
                       {lead.address || "—"}
                     </td>
 
-                    {/* TÉLÉPHONE → CLICK TO REVEAL 🔥 */}
                     <td className="py-3 px-4 whitespace-nowrap max-w-[140px]">
                       <RevealPhone phone={lead.phoneNumber} />
                     </td>
 
-                    {/* SITE WEB */}
                     <td className="py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
                       {lead.website ? (
                         <a
@@ -233,7 +188,6 @@ export default async function MapsPage() {
                       )}
                     </td>
 
-                    {/* GOOGLE MAPS */}
                     <td className="py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
                       {lead.placeUrl ? (
                         <a
@@ -248,7 +202,6 @@ export default async function MapsPage() {
                       )}
                     </td>
 
-                    {/* DATE */}
                     <td className="py-3 px-4 text-center text-slate-400 whitespace-nowrap">
                       {lead.created_at
                         ? new Date(lead.created_at).toLocaleDateString("fr-FR")
@@ -265,7 +218,6 @@ export default async function MapsPage() {
   );
 }
 
-/* 🔹 KPI Component */
 function KPI({ title, value, text }: { title: string; value: any; text: string }) {
   return (
     <div className="rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center">
