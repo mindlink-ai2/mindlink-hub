@@ -101,11 +101,11 @@ export default async function LeadsPage() {
         </div>
 
         <a
-          href="/api/leads/export"
-          className="px-4 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 transition"
-        >
-          Exporter CSV
-        </a>
+  href="/dashboard/leads/export"
+  className="px-4 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 transition"
+>
+  Exporter CSV
+</a>
       </div>
 
       {/* KPIs */}
