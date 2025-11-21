@@ -181,10 +181,10 @@ export default function HomePage() {
               Accéder à votre dashboard
             </Link>
 
-            {/* 👉 Nouveau bouton Prospection */}
+            {/* 👉 BOUTON PROSPECTION — Solution 2 */}
             <Link
               href="/prospection"
-              className="rounded-xl bg-blue-600 px-4 py-2 text-xs md:text-sm font-medium text-white hover:bg-blue-500 transition shadow-lg shadow-blue-500/30"
+              className="rounded-xl bg-[#0033FF] px-4 py-2 text-xs md:text-sm font-medium text-white hover:bg-[#0028CC] transition shadow-lg shadow-blue-500/30"
             >
               Accéder à la prospection
             </Link>
