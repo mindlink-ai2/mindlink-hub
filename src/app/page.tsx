@@ -156,7 +156,6 @@ export default function HomePage() {
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>Votre prospection</li>
               <li>Votre gestion d’emails</li>
-              <li>Votre création de contenu</li>
             </ul>
 
             <p>
@@ -182,14 +181,13 @@ export default function HomePage() {
               Accéder à votre dashboard
             </Link>
 
-            <a
-              href="https://mind-link.fr"
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-xl border border-slate-700 px-4 py-2 text-xs md:text-sm text-slate-200 hover:bg-slate-800 transition"
+            {/* 👉 Nouveau bouton Prospection */}
+            <Link
+              href="/prospection"
+              className="rounded-xl bg-blue-600 px-4 py-2 text-xs md:text-sm font-medium text-white hover:bg-blue-500 transition shadow-lg shadow-blue-500/30"
             >
-              Sortir du Mindlink Hub
-            </a>
+              Accéder à la prospection
+            </Link>
           </div>
         </SignedIn>
       </section>
