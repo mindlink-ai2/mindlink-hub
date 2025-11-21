@@ -14,7 +14,7 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // 1️⃣ Trouver le client lié à ce compte
+  // 1️⃣ Récupération du client
   const { data: client, error: clientError } = await supabase
     .from("clients")
     .select("*")
@@ -28,12 +28,12 @@ export async function GET() {
     );
   }
 
-  // 2️⃣ Récupérer les leads Google Maps
+  // 2️⃣ Récupérer les leads dans la bonne table
   const { data: mapsData, error: mapsError } = await supabase
-    .from("maps_leads")
+    .from("map_leads") // 🔥 CORRECTION ICI
     .select("*")
     .eq("client_id", client.id)
-    .order("created_at", { ascending: false });
+    .order("id", { ascending: false });
 
   const leads = mapsData ?? [];
 
@@ -44,7 +44,7 @@ export async function GET() {
     );
   }
 
-  // 3️⃣ Construire le CSV
+  // 3️⃣ Construction du CSV
   const header = [
     "Title",
     "Address",
