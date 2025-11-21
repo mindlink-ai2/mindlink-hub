@@ -65,27 +65,29 @@ export default async function LeadsPage() {
       ? new Date(safeLeads[0].created_at).toLocaleString("fr-FR")
       : "—";
 
-  // 🆕 ➕ Ajout : Prochaine importation (tous les jours à 8h)
-  const now = new Date();
-  const nextImport = new Date();
-  nextImport.setHours(8, 0, 0, 0);
+  // 🕒 PROCHAINE IMPORTATION – heure française (Europe/Paris)
+const now = new Date(
+  new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
+);
 
-  // si l'import de 8h est déjà passé → demain
-  if (now > nextImport) {
-    nextImport.setDate(nextImport.getDate() + 1);
-  }
+const nextImport = new Date(
+  new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
+);
+nextImport.setHours(8, 0, 0, 0);
 
-  const diffMs = nextImport.getTime() - now.getTime();
-  const diffMinutes = Math.floor(diffMs / 1000 / 60);
-  const hours = Math.floor(diffMinutes / 60);
-  const minutes = diffMinutes % 60;
+// si import passé → demain
+if (now > nextImport) {
+  nextImport.setDate(nextImport.getDate() + 1);
+}
 
-  let nextImportText = "";
-  if (hours <= 0) {
-    nextImportText = `Dans ${minutes} min`;
-  } else {
-    nextImportText = `Dans ${hours}h ${minutes}min`;
-  }
+// diff
+const diffMs = nextImport.getTime() - now.getTime();
+const diffMinutes = Math.floor(diffMs / 1000 / 60);
+const hours = Math.floor(diffMinutes / 60);
+const minutes = diffMinutes % 60;
+
+const nextImportText =
+  hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
 
   return (
     <div className="space-y-10">

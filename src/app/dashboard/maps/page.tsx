@@ -45,18 +45,29 @@ export default async function MapsPage() {
   const treatedCount = safeLeads.filter((l) => l.traite).length;
   const remainingToTreat = total - treatedCount;
 
-  // Next import at 8h00
-  const now = new Date();
-  const nextImport = new Date();
-  nextImport.setHours(8, 0, 0, 0);
-  if (now > nextImport) nextImport.setDate(nextImport.getDate() + 1);
+  // 🕒 PROCHAINE IMPORTATION – heure française (Europe/Paris)
+const now = new Date(
+  new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
+);
 
-  const diffMs = nextImport.getTime() - now.getTime();
-  const diffMinutes = Math.floor(diffMs / 1000 / 60);
-  const hours = Math.floor(diffMinutes / 60);
-  const minutes = diffMinutes % 60;
-  const nextImportText =
-    hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
+const nextImport = new Date(
+  new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
+);
+nextImport.setHours(8, 0, 0, 0);
+
+// si import passé → demain
+if (now > nextImport) {
+  nextImport.setDate(nextImport.getDate() + 1);
+}
+
+// diff
+const diffMs = nextImport.getTime() - now.getTime();
+const diffMinutes = Math.floor(diffMs / 1000 / 60);
+const hours = Math.floor(diffMinutes / 60);
+const minutes = diffMinutes % 60;
+
+const nextImportText =
+  hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
 
   return (
     <div className="space-y-10">
