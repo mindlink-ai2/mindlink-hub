@@ -18,10 +18,12 @@ export default function RootLayout({
       <html lang="fr">
         <body className="bg-slate-950 text-slate-50">
           <div className="min-h-screen flex flex-col">
-            {/* Top bar */}
+            
+            {/* 🔵 HEADER */}
             <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-20">
               <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
-                {/* Logo + titre */}
+                
+                {/* 🔹 Logo + titre */}
                 <div className="flex items-center gap-2">
                   <Link href="/" className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-500 flex items-center justify-center text-xs font-bold tracking-tight">
@@ -38,24 +40,12 @@ export default function RootLayout({
                   </Link>
                 </div>
 
-                {/* Navigation / actions */}
+                {/* 🔹 Navigation + User */}
                 <div className="flex items-center gap-4 text-xs">
                   <SignedIn>
                     <nav className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
-                      <Link
-                        href="/dashboard"
-                        className="hover:text-slate-100 transition"
-                      >
-                        Dashboard
-                      </Link>
-                      {/* 👇 Nouveau lien Leads */}
-                      <Link
-                        href="/dashboard/leads"
-                        className="hover:text-slate-100 transition"
-                      >
-                        Leads
-                      </Link>
-                      {/* plus tard : /integrations, /billing, etc. */}
+                      <Link href="/dashboard" className="hover:text-slate-100 transition">Dashboard</Link>
+                      <Link href="/dashboard/prospection" className="hover:text-slate-100 transition">Prospection</Link>
                     </nav>
 
                     <div className="flex items-center gap-3">
@@ -64,27 +54,17 @@ export default function RootLayout({
                       </span>
                       <UserButton
                         afterSignOutUrl="/"
-                        appearance={{
-                          elements: {
-                            avatarBox: "h-8 w-8",
-                          },
-                        }}
+                        appearance={{ elements: { avatarBox: "h-8 w-8" } }}
                       />
                     </div>
                   </SignedIn>
 
                   <SignedOut>
                     <div className="flex items-center gap-3">
-                      <Link
-                        href="/sign-in"
-                        className="rounded-full border border-slate-700 px-3 py-1 text-xs hover:bg-slate-800 transition"
-                      >
+                      <Link href="/sign-in" className="rounded-full border border-slate-700 px-3 py-1 text-xs hover:bg-slate-800 transition">
                         Se connecter
                       </Link>
-                      <Link
-                        href="/sign-up"
-                        className="hidden sm:inline rounded-full bg-sky-500 px-3 py-1 text-xs font-medium text-slate-950 hover:bg-sky-400 transition shadow-lg shadow-sky-500/30"
-                      >
+                      <Link href="/sign-up" className="hidden sm:inline rounded-full bg-sky-500 px-3 py-1 text-xs font-medium text-slate-950 hover:bg-sky-400 transition shadow-lg shadow-sky-500/30">
                         Créer un compte
                       </Link>
                     </div>
@@ -93,25 +73,32 @@ export default function RootLayout({
               </div>
             </header>
 
-            {/* Page content */}
+            {/* 🔵 PAGE CONTENT */}
             <main className="flex-1">
-              <div className="max-w-6xl mx-auto px-4 py-8">{children}</div>
+
+              {/* 🎯 FIX : container seulement si la page n’est PAS prospection */}
+              <div className={
+                typeof window !== "undefined" &&
+                window.location.pathname.includes("/dashboard/prospection")
+                  ? "" // = Fullscreen parfait
+                  : "max-w-6xl mx-auto px-4 py-8" // = toutes les autres pages restent identiques
+              }>
+                {children}
+              </div>
+
             </main>
 
-            {/* Footer */}
+            {/* 🔵 FOOTER */}
             <footer className="border-t border-slate-900 text-xs text-slate-500">
               <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
                 <span>© Mindlink</span>
                 <div className="flex gap-4">
-                  <button className="hover:text-slate-300 transition">
-                    Statut
-                  </button>
-                  <button className="hover:text-slate-300 transition">
-                    Mentions légales
-                  </button>
+                  <button className="hover:text-slate-300 transition">Statut</button>
+                  <button className="hover:text-slate-300 transition">Mentions légales</button>
                 </div>
               </div>
             </footer>
+
           </div>
         </body>
       </html>
