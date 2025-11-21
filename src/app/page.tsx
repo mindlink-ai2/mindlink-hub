@@ -33,7 +33,7 @@ export default function HomePage() {
             </h1>
             <p className="text-sm md:text-base text-slate-300 max-w-xl">
               Centralisez vos automatisations, vos intégrations et vos performances.
-              Un seul espace pour suivre ce que Mindlink fait tourner pour votre agence,
+              Un seul espace pour suivre ce que Mindlink fait tourner pour votre entreprise,
               en arrière-plan.
             </p>
           </div>
