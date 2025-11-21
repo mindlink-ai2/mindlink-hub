@@ -63,8 +63,9 @@ export default function HomePage() {
                   Visualisez votre dashboard en temps réel
                 </p>
                 <p className="text-slate-400">
-                  Votre dashboard Airtable sera connecté à votre compte
-                  pour vous afficher uniquement vos chiffres, vos leads et vos tâches.
+                  Votre dashboard intégré vous affiche automatiquement vos chiffres,
+                  vos leads, vos tâches — tout ce qui compte pour piloter votre
+                  activité, en un seul endroit.
                 </p>
               </div>
             </div>
@@ -75,11 +76,12 @@ export default function HomePage() {
               </div>
               <div>
                 <p className="font-medium text-slate-100">
-                  Gérez vos intégrations & automatisations
+                  Accédez à toutes vos données en un clic
                 </p>
                 <p className="text-slate-400">
-                  Bientôt : connexion à HubSpot, Gmail, Notion…
-                  directement depuis le Hub, sans friction.
+                  Retrouvez instantanément tous vos leads, vos automatisations,
+                  votre profil et bientôt vos connexions Gmail, HubSpot, Notion…
+                  directement depuis le Hub, sans aucune friction.
                 </p>
               </div>
             </div>
