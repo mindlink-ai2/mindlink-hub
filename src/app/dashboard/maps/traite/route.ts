@@ -4,9 +4,9 @@ import { createClient } from "@supabase/supabase-js";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { id, traite } = body;
+    const { leadId, newValue } = body;
 
-    if (!id) {
+    if (!leadId) {
       return NextResponse.json(
         { error: "Missing lead id" },
         { status: 400 }
@@ -19,9 +19,9 @@ export async function POST(req: Request) {
     );
 
     const { error } = await supabase
-      .from("maps_leads")
-      .update({ traite })
-      .eq("id", id);
+      .from("map_leads") // ✅ CORRECTION : bon nom de table
+      .update({ traite: newValue }) // ✅ CORRECTION : bon champ
+      .eq("id", leadId);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
