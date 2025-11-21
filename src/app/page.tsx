@@ -183,11 +183,11 @@ export default function HomePage() {
 
             {/* 👉 BOUTON PROSPECTION — Solution 2 */}
             <Link
-              href="/prospection"
-              className="rounded-xl bg-[#0033FF] px-4 py-2 text-xs md:text-sm font-medium text-white hover:bg-[#0028CC] transition shadow-lg shadow-blue-500/30"
-            >
-              Accéder à la prospection
-            </Link>
+  href="/prospection"
+  className="rounded-xl border border-[#0033FF] px-4 py-2 text-xs md:text-sm font-medium text-[#6FA3FF] hover:bg-[#0033FF] hover:text-white transition shadow-lg shadow-blue-500/20 active:bg-[#0028CC]"
+>
+  Accéder à la prospection
+</Link>
           </div>
         </SignedIn>
       </section>
