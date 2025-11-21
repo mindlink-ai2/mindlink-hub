@@ -64,7 +64,7 @@ export default function HomePage() {
                 </p>
                 <p className="text-slate-400">
                   Votre dashboard intégré vous affiche automatiquement vos chiffres,
-                  vos leads, vos tâches — tout ce qui compte pour piloter votre
+                  vos leads, vos tâches et tout ce qui compte pour piloter votre
                   activité, en un seul endroit.
                 </p>
               </div>
@@ -79,9 +79,8 @@ export default function HomePage() {
                   Accédez à toutes vos données en un clic
                 </p>
                 <p className="text-slate-400">
-                  Retrouvez instantanément tous vos leads, vos automatisations,
-                  votre profil et bientôt vos connexions Gmail, HubSpot, Notion…
-                  directement depuis le Hub, sans aucune friction.
+                  Retrouvez instantanément tous vos leads, vos automatisations et 
+                  votre profil directement depuis le Hub, sans aucune friction.
                 </p>
               </div>
             </div>
