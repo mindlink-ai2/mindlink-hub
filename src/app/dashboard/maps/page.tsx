@@ -3,6 +3,35 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import TraiteCheckbox from "./TraiteCheckbox";
 
+"use client";
+import { useState } from "react";
+
+// 🔥 CLICK TO REVEAL PHONE
+function RevealPhone({ phone }: { phone: string | null }) {
+  const [revealed, setRevealed] = useState(false);
+
+  if (!phone) return <span className="text-slate-500">—</span>;
+
+  return (
+    <button
+      onClick={() => setRevealed(!revealed)}
+      className="text-left text-slate-300 hover:text-slate-100 transition"
+    >
+      {revealed ? (
+        <span>
+          {phone}{" "}
+          <span className="text-sky-400 text-xs ml-1">(Masquer)</span>
+        </span>
+      ) : (
+        <span>
+          ••••••••••••{" "}
+          <span className="text-sky-400 text-xs ml-1">(Afficher)</span>
+        </span>
+      )}
+    </button>
+  );
+}
+
 export default async function MapsPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
@@ -58,7 +87,7 @@ export default async function MapsPage() {
 
   const lastLead =
     safeLeads.length > 0 && safeLeads[0].created_at
-      ? new Date(safeLeads[0].created_at).toLocaleString("fr-FR")
+      ? new Date(lead.created_at).toLocaleString("fr-FR")
       : "—";
 
   // Prochaine importation automatique
@@ -113,7 +142,6 @@ export default async function MapsPage() {
 
       {/* TABLE CARD */}
       <div className="rounded-2xl border border-slate-800 bg-slate-950/90 shadow-md overflow-hidden">
-        {/* TOP BAR */}
         <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
           <div>
             <h2 className="text-slate-100 text-sm font-medium">
@@ -128,7 +156,6 @@ export default async function MapsPage() {
           </div>
         </div>
 
-        {/* TABLE */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-separate border-spacing-0">
             <thead>
@@ -186,9 +213,9 @@ export default async function MapsPage() {
                       {lead.address || "—"}
                     </td>
 
-                    {/* TÉLÉPHONE */}
-                    <td className="py-3 px-4 text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
-                      {lead.phoneNumber || "—"}
+                    {/* TÉLÉPHONE → CLICK TO REVEAL 🔥 */}
+                    <td className="py-3 px-4 whitespace-nowrap max-w-[140px]">
+                      <RevealPhone phone={lead.phoneNumber} />
                     </td>
 
                     {/* SITE WEB */}
@@ -239,15 +266,7 @@ export default async function MapsPage() {
 }
 
 /* 🔹 KPI Component */
-function KPI({
-  title,
-  value,
-  text,
-}: {
-  title: string;
-  value: any;
-  text: string;
-}) {
+function KPI({ title, value, text }: { title: string; value: any; text: string }) {
   return (
     <div className="rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center">
       <div className="text-[11px] text-slate-500 uppercase tracking-wide">
