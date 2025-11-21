@@ -181,12 +181,7 @@ export default function HomePage() {
               Accéder à votre dashboard
               <Link
   href="/prospection"
-  className="rounded-xl border border-[#0033FF] px-4 py-2 text-xs md:text-sm font-medium text-[#6FA3FF] 
-    hover:border-[#4D7DFF] hover:text-white 
-    transition 
-    shadow-[0_0_0px_0px_rgba(0,51,255,0)] hover:shadow-[0_0_8px_2px_rgba(0,51,255,0.4)]
-    active:shadow-[0_0_10px_3px_rgba(0,51,255,0.5)]
-  "
+  className="rounded-xl border border-[#0033FF] px-4 py-2 text-xs md:text-sm font-medium text-[#6FA3FF] hover:border-[#4D7DFF] hover:text-white transition shadow-[0_0_0px_0px_rgba(0,51,255,0)] hover:shadow-[0_0_8px_2px_rgba(0,51,255,0.4)] active:shadow-[0_0_10px_3px_rgba(0,51,255,0.5)]"
 >
   Accéder à la prospection
 </Link>
