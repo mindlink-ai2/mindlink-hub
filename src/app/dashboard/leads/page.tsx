@@ -42,6 +42,7 @@ export default async function LeadsPage() {
 
   // KPIs
   const total = safeLeads.length;
+
   const thisMonth =
     safeLeads.filter((l) => {
       const d = l.created_at ? new Date(l.created_at) : null;
@@ -53,14 +54,41 @@ export default async function LeadsPage() {
       );
     }).length ?? 0;
 
+  // ➕ Ajout : nombre de leads traités
+  const treatedCount = safeLeads.filter((l) => l.traite === true).length;
+
+  // ➕ Ajout : leads restants à traiter
+  const remainingToTreat = total - treatedCount;
+
   const lastLead =
     safeLeads.length > 0 && safeLeads[0].created_at
       ? new Date(safeLeads[0].created_at).toLocaleString("fr-FR")
       : "—";
 
+  // 🆕 ➕ Ajout : Prochaine importation (tous les jours à 8h)
+  const now = new Date();
+  const nextImport = new Date();
+  nextImport.setHours(8, 0, 0, 0);
+
+  // si l'import de 8h est déjà passé → demain
+  if (now > nextImport) {
+    nextImport.setDate(nextImport.getDate() + 1);
+  }
+
+  const diffMs = nextImport.getTime() - now.getTime();
+  const diffMinutes = Math.floor(diffMs / 1000 / 60);
+  const hours = Math.floor(diffMinutes / 60);
+  const minutes = diffMinutes % 60;
+
+  let nextImportText = "";
+  if (hours <= 0) {
+    nextImportText = `Dans ${minutes} min`;
+  } else {
+    nextImportText = `Dans ${hours}h ${minutes}min`;
+  }
+
   return (
     <div className="space-y-10">
-
       {/* HEADER */}
       <div className="flex justify-between items-start">
         <div>
@@ -83,13 +111,24 @@ export default async function LeadsPage() {
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <KPI title="Total leads" value={total} text="Leads totaux générés" />
-        <KPI title="Ce mois-ci" value={thisMonth} text="Leads générés ce mois" />
-        <KPI title="Dernier lead" value={lastLead} text="Dernière importation" />
+
+        {/* ➕ KPI MODIFIÉ */}
+        <KPI
+          title="À traiter"
+          value={remainingToTreat}
+          text={`${remainingToTreat} leads restant à traiter`}
+        />
+
+        {/* 🆕 KPI PROCHAINE IMPORTATION */}
+        <KPI
+          title="Prochaine importation"
+          value={nextImportText}
+          text="Import automatique à 8h00"
+        />
       </div>
 
       {/* TABLE CARD */}
       <div className="rounded-2xl border border-slate-800 bg-slate-950/90 shadow-md overflow-hidden">
-
         {/* TOP BAR */}
         <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
           <div>
@@ -185,7 +224,6 @@ export default async function LeadsPage() {
             </tbody>
           </table>
         </div>
-
       </div>
     </div>
   );
