@@ -2,7 +2,6 @@ import { createClient } from "@supabase/supabase-js";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import TraiteCheckbox from "./TraiteCheckbox";
-import RevealPhone from "./RevealPhone"; // ✅ NOUVEAU
 
 export default async function MapsPage() {
   const { userId } = await auth();
@@ -13,6 +12,7 @@ export default async function MapsPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  // 1️⃣ Récup client
   const { data: client } = await supabase
     .from("clients")
     .select("*")
@@ -29,6 +29,7 @@ export default async function MapsPage() {
 
   const clientId = client.id;
 
+  // 2️⃣ Récupération leads Maps
   const { data: mapsLeads } = await supabase
     .from("map_leads")
     .select(
@@ -39,21 +40,12 @@ export default async function MapsPage() {
 
   const safeLeads = mapsLeads ?? [];
 
+  // KPIs
   const total = safeLeads.length;
   const treatedCount = safeLeads.filter((l) => l.traite).length;
   const remainingToTreat = total - treatedCount;
 
-  const thisMonth =
-    safeLeads.filter((l) => {
-      const d = l.created_at ? new Date(l.created_at) : null;
-      const now = new Date();
-      return (
-        d &&
-        d.getMonth() === now.getMonth() &&
-        d.getFullYear() === now.getFullYear()
-      );
-    }).length ?? 0;
-
+  // Next import at 8h00
   const now = new Date();
   const nextImport = new Date();
   nextImport.setHours(8, 0, 0, 0);
@@ -63,12 +55,12 @@ export default async function MapsPage() {
   const diffMinutes = Math.floor(diffMs / 1000 / 60);
   const hours = Math.floor(diffMinutes / 60);
   const minutes = diffMinutes % 60;
-
   const nextImportText =
     hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
 
   return (
     <div className="space-y-10">
+      {/* HEADER */}
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
@@ -87,6 +79,7 @@ export default async function MapsPage() {
         </a>
       </div>
 
+      {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <KPI title="Total leads" value={total} text="Leads importés" />
         <KPI
@@ -101,7 +94,9 @@ export default async function MapsPage() {
         />
       </div>
 
+      {/* TABLE */}
       <div className="rounded-2xl border border-slate-800 bg-slate-950/90 shadow-md overflow-hidden">
+        {/* TOP BAR */}
         <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
           <div>
             <h2 className="text-slate-100 text-sm font-medium">
@@ -155,6 +150,7 @@ export default async function MapsPage() {
                     key={lead.id}
                     className="border-b border-slate-900 hover:bg-slate-900/70 transition"
                   >
+                    {/* TRAITE */}
                     <td className="py-3 px-4 text-center">
                       <TraiteCheckbox
                         leadId={lead.id}
@@ -162,18 +158,22 @@ export default async function MapsPage() {
                       />
                     </td>
 
+                    {/* NOM */}
                     <td className="py-3 px-4 text-slate-50 whitespace-nowrap overflow-hidden text-ellipsis max-w-[240px]">
                       {lead.title || "—"}
                     </td>
 
+                    {/* ADRESSE */}
                     <td className="py-3 px-4 text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis max-w-[280px]">
                       {lead.address || "—"}
                     </td>
 
-                    <td className="py-3 px-4 whitespace-nowrap max-w-[140px]">
-                      <RevealPhone phone={lead.phoneNumber} />
+                    {/* TÉLÉPHONE */}
+                    <td className="py-3 px-4 text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis max-w-[140px]">
+                      {lead.phoneNumber || "—"}
                     </td>
 
+                    {/* SITE WEB */}
                     <td className="py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
                       {lead.website ? (
                         <a
@@ -188,6 +188,7 @@ export default async function MapsPage() {
                       )}
                     </td>
 
+                    {/* MAPS */}
                     <td className="py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
                       {lead.placeUrl ? (
                         <a
@@ -202,6 +203,7 @@ export default async function MapsPage() {
                       )}
                     </td>
 
+                    {/* DATE */}
                     <td className="py-3 px-4 text-center text-slate-400 whitespace-nowrap">
                       {lead.created_at
                         ? new Date(lead.created_at).toLocaleDateString("fr-FR")
@@ -218,7 +220,16 @@ export default async function MapsPage() {
   );
 }
 
-function KPI({ title, value, text }: { title: string; value: any; text: string }) {
+/* KPI component */
+function KPI({
+  title,
+  value,
+  text,
+}: {
+  title: string;
+  value: any;
+  text: string;
+}) {
   return (
     <div className="rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center">
       <div className="text-[11px] text-slate-500 uppercase tracking-wide">
