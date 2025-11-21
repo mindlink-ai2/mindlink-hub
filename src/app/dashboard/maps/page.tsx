@@ -81,10 +81,10 @@ export default async function MapsPage() {
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
-            Prospects Google Maps
+            Leads Google Maps
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Tous vos prospects importés automatiquement depuis Google Maps.
+            Tous vos leads importés automatiquement depuis Google Maps.
           </p>
         </div>
 
@@ -98,11 +98,11 @@ export default async function MapsPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <KPI title="Total lieux" value={total} text="Lieux importés" />
+        <KPI title="Total leads" value={total} text="Leads importés" />
         <KPI
           title="À traiter"
           value={remainingToTreat}
-          text={`${remainingToTreat} lieux restant à traiter`}
+          text={`${remainingToTreat} leads restant à traiter`}
         />
         <KPI
           title="Prochaine importation"
@@ -117,14 +117,14 @@ export default async function MapsPage() {
         <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
           <div>
             <h2 className="text-slate-100 text-sm font-medium">
-              Liste des lieux Google Maps
+              Liste des leads Google Maps
             </h2>
             <p className="text-[11px] text-slate-500">
-              Tous vos lieux triés du plus récent au plus ancien.
+              Tous vos leads triés du plus récent au plus ancien.
             </p>
           </div>
           <div className="text-[11px] text-slate-400">
-            {safeLeads.length} lieu(x)
+            {safeLeads.length} lead(s)
           </div>
         </div>
 
@@ -159,7 +159,7 @@ export default async function MapsPage() {
               {safeLeads.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-10 text-center text-slate-500">
-                    Aucun lieu pour le moment.
+                    Aucun lead pour le moment.
                   </td>
                 </tr>
               ) : (
@@ -176,7 +176,7 @@ export default async function MapsPage() {
                       />
                     </td>
 
-                    {/* NOM DU LIEU */}
+                    {/* NOM */}
                     <td className="py-3 px-4 text-slate-50">
                       {lead.title || "—"}
                     </td>
