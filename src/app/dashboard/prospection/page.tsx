@@ -2,8 +2,8 @@ export default function ProspectionPage() {
     return (
       <div className="min-h-[75vh] w-full flex flex-col items-center justify-center text-center px-6">
   
-        {/* 🔥 GRAND TITRE PREMIUM */}
-        <h1 className="text-6xl sm:text-7xl md:text-8xl font-extrabold tracking-tight mb-6 leading-tight">
+        {/* 🔥 GRAND TITRE PREMIUM (légèrement réduit) */}
+        <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
           Votre espace <span className="text-blue-500">prospection</span>
         </h1>
   
