@@ -12,7 +12,7 @@ export default async function MapsPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // 1️⃣ Récup client (pour obtenir son client_id)
+  // 1️⃣ Récupération client
   const { data: client } = await supabase
     .from("clients")
     .select("*")
@@ -31,17 +31,19 @@ export default async function MapsPage() {
 
   // 2️⃣ Récupération des leads Google Maps
   const { data: mapsLeads } = await supabase
-    .from("maps_leads")
+    .from("map_leads")
     .select(
       "id, title, address, website, phoneNumber, placeUrl, created_at, traite"
     )
     .eq("client_id", clientId)
-    .order("created_at", { ascending: false });
+    .order("id", { ascending: false });
 
   const safeLeads = mapsLeads ?? [];
 
   // KPIs
   const total = safeLeads.length;
+  const treatedCount = safeLeads.filter((l) => l.traite).length;
+  const remainingToTreat = total - treatedCount;
 
   const thisMonth =
     safeLeads.filter((l) => {
@@ -54,15 +56,12 @@ export default async function MapsPage() {
       );
     }).length ?? 0;
 
-  const treatedCount = safeLeads.filter((l) => l.traite === true).length;
-  const remainingToTreat = total - treatedCount;
-
   const lastLead =
     safeLeads.length > 0 && safeLeads[0].created_at
       ? new Date(safeLeads[0].created_at).toLocaleString("fr-FR")
       : "—";
 
-  // Prochaine importation automatique (8h00)
+  // Prochaine importation automatique
   const now = new Date();
   const nextImport = new Date();
   nextImport.setHours(8, 0, 0, 0);
@@ -72,6 +71,7 @@ export default async function MapsPage() {
   const diffMinutes = Math.floor(diffMs / 1000 / 60);
   const hours = Math.floor(diffMinutes / 60);
   const minutes = diffMinutes % 60;
+
   const nextImportText =
     hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
 
@@ -102,7 +102,7 @@ export default async function MapsPage() {
         <KPI
           title="À traiter"
           value={remainingToTreat}
-          text={`${remainingToTreat} leads restant à traiter`}
+          text={`${remainingToTreat} lead(s) restant à traiter`}
         />
         <KPI
           title="Prochaine importation"
@@ -177,22 +177,22 @@ export default async function MapsPage() {
                     </td>
 
                     {/* NOM */}
-                    <td className="py-3 px-4 text-slate-50">
+                    <td className="py-3 px-4 text-slate-50 whitespace-nowrap overflow-hidden text-ellipsis max-w-[240px]">
                       {lead.title || "—"}
                     </td>
 
                     {/* ADRESSE */}
-                    <td className="py-3 px-4 text-slate-300">
+                    <td className="py-3 px-4 text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis max-w-[280px]">
                       {lead.address || "—"}
                     </td>
 
                     {/* TÉLÉPHONE */}
-                    <td className="py-3 px-4 text-slate-300">
+                    <td className="py-3 px-4 text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
                       {lead.phoneNumber || "—"}
                     </td>
 
                     {/* SITE WEB */}
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
                       {lead.website ? (
                         <a
                           href={lead.website}
@@ -207,7 +207,7 @@ export default async function MapsPage() {
                     </td>
 
                     {/* GOOGLE MAPS */}
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
                       {lead.placeUrl ? (
                         <a
                           href={lead.placeUrl}
@@ -222,7 +222,7 @@ export default async function MapsPage() {
                     </td>
 
                     {/* DATE */}
-                    <td className="py-3 px-4 text-center text-slate-400">
+                    <td className="py-3 px-4 text-center text-slate-400 whitespace-nowrap">
                       {lead.created_at
                         ? new Date(lead.created_at).toLocaleDateString("fr-FR")
                         : "—"}
@@ -239,7 +239,15 @@ export default async function MapsPage() {
 }
 
 /* 🔹 KPI Component */
-function KPI({ title, value, text }: { title: string; value: any; text: string }) {
+function KPI({
+  title,
+  value,
+  text,
+}: {
+  title: string;
+  value: any;
+  text: string;
+}) {
   return (
     <div className="rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center">
       <div className="text-[11px] text-slate-500 uppercase tracking-wide">
