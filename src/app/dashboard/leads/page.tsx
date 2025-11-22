@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import TraiteCheckbox from "./TraiteCheckbox";
+import DeleteLeadButton from "./DeleteLeadButton";
 
 export default async function LeadsPage() {
   const { userId } = await auth();
@@ -29,7 +30,7 @@ export default async function LeadsPage() {
 
   const clientId = client.id;
 
-  // 2️⃣ Récup leads avec location + traite
+  // 2️⃣ Récup leads
   const { data: leads } = await supabase
     .from("leads")
     .select(
@@ -42,52 +43,30 @@ export default async function LeadsPage() {
 
   // KPIs
   const total = safeLeads.length;
-
-  const thisMonth =
-    safeLeads.filter((l) => {
-      const d = l.created_at ? new Date(l.created_at) : null;
-      const now = new Date();
-      return (
-        d &&
-        d.getMonth() === now.getMonth() &&
-        d.getFullYear() === now.getFullYear()
-      );
-    }).length ?? 0;
-
-  // ➕ Ajout : nombre de leads traités
   const treatedCount = safeLeads.filter((l) => l.traite === true).length;
-
-  // ➕ Ajout : leads restants à traiter
   const remainingToTreat = total - treatedCount;
 
-  const lastLead =
-    safeLeads.length > 0 && safeLeads[0].created_at
-      ? new Date(safeLeads[0].created_at).toLocaleString("fr-FR")
-      : "—";
-
   // 🕒 PROCHAINE IMPORTATION – heure française (Europe/Paris)
-const now = new Date(
-  new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
-);
+  const now = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
+  );
 
-const nextImport = new Date(
-  new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
-);
-nextImport.setHours(8, 0, 0, 0);
+  const nextImport = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
+  );
+  nextImport.setHours(8, 0, 0, 0);
 
-// si import passé → demain
-if (now > nextImport) {
-  nextImport.setDate(nextImport.getDate() + 1);
-}
+  if (now > nextImport) {
+    nextImport.setDate(nextImport.getDate() + 1);
+  }
 
-// diff
-const diffMs = nextImport.getTime() - now.getTime();
-const diffMinutes = Math.floor(diffMs / 1000 / 60);
-const hours = Math.floor(diffMinutes / 60);
-const minutes = diffMinutes % 60;
+  const diffMs = nextImport.getTime() - now.getTime();
+  const diffMinutes = Math.floor(diffMs / 1000 / 60);
+  const hours = Math.floor(diffMinutes / 60);
+  const minutes = diffMinutes % 60;
 
-const nextImportText =
-  hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
+  const nextImportText =
+    hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
 
   return (
     <div className="space-y-10">
@@ -103,25 +82,23 @@ const nextImportText =
         </div>
 
         <a
-  href="/dashboard/leads/export"
-  className="px-4 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 transition"
->
-  Exporter CSV
-</a>
+          href="/dashboard/leads/export"
+          className="px-4 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 transition"
+        >
+          Exporter CSV
+        </a>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <KPI title="Total leads" value={total} text="Leads totaux générés" />
 
-        {/* ➕ KPI MODIFIÉ */}
         <KPI
           title="À traiter"
           value={remainingToTreat}
           text={`${remainingToTreat} leads restant à traiter`}
         />
 
-        {/* 🆕 KPI PROCHAINE IMPORTATION */}
         <KPI
           title="Prochaine importation"
           value={nextImportText}
@@ -155,13 +132,18 @@ const nextImportText =
                 <th className="py-3 px-4 border-b border-slate-800 text-left">Localisation</th>
                 <th className="py-3 px-4 border-b border-slate-800 text-left">LinkedIn</th>
                 <th className="py-3 px-4 border-b border-slate-800 text-center">Date</th>
+
+                {/* 🗑️ Supprimer */}
+                <th className="py-3 px-4 border-b border-slate-800 text-center">
+                  Supprimer
+                </th>
               </tr>
             </thead>
 
             <tbody>
               {safeLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-slate-500">
+                  <td colSpan={7} className="py-10 text-center text-slate-500">
                     Aucun lead pour le moment.
                   </td>
                 </tr>
@@ -218,6 +200,11 @@ const nextImportText =
                         {lead.created_at
                           ? new Date(lead.created_at).toLocaleDateString("fr-FR")
                           : "—"}
+                      </td>
+
+                      {/* SUPPRIMER */}
+                      <td className="py-3 px-4 text-center">
+                        <DeleteLeadButton leadId={lead.id} />
                       </td>
                     </tr>
                   );
