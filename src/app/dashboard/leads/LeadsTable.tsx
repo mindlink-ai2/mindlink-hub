@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import DeleteLeadButton from "./DeleteLeadButton";
 
 type Lead = {
   id: number;
@@ -10,16 +11,16 @@ type Lead = {
   Company: string | null;
   LinkedInURL: string | null;
   created_at: string | null;
-  traite: boolean | null; // bool Supabase
+  traite: boolean | null;
 };
 
 export function LeadsTable({ leads }: { leads: Lead[] }) {
   const [rows, setRows] = useState<Lead[]>(leads);
 
+  // 🟦 Toggle traité
   const toggleTraite = async (lead: Lead) => {
     const newValue = !lead.traite;
 
-    // UI optimiste
     setRows((prev) =>
       prev.map((l) => (l.id === lead.id ? { ...l, traite: newValue } : l))
     );
@@ -32,11 +33,16 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
       });
     } catch (e) {
       console.error(e);
-      // si erreur → rollback
+      // rollback
       setRows((prev) =>
         prev.map((l) => (l.id === lead.id ? { ...l, traite: !newValue } : l))
       );
     }
+  };
+
+  // 🗑️ Suppression locale après delete
+  const handleDelete = (id: number) => {
+    setRows((prev) => prev.filter((l) => l.id !== id));
   };
 
   return (
@@ -44,10 +50,10 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
       <div className="min-w-full flex justify-center">
         <table className="w-full max-w-5xl mx-auto text-xs md:text-sm border-separate border-spacing-0">
           <thead>
-            {/* Bandeau titre section */}
+            {/* Titre section */}
             <tr>
               <th
-                colSpan={5}
+                colSpan={6}
                 className="pt-6 pb-3 px-6 text-center align-middle"
               >
                 <span className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
@@ -56,23 +62,31 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
               </th>
             </tr>
 
-            {/* Titres colonnes : EXACTEMENT ton design */}
+            {/* En-têtes */}
             <tr className="bg-slate-900/95 text-slate-100">
-              <th className="w-[40px] py-4 px-4 text-center align-middle text-sm md:text-base font-semibold tracking-[0.12em] uppercase border-t border-b border-slate-800 first:rounded-l-xl">
+              <th className="w-[40px] py-4 px-4 text-center align-middle text-sm md:text-base font-semibold tracking-[0.12em] uppercase border-t border-b border-slate-800">
                 Traité
               </th>
 
-              <th className="w-1/4 py-4 px-4 text-center align-middle text-sm md:text-base font-semibold tracking-[0.12em] uppercase border-t border-b border-slate-800 first:rounded-l-xl last:rounded-r-xl">
+              <th className="w-1/4 py-4 px-4 text-center align-middle text-sm md:text-base font-semibold tracking-[0.12em] uppercase border-t border-b border-slate-800">
                 Nom
               </th>
+
               <th className="w-1/4 py-4 px-4 text-center align-middle text-sm md:text-base font-semibold tracking-[0.12em] uppercase border-t border-b border-l border-slate-800">
                 Entreprise
               </th>
+
               <th className="w-1/4 py-4 px-4 text-center align-middle text-sm md:text-base font-semibold tracking-[0.12em] uppercase border-t border-b border-l border-slate-800">
                 LinkedIn
               </th>
-              <th className="w-1/4 py-4 px-4 text-center align-middle text-sm md:text-base font-semibold tracking-[0.12em] uppercase border-t border-b border-l border-slate-800 last:rounded-r-xl">
+
+              <th className="w-1/4 py-4 px-4 text-center align-middle text-sm md:text-base font-semibold tracking-[0.12em] uppercase border-t border-b border-l border-slate-800">
                 Date
+              </th>
+
+              {/* 🗑️ Nouvelle colonne */}
+              <th className="w-[60px] py-4 px-4 text-center align-middle text-sm md:text-base font-semibold uppercase border-t border-b border-l border-slate-800">
+                —
               </th>
             </tr>
           </thead>
@@ -81,11 +95,10 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="py-10 px-4 text-center text-slate-500 text-sm"
                 >
-                  Aucun lead pour l’instant. Ils apparaîtront ici dès que vos
-                  automatisations commenceront à tourner 🚀
+                  Aucun lead pour l’instant 🚀
                 </td>
               </tr>
             ) : (
@@ -94,7 +107,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
                   lead.created_at &&
                   new Date().getTime() -
                     new Date(lead.created_at).getTime() <
-                    48 * 60 * 60 * 1000; // < 48h
+                    48 * 60 * 60 * 1000;
 
                 const fullName = `${lead.FirstName ?? ""} ${
                   lead.LastName ?? ""
@@ -110,8 +123,8 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
                     key={lead.id}
                     className={`${rowBg} border-b border-slate-900 hover:bg-slate-900/80 transition-colors`}
                   >
-                    {/* ✅ case liée à Supabase */}
-                    <td className="w-[40px] py-3 px-6 align-middle border-r border-slate-900 text-center">
+                    {/* Traité */}
+                    <td className="w-[40px] py-3 px-6 text-center border-r border-slate-900">
                       <input
                         type="checkbox"
                         className="h-4 w-4 rounded border-slate-700 bg-slate-900"
@@ -121,7 +134,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
                     </td>
 
                     {/* Nom */}
-                    <td className="w-1/4 py-3 px-6 align-middle border-r border-slate-900">
+                    <td className="w-1/4 py-3 px-6 text-center border-r border-slate-900">
                       <div className="flex items-center justify-center gap-2">
                         <span className="truncate max-w-[260px] text-center">
                           {fullName || lead.Name || "—"}
@@ -135,14 +148,14 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
                     </td>
 
                     {/* Entreprise */}
-                    <td className="w-1/4 py-3 px-6 align-middle border-r border-slate-900 text-center">
+                    <td className="w-1/4 py-3 px-6 text-center border-r border-slate-900">
                       <span className="truncate max-w-[260px] inline-block">
                         {lead.Company ?? "—"}
                       </span>
                     </td>
 
                     {/* LinkedIn */}
-                    <td className="w-1/4 py-3 px-6 align-middle border-r border-slate-900 text-center">
+                    <td className="w-1/4 py-3 px-6 text-center border-r border-slate-900">
                       {lead.LinkedInURL ? (
                         <a
                           href={lead.LinkedInURL}
@@ -158,7 +171,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
                     </td>
 
                     {/* Date */}
-                    <td className="w-1/4 py-3 px-6 align-middle text-center">
+                    <td className="w-1/4 py-3 px-6 text-center border-r border-slate-900">
                       {lead.created_at ? (
                         <span
                           className="text-xs text-slate-100"
@@ -173,6 +186,14 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
                       ) : (
                         <span className="text-slate-500">—</span>
                       )}
+                    </td>
+
+                    {/* 🗑️ Delete */}
+                    <td className="w-[60px] py-3 px-6 text-center">
+                      <DeleteLeadButton
+                        leadId={lead.id}
+                        onDeleted={() => handleDelete(lead.id)}
+                      />
                     </td>
                   </tr>
                 );
