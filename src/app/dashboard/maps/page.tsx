@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import TraiteCheckbox from "./TraiteCheckbox";
+import DeleteLeadButton from "./DeleteLeadButton";
 
 export default async function MapsPage() {
   const { userId } = await auth();
@@ -46,28 +47,24 @@ export default async function MapsPage() {
   const remainingToTreat = total - treatedCount;
 
   // 🕒 PROCHAINE IMPORTATION – heure française (Europe/Paris)
-const now = new Date(
-  new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
-);
+  const now = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
+  );
 
-const nextImport = new Date(
-  new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
-);
-nextImport.setHours(8, 0, 0, 0);
+  const nextImport = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
+  );
+  nextImport.setHours(8, 0, 0, 0);
 
-// si import passé → demain
-if (now > nextImport) {
-  nextImport.setDate(nextImport.getDate() + 1);
-}
+  if (now > nextImport) nextImport.setDate(nextImport.getDate() + 1);
 
-// diff
-const diffMs = nextImport.getTime() - now.getTime();
-const diffMinutes = Math.floor(diffMs / 1000 / 60);
-const hours = Math.floor(diffMinutes / 60);
-const minutes = diffMinutes % 60;
+  const diffMs = nextImport.getTime() - now.getTime();
+  const diffMinutes = Math.floor(diffMs / 1000 / 60);
+  const hours = Math.floor(diffMinutes / 60);
+  const minutes = diffMinutes % 60;
 
-const nextImportText =
-  hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
+  const nextImportText =
+    hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
 
   return (
     <div className="space-y-10">
@@ -145,13 +142,18 @@ const nextImportText =
                 <th className="py-3 px-4 border-b border-slate-800 text-center">
                   Date
                 </th>
+
+                {/* 🗑️ SUPPRIMER */}
+                <th className="py-3 px-4 border-b border-slate-800 text-center">
+                  Supprimer
+                </th>
               </tr>
             </thead>
 
             <tbody>
               {safeLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-slate-500">
+                  <td colSpan={8} className="py-10 text-center text-slate-500">
                     Aucun lead pour le moment.
                   </td>
                 </tr>
@@ -170,22 +172,22 @@ const nextImportText =
                     </td>
 
                     {/* NOM */}
-                    <td className="py-3 px-4 text-slate-50 whitespace-nowrap overflow-hidden text-ellipsis max-w-[240px]">
+                    <td className="py-3 px-4 text-slate-50 max-w-[220px] truncate">
                       {lead.title || "—"}
                     </td>
 
                     {/* ADRESSE */}
-                    <td className="py-3 px-4 text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis max-w-[280px]">
+                    <td className="py-3 px-4 text-slate-300 max-w-[260px] truncate">
                       {lead.address || "—"}
                     </td>
 
                     {/* TÉLÉPHONE */}
-                    <td className="py-3 px-4 text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis max-w-[140px]">
+                    <td className="py-3 px-4 text-slate-300 max-w-[140px] truncate">
                       {lead.phoneNumber || "—"}
                     </td>
 
                     {/* SITE WEB */}
-                    <td className="py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
+                    <td className="py-3 px-4">
                       {lead.website ? (
                         <a
                           href={lead.website}
@@ -199,8 +201,8 @@ const nextImportText =
                       )}
                     </td>
 
-                    {/* MAPS */}
-                    <td className="py-3 px-4 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
+                    {/* GOOGLE MAPS */}
+                    <td className="py-3 px-4">
                       {lead.placeUrl ? (
                         <a
                           href={lead.placeUrl}
@@ -215,10 +217,15 @@ const nextImportText =
                     </td>
 
                     {/* DATE */}
-                    <td className="py-3 px-4 text-center text-slate-400 whitespace-nowrap">
+                    <td className="py-3 px-4 text-center text-slate-400">
                       {lead.created_at
                         ? new Date(lead.created_at).toLocaleDateString("fr-FR")
                         : "—"}
+                    </td>
+
+                    {/* 🗑️ SUPPRIMER */}
+                    <td className="py-3 px-4 text-center">
+                      <DeleteLeadButton leadId={lead.id} />
                     </td>
                   </tr>
                 ))
