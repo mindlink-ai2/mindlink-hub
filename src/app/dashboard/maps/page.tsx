@@ -30,11 +30,11 @@ export default async function MapsPage() {
 
   const clientId = client.id;
 
-  // 2️⃣ Récupération leads Maps
+  // 2️⃣ Récupération leads Maps (adresse supprimée, email + category ajoutées)
   const { data: mapsLeads } = await supabase
     .from("map_leads")
     .select(
-      "id, title, address, website, phoneNumber, placeUrl, created_at, traite"
+      "id, title, website, phoneNumber, placeUrl, created_at, traite, email, category"
     )
     .eq("client_id", clientId)
     .order("id", { ascending: false });
@@ -124,36 +124,28 @@ export default async function MapsPage() {
             <thead>
               <tr className="bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide">
                 <th className="py-3 px-4 border-b border-slate-800">Traité</th>
-                <th className="py-3 px-4 border-b border-slate-800 text-left">
-                  Nom
-                </th>
-                <th className="py-3 px-4 border-b border-slate-800 text-left">
-                  Adresse
-                </th>
-                <th className="py-3 px-4 border-b border-slate-800 text-left">
-                  Téléphone
-                </th>
-                <th className="py-3 px-4 border-b border-slate-800 text-left">
-                  Site web
-                </th>
-                <th className="py-3 px-4 border-b border-slate-800 text-left">
-                  Google Maps
-                </th>
-                <th className="py-3 px-4 border-b border-slate-800 text-center">
-                  Date
-                </th>
+                <th className="py-3 px-4 border-b border-slate-800 text-left">Nom</th>
+
+                {/* 🆕 EMAIL */}
+                <th className="py-3 px-4 border-b border-slate-800 text-left">Email</th>
+
+                {/* 🆕 CATEGORY */}
+                <th className="py-3 px-4 border-b border-slate-800 text-left">Catégorie</th>
+
+                <th className="py-3 px-4 border-b border-slate-800 text-left">Téléphone</th>
+                <th className="py-3 px-4 border-b border-slate-800 text-left">Site web</th>
+                <th className="py-3 px-4 border-b border-slate-800 text-left">Google Maps</th>
+                <th className="py-3 px-4 border-b border-slate-800 text-center">Date</th>
 
                 {/* 🗑️ SUPPRIMER */}
-                <th className="py-3 px-4 border-b border-slate-800 text-center">
-                  Supprimer
-                </th>
+                <th className="py-3 px-4 border-b border-slate-800 text-center">Supprimer</th>
               </tr>
             </thead>
 
             <tbody>
               {safeLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-slate-500">
+                  <td colSpan={9} className="py-10 text-center text-slate-500">
                     Aucun lead pour le moment.
                   </td>
                 </tr>
@@ -176,9 +168,14 @@ export default async function MapsPage() {
                       {lead.title || "—"}
                     </td>
 
-                    {/* ADRESSE */}
-                    <td className="py-3 px-4 text-slate-300 max-w-[260px] truncate">
-                      {lead.address || "—"}
+                    {/* 🆕 EMAIL */}
+                    <td className="py-3 px-4 text-slate-300 max-w-[220px] truncate">
+                      {lead.email || "—"}
+                    </td>
+
+                    {/* 🆕 CATEGORY */}
+                    <td className="py-3 px-4 text-slate-300 max-w-[160px] truncate">
+                      {lead.category || "—"}
                     </td>
 
                     {/* TÉLÉPHONE */}
@@ -223,7 +220,7 @@ export default async function MapsPage() {
                         : "—"}
                     </td>
 
-                    {/* 🗑️ SUPPRIMER */}
+                    {/* DELETE */}
                     <td className="py-3 px-4 text-center">
                       <DeleteLeadButton leadId={lead.id} />
                     </td>
@@ -239,15 +236,7 @@ export default async function MapsPage() {
 }
 
 /* KPI component */
-function KPI({
-  title,
-  value,
-  text,
-}: {
-  title: string;
-  value: any;
-  text: string;
-}) {
+function KPI({ title, value, text }: { title: string; value: any; text: string }) {
   return (
     <div className="rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center">
       <div className="text-[11px] text-slate-500 uppercase tracking-wide">
