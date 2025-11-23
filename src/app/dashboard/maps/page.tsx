@@ -30,11 +30,11 @@ export default async function MapsPage() {
 
   const clientId = client.id;
 
-  // 2️⃣ Récupération leads Maps (adresse supprimée, email + category ajoutées)
+  // 2️⃣ Récupération leads Maps (category retiré)
   const { data: mapsLeads } = await supabase
     .from("map_leads")
     .select(
-      "id, title, website, phoneNumber, placeUrl, created_at, traite, email, category"
+      "id, title, website, phoneNumber, placeUrl, created_at, traite, email"
     )
     .eq("client_id", clientId)
     .order("id", { ascending: false });
@@ -126,11 +126,8 @@ export default async function MapsPage() {
                 <th className="py-3 px-4 border-b border-slate-800">Traité</th>
                 <th className="py-3 px-4 border-b border-slate-800 text-left">Nom</th>
 
-                {/* 🆕 EMAIL */}
+                {/* EMAIL */}
                 <th className="py-3 px-4 border-b border-slate-800 text-left">Email</th>
-
-                {/* 🆕 CATEGORY */}
-                <th className="py-3 px-4 border-b border-slate-800 text-left">Catégorie</th>
 
                 <th className="py-3 px-4 border-b border-slate-800 text-left">Téléphone</th>
                 <th className="py-3 px-4 border-b border-slate-800 text-left">Site web</th>
@@ -145,7 +142,7 @@ export default async function MapsPage() {
             <tbody>
               {safeLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-slate-500">
+                  <td colSpan={8} className="py-10 text-center text-slate-500">
                     Aucun lead pour le moment.
                   </td>
                 </tr>
@@ -168,14 +165,9 @@ export default async function MapsPage() {
                       {lead.title || "—"}
                     </td>
 
-                    {/* 🆕 EMAIL */}
+                    {/* EMAIL */}
                     <td className="py-3 px-4 text-slate-300 max-w-[220px] truncate">
                       {lead.email || "—"}
-                    </td>
-
-                    {/* 🆕 CATEGORY */}
-                    <td className="py-3 px-4 text-slate-300 max-w-[160px] truncate">
-                      {lead.category || "—"}
                     </td>
 
                     {/* TÉLÉPHONE */}
