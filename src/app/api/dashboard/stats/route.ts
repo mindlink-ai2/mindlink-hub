@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { auth } from "@clerk/nextjs/server";
+import { createClient } from "@supabase/supabase-js";
 
 export async function GET() {
   const { userId } = await auth();
@@ -14,10 +14,10 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // 1️⃣ Récup client
+  // 1️⃣ Récup client_id
   const { data: client } = await supabase
     .from("clients")
-    .select("*")
+    .select("id")
     .eq("clerk_user_id", userId)
     .single();
 
@@ -27,71 +27,36 @@ export async function GET() {
 
   const clientId = client.id;
 
-  // Dates
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // 2️⃣ Dates
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
 
   const weekAgo = new Date();
-  weekAgo.setDate(today.getDate() - 7);
+  weekAgo.setDate(todayStart.getDate() - 7);
 
-  // Leads Today (LinkedIn + Map)
-  const { count: leadsTodayLinkedin } = await supabase
-    .from("leads")
-    .select("*", { count: "exact", head: true })
-    .eq("client_id", clientId)
-    .gte("created_at", today.toISOString());
+  // 3️⃣ Leads + Maps leads
+  const [leads, maps] = await Promise.all([
+    supabase.from("leads").select("created_at, traite").eq("client_id", clientId),
+    supabase.from("map_leads").select("created_at, traite").eq("client_id", clientId),
+  ]);
 
-  const { count: leadsTodayMaps } = await supabase
-    .from("map_leads")
-    .select("*", { count: "exact", head: true })
-    .eq("client_id", clientId)
-    .gte("created_at", today.toISOString());
+  const all = [...(leads.data || []), ...(maps.data || [])];
 
-  // Leads Week
-  const { count: leadsWeekLinkedin } = await supabase
-    .from("leads")
-    .select("*", { count: "exact", head: true })
-    .eq("client_id", clientId)
-    .gte("created_at", weekAgo.toISOString());
+  const leadsToday = all.filter((l) => new Date(l.created_at) >= todayStart).length;
 
-  const { count: leadsWeekMaps } = await supabase
-    .from("map_leads")
-    .select("*", { count: "exact", head: true })
-    .eq("client_id", clientId)
-    .gte("created_at", weekAgo.toISOString());
+  const leadsWeek = all.filter((l) => new Date(l.created_at) >= weekAgo).length;
 
-  // Traitement Rate
-  const { count: totalLeads } = await supabase
-    .from("leads")
-    .select("*", { count: "exact", head: true })
-    .eq("client_id", clientId);
+  const total = all.length;
+  const treated = all.filter((l) => l.traite === true).length;
 
-  const { count: treatedLeads } = await supabase
-    .from("leads")
-    .select("*", { count: "exact", head: true })
-    .eq("client_id", clientId)
-    .eq("traite", true);
-
-  const traitementRate =
-    totalLeads && totalLeads > 0
-      ? Math.round((treatedLeads! / totalLeads!) * 100)
-      : 0;
-
-  // Score Mindlink
-  const mindlinkScore = Math.min(
-    100,
-    Math.round(
-      traitementRate * 0.6 +
-        ((leadsWeekLinkedin! + leadsWeekMaps!) > 0 ? 40 : 10)
-    )
-  );
+  const traitementRate = total === 0 ? 0 : Math.round((treated / total) * 100);
 
   return NextResponse.json({
-    leadsToday: (leadsTodayLinkedin || 0) + (leadsTodayMaps || 0),
-    leadsWeek: (leadsWeekLinkedin || 0) + (leadsWeekMaps || 0),
+    leadsToday,
+    leadsWeek,
     traitementRate,
     emailsSortedToday: 0,
     relancesCount: 0,
-    mindlinkScore,
+    mindlinkScore: Math.round((traitementRate + leadsWeek) / 2),
   });
 }
