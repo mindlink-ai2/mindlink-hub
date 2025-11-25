@@ -113,8 +113,7 @@ export default function DashboardPage() {
       {/* ⭐️ MINDLINK MAP */}
       <MindlinkMap stats={stats} />
 
-      {/* ❌ Leads retiré comme demandé */}
-      {/* Rien ici */}
+      {/* ❌ Leads retiré */}
     </div>
   );
 }
@@ -123,9 +122,16 @@ export default function DashboardPage() {
 /* Composants utilitaires    */
 /* ------------------------- */
 
+// ⭐️ NOUVELLE VERSION KPI AVEC HOVER PREMIUM
 function KPI({ label, value, color }: { label: string; value: any; color: string }) {
   return (
-    <div className="rounded-2xl bg-[#0B0E13] border border-slate-800 p-6 shadow-xl shadow-black/40 relative overflow-hidden">
+    <div
+      className={`
+        rounded-2xl bg-[#0B0E13] border border-slate-800 p-6 shadow-xl shadow-black/40 
+        relative overflow-hidden transition-all duration-300 ease-out
+        hover:-translate-y-1 hover:scale-[1.03] hover:shadow-indigo-500/30
+      `}
+    >
       <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${color}`}></div>
 
       <div className="text-slate-400 text-sm relative z-10">{label}</div>
