@@ -99,7 +99,10 @@ export default function DashboardPage() {
           {tips.map((tip, i) => (
             <div
               key={i}
-              className="p-4 rounded-xl bg-gradient-to-br from-blue-500/10 via-slate-800/30 to-indigo-500/10 border border-indigo-500/20 text-slate-200 shadow-lg shadow-indigo-500/10"
+              className="p-4 rounded-xl bg-gradient-to-br from-blue-500/10 via-slate-800/30 to-indigo-500/10 
+                         border border-indigo-500/20 text-slate-200 shadow-lg shadow-indigo-500/10 
+                         transition-all duration-300 ease-out 
+                         hover:shadow-indigo-500/40 hover:-translate-y-1 hover:scale-[1.02]"
             >
               {tip}
             </div>
@@ -110,10 +113,8 @@ export default function DashboardPage() {
       {/* ⭐️ MINDLINK MAP */}
       <MindlinkMap stats={stats} />
 
-      {/* Leads */}
-      <Section title="Vos leads" height="400px">
-        Tableau interactif
-      </Section>
+      {/* ❌ Leads retiré comme demandé */}
+      {/* Rien ici */}
     </div>
   );
 }
@@ -122,27 +123,13 @@ export default function DashboardPage() {
 /* Composants utilitaires    */
 /* ------------------------- */
 
-function KPI({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: any;
-  color: string;
-}) {
+function KPI({ label, value, color }: { label: string; value: any; color: string }) {
   return (
-    <div
-      className={`rounded-2xl bg-[#0B0E13] border border-slate-800 p-6 shadow-xl shadow-black/40 relative overflow-hidden`}
-    >
-      <div
-        className={`absolute inset-0 opacity-20 bg-gradient-to-br ${color}`}
-      ></div>
+    <div className="rounded-2xl bg-[#0B0E13] border border-slate-800 p-6 shadow-xl shadow-black/40 relative overflow-hidden">
+      <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${color}`}></div>
 
       <div className="text-slate-400 text-sm relative z-10">{label}</div>
-      <div className="text-4xl font-bold mt-2 text-white relative z-10">
-        {value}
-      </div>
+      <div className="text-4xl font-bold mt-2 text-white relative z-10">{value}</div>
     </div>
   );
 }
