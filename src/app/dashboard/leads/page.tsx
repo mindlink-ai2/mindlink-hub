@@ -1,50 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import TraiteCheckbox from "./TraiteCheckbox";
 import DeleteLeadButton from "./DeleteLeadButton";
 
 export default function LeadsPage() {
   const [safeLeads, setSafeLeads] = useState<any[]>([]);
   const [openLead, setOpenLead] = useState<any>(null);
-
   const [clientLoaded, setClientLoaded] = useState(false);
 
-  // Chargement côté client
+  // Chargement côté client SANS auth() direct
   useEffect(() => {
     (async () => {
-      const { userId } = await auth();
-      if (!userId) redirect("/sign-in");
+      const res = await fetch("/api/get-leads");
+      const data = await res.json();
 
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
-
-      // client
-      const { data: client } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("clerk_user_id", userId)
-        .single();
-
-      if (!client) return;
-
-      const clientId = client.id;
-
-      // leads
-      const { data: leads } = await supabase
-        .from("leads")
-        .select(
-          "id, Name, FirstName, LastName, Company, LinkedInURL, location, created_at, traite"
-        )
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false });
-
-      setSafeLeads(leads ?? []);
+      setSafeLeads(data.leads ?? []);
       setClientLoaded(true);
     })();
   }, []);
