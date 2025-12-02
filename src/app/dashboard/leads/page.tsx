@@ -20,7 +20,7 @@ export default function LeadsPage() {
     })();
   }, []);
 
-  // Sauvegarde automatique du message interne
+  // Sauvegarde automatique du message interne + mise à jour de safeLeads
   useEffect(() => {
     if (!openLead) return;
 
@@ -33,7 +33,16 @@ export default function LeadsPage() {
           message: openLead.internal_message ?? "",
         }),
       });
-    }, 500);
+
+      // 🔥 Mise à jour immédiate dans la liste principale
+      setSafeLeads((prev) =>
+        prev.map((l) =>
+          l.id === openLead.id
+            ? { ...l, internal_message: openLead.internal_message }
+            : l
+        )
+      );
+    }, 300);
 
     return () => clearTimeout(delay);
   }, [openLead?.internal_message]);
@@ -275,9 +284,21 @@ export default function LeadsPage() {
           <div className="mt-6">
             <textarea
               value={openLead.internal_message ?? ""}
-              onChange={(e) =>
-                setOpenLead({ ...openLead, internal_message: e.target.value })
-              }
+              onChange={(e) => {
+                const newMessage = e.target.value;
+
+                // MAJ immédiate sidebar
+                setOpenLead({ ...openLead, internal_message: newMessage });
+
+                // MAJ immédiate liste principale
+                setSafeLeads((prev) =>
+                  prev.map((l) =>
+                    l.id === openLead.id
+                      ? { ...l, internal_message: newMessage }
+                      : l
+                  )
+                );
+              }}
               placeholder="Message interne…"
               className="
                 w-full h-32 p-3 rounded-lg
