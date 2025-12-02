@@ -14,7 +14,13 @@ type Lead = {
   traite: boolean | null;
 };
 
-export function LeadsTable({ leads }: { leads: Lead[] }) {
+export function LeadsTable({
+  leads,
+  onOpen, // 🔵 AJOUT : callback pour ouvrir la sidebar
+}: {
+  leads: Lead[];
+  onOpen?: (lead: Lead) => void; // 🔵 AJOUT
+}) {
   const [rows, setRows] = useState<Lead[]>(leads);
 
   // 🟦 Toggle traité
@@ -52,10 +58,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
           <thead>
             {/* Titre section */}
             <tr>
-              <th
-                colSpan={6}
-                className="pt-6 pb-3 px-6 text-center align-middle"
-              >
+              <th colSpan={6} className="pt-6 pb-3 px-6 text-center align-middle">
                 <span className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
                   DÉTAILS DES LEADS
                 </span>
@@ -94,10 +97,7 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td
-                  colSpan={6}
-                  className="py-10 px-4 text-center text-slate-500 text-sm"
-                >
+                <td colSpan={6} className="py-10 px-4 text-center text-slate-500 text-sm">
                   Aucun lead pour l’instant 🚀
                 </td>
               </tr>
@@ -109,19 +109,14 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
                     new Date(lead.created_at).getTime() <
                     48 * 60 * 60 * 1000;
 
-                const fullName = `${lead.FirstName ?? ""} ${
-                  lead.LastName ?? ""
-                }`.trim();
+                const fullName = `${lead.FirstName ?? ""} ${lead.LastName ?? ""}`.trim();
 
-                const rowBg =
-                  index % 2 === 0
-                    ? "bg-slate-950/80"
-                    : "bg-slate-950/40";
+                const rowBg = index % 2 === 0 ? "bg-slate-950/80" : "bg-slate-950/40";
 
                 return (
                   <tr
                     key={lead.id}
-                    className={`${rowBg} border-b border-slate-900 hover:bg-slate-900/80 transition-colors`}
+                    className={`${rowBg} group border-b border-slate-900 hover:bg-slate-900/80 transition-colors`}
                   >
                     {/* Traité */}
                     <td className="w-[40px] py-3 px-6 text-center border-r border-slate-900">
@@ -133,17 +128,38 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
                       />
                     </td>
 
-                    {/* Nom */}
-                    <td className="w-1/4 py-3 px-6 text-center border-r border-slate-900">
-                      <div className="flex items-center justify-center gap-2">
+                    {/* NOM + 🔵 BOUTON OUVRIR */}
+                    <td className="w-1/4 py-3 px-6 text-center border-r border-slate-900 relative">
+                      <div className="flex items-center justify-center gap-2 relative">
+
+                        {/* Nom */}
                         <span className="truncate max-w-[260px] text-center">
                           {fullName || lead.Name || "—"}
                         </span>
+
+                        {/* Nouveau */}
                         {isNew && (
                           <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                             Nouveau
                           </span>
                         )}
+
+                        {/* 🔵 AJOUT : bouton Ouvrir */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpen?.(lead);
+                          }}
+                          className="
+                            absolute right-0 top-1/2 -translate-y-1/2
+                            opacity-0 group-hover:opacity-100
+                            transition-all duration-200
+                            bg-indigo-600 hover:bg-indigo-500 
+                            text-white text-[10px] px-2 py-1 rounded-md
+                          "
+                        >
+                          Ouvrir
+                        </button>
                       </div>
                     </td>
 
@@ -175,20 +191,16 @@ export function LeadsTable({ leads }: { leads: Lead[] }) {
                       {lead.created_at ? (
                         <span
                           className="text-xs text-slate-100"
-                          title={new Date(
-                            lead.created_at
-                          ).toLocaleString("fr-FR")}
+                          title={new Date(lead.created_at).toLocaleString("fr-FR")}
                         >
-                          {new Date(
-                            lead.created_at
-                          ).toLocaleDateString("fr-FR")}
+                          {new Date(lead.created_at).toLocaleDateString("fr-FR")}
                         </span>
                       ) : (
                         <span className="text-slate-500">—</span>
                       )}
                     </td>
 
-                    {/* 🗑️ Delete */}
+                    {/* Delete */}
                     <td className="w-[60px] py-3 px-6 text-center">
                       <DeleteLeadButton
                         leadId={lead.id}
