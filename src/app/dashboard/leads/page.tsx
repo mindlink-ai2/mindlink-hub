@@ -9,7 +9,7 @@ export default function LeadsPage() {
   const [openLead, setOpenLead] = useState<any>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
-  // Chargement côté client SANS auth() direct
+  // Chargement côté client
   useEffect(() => {
     (async () => {
       const res = await fetch("/api/get-leads");
@@ -19,6 +19,24 @@ export default function LeadsPage() {
       setClientLoaded(true);
     })();
   }, []);
+
+  // Sauvegarde automatique du message interne
+  useEffect(() => {
+    if (!openLead) return;
+
+    const delay = setTimeout(async () => {
+      await fetch("/api/update-internal-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: openLead.id,
+          message: openLead.internal_message ?? "",
+        }),
+      });
+    }, 500);
+
+    return () => clearTimeout(delay);
+  }, [openLead?.internal_message]);
 
   if (!clientLoaded) {
     return (
@@ -256,6 +274,10 @@ export default function LeadsPage() {
           {/* Message interne */}
           <div className="mt-6">
             <textarea
+              value={openLead.internal_message ?? ""}
+              onChange={(e) =>
+                setOpenLead({ ...openLead, internal_message: e.target.value })
+              }
               placeholder="Message interne…"
               className="
                 w-full h-32 p-3 rounded-lg
