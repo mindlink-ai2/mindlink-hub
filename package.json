@@ -11,9 +11,9 @@
   "dependencies": {
     "@clerk/nextjs": "^6.35.1",
     "@supabase/supabase-js": "^2.81.1",
-    "next": "16.0.3",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
+    "next": "^16.0.7",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
     "recharts": "^3.5.0"
   },
   "devDependencies": {
@@ -23,7 +23,7 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.0.3",
+    "eslint-config-next": "^16.0.7",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
