@@ -11,7 +11,6 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Récup client
   const { data: client } = await supabase
     .from("clients")
     .select("id")
@@ -20,7 +19,6 @@ export async function GET() {
 
   if (!client) return NextResponse.json({ leads: [] });
 
-  // Récup leads Google Maps
   const { data: leads } = await supabase
     .from("map_leads")
     .select(`
