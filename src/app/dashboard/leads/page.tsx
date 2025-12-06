@@ -46,6 +46,45 @@ export default function LeadsPage() {
     return () => clearTimeout(delay);
   }, [openLead?.internal_message]);
 
+  // 🔵 AJOUT — Fonction pour marquer "Message envoyé"
+  const handleMessageSent = async () => {
+    if (!openLead) return;
+
+    const res = await fetch('/api/leads/message-sent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId: openLead.id }),
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+      alert("Erreur lors de l'envoi.");
+      return;
+    }
+
+    // Mise à jour du lead dans le state
+    setOpenLead((prev: any) => ({
+      ...prev,
+      message_sent: true,
+      message_sent_at: data.lead?.message_sent_at,
+      next_followup_at: data.lead?.next_followup_at,
+    }));
+
+    setSafeLeads((prev) =>
+      prev.map((l) =>
+        l.id === openLead.id
+          ? {
+              ...l,
+              message_sent: true,
+              message_sent_at: data.lead?.message_sent_at,
+              next_followup_at: data.lead?.next_followup_at,
+            }
+          : l
+      )
+    );
+  };
+
   if (!clientLoaded) {
     return (
       <div className='text-slate-400 text-sm'>Chargement des leads...</div>
@@ -178,7 +217,16 @@ export default function LeadsPage() {
 
                         {/* NOM */}
                         <td className='py-3 px-4 text-slate-50 relative pr-14'>
-                          {fullName}
+                          
+                          <div className="flex items-center gap-2">
+                            
+                            {/* 🔵 AJOUT : pastille verte */}
+                            {lead.message_sent && (
+                              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-sm"></span>
+                            )}
+
+                            <span>{fullName}</span>
+                          </div>
 
                           <button
                             onClick={() => setOpenLead(lead)}
@@ -198,7 +246,7 @@ export default function LeadsPage() {
                           {lead.location || '—'}
                         </td>
 
-                        {/* LINKEDIN — FIX: “Voir profil” */}
+                        {/* LINKEDIN */}
                         <td className='py-3 px-4'>
                           {lead.LinkedInURL ? (
                             <a
@@ -339,6 +387,32 @@ export default function LeadsPage() {
               '
             ></textarea>
           </div>
+
+          {/* 🔵 AJOUT — BOUTON MESSAGE ENVOYÉ */}
+          <div className="mt-4">
+            <button
+              onClick={handleMessageSent}
+              disabled={openLead.message_sent}
+              className={`
+                w-full px-4 py-3 rounded-xl text-sm font-medium transition
+                ${openLead.message_sent
+                  ? 'bg-emerald-600 text-white cursor-default'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white'}
+              `}
+            >
+              {openLead.message_sent ? 'Message envoyé ✓' : 'Marquer comme envoyé'}
+            </button>
+          </div>
+
+          {/* 🔵 AJOUT — AFFICHAGE DATE SUIVANTE */}
+          {openLead.next_followup_at && (
+            <p className="text-xs text-slate-400 mt-2">
+              Prochaine relance :{' '}
+              <span className="text-slate-200 font-medium">
+                {new Date(openLead.next_followup_at).toLocaleDateString('fr-FR')}
+              </span>
+            </p>
+          )}
         </div>
       )}
     </>

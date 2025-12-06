@@ -12,6 +12,11 @@ type Lead = {
   LinkedInURL: string | null;
   created_at: string | null;
   traite: boolean | null;
+
+  // 🔥 AJOUT EXCLUSIF : nouveaux champs pour la relance
+  message_sent: boolean | null;
+  message_sent_at: string | null;
+  next_followup_at: string | null;
 };
 
 export function LeadsTable({
