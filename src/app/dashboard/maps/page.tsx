@@ -37,7 +37,6 @@ export default function MapsPage() {
         }),
       });
 
-      // Mise à jour instantanée dans le tableau
       setSafeLeads((prev) =>
         prev.map((l) =>
           l.id === openLead.id
@@ -49,6 +48,48 @@ export default function MapsPage() {
 
     return () => clearTimeout(delay);
   }, [openLead?.internal_message]);
+
+
+  /* --------------------------------------------
+      🔵 AJOUT — MARQUER MESSAGE ENVOYÉ
+  -------------------------------------------- */
+  const handleMessageSent = async () => {
+    if (!openLead) return;
+
+    const res = await fetch("/api/map-leads/message-sent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId: openLead.id }),
+    });
+
+    const data = await res.json();
+    if (data.error) {
+      alert("Erreur lors de l'enregistrement.");
+      return;
+    }
+
+    // Mise à jour sidebar
+    setOpenLead((prev: any) => ({
+      ...prev,
+      message_sent: true,
+      message_sent_at: data.lead?.message_sent_at,
+      next_followup_at: data.lead?.next_followup_at,
+    }));
+
+    // Mise à jour tableau
+    setSafeLeads((prev) =>
+      prev.map((l) =>
+        l.id === openLead.id
+          ? {
+              ...l,
+              message_sent: true,
+              message_sent_at: data.lead?.message_sent_at,
+              next_followup_at: data.lead?.next_followup_at,
+            }
+          : l
+      )
+    );
+  };
 
   if (!loaded) {
     return <div className="text-slate-400 text-sm">Chargement des leads…</div>;
@@ -106,6 +147,7 @@ export default function MapsPage() {
 
         {/* TABLE */}
         <div className="rounded-2xl border border-slate-800 bg-slate-950/90 shadow-xl overflow-hidden">
+
           {/* TOP BAR */}
           <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
             <div>
@@ -151,12 +193,25 @@ export default function MapsPage() {
                         <TraiteCheckbox leadId={lead.id} defaultChecked={Boolean(lead.traite)} />
                       </td>
 
-                      {/* NOM + bouton voir */}
-                      <td className="py-3 px-4 text-slate-50 relative pr-14">
+                      {/* NOM + pastille + bouton voir */}
+                      <td className="py-3 px-4 text-slate-50 relative pr-14 flex items-center gap-2">
                         {lead.title || "—"}
 
+                        {/* pastille verte */}
+                        {lead.message_sent && (
+                          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
+                        )}
+
+                        {/* 🔵 FIX ICI — ON FORCE LES CHAMPS */}
                         <button
-                          onClick={() => setOpenLead(lead)}
+                          onClick={() =>
+                            setOpenLead({
+                              ...lead,
+                              message_sent: lead.message_sent ?? false,
+                              message_sent_at: lead.message_sent_at ?? null,
+                              next_followup_at: lead.next_followup_at ?? null,
+                            })
+                          }
                           className="
                             opacity-0 group-hover:opacity-100
                             absolute right-3 top-1/2 -translate-y-1/2
@@ -261,6 +316,7 @@ export default function MapsPage() {
             <p><strong>Créé le :</strong> {openLead.created_at?.slice(0, 10)}</p>
           </div>
 
+          {/* Message interne */}
           <div className="mt-6">
             <label className="text-xs text-slate-400 mb-2 block">Message interne</label>
 
@@ -286,6 +342,34 @@ export default function MapsPage() {
               "
             ></textarea>
           </div>
+
+          {/* 🔵 AJOUT — bouton message envoyé */}
+          <div className="mt-5">
+            <button
+              onClick={handleMessageSent}
+              disabled={openLead.message_sent}
+              className={`
+                w-full px-4 py-3 rounded-xl text-sm font-medium transition
+                ${
+                  openLead.message_sent
+                    ? "bg-emerald-600 cursor-default text-white"
+                    : "bg-indigo-600 hover:bg-indigo-500 text-white"
+                }
+              `}
+            >
+              {openLead.message_sent ? "Message envoyé ✓" : "Marquer comme envoyé"}
+            </button>
+          </div>
+
+          {/* 🔵 AJOUT — prochaine relance */}
+          {openLead.next_followup_at && (
+            <p className="text-xs text-slate-400 mt-2">
+              Prochaine relance :{" "}
+              <span className="text-slate-200 font-medium">
+                {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
+              </span>
+            </p>
+          )}
         </div>
       )}
     </>
