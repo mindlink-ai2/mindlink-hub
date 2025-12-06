@@ -24,8 +24,22 @@ export async function GET() {
   const { data: leads } = await supabase
     .from("leads")
     .select(
-      "id, Name, FirstName, LastName, Company, LinkedInURL, location, created_at, traite, internal_message"
-    ) // 🔥 ajouté internal_message
+      `
+      id,
+      Name,
+      FirstName,
+      LastName,
+      Company,
+      LinkedInURL,
+      location,
+      created_at,
+      traite,
+      internal_message,
+      message_sent,
+      message_sent_at,
+      next_followup_at
+      `
+    )
     .eq("client_id", clientId)
     .order("created_at", { ascending: false });
 
