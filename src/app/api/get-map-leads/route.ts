@@ -20,12 +20,23 @@ export async function GET() {
 
   if (!client) return NextResponse.json({ leads: [] });
 
-  // Récup leads Google Maps, avec internal_message
+  // Récup leads Google Maps
   const { data: leads } = await supabase
     .from("map_leads")
-    .select(
-      "id, title, email, phoneNumber, website, placeUrl, created_at, traite, internal_message"
-    )
+    .select(`
+      id,
+      title,
+      email,
+      phoneNumber,
+      website,
+      placeUrl,
+      created_at,
+      traite,
+      internal_message,
+      message_sent,
+      message_sent_at,
+      next_followup_at
+    `)
     .eq("client_id", client.id)
     .order("created_at", { ascending: false });
 
