@@ -39,11 +39,28 @@ export default function FollowupsPage() {
     (l) => cleanDate(l.next_followup_at) < cleanDate(today.toISOString())
   );
   const todayList = leads.filter(
-    (l) => cleanDate(l.next_followup_at).getTime() === cleanDate(today.toISOString()).getTime()
+    (l) =>
+      cleanDate(l.next_followup_at).getTime() ===
+      cleanDate(today.toISOString()).getTime()
   );
   const upcoming = leads.filter(
     (l) => cleanDate(l.next_followup_at) > cleanDate(today.toISOString())
   );
+
+  // 🔵 Fonction : marquer comme répondu
+  const markAsResponded = async (leadId: string) => {
+    const res = await fetch("/api/map-leads/responded", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId }),
+    });
+
+    if (res.ok) {
+      // On retire le lead de la liste immédiatement
+      setLeads((prev) => prev.filter((l) => l.id !== leadId));
+      setOpenLead(null);
+    }
+  };
 
   const Section = ({ title, data }: any) => (
     <div>
@@ -130,6 +147,18 @@ export default function FollowupsPage() {
             </span>
           </p>
 
+          {/* ⭐️ BOUTON MARQUER COMME RÉPONDU */}
+          <button
+            onClick={() => markAsResponded(openLead.id)}
+            className="
+              w-full text-center py-2 mt-4 rounded-lg 
+              bg-emerald-600 hover:bg-emerald-500 
+              text-sm font-medium text-white transition
+            "
+          >
+            Marquer comme répondu ✓
+          </button>
+
           <div className="border-t border-slate-800 mt-4 pt-4 space-y-3 text-sm text-slate-300">
             {openLead.Company && (
               <p>
@@ -137,9 +166,16 @@ export default function FollowupsPage() {
               </p>
             )}
 
-            {openLead.email && <p><strong>Email :</strong> {openLead.email}</p>}
+            {openLead.email && (
+              <p>
+                <strong>Email :</strong> {openLead.email}
+              </p>
+            )}
+
             {openLead.phoneNumber && (
-              <p><strong>Téléphone :</strong> {openLead.phoneNumber}</p>
+              <p>
+                <strong>Téléphone :</strong> {openLead.phoneNumber}
+              </p>
             )}
 
             {openLead.LinkedInURL && (
