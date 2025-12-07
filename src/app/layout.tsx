@@ -43,11 +43,17 @@ export default function RootLayout({
                 {/* 🔹 Navigation + User */}
                 <div className="flex items-center gap-4 text-xs">
                   <SignedIn>
-                    <nav className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
-                      <Link href="/dashboard" className="hover:text-slate-100 transition">Dashboard</Link>
-                      <Link href="/dashboard/prospection" className="hover:text-slate-100 transition">Prospection</Link>
-                    </nav>
-
+                  <nav className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
+  <Link href="/dashboard" className="hover:text-slate-100 transition">
+    Dashboard
+  </Link>
+  <Link href="/dashboard/prospection" className="hover:text-slate-100 transition">
+    Prospection
+  </Link>
+  <Link href="/dashboard/followups" className="hover:text-slate-100 transition">
+    Relances
+  </Link>
+</nav>
                     <div className="flex items-center gap-3">
                       <span className="hidden sm:inline text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-full">
                         Connecté
