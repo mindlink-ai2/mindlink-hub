@@ -18,10 +18,8 @@ export default function FollowupsPage() {
 
       const merged = [...(data1.leads ?? []), ...(data2.leads ?? [])];
 
-      // filtre safe (évite les crash)
-      const filtered = merged.filter(
-        (l) => l.next_followup_at !== null && l.next_followup_at !== undefined
-      );
+      // Only leads with next_followup_at
+      const filtered = merged.filter((l) => l.next_followup_at != null);
 
       setLeads(filtered);
       setLoaded(true);
@@ -30,51 +28,48 @@ export default function FollowupsPage() {
 
   if (!loaded) return <p className="text-slate-400">Chargement…</p>;
 
-  // TZ Paris
+  // Paris timezone date
   const today = new Date(
     new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
   );
 
-  // Clean date SAFE (évite le crash split/T)
+  // 🔧 FIX 1 : éviter crash si la date n’est pas une string
   const cleanDate = (d: any) => {
-    if (!d) return new Date("1970-01-01");
-    const str = typeof d === "string" ? d : d.toString();
-    const day = str.split("T")[0];
-    return new Date(day + "T00:00:00");
+    if (!d || typeof d !== "string") return new Date("2100-01-01"); 
+    return new Date(d.split("T")[0] + "T00:00:00");
   };
 
-  const t = cleanDate(today.toISOString());
-  const overdue = leads.filter((l) => cleanDate(l.next_followup_at) < t);
-  const todayList = leads.filter(
-    (l) => cleanDate(l.next_followup_at).getTime() === t.getTime()
+  const overdue = leads.filter(
+    (l) => cleanDate(l.next_followup_at) < cleanDate(today.toISOString())
   );
-  const upcoming = leads.filter((l) => cleanDate(l.next_followup_at) > t);
+  const todayList = leads.filter(
+    (l) =>
+      cleanDate(l.next_followup_at).getTime() ===
+      cleanDate(today.toISOString()).getTime()
+  );
+  const upcoming = leads.filter(
+    (l) => cleanDate(l.next_followup_at) > cleanDate(today.toISOString())
+  );
 
-  // 🔵 MARQUER COMME RÉPONDU
+  // 🔵 Fonction : marquer comme répondu (LinkedIn OU Maps)
   const markAsResponded = async (leadId: string) => {
-    const isMapLead = openLead.placeUrl !== undefined; // Maps lead
+
+    // 🔧 FIX 2 : éviter crash si openLead est null
+    const isMapLead = !!openLead?.placeUrl;
 
     const endpoint = isMapLead
       ? "/api/map-leads/responded"
-      : "/api/leads/responded"; // prépare LinkedIn (à créer)
+      : "/api/leads/responded";
 
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId }),
-      });
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadId }),
+    });
 
-      if (!res.ok) {
-        console.error("API responded with error");
-        return;
-      }
-
-      // retire immédiatement le lead
+    if (res.ok) {
       setLeads((prev) => prev.filter((l) => l.id !== leadId));
       setOpenLead(null);
-    } catch (e) {
-      console.error(e);
     }
   };
 
@@ -121,7 +116,9 @@ export default function FollowupsPage() {
     <>
       <div className="space-y-10">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-50">Relances clients</h1>
+          <h1 className="text-3xl font-semibold text-slate-50">
+            Relances clients
+          </h1>
           <p className="text-slate-400 text-sm mt-1">
             Suivi des relances en retard, du jour et à venir.
           </p>
@@ -132,7 +129,7 @@ export default function FollowupsPage() {
         <Section title="⏳ À venir" data={upcoming} />
       </div>
 
-      {/* SIDEBAR */}
+      {/* SIDEBAR PREMIUM */}
       {openLead && (
         <div
           className="
@@ -161,7 +158,7 @@ export default function FollowupsPage() {
             </span>
           </p>
 
-          {/* ⭐️ BOUTON */}
+          {/* ⭐️ BOUTON MARQUER COMME RÉPONDU */}
           <button
             onClick={() => markAsResponded(openLead.id)}
             className="
@@ -179,16 +176,19 @@ export default function FollowupsPage() {
                 <strong>Entreprise :</strong> {openLead.Company}
               </p>
             )}
+
             {openLead.email && (
               <p>
                 <strong>Email :</strong> {openLead.email}
               </p>
             )}
+
             {openLead.phoneNumber && (
               <p>
                 <strong>Téléphone :</strong> {openLead.phoneNumber}
               </p>
             )}
+
             {openLead.LinkedInURL && (
               <p>
                 <strong>LinkedIn :</strong>{" "}
@@ -201,6 +201,7 @@ export default function FollowupsPage() {
                 </a>
               </p>
             )}
+
             {openLead.placeUrl && (
               <p>
                 <strong>Google Maps :</strong>{" "}
