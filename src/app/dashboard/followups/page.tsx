@@ -47,16 +47,21 @@ export default function FollowupsPage() {
     (l) => cleanDate(l.next_followup_at) > cleanDate(today.toISOString())
   );
 
-  // 🔵 Fonction : marquer comme répondu
+  // 🔵 Fonction : marquer comme répondu (LinkedIn OU Maps)
   const markAsResponded = async (leadId: string) => {
-    const res = await fetch("/api/map-leads/responded", {
+    const isMapLead = openLead.placeUrl !== undefined;
+
+    const endpoint = isMapLead
+      ? "/api/map-leads/responded"
+      : "/api/leads/responded";
+
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ leadId }),
     });
 
     if (res.ok) {
-      // On retire le lead de la liste immédiatement
       setLeads((prev) => prev.filter((l) => l.id !== leadId));
       setOpenLead(null);
     }
