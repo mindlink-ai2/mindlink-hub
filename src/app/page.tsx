@@ -10,7 +10,6 @@ export default function HomePage() {
   return (
     <div className="grid gap-8 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-start">
 
-
       {/* ======================= */}
       {/* COLONNE GAUCHE */}
       {/* ======================= */}
@@ -44,12 +43,9 @@ export default function HomePage() {
                 1
               </div>
               <div>
-                <p className="font-medium text-slate-100">
-                  Connectez-vous à votre espace sécurisé
-                </p>
+                <p className="font-medium text-slate-100">Connectez-vous à votre espace sécurisé</p>
                 <p className="text-slate-400">
-                  L’accès se fait via un compte personnel (email),
-                  avec authentification moderne et sécurisée.
+                  L’accès se fait via un compte personnel (email), avec authentification moderne et sécurisée.
                 </p>
               </div>
             </div>
@@ -59,13 +55,10 @@ export default function HomePage() {
                 2
               </div>
               <div>
-                <p className="font-medium text-slate-100">
-                  Visualisez votre dashboard en temps réel
-                </p>
+                <p className="font-medium text-slate-100">Visualisez votre dashboard en temps réel</p>
                 <p className="text-slate-400">
-                  Votre dashboard intégré vous affiche automatiquement vos chiffres,
-                  vos leads, vos tâches et tout ce qui compte pour piloter votre
-                  activité, en un seul endroit.
+                  Votre dashboard intégré vous affiche automatiquement vos chiffres, vos leads,
+                  vos tâches, et tout ce qui compte pour piloter votre activité.
                 </p>
               </div>
             </div>
@@ -75,12 +68,9 @@ export default function HomePage() {
                 3
               </div>
               <div>
-                <p className="font-medium text-slate-100">
-                  Accédez à toutes vos données en un clic
-                </p>
+                <p className="font-medium text-slate-100">Accédez à toutes vos données en un clic</p>
                 <p className="text-slate-400">
-                  Retrouvez instantanément tous vos leads, vos automatisations et 
-                  votre profil directement depuis le Hub, sans aucune friction.
+                  Retrouvez instantanément tous vos leads, vos automatisations et votre profil.
                 </p>
               </div>
             </div>
@@ -114,12 +104,9 @@ export default function HomePage() {
 
           <p className="text-[11px] text-slate-500">
             Vous êtes client Mindlink et vous n’avez pas encore reçu vos accès ?{" "}
-            <span className="text-sky-400">
-              Contactez votre référent Mindlink ou créez votre compte depuis le Hub.
-            </span>
+            <span className="text-sky-400">Contactez votre référent Mindlink.</span>
           </p>
         </SignedOut>
-
 
 
         {/* 🔒 VERSION CONNECTÉE */}
@@ -144,35 +131,25 @@ export default function HomePage() {
           </h1>
 
           <div className="space-y-4 text-sm md:text-base text-slate-300 max-w-xl">
-            <p>
-              Vous êtes ici chez vous. Cet espace a été conçu pour vous offrir une vision claire,
-              précise et instantanée de tout ce que Mindlink automatise pour votre activité.
-            </p>
+            <p>Vous êtes ici chez vous. Cet espace vous offre une vision claire et instantanée de tout ce que Mindlink automatise pour vous.</p>
 
-            <p>
-              Chaque jour, vos automatisations travaillent en arrière-plan pour vous faire gagner du temps sur :
-            </p>
+            <p>Chaque jour, vos automatisations vous font gagner du temps sur :</p>
 
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>Votre prospection</li>
               <li>Votre gestion d’emails</li>
             </ul>
 
-            <p>
-              Ici, vous pouvez suivre vos résultats, vos connexions et l’ensemble de vos automatisations.
-              Le tout en un seul endroit, sans effort.
-            </p>
+            <p>Suivez vos résultats, vos connexions et vos automatisations en un endroit unique.</p>
 
             <div className="space-y-1 pt-2">
               <p className="text-slate-200">Avancez plus vite.</p>
               <p className="text-slate-200">Restez concentré sur l’essentiel.</p>
-              <p className="text-slate-200">
-                <span className="font-semibold">Mindlink</span> s’occupe du reste.
-              </p>
+              <p className="text-slate-200"><span className="font-semibold">Mindlink</span> s’occupe du reste.</p>
             </div>
           </div>
 
-          {/* Boutons connecté */}
+          {/* Boutons connecté — AJOUT bouton Relances */}
           <div className="flex flex-wrap gap-3 pt-4">
             <Link
               href="/dashboard"
@@ -187,22 +164,26 @@ export default function HomePage() {
             >
               Accéder à la prospection
             </Link>
+
+            {/* ⭐ AJOUT : Bouton Relances */}
+            <Link
+              href="/dashboard/followups"
+              className="rounded-xl border border-emerald-500/40 px-4 py-2 text-xs md:text-sm font-medium text-emerald-300 hover:border-emerald-400 hover:text-white transition shadow-[0_0_0px_0px_rgba(16,185,129,0)] hover:shadow-[0_0_8px_2px_rgba(16,185,129,0.4)] active:shadow-[0_0_10px_3px_rgba(16,185,129,0.5)]"
+            >
+              Voir les relances
+            </Link>
           </div>
         </SignedIn>
       </section>
 
-
-
       {/* =============================== */}
-      {/* COLONNE DROITE : CARTE EXEMPLE */}
+      {/* COLONNE DROITE */}
       {/* =============================== */}
 
-      {/* 🔓 Version déconnectée */}
       <SignedOut>
         <ExampleCard />
       </SignedOut>
 
-      {/* 🔒 Version connectée — nouvelle */}
       <SignedIn>
         <ExampleCard />
       </SignedIn>
@@ -210,7 +191,6 @@ export default function HomePage() {
     </div>
   );
 }
-
 
 
 /* COMPONENT : BLOCK D’EXEMPLE */
