@@ -34,21 +34,35 @@ export async function GET() {
   const weekAgo = new Date();
   weekAgo.setDate(todayStart.getDate() - 7);
 
-  // 3️⃣ Leads + Maps leads
+  const now = new Date();
+
+  // 3️⃣ Leads + Maps leads (ajout de next_followup_at)
   const [leads, maps] = await Promise.all([
-    supabase.from("leads").select("created_at, traite").eq("client_id", clientId),
-    supabase.from("map_leads").select("created_at, traite").eq("client_id", clientId),
+    supabase
+      .from("leads")
+      .select("created_at, traite, next_followup_at")
+      .eq("client_id", clientId),
+    supabase
+      .from("map_leads")
+      .select("created_at, traite, next_followup_at")
+      .eq("client_id", clientId),
   ]);
 
   const all = [...(leads.data || []), ...(maps.data || [])];
 
-  const leadsToday = all.filter((l) => new Date(l.created_at) >= todayStart).length;
-  const leadsWeek = all.filter((l) => new Date(l.created_at) >= weekAgo).length;
+  const leadsToday = all.filter(
+    (l) => new Date(l.created_at) >= todayStart
+  ).length;
+
+  const leadsWeek = all.filter(
+    (l) => new Date(l.created_at) >= weekAgo
+  ).length;
 
   const total = all.length;
   const treated = all.filter((l) => l.traite === true).length;
 
-  const traitementRate = total === 0 ? 0 : Math.round((treated / total) * 100);
+  const traitementRate =
+    total === 0 ? 0 : Math.round((treated / total) * 100);
 
   // ----------------------------------------------------------------------
   // 4️⃣ Emails triés — depuis ta table mail_trie
@@ -72,14 +86,31 @@ export async function GET() {
     ).length;
 
   // ----------------------------------------------------------------------
+  // 5️⃣ RELANCES : à venir + en retard
+  // ----------------------------------------------------------------------
+
+  const relances = all.filter((l) => l.next_followup_at != null);
+
+  // Relances à venir
+  const relancesCount = relances.filter(
+    (l) => new Date(l.next_followup_at) >= now
+  ).length;
+
+  // Relances en retard
+  const relancesLate = relances.filter(
+    (l) => new Date(l.next_followup_at) < now
+  ).length;
+
+  // ----------------------------------------------------------------------
 
   return NextResponse.json({
     leadsToday,
     leadsWeek,
     traitementRate,
     emailsSortedToday,
-    emailsSortedTotal,       // 🔥 envoyé au front
-    relancesCount: 0,
-    mindlinkScore: Math.round((traitementRate + leadsWeek) / 2),
+    emailsSortedTotal,
+    relancesCount,   // 🔥 relances à venir
+    relancesLate,    // 🔥 relances en retard
+    mindlinkScore: Math.round((traitementRate + leadsWeek) / 2), // reste utilisé dans la MAP
   });
 }
