@@ -36,7 +36,7 @@ export async function GET() {
 
   const now = new Date();
 
-  // 3️⃣ Leads + Maps leads (ajout de next_followup_at)
+  // 3️⃣ Leads + Maps leads + next_followup_at
   const [leads, maps] = await Promise.all([
     supabase
       .from("leads")
@@ -65,16 +65,14 @@ export async function GET() {
     total === 0 ? 0 : Math.round((treated / total) * 100);
 
   // ----------------------------------------------------------------------
-  // 4️⃣ Emails triés — depuis ta table mail_trie
+  // 4️⃣ Emails triés — depuis mail_trie
   // ----------------------------------------------------------------------
 
-  // Total d’emails triés pour ce client
   const { count: emailsSortedTotal } = await supabase
     .from("mail_trie")
     .select("*", { count: "exact", head: true })
     .eq("client_id", clientId);
 
-  // Emails triés aujourd'hui
   const { data: emailsTodayRows } = await supabase
     .from("mail_trie")
     .select("created_at")
@@ -91,12 +89,10 @@ export async function GET() {
 
   const relances = all.filter((l) => l.next_followup_at != null);
 
-  // Relances à venir
   const relancesCount = relances.filter(
     (l) => new Date(l.next_followup_at) >= now
   ).length;
 
-  // Relances en retard
   const relancesLate = relances.filter(
     (l) => new Date(l.next_followup_at) < now
   ).length;
@@ -109,8 +105,8 @@ export async function GET() {
     traitementRate,
     emailsSortedToday,
     emailsSortedTotal,
-    relancesCount,   // 🔥 relances à venir
-    relancesLate,    // 🔥 relances en retard
-    mindlinkScore: Math.round((traitementRate + leadsWeek) / 2), // reste utilisé dans la MAP
+    relancesCount,
+    relancesLate,          // ⭐️ MANQUAIT AVANT → FIX
+    mindlinkScore: Math.round((traitementRate + leadsWeek) / 2), // map only
   });
 }
