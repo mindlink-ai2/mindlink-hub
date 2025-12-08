@@ -40,6 +40,7 @@ export default function DashboardPage() {
     leadsWeek: 0,
     traitementRate: 0,
     emailsSortedToday: 0,
+    emailsSortedTotal: 0,   // ⭐️ ajout ici
     relancesCount: 0,
     mindlinkScore: 0,
   });
@@ -87,8 +88,9 @@ export default function DashboardPage() {
       </div>
 
       {/* KPIs ligne 2 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-14">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-14">
         <KPI label="Emails triés aujourd’hui" value={stats.emailsSortedToday} color="from-indigo-500 to-blue-400" />
+        <KPI label="Emails triés au total" value={stats.emailsSortedTotal} color="from-sky-500 to-blue-300" /> {/* ⭐️ Ajout */}
         <KPI label="Relances à venir" value={stats.relancesCount} color="from-yellow-500 to-orange-400" />
         <KPI label="Mindlink Score™" value={stats.mindlinkScore} color="from-pink-500 to-rose-400" />
       </div>
@@ -122,7 +124,6 @@ export default function DashboardPage() {
 /* Composants utilitaires    */
 /* ------------------------- */
 
-// ⭐️ NOUVELLE VERSION KPI AVEC HOVER PREMIUM
 function KPI({ label, value, color }: { label: string; value: any; color: string }) {
   return (
     <div

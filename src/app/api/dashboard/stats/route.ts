@@ -43,7 +43,6 @@ export async function GET() {
   const all = [...(leads.data || []), ...(maps.data || [])];
 
   const leadsToday = all.filter((l) => new Date(l.created_at) >= todayStart).length;
-
   const leadsWeek = all.filter((l) => new Date(l.created_at) >= weekAgo).length;
 
   const total = all.length;
@@ -51,11 +50,35 @@ export async function GET() {
 
   const traitementRate = total === 0 ? 0 : Math.round((treated / total) * 100);
 
+  // ----------------------------------------------------------------------
+  // 4️⃣ Emails triés — depuis ta table mail_trie
+  // ----------------------------------------------------------------------
+
+  // Total d’emails triés pour ce client
+  const { count: emailsSortedTotal } = await supabase
+    .from("mail_trie")
+    .select("*", { count: "exact", head: true })
+    .eq("client_id", clientId);
+
+  // Emails triés aujourd'hui
+  const { data: emailsTodayRows } = await supabase
+    .from("mail_trie")
+    .select("created_at")
+    .eq("client_id", clientId);
+
+  const emailsSortedToday =
+    (emailsTodayRows || []).filter(
+      (row) => new Date(row.created_at) >= todayStart
+    ).length;
+
+  // ----------------------------------------------------------------------
+
   return NextResponse.json({
     leadsToday,
     leadsWeek,
     traitementRate,
-    emailsSortedToday: 0,
+    emailsSortedToday,
+    emailsSortedTotal,       // 🔥 envoyé au front
     relancesCount: 0,
     mindlinkScore: Math.round((traitementRate + leadsWeek) / 2),
   });
