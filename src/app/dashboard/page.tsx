@@ -40,8 +40,9 @@ export default function DashboardPage() {
     leadsWeek: 0,
     traitementRate: 0,
     emailsSortedToday: 0,
-    emailsSortedTotal: 0,   // ⭐️ ajout ici
-    relancesCount: 0,
+    emailsSortedTotal: 0,
+    relancesCount: 0,   // relances à venir
+    relancesLate: 0,    // relances en retard
     mindlinkScore: 0,
   });
 
@@ -90,9 +91,9 @@ export default function DashboardPage() {
       {/* KPIs ligne 2 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-14">
         <KPI label="Emails triés aujourd’hui" value={stats.emailsSortedToday} color="from-indigo-500 to-blue-400" />
-        <KPI label="Emails triés au total" value={stats.emailsSortedTotal} color="from-sky-500 to-blue-300" /> {/* ⭐️ Ajout */}
+        <KPI label="Emails triés au total" value={stats.emailsSortedTotal} color="from-sky-500 to-blue-300" />
         <KPI label="Relances à venir" value={stats.relancesCount} color="from-yellow-500 to-orange-400" />
-        <KPI label="Mindlink Score™" value={stats.mindlinkScore} color="from-pink-500 to-rose-400" />
+        <KPI label="Relances en retard" value={stats.relancesLate} color="from-red-500 to-rose-500" />
       </div>
 
       {/* IA */}
@@ -114,8 +115,6 @@ export default function DashboardPage() {
 
       {/* ⭐️ MINDLINK MAP */}
       <MindlinkMap stats={stats} />
-
-      {/* ❌ Leads retiré */}
     </div>
   );
 }
@@ -141,15 +140,7 @@ function KPI({ label, value, color }: { label: string; value: any; color: string
   );
 }
 
-function Section({
-  title,
-  height,
-  children,
-}: {
-  title: string;
-  height: string | number;
-  children: React.ReactNode;
-}) {
+function Section({ title, height, children }: any) {
   return (
     <>
       <h2 className="text-2xl font-bold mb-4 text-indigo-300">{title}</h2>
@@ -174,7 +165,7 @@ function MindlinkMap({ stats }: { stats: any }) {
     { subject: "Traitement", value: stats.traitementRate, fullMark: 100 },
     { subject: "Emails", value: stats.emailsSortedToday, fullMark: 100 },
     { subject: "Relances", value: stats.relancesCount, fullMark: 100 },
-    { subject: "Score", value: stats.mindlinkScore, fullMark: 100 },
+    { subject: "Relances en retard", value: stats.relancesLate, fullMark: 100 }, // ⭐️ remplacé ici
   ];
 
   return (
