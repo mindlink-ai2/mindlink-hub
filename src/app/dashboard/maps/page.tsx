@@ -6,6 +6,8 @@ import DeleteLeadButton from "./DeleteLeadButton";
 
 export default function MapsPage() {
   const [safeLeads, setSafeLeads] = useState<any[]>([]);
+  const [filteredLeads, setFilteredLeads] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [openLead, setOpenLead] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -17,9 +19,30 @@ export default function MapsPage() {
       const res = await fetch("/api/get-map-leads");
       const data = await res.json();
       setSafeLeads(data.leads ?? []);
+      setFilteredLeads(data.leads ?? []); // 🔵 Ajout
       setLoaded(true);
     })();
   }, []);
+
+  /* --------------------------------------------
+      SEARCH FUNCTION (same quality as LinkedIn)
+  -------------------------------------------- */
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    const v = value.toLowerCase();
+
+    const results = safeLeads.filter((l) => {
+      return (
+        (l.title ?? "").toLowerCase().includes(v) ||
+        (l.email ?? "").toLowerCase().includes(v) ||
+        (l.phoneNumber ?? "").toLowerCase().includes(v) ||
+        (l.website ?? "").toLowerCase().includes(v) ||
+        (l.placeUrl ?? "").toLowerCase().includes(v)
+      );
+    });
+
+    setFilteredLeads(results);
+  };
 
   /* --------------------------------------------
       AUTO-SAVE INTERNAL MESSAGE
@@ -48,7 +71,6 @@ export default function MapsPage() {
 
     return () => clearTimeout(delay);
   }, [openLead?.internal_message]);
-
 
   /* --------------------------------------------
       🔵 AJOUT — MARQUER MESSAGE ENVOYÉ
@@ -115,6 +137,7 @@ export default function MapsPage() {
   return (
     <>
       <div className="space-y-10">
+
         {/* HEADER */}
         <div className="flex justify-between items-start">
           <div>
@@ -138,6 +161,43 @@ export default function MapsPage() {
           </a>
         </div>
 
+        {/* 🔍 SEARCH BAR — même design premium que LinkedIn */}
+        <div className="w-full max-w-md">
+          <div
+            className="
+              flex items-center gap-3
+              bg-slate-900/60 border border-slate-700 rounded-xl 
+              px-4 py-2.5 shadow-inner backdrop-blur-md
+              focus-within:ring-2 focus-within:ring-indigo-500/50
+              transition
+            "
+          >
+            <svg
+              className="w-4 h-4 text-slate-500"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+              />
+            </svg>
+
+            <input
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Rechercher un lead (nom, email, téléphone, site)…"
+              className="
+                bg-transparent w-full text-sm text-slate-200 placeholder-slate-500
+                focus:outline-none
+              "
+            />
+          </div>
+        </div>
+
         {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <KPI title="Total leads" value={total} text="Importés depuis Google Maps" />
@@ -156,7 +216,7 @@ export default function MapsPage() {
               </h2>
               <p className="text-[11px] text-slate-500">Triés du plus récent au plus ancien</p>
             </div>
-            <div className="text-[11px] text-slate-400">{safeLeads.length} lead(s)</div>
+            <div className="text-[11px] text-slate-400">{filteredLeads.length} lead(s)</div>
           </div>
 
           {/* TABLE CONTENT */}
@@ -176,14 +236,14 @@ export default function MapsPage() {
               </thead>
 
               <tbody>
-                {safeLeads.length === 0 ? (
+                {filteredLeads.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-10 text-center text-slate-500">
-                      Aucun lead pour le moment.
+                      Aucun résultat.
                     </td>
                   </tr>
                 ) : (
-                  safeLeads.map((lead) => (
+                  filteredLeads.map((lead) => (
                     <tr
                       key={lead.id}
                       className="border-b border-slate-900 hover:bg-slate-900/60 transition group"
@@ -197,12 +257,10 @@ export default function MapsPage() {
                       <td className="py-3 px-4 text-slate-50 relative pr-14 flex items-center gap-2">
                         {lead.title || "—"}
 
-                        {/* pastille verte */}
                         {lead.message_sent && (
                           <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
                         )}
 
-                        {/* 🔵 FIX ICI — ON FORCE LES CHAMPS */}
                         <button
                           onClick={() =>
                             setOpenLead({
