@@ -6,6 +6,8 @@ import DeleteLeadButton from './DeleteLeadButton';
 
 export default function LeadsPage() {
   const [safeLeads, setSafeLeads] = useState<any[]>([]);
+  const [filteredLeads, setFilteredLeads] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [openLead, setOpenLead] = useState<any>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
@@ -16,9 +18,28 @@ export default function LeadsPage() {
       const data = await res.json();
 
       setSafeLeads(data.leads ?? []);
+      setFilteredLeads(data.leads ?? []); // ← initial filtered list
       setClientLoaded(true);
     })();
   }, []);
+
+  // SEARCH FUNCTION
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+
+    const v = value.toLowerCase();
+
+    const results = safeLeads.filter((l) => {
+      const name = `${l.FirstName ?? ''} ${l.LastName ?? ''}`.toLowerCase();
+      return (
+        name.includes(v) ||
+        (l.Company ?? '').toLowerCase().includes(v) ||
+        (l.location ?? '').toLowerCase().includes(v)
+      );
+    });
+
+    setFilteredLeads(results);
+  };
 
   // Auto-save internal message
   useEffect(() => {
@@ -63,7 +84,6 @@ export default function LeadsPage() {
       return;
     }
 
-    // Mise à jour du lead dans le state
     setOpenLead((prev: any) => ({
       ...prev,
       message_sent: true,
@@ -114,6 +134,7 @@ export default function LeadsPage() {
   return (
     <>
       <div className='space-y-10'>
+        
         {/* HEADER */}
         <div className='flex justify-between items-start'>
           <div>
@@ -131,6 +152,39 @@ export default function LeadsPage() {
           >
             Exporter CSV
           </a>
+        </div>
+
+        {/* 🔍 SEARCH BAR (premium, compacte, magnifique) */}
+        <div className="w-full max-w-md">
+          <div className="
+            flex items-center gap-3
+            bg-slate-900/60 border border-slate-700 rounded-xl 
+            px-4 py-2.5 shadow-inner backdrop-blur-md
+            focus-within:ring-2 focus-within:ring-indigo-500/50
+            transition
+          ">
+            <svg
+              className="w-4 h-4 text-slate-500"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+              />
+            </svg>
+
+            <input
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Rechercher un lead (nom, entreprise, ville)…"
+              className="
+                bg-transparent w-full text-sm text-slate-200 placeholder-slate-500
+                focus:outline-none
+              "
+            />
+          </div>
         </div>
 
         {/* KPIs */}
@@ -157,7 +211,7 @@ export default function LeadsPage() {
                 Triés du plus récent au plus ancien
               </p>
             </div>
-            <div className='text-[11px] text-slate-400'>{safeLeads.length} lead(s)</div>
+            <div className='text-[11px] text-slate-400'>{filteredLeads.length} lead(s)</div>
           </div>
 
           {/* TABLE */}
@@ -167,47 +221,32 @@ export default function LeadsPage() {
                 <tr className='bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide'>
                   <th className='py-3 px-4 border-b border-slate-800'>Traité</th>
                   <th className='py-3 px-4 border-b border-slate-800 text-left'>Nom</th>
-                  <th className='py-3 px-4 border-b border-slate-800 text-left'>
-                    Entreprise
-                  </th>
-                  <th className='py-3 px-4 border-b border-slate-800 text-left'>
-                    Localisation
-                  </th>
-                  <th className='py-3 px-4 border-b border-slate-800 text-left'>
-                    LinkedIn
-                  </th>
-                  <th className='py-3 px-4 border-b border-slate-800 text-center'>
-                    Date
-                  </th>
-                  <th className='py-3 px-4 border-b border-slate-800 text-center'>
-                    Supprimer
-                  </th>
+                  <th className='py-3 px-4 border-b border-slate-800 text-left'>Entreprise</th>
+                  <th className='py-3 px-4 border-b border-slate-800 text-left'>Localisation</th>
+                  <th className='py-3 px-4 border-b border-slate-800 text-left'>LinkedIn</th>
+                  <th className='py-3 px-4 border-b border-slate-800 text-center'>Date</th>
+                  <th className='py-3 px-4 border-b border-slate-800 text-center'>Supprimer</th>
                 </tr>
               </thead>
 
               <tbody>
-                {safeLeads.length === 0 ? (
+                {filteredLeads.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={7}
-                      className='py-10 text-center text-slate-500'
-                    >
-                      Aucun lead pour le moment.
+                    <td colSpan={7} className='py-10 text-center text-slate-500'>
+                      Aucun résultat.
                     </td>
                   </tr>
                 ) : (
-                  safeLeads.map((lead) => {
+                  filteredLeads.map((lead) => {
                     const fullName =
                       `${lead.FirstName ?? ''} ${lead.LastName ?? ''}`.trim() ||
-                      lead.Name ||
-                      '—';
+                      lead.Name || '—';
 
                     return (
                       <tr
                         key={lead.id}
                         className='border-b border-slate-900 hover:bg-slate-900/60 transition group'
                       >
-                        {/* TRAITE */}
                         <td className='py-3 px-4 text-center'>
                           <TraiteCheckbox
                             leadId={lead.id}
@@ -215,16 +254,11 @@ export default function LeadsPage() {
                           />
                         </td>
 
-                        {/* NOM */}
                         <td className='py-3 px-4 text-slate-50 relative pr-14'>
-                          
                           <div className="flex items-center gap-2">
-                            
-                            {/* 🔵 AJOUT : pastille verte */}
                             {lead.message_sent && (
                               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-sm"></span>
                             )}
-
                             <span>{fullName}</span>
                           </div>
 
@@ -236,17 +270,14 @@ export default function LeadsPage() {
                           </button>
                         </td>
 
-                        {/* ENTREPRISE */}
                         <td className='py-3 px-4 text-slate-300'>
                           {lead.Company || '—'}
                         </td>
 
-                        {/* LOCALISATION */}
                         <td className='py-3 px-4 text-slate-300'>
                           {lead.location || '—'}
                         </td>
 
-                        {/* LINKEDIN */}
                         <td className='py-3 px-4'>
                           {lead.LinkedInURL ? (
                             <a
@@ -261,14 +292,12 @@ export default function LeadsPage() {
                           )}
                         </td>
 
-                        {/* DATE */}
                         <td className='py-3 px-4 text-center text-slate-400'>
                           {lead.created_at
                             ? new Date(lead.created_at).toLocaleDateString('fr-FR')
                             : '—'}
                         </td>
 
-                        {/* DELETE */}
                         <td className='py-3 px-4 text-center'>
                           <DeleteLeadButton leadId={lead.id} />
                         </td>
@@ -288,14 +317,11 @@ export default function LeadsPage() {
           className='
             fixed right-0 top-0 h-full w-[420px]
             bg-gradient-to-b from-slate-900/95 to-slate-900/80 
-            backdrop-blur-2xl
-            border-l border-slate-800
+            backdrop-blur-2xl border-l border-slate-800
             shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)]
-            p-6 z-50
-            animate-slideLeft
+            p-6 z-50 animate-slideLeft
           '
         >
-          {/* Header (sticky) */}
           <div className='sticky top-0 pb-3 bg-slate-900/80 backdrop-blur-xl'>
             <button
               className='text-slate-400 text-xs mb-4 hover:text-slate-200 transition'
@@ -309,7 +335,6 @@ export default function LeadsPage() {
             </h2>
           </div>
 
-          {/* Infos section */}
           <div className='mt-4 space-y-4 text-sm text-slate-300 border-b border-slate-800 pb-6'>
             <div>
               <span className='text-slate-500 text-xs uppercase tracking-wide'>
@@ -358,7 +383,6 @@ export default function LeadsPage() {
             </div>
           </div>
 
-          {/* Internal message */}
           <div className='mt-6'>
             <label className='text-xs text-slate-400 mb-2 block'>
               Message interne
@@ -388,7 +412,6 @@ export default function LeadsPage() {
             ></textarea>
           </div>
 
-          {/* 🔵 AJOUT — BOUTON MESSAGE ENVOYÉ */}
           <div className="mt-4">
             <button
               onClick={handleMessageSent}
@@ -404,7 +427,6 @@ export default function LeadsPage() {
             </button>
           </div>
 
-          {/* 🔵 AJOUT — AFFICHAGE DATE SUIVANTE */}
           {openLead.next_followup_at && (
             <p className="text-xs text-slate-400 mt-2">
               Prochaine relance :{' '}
