@@ -32,6 +32,13 @@ export default function TraiteCheckbox({
       if (!res.ok) {
         throw new Error("Erreur mise à jour traite");
       }
+
+      // ✅ Informe la page (KPIs + table) pour update instantané
+      window.dispatchEvent(
+        new CustomEvent("mindlink:lead-treated", {
+          detail: { leadId, traite: newValue },
+        })
+      );
     } catch (e) {
       console.error(e);
       // rollback si erreur

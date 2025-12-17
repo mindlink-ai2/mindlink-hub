@@ -1,57 +1,104 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import TraiteCheckbox from './TraiteCheckbox';
-import DeleteLeadButton from './DeleteLeadButton';
+import { useEffect, useState } from "react";
+import TraiteCheckbox from "./TraiteCheckbox";
+import DeleteLeadButton from "./DeleteLeadButton";
+
+type Lead = any;
+
+function filterLeads(leads: Lead[], term: string) {
+  const v = term.trim().toLowerCase();
+  if (!v) return leads;
+
+  return leads.filter((l) => {
+    const name = `${l.FirstName ?? ""} ${l.LastName ?? ""}`.toLowerCase();
+    return (
+      name.includes(v) ||
+      (l.Company ?? "").toLowerCase().includes(v) ||
+      (l.location ?? "").toLowerCase().includes(v)
+    );
+  });
+}
 
 export default function LeadsPage() {
-  const [safeLeads, setSafeLeads] = useState<any[]>([]);
-  const [filteredLeads, setFilteredLeads] = useState<any[]>([]);
+  const [safeLeads, setSafeLeads] = useState<Lead[]>([]);
+  const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [openLead, setOpenLead] = useState<any>(null);
+  const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
   // Load leads
   useEffect(() => {
     (async () => {
-      const res = await fetch('/api/get-leads');
+      const res = await fetch("/api/get-leads");
       const data = await res.json();
 
-      setSafeLeads(data.leads ?? []);
-      setFilteredLeads(data.leads ?? []); // ← initial filtered list
+      const leads = data.leads ?? [];
+      setSafeLeads(leads);
+      setFilteredLeads(leads);
       setClientLoaded(true);
     })();
   }, []);
 
+  // keep filtered list synced when safeLeads changes
+  useEffect(() => {
+    setFilteredLeads(filterLeads(safeLeads, searchTerm));
+  }, [safeLeads, searchTerm]);
+
   // SEARCH FUNCTION
   const handleSearch = (value: string) => {
     setSearchTerm(value);
-
-    const v = value.toLowerCase();
-
-    const results = safeLeads.filter((l) => {
-      const name = `${l.FirstName ?? ''} ${l.LastName ?? ''}`.toLowerCase();
-      return (
-        name.includes(v) ||
-        (l.Company ?? '').toLowerCase().includes(v) ||
-        (l.location ?? '').toLowerCase().includes(v)
-      );
-    });
-
-    setFilteredLeads(results);
+    setFilteredLeads(filterLeads(safeLeads, value));
   };
+
+  // ✅ LIVE UI UPDATE via events from child components
+  useEffect(() => {
+    const onTreated = (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        leadId: number;
+        traite: boolean;
+      };
+      if (!detail?.leadId) return;
+  
+      setSafeLeads((prev) =>
+        prev.map((l) =>
+          l.id === detail.leadId ? { ...l, traite: detail.traite } : l
+        )
+      );
+  
+      setOpenLead((prev: Lead | null) =>
+        prev?.id === detail.leadId ? { ...prev, traite: detail.traite } : prev
+      );
+    };
+  
+    const onDeleted = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { leadId: number };
+      if (!detail?.leadId) return;
+  
+      setSafeLeads((prev) => prev.filter((l) => l.id !== detail.leadId));
+      setOpenLead((prev: Lead | null) => (prev?.id === detail.leadId ? null : prev));
+    };
+  
+    window.addEventListener("mindlink:lead-treated", onTreated as EventListener);
+    window.addEventListener("mindlink:lead-deleted", onDeleted as EventListener);
+  
+    return () => {
+      window.removeEventListener("mindlink:lead-treated", onTreated as EventListener);
+      window.removeEventListener("mindlink:lead-deleted", onDeleted as EventListener);
+    };
+  }, []);
 
   // Auto-save internal message
   useEffect(() => {
     if (!openLead) return;
 
     const delay = setTimeout(async () => {
-      await fetch('/api/update-internal-message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/update-internal-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           leadId: openLead.id,
-          message: openLead.internal_message ?? '',
+          message: openLead.internal_message ?? "",
         }),
       });
 
@@ -67,13 +114,13 @@ export default function LeadsPage() {
     return () => clearTimeout(delay);
   }, [openLead?.internal_message]);
 
-  // 🔵 AJOUT — Fonction pour marquer "Message envoyé"
+  // 🔵 Fonction pour marquer "Message envoyé"
   const handleMessageSent = async () => {
     if (!openLead) return;
 
-    const res = await fetch('/api/leads/message-sent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch("/api/leads/message-sent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ leadId: openLead.id }),
     });
 
@@ -107,7 +154,7 @@ export default function LeadsPage() {
 
   if (!clientLoaded) {
     return (
-      <div className='text-slate-400 text-sm'>Chargement des leads...</div>
+      <div className="text-slate-400 text-sm">Chargement des leads...</div>
     );
   }
 
@@ -117,10 +164,10 @@ export default function LeadsPage() {
 
   // Next import (Paris)
   const now = new Date(
-    new Date().toLocaleString('en-US', { timeZone: 'Europe/Paris' })
+    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
   );
   const nextImport = new Date(
-    new Date().toLocaleString('en-US', { timeZone: 'Europe/Paris' })
+    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
   );
   nextImport.setHours(8, 0, 0, 0);
   if (now > nextImport) nextImport.setDate(nextImport.getDate() + 1);
@@ -133,36 +180,38 @@ export default function LeadsPage() {
 
   return (
     <>
-      <div className='space-y-10'>
-        
+      <div className="space-y-10">
         {/* HEADER */}
-        <div className='flex justify-between items-start'>
+        <div className="flex justify-between items-start">
           <div>
-            <h1 className='text-3xl font-semibold tracking-tight text-slate-50'>
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
               Leads générés
             </h1>
-            <p className='text-slate-400 text-sm mt-1'>
-              Tous vos prospects qualifiés, importés automatiquement par Mindlink.
+            <p className="text-slate-400 text-sm mt-1">
+              Tous vos prospects qualifiés, importés automatiquement par
+              Mindlink.
             </p>
           </div>
 
           <a
-            href='/dashboard/leads/export'
-            className='px-4 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 transition'
+            href="/dashboard/leads/export"
+            className="px-4 py-2 text-xs rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 transition"
           >
             Exporter CSV
           </a>
         </div>
 
-        {/* 🔍 SEARCH BAR (premium, compacte, magnifique) */}
+        {/* SEARCH BAR */}
         <div className="w-full max-w-md">
-          <div className="
-            flex items-center gap-3
-            bg-slate-900/60 border border-slate-700 rounded-xl 
-            px-4 py-2.5 shadow-inner backdrop-blur-md
-            focus-within:ring-2 focus-within:ring-indigo-500/50
-            transition
-          ">
+          <div
+            className="
+              flex items-center gap-3
+              bg-slate-900/60 border border-slate-700 rounded-xl
+              px-4 py-2.5 shadow-inner backdrop-blur-md
+              focus-within:ring-2 focus-within:ring-indigo-500/50
+              transition
+            "
+          >
             <svg
               className="w-4 h-4 text-slate-500"
               fill="none"
@@ -170,7 +219,9 @@ export default function LeadsPage() {
               strokeWidth="2"
               viewBox="0 0 24 24"
             >
-              <path strokeLinecap="round" strokeLinejoin="round"
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
                 d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
               />
             </svg>
@@ -188,117 +239,140 @@ export default function LeadsPage() {
         </div>
 
         {/* KPIs */}
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-          <KPI title='Total leads' value={total} text='Leads totaux générés' />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <KPI title="Total leads" value={total} text="Leads totaux générés" />
           <KPI
-            title='À traiter'
+            title="À traiter"
             value={remainingToTreat}
             text={`${remainingToTreat} restants`}
           />
           <KPI
-            title='Prochaine importation'
+            title="Prochaine importation"
             value={nextImportText}
-            text='À 8h00 automatique'
+            text="À 8h00 automatique"
           />
         </div>
 
         {/* TABLE CARD */}
-        <div className='rounded-2xl border border-slate-800 bg-slate-950/90 shadow-xl overflow-hidden'>
-          <div className='px-6 py-4 border-b border-slate-800 flex justify-between items-center'>
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/90 shadow-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
             <div>
-              <h2 className='text-slate-100 text-sm font-medium'>Liste des leads</h2>
-              <p className='text-[11px] text-slate-500'>
+              <h2 className="text-slate-100 text-sm font-medium">
+                Liste des leads
+              </h2>
+              <p className="text-[11px] text-slate-500">
                 Triés du plus récent au plus ancien
               </p>
             </div>
-            <div className='text-[11px] text-slate-400'>{filteredLeads.length} lead(s)</div>
+            <div className="text-[11px] text-slate-400">
+              {filteredLeads.length} lead(s)
+            </div>
           </div>
 
           {/* TABLE */}
-          <div className='overflow-x-auto'>
-            <table className='w-full text-sm border-separate border-spacing-0'>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-separate border-spacing-0">
               <thead>
-                <tr className='bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide'>
-                  <th className='py-3 px-4 border-b border-slate-800'>Traité</th>
-                  <th className='py-3 px-4 border-b border-slate-800 text-left'>Nom</th>
-                  <th className='py-3 px-4 border-b border-slate-800 text-left'>Entreprise</th>
-                  <th className='py-3 px-4 border-b border-slate-800 text-left'>Localisation</th>
-                  <th className='py-3 px-4 border-b border-slate-800 text-left'>LinkedIn</th>
-                  <th className='py-3 px-4 border-b border-slate-800 text-center'>Date</th>
-                  <th className='py-3 px-4 border-b border-slate-800 text-center'>Supprimer</th>
+                <tr className="bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide">
+                  <th className="py-3 px-4 border-b border-slate-800">
+                    Traité
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-left">
+                    Nom
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-left">
+                    Entreprise
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-left">
+                    Localisation
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-left">
+                    LinkedIn
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-center">
+                    Date
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-center">
+                    Supprimer
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
                 {filteredLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className='py-10 text-center text-slate-500'>
+                    <td
+                      colSpan={7}
+                      className="py-10 text-center text-slate-500"
+                    >
                       Aucun résultat.
                     </td>
                   </tr>
                 ) : (
                   filteredLeads.map((lead) => {
                     const fullName =
-                      `${lead.FirstName ?? ''} ${lead.LastName ?? ''}`.trim() ||
-                      lead.Name || '—';
+                      `${lead.FirstName ?? ""} ${lead.LastName ?? ""}`.trim() ||
+                      lead.Name ||
+                      "—";
 
                     return (
                       <tr
                         key={lead.id}
-                        className='border-b border-slate-900 hover:bg-slate-900/60 transition group'
+                        className="border-b border-slate-900 hover:bg-slate-900/60 transition group"
                       >
-                        <td className='py-3 px-4 text-center'>
+                        <td className="py-3 px-4 text-center">
                           <TraiteCheckbox
                             leadId={lead.id}
                             defaultChecked={Boolean(lead.traite)}
                           />
                         </td>
 
-                        <td className='py-3 px-4 text-slate-50 relative pr-14'>
+                        <td className="py-3 px-4 text-slate-50 relative pr-14">
                           <div className="flex items-center gap-2">
                             {lead.message_sent && (
-                              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-sm"></span>
+                              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-sm" />
                             )}
                             <span>{fullName}</span>
                           </div>
 
                           <button
                             onClick={() => setOpenLead(lead)}
-                            className='opacity-0 group-hover:opacity-100 absolute right-3 top-1/2 -translate-y-1/2 text-[11px] px-3 py-1.5 rounded-lg bg-indigo-600/70 hover:bg-indigo-500 backdrop-blur-md text-white transition shadow-sm hover:shadow-md'
+                            className="opacity-0 group-hover:opacity-100 absolute right-3 top-1/2 -translate-y-1/2 text-[11px] px-3 py-1.5 rounded-lg bg-indigo-600/70 hover:bg-indigo-500 backdrop-blur-md text-white transition shadow-sm hover:shadow-md"
                           >
                             Voir →
                           </button>
                         </td>
 
-                        <td className='py-3 px-4 text-slate-300'>
-                          {lead.Company || '—'}
+                        <td className="py-3 px-4 text-slate-300">
+                          {lead.Company || "—"}
+                        </td>
+                        <td className="py-3 px-4 text-slate-300">
+                          {lead.location || "—"}
                         </td>
 
-                        <td className='py-3 px-4 text-slate-300'>
-                          {lead.location || '—'}
-                        </td>
-
-                        <td className='py-3 px-4'>
+                        <td className="py-3 px-4">
                           {lead.LinkedInURL ? (
                             <a
                               href={lead.LinkedInURL}
-                              target='_blank'
-                              className='text-sky-400 hover:underline'
+                              target="_blank"
+                              className="text-sky-400 hover:underline"
                             >
                               Voir profil
                             </a>
                           ) : (
-                            <span className='text-slate-500'>—</span>
+                            <span className="text-slate-500">—</span>
                           )}
                         </td>
 
-                        <td className='py-3 px-4 text-center text-slate-400'>
+                        <td className="py-3 px-4 text-center text-slate-400">
                           {lead.created_at
-                            ? new Date(lead.created_at).toLocaleDateString('fr-FR')
-                            : '—'}
+                            ? new Date(lead.created_at).toLocaleDateString(
+                                "fr-FR"
+                              )
+                            : "—"}
                         </td>
 
-                        <td className='py-3 px-4 text-center'>
+                        <td className="py-3 px-4 text-center">
                           <DeleteLeadButton leadId={lead.id} />
                         </td>
                       </tr>
@@ -314,82 +388,78 @@ export default function LeadsPage() {
       {/* --- PREMIUM SIDEBAR --- */}
       {openLead && (
         <div
-          className='
+          className="
             fixed right-0 top-0 h-full w-[420px]
-            bg-gradient-to-b from-slate-900/95 to-slate-900/80 
+            bg-gradient-to-b from-slate-900/95 to-slate-900/80
             backdrop-blur-2xl border-l border-slate-800
             shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)]
             p-6 z-50 animate-slideLeft
-          '
+          "
         >
-          <div className='sticky top-0 pb-3 bg-slate-900/80 backdrop-blur-xl'>
+          <div className="sticky top-0 pb-3 bg-slate-900/80 backdrop-blur-xl">
             <button
-              className='text-slate-400 text-xs mb-4 hover:text-slate-200 transition'
+              className="text-slate-400 text-xs mb-4 hover:text-slate-200 transition"
               onClick={() => setOpenLead(null)}
             >
               ✕ Fermer
             </button>
 
-            <h2 className='text-2xl font-semibold text-slate-50 mb-2'>
+            <h2 className="text-2xl font-semibold text-slate-50 mb-2">
               {openLead.FirstName} {openLead.LastName}
             </h2>
           </div>
 
-          <div className='mt-4 space-y-4 text-sm text-slate-300 border-b border-slate-800 pb-6'>
+          <div className="mt-4 space-y-4 text-sm text-slate-300 border-b border-slate-800 pb-6">
             <div>
-              <span className='text-slate-500 text-xs uppercase tracking-wide'>
+              <span className="text-slate-500 text-xs uppercase tracking-wide">
                 Entreprise
               </span>
-              <p className='text-slate-200 mt-1'>
-                {openLead.Company || '—'}
-              </p>
+              <p className="text-slate-200 mt-1">{openLead.Company || "—"}</p>
             </div>
 
             <div>
-              <span className='text-slate-500 text-xs uppercase tracking-wide'>
+              <span className="text-slate-500 text-xs uppercase tracking-wide">
                 Localisation
               </span>
-              <p className='text-slate-200 mt-1'>
-                {openLead.location || '—'}
-              </p>
+              <p className="text-slate-200 mt-1">{openLead.location || "—"}</p>
             </div>
 
             <div>
-              <span className='text-slate-500 text-xs uppercase tracking-wide'>
+              <span className="text-slate-500 text-xs uppercase tracking-wide">
                 LinkedIn
               </span>
-              <p className='mt-1'>
+              <p className="mt-1">
                 {openLead.LinkedInURL ? (
                   <a
                     href={openLead.LinkedInURL}
-                    target='_blank'
-                    className='text-indigo-400 hover:underline'
+                    target="_blank"
+                    className="text-indigo-400 hover:underline"
                   >
                     Voir profil →
                   </a>
                 ) : (
-                  '—'
+                  "—"
                 )}
               </p>
             </div>
 
             <div>
-              <span className='text-slate-500 text-xs uppercase tracking-wide'>
+              <span className="text-slate-500 text-xs uppercase tracking-wide">
                 Créé le
               </span>
-              <p className='text-slate-200 mt-1'>
+              <p className="text-slate-200 mt-1">
                 {openLead.created_at?.slice(0, 10)}
               </p>
             </div>
           </div>
 
-          <div className='mt-6'>
-            <label className='text-xs text-slate-400 mb-2 block'>
+          <div className="mt-6">
+            <label className="text-xs text-slate-400 mb-2 block">
               Message interne
             </label>
 
             <textarea
-              value={openLead.internal_message ?? ''}
+              value={openLead.internal_message ?? ""}
               onChange={(e) => {
                 const newMsg = e.target.value;
                 setOpenLead({ ...openLead, internal_message: newMsg });
@@ -401,15 +471,15 @@ export default function LeadsPage() {
                   )
                 );
               }}
-              placeholder='Écris une note interne…'
-              className='
+              placeholder="Écris une note interne…"
+              className="
                 w-full h-44 p-4 rounded-xl
                 bg-slate-800/60 border border-slate-700
                 text-sm text-slate-200
                 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
                 transition
-              '
-            ></textarea>
+              "
+            />
           </div>
 
           <div className="mt-4">
@@ -418,20 +488,24 @@ export default function LeadsPage() {
               disabled={openLead.message_sent}
               className={`
                 w-full px-4 py-3 rounded-xl text-sm font-medium transition
-                ${openLead.message_sent
-                  ? 'bg-emerald-600 text-white cursor-default'
-                  : 'bg-indigo-600 hover:bg-indigo-500 text-white'}
+                ${
+                  openLead.message_sent
+                    ? "bg-emerald-600 text-white cursor-default"
+                    : "bg-indigo-600 hover:bg-indigo-500 text-white"
+                }
               `}
             >
-              {openLead.message_sent ? 'Message envoyé ✓' : 'Marquer comme envoyé'}
+              {openLead.message_sent
+                ? "Message envoyé ✓"
+                : "Marquer comme envoyé"}
             </button>
           </div>
 
           {openLead.next_followup_at && (
             <p className="text-xs text-slate-400 mt-2">
-              Prochaine relance :{' '}
+              Prochaine relance :{" "}
               <span className="text-slate-200 font-medium">
-                {new Date(openLead.next_followup_at).toLocaleDateString('fr-FR')}
+                {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
               </span>
             </p>
           )}
@@ -444,10 +518,12 @@ export default function LeadsPage() {
 /* KPI Component */
 function KPI({ title, value, text }: { title: string; value: any; text: string }) {
   return (
-    <div className='rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center shadow-inner'>
-      <div className='text-[11px] text-slate-500 uppercase tracking-wide'>{title}</div>
-      <div className='text-3xl font-semibold text-slate-50 mt-1'>{value}</div>
-      <p className='text-[11px] text-slate-500 mt-1'>{text}</p>
+    <div className="rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center shadow-inner">
+      <div className="text-[11px] text-slate-500 uppercase tracking-wide">
+        {title}
+      </div>
+      <div className="text-3xl font-semibold text-slate-50 mt-1">{value}</div>
+      <p className="text-[11px] text-slate-500 mt-1">{text}</p>
     </div>
   );
 }
