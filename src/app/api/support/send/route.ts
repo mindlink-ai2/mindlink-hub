@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { auth, currentUser } from "@clerk/nextjs/server";
+
+const resend = new Resend(process.env.RESEND_API_KEY!);
 
 export async function POST(req: Request) {
   try {
-    // Sécurité : user connecté
+    // 🔐 Sécurité : utilisateur connecté
     const { userId } = await auth();
-        if (!userId) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -14,8 +16,7 @@ export async function POST(req: Request) {
     const userEmail =
       user?.emailAddresses?.[0]?.emailAddress ?? "email inconnu";
 
-    const body = await req.json();
-    const { subject, message, category, priority } = body;
+    const { subject, message, category, priority } = await req.json();
 
     if (!subject || !message) {
       return NextResponse.json(
@@ -24,24 +25,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // SMTP Infomaniak
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-      secure: false, // Infomaniak = false sur 587
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-
-    await transporter.sendMail({
-      from: `"Mindlink Support" <${process.env.SMTP_USER}>`,
+    await resend.emails.send({
+      from: "Mindlink Support <onboarding@resend.dev>",
       to: "contact@mind-link.fr",
       replyTo: userEmail,
-      subject: `🎫 Demande client Mindlink — ${subject}`,
+      subject: `🎫 Ticket Mindlink — ${subject}`,
       html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.5">
+        <div style="font-family: Arial, sans-serif; line-height: 1.6">
           <p><strong>De :</strong> ${userEmail}</p>
           <p><strong>Catégorie :</strong> ${category ?? "Support"}</p>
           <p><strong>Priorité :</strong> ${priority ?? "Normale"}</p>
@@ -52,8 +42,8 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("SUPPORT MAIL ERROR", err);
+  } catch (error) {
+    console.error("SUPPORT SEND ERROR:", error);
     return NextResponse.json(
       { error: "Mail sending failed" },
       { status: 500 }
