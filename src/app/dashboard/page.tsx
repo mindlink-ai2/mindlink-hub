@@ -38,7 +38,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="min-h-screen w-full px-6 pt-20 pb-32 bg-[#090c12]">
+    <div className="min-h-screen w-full px-6 pt-20 pb-32">
       <h1 className="text-5xl font-extrabold tracking-tight mb-3 bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-400 bg-clip-text text-transparent">
         Tableau de bord Mindlink
       </h1>
@@ -49,17 +49,45 @@ export default function DashboardPage() {
 
       {/* KPIs ligne 1 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        <KPI label="Leads aujourd’hui" value={stats.leadsToday} color="from-blue-500 to-cyan-400" />
-        <KPI label="Leads cette semaine" value={stats.leadsWeek} color="from-green-500 to-emerald-400" />
-        <KPI label="Taux de traitement" value={`${stats.traitementRate}%`} color="from-purple-500 to-fuchsia-400" />
+        <KPI
+          label="Leads aujourd’hui"
+          value={stats.leadsToday}
+          color="from-blue-500 to-cyan-400"
+        />
+        <KPI
+          label="Leads cette semaine"
+          value={stats.leadsWeek}
+          color="from-green-500 to-emerald-400"
+        />
+        <KPI
+          label="Taux de traitement"
+          value={`${stats.traitementRate}%`}
+          color="from-purple-500 to-fuchsia-400"
+        />
       </div>
 
       {/* KPIs ligne 2 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <KPI label="Emails triés aujourd’hui" value={stats.emailsSortedToday} color="from-indigo-500 to-blue-400" />
-        <KPI label="Emails triés au total" value={stats.emailsSortedTotal} color="from-sky-500 to-blue-300" />
-        <KPI label="Relances à venir" value={stats.relancesCount} color="from-yellow-500 to-orange-400" />
-        <KPI label="Relances en retard" value={stats.relancesLate} color="from-red-500 to-rose-500" />
+        <KPI
+          label="Emails triés aujourd’hui"
+          value={stats.emailsSortedToday}
+          color="from-indigo-500 to-blue-400"
+        />
+        <KPI
+          label="Emails triés au total"
+          value={stats.emailsSortedTotal}
+          color="from-sky-500 to-blue-300"
+        />
+        <KPI
+          label="Relances à venir"
+          value={stats.relancesCount}
+          color="from-yellow-500 to-orange-400"
+        />
+        <KPI
+          label="Relances en retard"
+          value={stats.relancesLate}
+          color="from-red-500 to-rose-500"
+        />
       </div>
     </div>
   );
