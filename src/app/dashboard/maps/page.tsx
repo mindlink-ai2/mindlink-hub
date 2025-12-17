@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import TraiteCheckbox from "./TraiteCheckbox";
 import DeleteLeadButton from "./DeleteLeadButton";
 
 export default function MapsPage() {
   const [safeLeads, setSafeLeads] = useState<any[]>([]);
-  const [filteredLeads, setFilteredLeads] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [openLead, setOpenLead] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
@@ -19,19 +18,23 @@ export default function MapsPage() {
       const res = await fetch("/api/get-map-leads");
       const data = await res.json();
       setSafeLeads(data.leads ?? []);
-      setFilteredLeads(data.leads ?? []); // 🔵 Ajout
       setLoaded(true);
     })();
   }, []);
 
   /* --------------------------------------------
       SEARCH FUNCTION (same quality as LinkedIn)
+      ✅ filteredLeads is derived (no setFilteredLeads)
   -------------------------------------------- */
   const handleSearch = (value: string) => {
     setSearchTerm(value);
-    const v = value.toLowerCase();
+  };
 
-    const results = safeLeads.filter((l) => {
+  const filteredLeads = useMemo(() => {
+    const v = searchTerm.trim().toLowerCase();
+    if (!v) return safeLeads;
+
+    return safeLeads.filter((l) => {
       return (
         (l.title ?? "").toLowerCase().includes(v) ||
         (l.email ?? "").toLowerCase().includes(v) ||
@@ -40,9 +43,53 @@ export default function MapsPage() {
         (l.placeUrl ?? "").toLowerCase().includes(v)
       );
     });
+  }, [safeLeads, searchTerm]);
 
-    setFilteredLeads(results);
-  };
+  /* --------------------------------------------
+      ✅ LIVE UI UPDATE via events (Traité / Delete)
+      (same pattern as LinkedIn)
+  -------------------------------------------- */
+  useEffect(() => {
+    const onTreated = (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        leadId: string | number;
+        traite: boolean;
+      };
+      if (!detail?.leadId) return;
+
+      const leadIdStr = String(detail.leadId);
+
+      setSafeLeads((prev) =>
+        prev.map((l) =>
+          String(l.id) === leadIdStr ? { ...l, traite: detail.traite } : l
+        )
+      );
+
+      setOpenLead((prev: any) =>
+        prev && String(prev.id) === leadIdStr ? { ...prev, traite: detail.traite } : prev
+      );
+    };
+
+    const onDeleted = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { leadId: string | number };
+      if (!detail?.leadId) return;
+
+      const leadIdStr = String(detail.leadId);
+
+      setSafeLeads((prev) => prev.filter((l) => String(l.id) !== leadIdStr));
+      setOpenLead((prev: any) =>
+        prev && String(prev.id) === leadIdStr ? null : prev
+      );
+    };
+
+    window.addEventListener("mindlink:lead-treated", onTreated as EventListener);
+    window.addEventListener("mindlink:lead-deleted", onDeleted as EventListener);
+
+    return () => {
+      window.removeEventListener("mindlink:lead-treated", onTreated as EventListener);
+      window.removeEventListener("mindlink:lead-deleted", onDeleted as EventListener);
+    };
+  }, []);
 
   /* --------------------------------------------
       AUTO-SAVE INTERNAL MESSAGE
@@ -124,8 +171,12 @@ export default function MapsPage() {
   const treatedCount = safeLeads.filter((l) => l.traite).length;
   const remainingToTreat = total - treatedCount;
 
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-  const nextImport = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+  const now = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
+  );
+  const nextImport = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
+  );
   nextImport.setHours(8, 0, 0, 0);
   if (now > nextImport) nextImport.setDate(nextImport.getDate() + 1);
   const diff = nextImport.getTime() - now.getTime();
@@ -137,7 +188,6 @@ export default function MapsPage() {
   return (
     <>
       <div className="space-y-10">
-
         {/* HEADER */}
         <div className="flex justify-between items-start">
           <div>
@@ -153,7 +203,7 @@ export default function MapsPage() {
             href="/dashboard/maps/export"
             className="
               px-4 py-2 text-xs rounded-xl
-              bg-slate-900 border border-slate-700 
+              bg-slate-900 border border-slate-700
               hover:bg-slate-800 transition
             "
           >
@@ -166,7 +216,7 @@ export default function MapsPage() {
           <div
             className="
               flex items-center gap-3
-              bg-slate-900/60 border border-slate-700 rounded-xl 
+              bg-slate-900/60 border border-slate-700 rounded-xl
               px-4 py-2.5 shadow-inner backdrop-blur-md
               focus-within:ring-2 focus-within:ring-indigo-500/50
               transition
@@ -207,16 +257,19 @@ export default function MapsPage() {
 
         {/* TABLE */}
         <div className="rounded-2xl border border-slate-800 bg-slate-950/90 shadow-xl overflow-hidden">
-
           {/* TOP BAR */}
           <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
             <div>
               <h2 className="text-slate-100 text-sm font-medium">
                 Liste des leads Google Maps
               </h2>
-              <p className="text-[11px] text-slate-500">Triés du plus récent au plus ancien</p>
+              <p className="text-[11px] text-slate-500">
+                Triés du plus récent au plus ancien
+              </p>
             </div>
-            <div className="text-[11px] text-slate-400">{filteredLeads.length} lead(s)</div>
+            <div className="text-[11px] text-slate-400">
+              {filteredLeads.length} lead(s)
+            </div>
           </div>
 
           {/* TABLE CONTENT */}
@@ -250,7 +303,10 @@ export default function MapsPage() {
                     >
                       {/* TRAITE */}
                       <td className="py-3 px-4 text-center">
-                        <TraiteCheckbox leadId={lead.id} defaultChecked={Boolean(lead.traite)} />
+                        <TraiteCheckbox
+                          leadId={lead.id}
+                          defaultChecked={Boolean(lead.traite)}
+                        />
                       </td>
 
                       {/* NOM + pastille + bouton voir */}
@@ -291,7 +347,11 @@ export default function MapsPage() {
                       {/* WEBSITE */}
                       <td className="py-3 px-4">
                         {lead.website ? (
-                          <a href={lead.website} target="_blank" className="text-sky-400 hover:underline">
+                          <a
+                            href={lead.website}
+                            target="_blank"
+                            className="text-sky-400 hover:underline"
+                          >
                             Voir site
                           </a>
                         ) : (
@@ -302,7 +362,11 @@ export default function MapsPage() {
                       {/* MAPS */}
                       <td className="py-3 px-4">
                         {lead.placeUrl ? (
-                          <a href={lead.placeUrl} target="_blank" className="text-green-400 hover:underline">
+                          <a
+                            href={lead.placeUrl}
+                            target="_blank"
+                            className="text-green-400 hover:underline"
+                          >
                             Ouvrir Map
                           </a>
                         ) : (
@@ -353,30 +417,50 @@ export default function MapsPage() {
           </h2>
 
           <div className="text-sm text-slate-300 space-y-2 mb-6">
-            <p><strong>Email :</strong> {openLead.email || "—"}</p>
-            <p><strong>Téléphone :</strong> {openLead.phoneNumber || "—"}</p>
+            <p>
+              <strong>Email :</strong> {openLead.email || "—"}
+            </p>
+            <p>
+              <strong>Téléphone :</strong> {openLead.phoneNumber || "—"}
+            </p>
             <p>
               <strong>Site :</strong>{" "}
               {openLead.website ? (
-                <a href={openLead.website} target="_blank" className="text-sky-400 underline">
+                <a
+                  href={openLead.website}
+                  target="_blank"
+                  className="text-sky-400 underline"
+                >
                   Voir site
                 </a>
-              ) : "—"}
+              ) : (
+                "—"
+              )}
             </p>
             <p>
               <strong>Google Maps :</strong>{" "}
               {openLead.placeUrl ? (
-                <a href={openLead.placeUrl} target="_blank" className="text-green-400 underline">
+                <a
+                  href={openLead.placeUrl}
+                  target="_blank"
+                  className="text-green-400 underline"
+                >
                   Ouvrir map
                 </a>
-              ) : "—"}
+              ) : (
+                "—"
+              )}
             </p>
-            <p><strong>Créé le :</strong> {openLead.created_at?.slice(0, 10)}</p>
+            <p>
+              <strong>Créé le :</strong> {openLead.created_at?.slice(0, 10)}
+            </p>
           </div>
 
           {/* Message interne */}
           <div className="mt-6">
-            <label className="text-xs text-slate-400 mb-2 block">Message interne</label>
+            <label className="text-xs text-slate-400 mb-2 block">
+              Message interne
+            </label>
 
             <textarea
               value={openLead.internal_message ?? ""}
@@ -415,7 +499,9 @@ export default function MapsPage() {
                 }
               `}
             >
-              {openLead.message_sent ? "Message envoyé ✓" : "Marquer comme envoyé"}
+              {openLead.message_sent
+                ? "Message envoyé ✓"
+                : "Marquer comme envoyé"}
             </button>
           </div>
 
@@ -438,7 +524,9 @@ export default function MapsPage() {
 function KPI({ title, value, text }: { title: string; value: any; text: string }) {
   return (
     <div className="rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center shadow-inner">
-      <div className="text-[11px] text-slate-500 uppercase tracking-wide">{title}</div>
+      <div className="text-[11px] text-slate-500 uppercase tracking-wide">
+        {title}
+      </div>
       <div className="text-3xl font-semibold text-slate-50 mt-1">{value}</div>
       <p className="text-[11px] text-slate-500 mt-1">{text}</p>
     </div>

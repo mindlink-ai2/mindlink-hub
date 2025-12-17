@@ -3,7 +3,7 @@
 export default function DeleteLeadButton({
   leadId,
 }: {
-  leadId: number;
+  leadId: number | string;
 }) {
   const handleDelete = async () => {
     const confirmDelete = confirm("Tu veux vraiment supprimer ce lead ?");
@@ -20,10 +20,10 @@ export default function DeleteLeadButton({
       return;
     }
 
-    // ✅ informe la page pour update instantané
+    // ✅ NORMALISATION ID + EVENT (clé)
     window.dispatchEvent(
       new CustomEvent("mindlink:lead-deleted", {
-        detail: { leadId },
+        detail: { leadId: String(leadId) },
       })
     );
   };
