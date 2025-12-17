@@ -1,38 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  ResponsiveContainer,
-} from "recharts";
-
-import { RECOMMENDATIONS } from "@/app/data/recommendations";
-
-// ---------------------------------------------------------------------
-// 🔥 Fonction pour choisir 3 recommandations aléatoires toutes les 8h
-// ---------------------------------------------------------------------
-function getRotatingRecommendations() {
-  const now = new Date();
-
-  const cycle = Math.floor(now.getHours() / 8);
-  const seed = parseInt(
-    `${now.getFullYear()}${now.getMonth()}${now.getDate()}${cycle}`
-  );
-
-  function random(seedValue: number) {
-    const x = Math.sin(seedValue) * 10000;
-    return x - Math.floor(x);
-  }
-
-  const shuffled = [...RECOMMENDATIONS].sort(
-    (a, b) => random(seed + a.length) - random(seed + b.length)
-  );
-
-  return shuffled.slice(0, 3);
-}
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
@@ -41,12 +9,10 @@ export default function DashboardPage() {
     traitementRate: 0,
     emailsSortedToday: 0,
     emailsSortedTotal: 0,
-    relancesCount: 0,   // relances à venir
-    relancesLate: 0,    // relances en retard
+    relancesCount: 0,
+    relancesLate: 0,
     mindlinkScore: 0,
   });
-
-  const tips = getRotatingRecommendations();
 
   useEffect(() => {
     async function loadStats() {
@@ -89,109 +55,42 @@ export default function DashboardPage() {
       </div>
 
       {/* KPIs ligne 2 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-14">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <KPI label="Emails triés aujourd’hui" value={stats.emailsSortedToday} color="from-indigo-500 to-blue-400" />
         <KPI label="Emails triés au total" value={stats.emailsSortedTotal} color="from-sky-500 to-blue-300" />
         <KPI label="Relances à venir" value={stats.relancesCount} color="from-yellow-500 to-orange-400" />
         <KPI label="Relances en retard" value={stats.relancesLate} color="from-red-500 to-rose-500" />
       </div>
-
-      {/* IA */}
-      <Section title="Analyse IA & Recommandations" height="auto">
-        <div className="w-full space-y-4">
-          {tips.map((tip, i) => (
-            <div
-              key={i}
-              className="p-4 rounded-xl bg-gradient-to-br from-blue-500/10 via-slate-800/30 to-indigo-500/10 
-                         border border-indigo-500/20 text-slate-200 shadow-lg shadow-indigo-500/10 
-                         transition-all duration-300 ease-out 
-                         hover:shadow-indigo-500/40 hover:-translate-y-1 hover:scale-[1.02]"
-            >
-              {tip}
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* ⭐️ MINDLINK MAP */}
-      <MindlinkMap stats={stats} />
     </div>
   );
 }
 
 /* ------------------------- */
-/* Composants utilitaires    */
+/* Composant KPI             */
 /* ------------------------- */
 
-function KPI({ label, value, color }: { label: string; value: any; color: string }) {
+function KPI({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: any;
+  color: string;
+}) {
   return (
     <div
-      className={`
-        rounded-2xl bg-[#0B0E13] border border-slate-800 p-6 shadow-xl shadow-black/40 
+      className="
+        rounded-2xl bg-[#0B0E13] border border-slate-800 p-6 shadow-xl shadow-black/40
         relative overflow-hidden transition-all duration-300 ease-out
         hover:-translate-y-1 hover:scale-[1.03] hover:shadow-indigo-500/30
-      `}
+      "
     >
-      <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${color}`}></div>
-
+      <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${color}`} />
       <div className="text-slate-400 text-sm relative z-10">{label}</div>
-      <div className="text-4xl font-bold mt-2 text-white relative z-10">{value}</div>
+      <div className="text-4xl font-bold mt-2 text-white relative z-10">
+        {value}
+      </div>
     </div>
-  );
-}
-
-function Section({ title, height, children }: any) {
-  return (
-    <>
-      <h2 className="text-2xl font-bold mb-4 text-indigo-300">{title}</h2>
-      <div
-        className="rounded-2xl bg-[#0F131A] border border-slate-800 p-10 mb-16 shadow-lg shadow-black/30"
-        style={{ minHeight: height }}
-      >
-        {children}
-      </div>
-    </>
-  );
-}
-
-/* ---------------------------- */
-/* ⭐️ MINDLINK MAP (Radar Chart) */
-/* ---------------------------- */
-
-function MindlinkMap({ stats }: { stats: any }) {
-  const data = [
-    { subject: "LinkedIn", value: stats.leadsToday, fullMark: 100 },
-    { subject: "Google Maps", value: stats.leadsWeek, fullMark: 100 },
-    { subject: "Traitement", value: stats.traitementRate, fullMark: 100 },
-    { subject: "Emails", value: stats.emailsSortedToday, fullMark: 100 },
-    { subject: "Relances", value: stats.relancesCount, fullMark: 100 },
-    { subject: "Relances en retard", value: stats.relancesLate, fullMark: 100 }, // ⭐️ remplacé ici
-  ];
-
-  return (
-    <>
-      <h2 className="text-2xl font-bold mb-4 text-indigo-300">
-        Mindlink Map – Vue globale
-      </h2>
-
-      <div className="rounded-2xl bg-[#0F131A] border border-slate-800 p-10 h-[420px] mb-16 shadow-xl shadow-black/30">
-        <ResponsiveContainer width="100%" height="100%">
-          <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
-            <PolarGrid stroke="#334155" />
-            <PolarAngleAxis
-              dataKey="subject"
-              tick={{ fill: "#c7d2fe", fontSize: 12 }}
-            />
-            <Radar
-              name="Mindlink"
-              dataKey="value"
-              stroke="#4f46e5"
-              fill="#6366f1"
-              fillOpacity={0.35}
-            />
-          </RadarChart>
-        </ResponsiveContainer>
-      </div>
-    </>
   );
 }
