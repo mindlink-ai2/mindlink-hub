@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import TraiteCheckbox from "./TraiteCheckbox";
 import DeleteLeadButton from "./DeleteLeadButton";
 
@@ -22,10 +22,14 @@ function filterLeads(leads: Lead[], term: string) {
 
 export default function LeadsPage() {
   const [safeLeads, setSafeLeads] = useState<Lead[]>([]);
-  const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
+
+  // ✅ DERIVED filtered list (no state = no desync)
+  const filteredLeads = useMemo(() => {
+    return filterLeads(safeLeads, searchTerm);
+  }, [safeLeads, searchTerm]);
 
   // Load leads
   useEffect(() => {
@@ -35,20 +39,13 @@ export default function LeadsPage() {
 
       const leads = data.leads ?? [];
       setSafeLeads(leads);
-      setFilteredLeads(leads);
       setClientLoaded(true);
     })();
   }, []);
 
-  // keep filtered list synced when safeLeads changes
-  useEffect(() => {
-    setFilteredLeads(filterLeads(safeLeads, searchTerm));
-  }, [safeLeads, searchTerm]);
-
   // SEARCH FUNCTION
   const handleSearch = (value: string) => {
     setSearchTerm(value);
-    setFilteredLeads(filterLeads(safeLeads, value));
   };
 
   // ✅ LIVE UI UPDATE via events from child components
@@ -59,32 +56,47 @@ export default function LeadsPage() {
         traite: boolean;
       };
       if (!detail?.leadId) return;
-  
+
       setSafeLeads((prev) =>
         prev.map((l) =>
           l.id === detail.leadId ? { ...l, traite: detail.traite } : l
         )
       );
-  
+
       setOpenLead((prev: Lead | null) =>
         prev?.id === detail.leadId ? { ...prev, traite: detail.traite } : prev
       );
     };
-  
+
     const onDeleted = (e: Event) => {
       const detail = (e as CustomEvent).detail as { leadId: number };
       if (!detail?.leadId) return;
-  
+
+      // ✅ Update source of truth -> UI updates instantly
       setSafeLeads((prev) => prev.filter((l) => l.id !== detail.leadId));
-      setOpenLead((prev: Lead | null) => (prev?.id === detail.leadId ? null : prev));
+      setOpenLead((prev: Lead | null) =>
+        prev?.id === detail.leadId ? null : prev
+      );
     };
-  
-    window.addEventListener("mindlink:lead-treated", onTreated as EventListener);
-    window.addEventListener("mindlink:lead-deleted", onDeleted as EventListener);
-  
+
+    window.addEventListener(
+      "mindlink:lead-treated",
+      onTreated as EventListener
+    );
+    window.addEventListener(
+      "mindlink:lead-deleted",
+      onDeleted as EventListener
+    );
+
     return () => {
-      window.removeEventListener("mindlink:lead-treated", onTreated as EventListener);
-      window.removeEventListener("mindlink:lead-deleted", onDeleted as EventListener);
+      window.removeEventListener(
+        "mindlink:lead-treated",
+        onTreated as EventListener
+      );
+      window.removeEventListener(
+        "mindlink:lead-deleted",
+        onDeleted as EventListener
+      );
     };
   }, []);
 
@@ -153,9 +165,7 @@ export default function LeadsPage() {
   };
 
   if (!clientLoaded) {
-    return (
-      <div className="text-slate-400 text-sm">Chargement des leads...</div>
-    );
+    return <div className="text-slate-400 text-sm">Chargement des leads...</div>;
   }
 
   const total = safeLeads.length;
@@ -479,7 +489,7 @@ export default function LeadsPage() {
                 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
                 transition
               "
-            />
+            ></textarea>
           </div>
 
           <div className="mt-4">
@@ -516,7 +526,15 @@ export default function LeadsPage() {
 }
 
 /* KPI Component */
-function KPI({ title, value, text }: { title: string; value: any; text: string }) {
+function KPI({
+  title,
+  value,
+  text,
+}: {
+  title: string;
+  value: any;
+  text: string;
+}) {
   return (
     <div className="rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center shadow-inner">
       <div className="text-[11px] text-slate-500 uppercase tracking-wide">
