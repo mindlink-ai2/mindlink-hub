@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 
 type Lead = {
@@ -25,43 +24,6 @@ export function LeadsTable({
   leads: Lead[];
   onOpen?: (lead: Lead) => void;
 }) {
-  const [rows, setRows] = useState<Lead[]>(leads);
-
-  // ✅ SYNC rows avec leads (FIX CRITIQUE)
-  useEffect(() => {
-    setRows(leads);
-  }, [leads]);
-
-  // 🟦 Toggle traité
-  const toggleTraite = async (lead: Lead) => {
-    const newValue = !lead.traite;
-
-    setRows((prev) =>
-      prev.map((l) => (l.id === lead.id ? { ...l, traite: newValue } : l))
-    );
-
-    try {
-      await fetch("/api/leads/traite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId: lead.id, value: newValue }),
-      });
-    } catch (e) {
-      console.error(e);
-      // rollback
-      setRows((prev) =>
-        prev.map((l) =>
-          l.id === lead.id ? { ...l, traite: !newValue } : l
-        )
-      );
-    }
-  };
-
-  // 🗑️ Suppression locale après delete
-  const handleDelete = (id: number) => {
-    setRows((prev) => prev.filter((l) => l.id !== id));
-  };
-
   return (
     <div className="overflow-x-auto">
       <div className="min-w-full flex justify-center">
@@ -98,14 +60,14 @@ export function LeadsTable({
           </thead>
 
           <tbody>
-            {rows.length === 0 ? (
+            {leads.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-10 text-center text-slate-500">
                   Aucun lead pour l’instant 🚀
                 </td>
               </tr>
             ) : (
-              rows.map((lead, index) => {
+              leads.map((lead, index) => {
                 const isNew =
                   lead.created_at &&
                   Date.now() - new Date(lead.created_at).getTime() <
@@ -124,15 +86,17 @@ export function LeadsTable({
                     key={lead.id}
                     className={`${rowBg} group border-b border-slate-900 hover:bg-slate-900/80 transition`}
                   >
+                    {/* Traité */}
                     <td className="py-3 px-6 text-center border-r border-slate-900">
                       <input
                         type="checkbox"
                         className="h-4 w-4 rounded border-slate-700 bg-slate-900"
                         checked={!!lead.traite}
-                        onChange={() => toggleTraite(lead)}
+                        readOnly
                       />
                     </td>
 
+                    {/* Nom + Ouvrir */}
                     <td className="py-3 px-6 text-center border-r border-slate-900 relative">
                       <div className="flex items-center justify-center gap-2">
                         <span className="truncate max-w-[260px]">
@@ -163,10 +127,12 @@ export function LeadsTable({
                       </div>
                     </td>
 
+                    {/* Entreprise */}
                     <td className="py-3 px-6 text-center border-r border-slate-900">
                       {lead.Company ?? "—"}
                     </td>
 
+                    {/* LinkedIn */}
                     <td className="py-3 px-6 text-center border-r border-slate-900">
                       {lead.LinkedInURL ? (
                         <a
@@ -182,17 +148,16 @@ export function LeadsTable({
                       )}
                     </td>
 
+                    {/* Date */}
                     <td className="py-3 px-6 text-center border-r border-slate-900">
                       {lead.created_at
                         ? new Date(lead.created_at).toLocaleDateString("fr-FR")
                         : "—"}
                     </td>
 
+                    {/* Delete */}
                     <td className="py-3 px-6 text-center">
-                      <DeleteLeadButton
-                        leadId={lead.id}
-                        onDeleted={() => handleDelete(lead.id)}
-                      />
+                      <DeleteLeadButton leadId={lead.id} />
                     </td>
                   </tr>
                 );
