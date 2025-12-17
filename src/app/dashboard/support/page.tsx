@@ -19,29 +19,44 @@ export default function SupportPage() {
 
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState<null | "ok" | "error">(null);
+  const [errorMsg, setErrorMsg] = useState<string>("");
 
   const onChange = (key: keyof FormState, value: any) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setSent(null);
+    setErrorMsg("");
   };
 
   const handleSend = async () => {
     if (!form.subject.trim() || !form.message.trim()) {
       setSent("error");
+      setErrorMsg("Merci de renseigner un sujet et un message.");
       return;
     }
 
     setSending(true);
     setSent(null);
+    setErrorMsg("");
 
     try {
       const res = await fetch("/api/support/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          subject: form.subject,
+          message: form.message,
+          category: form.category,
+          priority: form.priority,
+        }),
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({} as any));
+        console.log("SUPPORT ERROR", res.status, err);
+        setSent("error");
+        setErrorMsg(err?.error ?? "Erreur. Réessaie.");
+        return;
+      }
 
       setSent("ok");
       setForm({
@@ -53,6 +68,7 @@ export default function SupportPage() {
     } catch (e) {
       console.error(e);
       setSent("error");
+      setErrorMsg("Erreur réseau. Réessaie.");
     } finally {
       setSending(false);
     }
@@ -156,7 +172,7 @@ export default function SupportPage() {
               )}
               {sent === "error" && (
                 <span className="text-red-400">
-                  ❌ Erreur. Vérifie le sujet / message, ou réessaie.
+                  ❌ {errorMsg || "Erreur. Vérifie le sujet / message, ou réessaie."}
                 </span>
               )}
             </div>
