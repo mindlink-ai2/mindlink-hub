@@ -9,14 +9,23 @@ export default function DeleteLeadButton({
     const confirmDelete = confirm("Tu veux vraiment supprimer ce lead ?");
     if (!confirmDelete) return;
 
-    await fetch("/dashboard/maps/delete", {
+    const res = await fetch("/dashboard/maps/delete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: leadId }),
     });
 
-    // rafraîchit la page automatiquement
-    window.location.reload();
+    if (!res.ok) {
+      alert("Erreur lors de la suppression");
+      return;
+    }
+
+    // ✅ informe la page pour update instantané
+    window.dispatchEvent(
+      new CustomEvent("mindlink:lead-deleted", {
+        detail: { leadId },
+      })
+    );
   };
 
   return (
