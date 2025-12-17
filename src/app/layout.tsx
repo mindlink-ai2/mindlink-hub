@@ -2,27 +2,22 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import "./globals.css";
+import DashboardContainer from "@/components/DashboardContainer";
 
 export const metadata: Metadata = {
   title: "Mindlink Hub",
   description: "Espace client pour agences & freelances",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
       <html lang="fr">
         <body className="bg-slate-950 text-slate-50">
           <div className="min-h-screen flex flex-col">
-            
             {/* 🔵 HEADER */}
             <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-20">
               <div className="max-w-6xl mx-auto flex items-center justify-between px-4 py-3">
-                
                 {/* 🔹 Logo + titre */}
                 <div className="flex items-center gap-2">
                   <Link href="/" className="flex items-center gap-2">
@@ -43,17 +38,21 @@ export default function RootLayout({
                 {/* 🔹 Navigation + User */}
                 <div className="flex items-center gap-4 text-xs">
                   <SignedIn>
-                  <nav className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
-  <Link href="/dashboard" className="hover:text-slate-100 transition">
-    Dashboard
-  </Link>
-  <Link href="/dashboard/prospection" className="hover:text-slate-100 transition">
-    Prospection
-  </Link>
-  <Link href="/dashboard/followups" className="hover:text-slate-100 transition">
-    Relances
-  </Link>
-</nav>
+                    <nav className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
+                      <Link href="/dashboard" className="hover:text-slate-100 transition">
+                        Dashboard
+                      </Link>
+                      <Link href="/dashboard/prospection" className="hover:text-slate-100 transition">
+                        Prospection
+                      </Link>
+                      <Link href="/dashboard/followups" className="hover:text-slate-100 transition">
+                        Relances
+                      </Link>
+                      <Link href="/dashboard/support" className="hover:text-slate-100 transition">
+                        Support
+                      </Link>
+                    </nav>
+
                     <div className="flex items-center gap-3">
                       <span className="hidden sm:inline text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-full">
                         Connecté
@@ -67,10 +66,16 @@ export default function RootLayout({
 
                   <SignedOut>
                     <div className="flex items-center gap-3">
-                      <Link href="/sign-in" className="rounded-full border border-slate-700 px-3 py-1 text-xs hover:bg-slate-800 transition">
+                      <Link
+                        href="/sign-in"
+                        className="rounded-full border border-slate-700 px-3 py-1 text-xs hover:bg-slate-800 transition"
+                      >
                         Se connecter
                       </Link>
-                      <Link href="/sign-up" className="hidden sm:inline rounded-full bg-sky-500 px-3 py-1 text-xs font-medium text-slate-950 hover:bg-sky-400 transition shadow-lg shadow-sky-500/30">
+                      <Link
+                        href="/sign-up"
+                        className="hidden sm:inline rounded-full bg-sky-500 px-3 py-1 text-xs font-medium text-slate-950 hover:bg-sky-400 transition shadow-lg shadow-sky-500/30"
+                      >
                         Créer un compte
                       </Link>
                     </div>
@@ -81,17 +86,7 @@ export default function RootLayout({
 
             {/* 🔵 PAGE CONTENT */}
             <main className="flex-1">
-
-              {/* 🎯 FIX : container seulement si la page n’est PAS prospection */}
-              <div className={
-                typeof window !== "undefined" &&
-                window.location.pathname.includes("/dashboard/prospection")
-                  ? "" // = Fullscreen parfait
-                  : "max-w-6xl mx-auto px-4 py-8" // = toutes les autres pages restent identiques
-              }>
-                {children}
-              </div>
-
+              <DashboardContainer>{children}</DashboardContainer>
             </main>
 
             {/* 🔵 FOOTER */}
@@ -104,7 +99,6 @@ export default function RootLayout({
                 </div>
               </div>
             </footer>
-
           </div>
         </body>
       </html>
