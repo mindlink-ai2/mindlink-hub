@@ -1,14 +1,11 @@
 "use client";
 
 type DeleteLeadButtonProps = {
-  leadId: number;
-  onDeleted?: () => void; // on l’utilisera plus tard pour rafraîchir la liste
+  leadId: string | number;
+  onDeleted?: () => void; // optionnel, compat future
 };
 
-export default function DeleteLeadButton({
-  leadId,
-  onDeleted,
-}: DeleteLeadButtonProps) {
+export default function DeleteLeadButton({ leadId, onDeleted }: DeleteLeadButtonProps) {
   async function handleDelete() {
     const ok = confirm("Voulez-vous vraiment supprimer ce lead ?");
     if (!ok) return;
@@ -16,10 +13,8 @@ export default function DeleteLeadButton({
     try {
       const res = await fetch("/dashboard/leads/delete", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ id: leadId }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: leadId }), // ✅ on envoie tel quel
       });
 
       if (!res.ok) {
@@ -27,6 +22,15 @@ export default function DeleteLeadButton({
         alert("Impossible de supprimer ce lead. Réessayez plus tard.");
         return;
       }
+
+      // ✅ Normalise en string pour éviter tout mismatch (number vs string vs uuid)
+      const leadIdStr = String(leadId);
+
+      window.dispatchEvent(
+        new CustomEvent("mindlink:lead-deleted", {
+          detail: { leadId: leadIdStr },
+        })
+      );
 
       if (onDeleted) onDeleted();
     } catch (err) {

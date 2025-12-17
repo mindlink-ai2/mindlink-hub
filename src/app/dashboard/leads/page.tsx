@@ -69,13 +69,12 @@ export default function LeadsPage() {
     };
 
     const onDeleted = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { leadId: number };
+      const detail = (e as CustomEvent).detail as { leadId: string };
       if (!detail?.leadId) return;
-
-      // ✅ Update source of truth -> UI updates instantly
-      setSafeLeads((prev) => prev.filter((l) => l.id !== detail.leadId));
+    
+      setSafeLeads((prev) => prev.filter((l) => String(l.id) !== detail.leadId));
       setOpenLead((prev: Lead | null) =>
-        prev?.id === detail.leadId ? null : prev
+        prev && String(prev.id) === detail.leadId ? null : prev
       );
     };
 
