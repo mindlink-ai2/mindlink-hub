@@ -2,58 +2,41 @@
 
 import { useMemo, useState } from "react";
 
-type Category = "support" | "cibles" | "mails" | "bug" | "autre";
-
 type FormState = {
   subject: string;
-  category: Category;
+  category: "support" | "cibles" | "mails" | "bug" | "autre";
   message: string;
 };
 
-const CATEGORY_UI: {
-  key: Category;
+const CATEGORIES: Array<{
+  value: FormState["category"];
   label: string;
   hint: string;
-  subjectPlaceholder: string;
-  messagePlaceholder: string;
-}[] = [
+}> = [
   {
-    key: "support",
+    value: "support",
     label: "Support",
-    hint: "Question, aide, configuration, accès.",
-    subjectPlaceholder: "Ex: Besoin d'aide sur la prospection",
-    messagePlaceholder: "Explique ton besoin, ce que tu vois à l'écran, et ce que tu attends.",
+    hint: "Questions, aide, accompagnement",
   },
   {
-    key: "cibles",
-    label: "Changement de cibles",
-    hint: "Zone, secteurs, taille, exclusions, exemples.",
-    subjectPlaceholder: "Ex: Modifier mes cibles (PME < 50, Bordeaux)",
-    messagePlaceholder:
-      "Indique la zone, secteurs, taille, intitulés, exclusions et 3 exemples d'entreprises à cibler.",
+    value: "cibles",
+    label: "Cibles",
+    hint: "Zone, secteurs, postes, exclusions",
   },
   {
-    key: "mails",
-    label: "Libellés / règles mails",
-    hint: "Libellés, règles, critères, cas limites.",
-    subjectPlaceholder: "Ex: Ajouter un libellé Devis",
-    messagePlaceholder:
-      "Ex: Ajouter un libellé “Devis” si l'objet contient “devis / proposition” ou si pièce jointe PDF.",
+    value: "mails",
+    label: "Mails",
+    hint: "Libellés, règles, automatisations",
   },
   {
-    key: "bug",
+    value: "bug",
     label: "Bug",
-    hint: "Décris le contexte, étapes, résultat attendu.",
-    subjectPlaceholder: "Ex: Bug sur la page Google Maps",
-    messagePlaceholder:
-      "Étapes pour reproduire, ce que tu observes, capture si possible, et résultat attendu.",
+    hint: "Un comportement anormal à corriger",
   },
   {
-    key: "autre",
+    value: "autre",
     label: "Autre",
-    hint: "Suggestion, amélioration, demande spécifique.",
-    subjectPlaceholder: "Ex: Suggestion d'amélioration",
-    messagePlaceholder: "Décris l'idée et ce que ça changerait pour toi.",
+    hint: "Toute autre demande",
   },
 ];
 
@@ -67,58 +50,18 @@ export default function SupportPage() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState<null | "ok" | "error">(null);
 
-  const active = useMemo(() => {
-    return CATEGORY_UI.find((c) => c.key === form.category) ?? CATEGORY_UI[0];
-  }, [form.category]);
+  const currentCategory = useMemo(
+    () => CATEGORIES.find((c) => c.value === form.category),
+    [form.category]
+  );
 
   const onChange = (key: keyof FormState, value: any) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setSent(null);
   };
 
-  const setCategory = (category: Category) => {
-    setForm((prev) => ({ ...prev, category }));
-    setSent(null);
-  };
-
-  const canSend = form.subject.trim().length > 0 && form.message.trim().length > 0;
-
-  const handlePrefill = () => {
-    // Petit pré-remplissage premium (optionnel)
-    const preset =
-      form.category === "cibles"
-        ? {
-            subject: "Modification de mes cibles",
-            message:
-              "Zone:\nSecteurs:\nTaille:\nIntitulés:\nExclusions:\n\n3 exemples d'entreprises:\n1.\n2.\n3.\n",
-          }
-        : form.category === "mails"
-        ? {
-            subject: "Ajout d'une règle mail",
-            message:
-              "Objectif:\nRègle:\nCritères:\nExceptions:\n\nExemples d'emails concernés:\n1.\n2.\n3.\n",
-          }
-        : form.category === "bug"
-        ? {
-            subject: "Bug à signaler",
-            message:
-              "Contexte:\nÉtapes pour reproduire:\nRésultat actuel:\nRésultat attendu:\n\nInfos utiles:\nNavigateur:\n",
-          }
-        : {
-            subject: "Question",
-            message: "Bonjour,\n\n",
-          };
-
-    setForm((prev) => ({
-      ...prev,
-      subject: prev.subject.trim() ? prev.subject : preset.subject,
-      message: prev.message.trim() ? prev.message : preset.message,
-    }));
-    setSent(null);
-  };
-
   const handleSend = async () => {
-    if (!canSend) {
+    if (!form.subject.trim() || !form.message.trim()) {
       setSent("error");
       return;
     }
@@ -133,13 +76,14 @@ export default function SupportPage() {
         body: JSON.stringify(form),
       });
 
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt);
-      }
+      if (!res.ok) throw new Error(await res.text());
 
       setSent("ok");
-      setForm({ subject: "", category: form.category, message: "" });
+      setForm({
+        subject: "",
+        category: "support",
+        message: "",
+      });
     } catch (e) {
       console.error(e);
       setSent("error");
@@ -148,181 +92,250 @@ export default function SupportPage() {
     }
   };
 
+  const subjectOk = form.subject.trim().length > 0;
+  const messageOk = form.message.trim().length > 0;
+  const canSend = subjectOk && messageOk && !sending;
+
   return (
     <div className="min-h-screen w-full px-6 pt-16 pb-24">
-      <div className="max-w-5xl mx-auto space-y-8">
+      <div className="max-w-4xl mx-auto space-y-8">
         {/* HEADER */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-semibold tracking-tight text-slate-50">
-              Support / Ticketing
-            </h1>
-            <p className="text-slate-400 mt-2">
-              Une question, un changement de cibles ou une règle mail à ajouter ?
-              Envoie-nous un ticket et notre équipe s’en occupe rapidement.
-            </p>
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/60 px-3 py-1 text-[11px] text-slate-300">
+            <span className="h-2 w-2 rounded-full bg-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.65)]" />
+            Support Mindlink
           </div>
 
-          <button
-            type="button"
-            onClick={handlePrefill}
-            className="
-              hidden sm:inline-flex items-center gap-2
-              px-4 py-2 rounded-full text-[12px]
-              bg-slate-900/60 border border-slate-700
-              hover:bg-slate-800/70 hover:border-slate-600
-              text-slate-200 transition
-            "
-          >
-            ✨ Pré-remplir
-          </button>
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-50">
+            Envoyer une demande
+          </h1>
+
+          <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-2xl">
+            Besoin d’un ajustement sur tes cibles, d’une règle mail, ou d’un coup
+            de main sur la plateforme ? Écris nous ici et on revient vers toi au
+            plus vite.
+          </p>
         </div>
 
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl border border-slate-800
-            bg-gradient-to-b from-slate-950/90 to-slate-950/60
-            shadow-[0_20px_80px_-40px_rgba(79,70,229,0.65)]
-            overflow-hidden
-          "
-        >
-          {/* TOP GRADIENT BAR */}
-          <div className="relative">
-            <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_20%_0%,rgba(99,102,241,0.25),transparent_60%),radial-gradient(50%_60%_at_80%_0%,rgba(56,189,248,0.18),transparent_55%)]" />
-            <div className="relative px-6 py-5 border-b border-slate-800">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="text-[12px] text-slate-400">
-                    Choisis un type de demande
+        {/* GRID */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* FORM CARD */}
+          <div className="lg:col-span-2">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/80 shadow-xl overflow-hidden">
+              {/* TOP */}
+              <div className="px-6 py-5 border-b border-slate-800 bg-gradient-to-b from-slate-950/80 to-slate-950/40">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <h2 className="text-slate-100 text-sm font-medium">
+                      Formulaire de support
+                    </h2>
+                    <p className="text-[12px] text-slate-400">
+                      Plus c’est précis, plus c’est rapide.
+                    </p>
                   </div>
-                  <div className="text-sm text-slate-200">{active.hint}</div>
-                </div>
 
-                <button
-                  type="button"
-                  onClick={handlePrefill}
-                  className="
-                    sm:hidden inline-flex items-center justify-center gap-2
-                    px-4 py-2 rounded-full text-[12px]
-                    bg-slate-900/60 border border-slate-700
-                    hover:bg-slate-800/70 hover:border-slate-600
-                    text-slate-200 transition
-                  "
-                >
-                  ✨ Pré-remplir
-                </button>
+                  {sent === "ok" && (
+                    <div className="text-[12px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-3 py-1.5 rounded-full">
+                      Envoyé
+                    </div>
+                  )}
+                  {sent === "error" && (
+                    <div className="text-[12px] text-red-300 bg-red-500/10 border border-red-500/25 px-3 py-1.5 rounded-full">
+                      Erreur
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* CATEGORY PILLS */}
-              <div className="mt-4 flex flex-wrap gap-2">
-                {CATEGORY_UI.map((c) => {
-                  const activePill = c.key === form.category;
-                  return (
-                    <button
-                      key={c.key}
-                      type="button"
-                      onClick={() => setCategory(c.key)}
-                      className={`
-                        px-4 py-2 rounded-full text-[12px] transition
-                        border
-                        ${
-                          activePill
-                            ? "bg-indigo-600/20 border-indigo-500/40 text-indigo-100 shadow-[0_0_0_1px_rgba(99,102,241,0.15)]"
-                            : "bg-slate-900/40 border-slate-700 text-slate-200 hover:bg-slate-800/60 hover:border-slate-600"
-                        }
-                      `}
-                    >
-                      {c.label}
-                    </button>
-                  );
-                })}
+              {/* BODY */}
+              <div className="p-6 space-y-5">
+                {/* SUBJECT */}
+                <div className="space-y-2">
+                  <label className="text-[11px] text-slate-400 uppercase tracking-wide">
+                    Sujet
+                  </label>
+                  <input
+                    value={form.subject}
+                    onChange={(e) => onChange("subject", e.target.value)}
+                    placeholder="Exemple : Ajuster mes cibles dans les Hauts de France"
+                    className="
+                      w-full rounded-xl bg-slate-900/50 border border-slate-700
+                      px-4 py-3 text-sm text-slate-200 placeholder-slate-500
+                      focus:outline-none focus:ring-2 focus:ring-indigo-500/50
+                    "
+                  />
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] text-slate-500">
+                      Un titre clair aide à traiter plus vite.
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {form.subject.trim().length}/80
+                    </p>
+                  </div>
+                </div>
+
+                {/* CATEGORY */}
+                <div className="space-y-2">
+                  <label className="text-[11px] text-slate-400 uppercase tracking-wide">
+                    Type de demande
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {CATEGORIES.map((c) => {
+                      const active = form.category === c.value;
+                      return (
+                        <button
+                          key={c.value}
+                          type="button"
+                          onClick={() => onChange("category", c.value)}
+                          className={`
+                            text-left rounded-xl border px-4 py-3 transition
+                            ${
+                              active
+                                ? "border-indigo-500/60 bg-indigo-500/10"
+                                : "border-slate-800 bg-slate-950/40 hover:bg-slate-900/40"
+                            }
+                          `}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`text-sm font-medium ${
+                                active ? "text-slate-100" : "text-slate-200"
+                              }`}
+                            >
+                              {c.label}
+                            </span>
+                            <span
+                              className={`h-2.5 w-2.5 rounded-full ${
+                                active
+                                  ? "bg-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.65)]"
+                                  : "bg-slate-700"
+                              }`}
+                            />
+                          </div>
+                          <p className="text-[12px] text-slate-400 mt-1">
+                            {c.hint}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {currentCategory?.value === "cibles" && (
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+                      <p className="text-[12px] text-slate-300 font-medium">
+                        Pour une demande de cibles, pense à préciser
+                      </p>
+                      <div className="mt-2 text-[12px] text-slate-400 leading-relaxed">
+                        Zone géographique, secteurs, postes, mots clés, exclusions
+                        et exemples de profils.
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* MESSAGE */}
+                <div className="space-y-2">
+                  <label className="text-[11px] text-slate-400 uppercase tracking-wide">
+                    Détails
+                  </label>
+                  <textarea
+                    value={form.message}
+                    onChange={(e) => onChange("message", e.target.value)}
+                    placeholder="Décris ce que tu veux. Tu peux donner des exemples, des contraintes, ou un résultat attendu."
+                    className="
+                      w-full h-44 rounded-xl bg-slate-900/50 border border-slate-700
+                      px-4 py-3 text-sm text-slate-200 placeholder-slate-500
+                      focus:outline-none focus:ring-2 focus:ring-indigo-500/50
+                      resize-none
+                    "
+                  />
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] text-slate-500">
+                      Tu peux copier coller des exemples.
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {form.message.trim().length}/2000
+                    </p>
+                  </div>
+                </div>
+
+                {/* ACTIONS */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
+                  <div className="text-[12px] text-slate-400">
+                    {sent === "error" ? (
+                      <span className="text-red-300">
+                        Vérifie le sujet et le message puis réessaie.
+                      </span>
+                    ) : sent === "ok" ? (
+                      <span className="text-emerald-300">
+                        Merci, ta demande a bien été envoyée.
+                      </span>
+                    ) : (
+                      <span>
+                        Réponse directement par email dès que c’est traité.
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleSend}
+                    disabled={!canSend}
+                    className={`
+                      inline-flex items-center justify-center gap-2
+                      px-5 py-2.5 rounded-xl text-sm font-medium transition
+                      ${
+                        canSend
+                          ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"
+                          : "bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed"
+                      }
+                    `}
+                  >
+                    {sending ? (
+                      <>
+                        <span className="h-4 w-4 rounded-full border-2 border-slate-300/40 border-t-slate-100 animate-spin" />
+                        Envoi en cours
+                      </>
+                    ) : (
+                      "Envoyer"
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* FORM */}
-          <div className="px-6 py-6 space-y-5">
-            {/* Sujet */}
-            <div className="space-y-2">
-              <label className="text-[11px] text-slate-400 uppercase tracking-wide">
-                Sujet
-              </label>
-              <input
-                value={form.subject}
-                onChange={(e) => onChange("subject", e.target.value)}
-                placeholder={active.subjectPlaceholder}
-                className="
-                  w-full rounded-2xl
-                  bg-slate-900/50 border border-slate-700
-                  px-4 py-3 text-sm text-slate-200 placeholder-slate-500
-                  focus:outline-none focus:ring-2 focus:ring-indigo-500/50
-                  transition
-                "
-              />
+          {/* SIDE PANEL */}
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 shadow-xl p-6">
+              <h3 className="text-sm font-medium text-slate-100">
+                Ce qu’on traite ici
+              </h3>
+
+              <ul className="mt-4 space-y-3 text-[12px] text-slate-400 leading-relaxed">
+                <li className="flex gap-3">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-sky-400" />
+                  Ajustements de cibles LinkedIn et Google Maps.
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-indigo-400" />
+                  Règles et libellés emails, tri, relances, automatisations.
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-emerald-400" />
+                  Bugs, améliorations, idées de fonctionnalités.
+                </li>
+              </ul>
             </div>
 
-            {/* Message */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] text-slate-400 uppercase tracking-wide">
-                  Message
-                </label>
-                <span className="text-[11px] text-slate-500">
-                  {form.message.length} caractères
-                </span>
-              </div>
-
-              <textarea
-                value={form.message}
-                onChange={(e) => onChange("message", e.target.value)}
-                placeholder={active.messagePlaceholder}
-                className="
-                  w-full h-56 rounded-2xl
-                  bg-slate-900/50 border border-slate-700
-                  px-4 py-3 text-sm text-slate-200 placeholder-slate-500
-                  focus:outline-none focus:ring-2 focus:ring-indigo-500/50
-                  transition
-                  resize-none
-                "
-              />
-            </div>
-
-            {/* FOOTER */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
-              <div className="text-xs">
-                {sent === "ok" && (
-                  <span className="text-emerald-400">✅ Message envoyé.</span>
-                )}
-                {sent === "error" && (
-                  <span className="text-red-400">
-                    ❌ Erreur. Vérifie le sujet et le message, puis réessaie.
-                  </span>
-                )}
-                {sent === null && (
-                  <span className="text-slate-500">
-                    Astuce : pour les cibles, indique zone, secteurs, taille, exclusions et 3 exemples.
-                  </span>
-                )}
-              </div>
-
-              <button
-                onClick={handleSend}
-                disabled={sending || !canSend}
-                className={`
-                  w-full sm:w-auto
-                  px-6 py-3 rounded-2xl text-sm font-medium transition
-                  ${
-                    sending
-                      ? "bg-slate-800 text-slate-400 cursor-not-allowed"
-                      : !canSend
-                      ? "bg-slate-900/60 text-slate-500 border border-slate-800 cursor-not-allowed"
-                      : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_10px_30px_-14px_rgba(99,102,241,0.75)]"
-                  }
-                `}
-              >
-                {sending ? "Envoi..." : "Envoyer"}
-              </button>
+            <div className="rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-950/70 to-slate-950/40 shadow-xl p-6">
+              <h3 className="text-sm font-medium text-slate-100">
+                Pour gagner du temps
+              </h3>
+              <p className="mt-3 text-[12px] text-slate-400 leading-relaxed">
+                Ajoute un exemple précis, une capture si possible, et le résultat
+                attendu. On pourra avancer beaucoup plus vite.
+              </p>
             </div>
           </div>
         </div>
