@@ -2,341 +2,313 @@
 
 import { useMemo, useState } from "react";
 
+type Category = "support" | "cibles" | "mails" | "bug" | "autre";
+
 type FormState = {
+  category: Category;
   subject: string;
-  category: "support" | "cibles" | "mails" | "bug" | "autre";
   message: string;
 };
 
 const CATEGORIES: Array<{
-  value: FormState["category"];
+  id: Category;
   label: string;
   hint: string;
+  subjectPH: string;
+  messagePH: string;
+  prefill: { subject: string; message: string };
 }> = [
   {
-    value: "support",
+    id: "support",
     label: "Support",
-    hint: "Questions, aide, accompagnement",
+    hint: "Question, aide, configuration, utilisation.",
+    subjectPH: "Ex : Je n’arrive pas à exporter mes leads",
+    messagePH:
+      "Décris ce que tu observes, ce que tu attendais, et si possible : navigateur + capture d’écran.",
+    prefill: {
+      subject: "Besoin d’aide sur…",
+      message:
+        "Bonjour,\n\nJ’ai besoin d’aide concernant : …\n\nCe que je fais : …\nCe que j’obtiens : …\nCe que j’attendais : …\n\nContexte (optionnel) : navigateur / capture / lien.\n\nMerci !",
+    },
   },
   {
-    value: "cibles",
-    label: "Cibles",
-    hint: "Zone, secteurs, postes, exclusions",
+    id: "cibles",
+    label: "Changement de cibles",
+    hint: "Zone, secteurs, taille, exclusions.",
+    subjectPH: "Ex : Ajuster mes cibles (PME < 50, Bordeaux)",
+    messagePH:
+      "Indique la zone, les secteurs, la taille, et ce que tu veux exclure (avec exemples).",
+    prefill: {
+      subject: "Changement de cibles",
+      message:
+        "Bonjour,\n\nJe souhaite mettre à jour mes cibles :\n\n• Zone : …\n• Secteurs : …\n• Taille : … (ex : < 50)\n• Exclusions : …\n• Exemples d’entreprises à viser : …\n• Exemples à éviter : …\n\nMerci !",
+    },
   },
   {
-    value: "mails",
-    label: "Mails",
-    hint: "Libellés, règles, automatisations",
+    id: "mails",
+    label: "Libellés / règles mails",
+    hint: "Libellés, règles, critères, cas limites.",
+    subjectPH: "Ex : Ajouter un libellé “Devis”",
+    messagePH:
+      "Décris la règle exactement (mots-clés, expéditeur, pièces jointes, exceptions).",
+    prefill: {
+      subject: "Nouvelle règle / libellé mails",
+      message:
+        "Bonjour,\n\nJe veux ajouter la règle suivante :\n\n• Libellé : “Devis”\n• Condition : si l’objet contient “devis” OU “proposition”\n• Condition 2 (option) : OU si pièce jointe PDF\n• Exceptions : …\n• Exemples (emails) : …\n\nMerci !",
+    },
   },
   {
-    value: "bug",
+    id: "bug",
     label: "Bug",
-    hint: "Un comportement anormal à corriger",
+    hint: "Un problème à corriger rapidement.",
+    subjectPH: "Ex : Erreur sur la page Prospection",
+    messagePH:
+      "Donne les étapes pour reproduire + le message d’erreur (si tu l’as).",
+    prefill: {
+      subject: "Bug — …",
+      message:
+        "Bonjour,\n\nJ’ai rencontré un bug : …\n\nÉtapes pour reproduire :\n1) …\n2) …\n3) …\n\nRésultat actuel : …\nRésultat attendu : …\n\nInfos utiles : navigateur / capture / heure approximative.\n\nMerci !",
+    },
   },
   {
-    value: "autre",
+    id: "autre",
     label: "Autre",
-    hint: "Toute autre demande",
+    hint: "Idée, demande spécifique, amélioration.",
+    subjectPH: "Ex : Suggestion d’amélioration",
+    messagePH:
+      "Explique le besoin, pourquoi c’est important, et le résultat attendu.",
+    prefill: {
+      subject: "Suggestion / demande",
+      message:
+        "Bonjour,\n\nJ’aimerais proposer / demander : …\n\nObjectif : …\nPourquoi c’est important : …\nRésultat attendu : …\n\nMerci !",
+    },
   },
 ];
 
 export default function SupportPage() {
   const [form, setForm] = useState<FormState>({
-    subject: "",
     category: "support",
+    subject: "",
     message: "",
   });
 
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState<null | "ok" | "error">(null);
+  const [serverMsg, setServerMsg] = useState<string | null>(null);
 
-  const currentCategory = useMemo(
-    () => CATEGORIES.find((c) => c.value === form.category),
+  const active = useMemo(
+    () => CATEGORIES.find((c) => c.id === form.category)!,
     [form.category]
   );
 
-  const onChange = (key: keyof FormState, value: any) => {
+  const messageCount = form.message.length;
+
+  const setField = (key: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setSent(null);
+    setServerMsg(null);
+  };
+
+  const handlePrefill = () => {
+    setForm((prev) => ({
+      ...prev,
+      subject: active.prefill.subject,
+      message: active.prefill.message,
+    }));
+    setSent(null);
+    setServerMsg(null);
   };
 
   const handleSend = async () => {
-    if (!form.subject.trim() || !form.message.trim()) {
+    const subject = form.subject.trim();
+    const message = form.message.trim();
+
+    if (!subject || !message) {
       setSent("error");
+      setServerMsg("Ajoute un sujet et un message, puis réessaie.");
       return;
     }
 
     setSending(true);
     setSent(null);
+    setServerMsg(null);
 
     try {
       const res = await fetch("/api/support/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          subject,
+          message,
+          category: form.category,
+        }),
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setSent("error");
+        setServerMsg(
+          data?.error || "Impossible d’envoyer le ticket pour le moment."
+        );
+        return;
+      }
 
       setSent("ok");
-      setForm({
-        subject: "",
-        category: "support",
-        message: "",
-      });
+      setServerMsg("Message envoyé, on revient vers toi au plus vite.");
+      setForm({ category: form.category, subject: "", message: "" });
     } catch (e) {
       console.error(e);
       setSent("error");
+      setServerMsg("Erreur réseau. Réessaie dans quelques secondes.");
     } finally {
       setSending(false);
     }
   };
 
-  const subjectOk = form.subject.trim().length > 0;
-  const messageOk = form.message.trim().length > 0;
-  const canSend = subjectOk && messageOk && !sending;
-
   return (
-    <div className="min-h-screen w-full px-6 pt-16 pb-24">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* HEADER */}
-        <div className="space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/60 px-3 py-1 text-[11px] text-slate-300">
-            <span className="h-2 w-2 rounded-full bg-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.65)]" />
-            Support Mindlink
-          </div>
+    <div className="w-full min-h-[calc(100vh-120px)]">
+      {/* HERO */}
+      <div className="relative overflow-hidden rounded-[28px] border border-slate-800/80 bg-slate-950/60 shadow-[0_20px_70px_-30px_rgba(79,70,229,0.45)]">
+        {/* glow */}
+        <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-600/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-sky-500/10 blur-3xl" />
 
-          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-50">
-            Envoyer une demande
-          </h1>
-
-          <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-2xl">
-            Besoin d’un ajustement sur tes cibles, d’une règle mail, ou d’un coup
-            de main sur la plateforme ? Écris nous ici et on revient vers toi au
-            plus vite.
-          </p>
-        </div>
-
-        {/* GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* FORM CARD */}
-          <div className="lg:col-span-2">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/80 shadow-xl overflow-hidden">
-              {/* TOP */}
-              <div className="px-6 py-5 border-b border-slate-800 bg-gradient-to-b from-slate-950/80 to-slate-950/40">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <h2 className="text-slate-100 text-sm font-medium">
-                      Formulaire de support
-                    </h2>
-                    <p className="text-[12px] text-slate-400">
-                      Plus c’est précis, plus c’est rapide.
-                    </p>
-                  </div>
-
-                  {sent === "ok" && (
-                    <div className="text-[12px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-3 py-1.5 rounded-full">
-                      Envoyé
-                    </div>
-                  )}
-                  {sent === "error" && (
-                    <div className="text-[12px] text-red-300 bg-red-500/10 border border-red-500/25 px-3 py-1.5 rounded-full">
-                      Erreur
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* BODY */}
-              <div className="p-6 space-y-5">
-                {/* SUBJECT */}
-                <div className="space-y-2">
-                  <label className="text-[11px] text-slate-400 uppercase tracking-wide">
-                    Sujet
-                  </label>
-                  <input
-                    value={form.subject}
-                    onChange={(e) => onChange("subject", e.target.value)}
-                    placeholder="Exemple : Ajuster mes cibles dans les Hauts de France"
-                    className="
-                      w-full rounded-xl bg-slate-900/50 border border-slate-700
-                      px-4 py-3 text-sm text-slate-200 placeholder-slate-500
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500/50
-                    "
-                  />
-                  <div className="flex items-center justify-between">
-                    <p className="text-[11px] text-slate-500">
-                      Un titre clair aide à traiter plus vite.
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {form.subject.trim().length}/80
-                    </p>
-                  </div>
-                </div>
-
-                {/* CATEGORY */}
-                <div className="space-y-2">
-                  <label className="text-[11px] text-slate-400 uppercase tracking-wide">
-                    Type de demande
-                  </label>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {CATEGORIES.map((c) => {
-                      const active = form.category === c.value;
-                      return (
-                        <button
-                          key={c.value}
-                          type="button"
-                          onClick={() => onChange("category", c.value)}
-                          className={`
-                            text-left rounded-xl border px-4 py-3 transition
-                            ${
-                              active
-                                ? "border-indigo-500/60 bg-indigo-500/10"
-                                : "border-slate-800 bg-slate-950/40 hover:bg-slate-900/40"
-                            }
-                          `}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span
-                              className={`text-sm font-medium ${
-                                active ? "text-slate-100" : "text-slate-200"
-                              }`}
-                            >
-                              {c.label}
-                            </span>
-                            <span
-                              className={`h-2.5 w-2.5 rounded-full ${
-                                active
-                                  ? "bg-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.65)]"
-                                  : "bg-slate-700"
-                              }`}
-                            />
-                          </div>
-                          <p className="text-[12px] text-slate-400 mt-1">
-                            {c.hint}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {currentCategory?.value === "cibles" && (
-                    <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-                      <p className="text-[12px] text-slate-300 font-medium">
-                        Pour une demande de cibles, pense à préciser
-                      </p>
-                      <div className="mt-2 text-[12px] text-slate-400 leading-relaxed">
-                        Zone géographique, secteurs, postes, mots clés, exclusions
-                        et exemples de profils.
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* MESSAGE */}
-                <div className="space-y-2">
-                  <label className="text-[11px] text-slate-400 uppercase tracking-wide">
-                    Détails
-                  </label>
-                  <textarea
-                    value={form.message}
-                    onChange={(e) => onChange("message", e.target.value)}
-                    placeholder="Décris ce que tu veux. Tu peux donner des exemples, des contraintes, ou un résultat attendu."
-                    className="
-                      w-full h-44 rounded-xl bg-slate-900/50 border border-slate-700
-                      px-4 py-3 text-sm text-slate-200 placeholder-slate-500
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500/50
-                      resize-none
-                    "
-                  />
-                  <div className="flex items-center justify-between">
-                    <p className="text-[11px] text-slate-500">
-                      Tu peux copier coller des exemples.
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {form.message.trim().length}/2000
-                    </p>
-                  </div>
-                </div>
-
-                {/* ACTIONS */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
-                  <div className="text-[12px] text-slate-400">
-                    {sent === "error" ? (
-                      <span className="text-red-300">
-                        Vérifie le sujet et le message puis réessaie.
-                      </span>
-                    ) : sent === "ok" ? (
-                      <span className="text-emerald-300">
-                        Merci, ta demande a bien été envoyée.
-                      </span>
-                    ) : (
-                      <span>
-                        Réponse directement par email dès que c’est traité.
-                      </span>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={handleSend}
-                    disabled={!canSend}
-                    className={`
-                      inline-flex items-center justify-center gap-2
-                      px-5 py-2.5 rounded-xl text-sm font-medium transition
-                      ${
-                        canSend
-                          ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"
-                          : "bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed"
-                      }
-                    `}
-                  >
-                    {sending ? (
-                      <>
-                        <span className="h-4 w-4 rounded-full border-2 border-slate-300/40 border-t-slate-100 animate-spin" />
-                        Envoi en cours
-                      </>
-                    ) : (
-                      "Envoyer"
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SIDE PANEL */}
-          <div className="space-y-6">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 shadow-xl p-6">
-              <h3 className="text-sm font-medium text-slate-100">
-                Ce qu’on traite ici
-              </h3>
-
-              <ul className="mt-4 space-y-3 text-[12px] text-slate-400 leading-relaxed">
-                <li className="flex gap-3">
-                  <span className="mt-1 h-2 w-2 rounded-full bg-sky-400" />
-                  Ajustements de cibles LinkedIn et Google Maps.
-                </li>
-                <li className="flex gap-3">
-                  <span className="mt-1 h-2 w-2 rounded-full bg-indigo-400" />
-                  Règles et libellés emails, tri, relances, automatisations.
-                </li>
-                <li className="flex gap-3">
-                  <span className="mt-1 h-2 w-2 rounded-full bg-emerald-400" />
-                  Bugs, améliorations, idées de fonctionnalités.
-                </li>
-              </ul>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-950/70 to-slate-950/40 shadow-xl p-6">
-              <h3 className="text-sm font-medium text-slate-100">
-                Pour gagner du temps
-              </h3>
-              <p className="mt-3 text-[12px] text-slate-400 leading-relaxed">
-                Ajoute un exemple précis, une capture si possible, et le résultat
-                attendu. On pourra avancer beaucoup plus vite.
+        <div className="px-7 py-8 sm:px-10 sm:py-10">
+          <div className="flex items-start justify-between gap-6">
+            <div className="space-y-2">
+              <h1 className="text-3xl sm:text-[34px] font-semibold tracking-tight text-slate-50">
+                Support / Ticketing
+              </h1>
+              <p className="text-sm text-slate-300/80 max-w-2xl">
+                Une question, un changement de cibles ou une règle mail à ajouter
+                ? Envoie-nous un ticket et on te répond rapidement.
               </p>
             </div>
+
+            <button
+              type="button"
+              onClick={handlePrefill}
+              className="
+                shrink-0 inline-flex items-center gap-2
+                rounded-full border border-slate-700/70
+                bg-slate-900/40 px-4 py-2 text-[12px] text-slate-200
+                hover:bg-slate-900/70 hover:border-slate-600
+                transition
+              "
+            >
+              <span className="text-[13px]">✨</span>
+              Pré-remplir
+            </button>
+          </div>
+
+          {/* FORM CARD */}
+          <div className="mt-8 rounded-[22px] border border-slate-800/70 bg-gradient-to-b from-slate-950/70 to-slate-950/40 p-6 sm:p-7 shadow-inner">
+            {/* category tabs */}
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIES.map((c) => {
+                const activeChip = c.id === form.category;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setField("category", c.id)}
+                    className={[
+                      "px-4 py-2 rounded-full text-[12px] transition border",
+                      activeChip
+                        ? "bg-indigo-600/20 border-indigo-500/40 text-slate-50 shadow-[0_0_0_1px_rgba(99,102,241,0.15)]"
+                        : "bg-slate-900/35 border-slate-800 text-slate-200/80 hover:text-slate-50 hover:bg-slate-900/55 hover:border-slate-700",
+                    ].join(" ")}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 text-[12px] text-slate-400">{active.hint}</div>
+
+            {/* subject */}
+            <div className="mt-6 space-y-2">
+              <label className="text-[11px] text-slate-400 uppercase tracking-wider">
+                Sujet
+              </label>
+              <input
+                value={form.subject}
+                onChange={(e) => setField("subject", e.target.value)}
+                placeholder={active.subjectPH}
+                className="
+                  w-full rounded-2xl bg-slate-900/35 border border-slate-800/80
+                  px-4 py-3.5 text-sm text-slate-100 placeholder-slate-500
+                  focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40
+                  transition
+                "
+              />
+            </div>
+
+            {/* message */}
+            <div className="mt-5 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] text-slate-400 uppercase tracking-wider">
+                  Message
+                </label>
+                <div className="text-[11px] text-slate-500">
+                  {messageCount} caractère{messageCount > 1 ? "s" : ""}
+                </div>
+              </div>
+
+              <textarea
+                value={form.message}
+                onChange={(e) => setField("message", e.target.value)}
+                placeholder={active.messagePH}
+                className="
+                  w-full min-h-[220px] rounded-2xl bg-slate-900/35 border border-slate-800/80
+                  px-4 py-4 text-sm text-slate-100 placeholder-slate-500
+                  focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40
+                  transition resize-none
+                "
+              />
+            </div>
+
+            {/* footer row */}
+            <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="text-[12px]">
+                {sent === "ok" && (
+                  <div className="text-emerald-400">
+                    ✅ {serverMsg ?? "Message envoyé."}
+                  </div>
+                )}
+                {sent === "error" && (
+                  <div className="text-red-400">
+                    ❌ {serverMsg ?? "Une erreur est survenue. Réessaie."}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={sending}
+                className={[
+                  "inline-flex items-center justify-center gap-2",
+                  "px-6 py-3 rounded-2xl text-sm font-medium transition",
+                  sending
+                    ? "bg-slate-800/70 text-slate-400 cursor-not-allowed"
+                    : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20",
+                ].join(" ")}
+              >
+                {sending ? "Envoi en cours…" : "Envoyer"}
+              </button>
+            </div>
+          </div>
+
+          {/* helper */}
+          <div className="mt-6 text-[11.5px] text-slate-500">
+            Astuce : pour les cibles, indique{" "}
+            <span className="text-slate-300/90">zone</span>,{" "}
+            <span className="text-slate-300/90">secteurs</span>,{" "}
+            <span className="text-slate-300/90">taille</span>,{" "}
+            <span className="text-slate-300/90">exclusions</span> + 2 exemples.
           </div>
         </div>
       </div>
