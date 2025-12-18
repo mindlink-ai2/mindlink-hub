@@ -45,8 +45,8 @@ export async function POST(req: Request) {
     `;
 
     const { error } = await resend.emails.send({
-      from: "Mindlink Support <contact@mind-link.fr>", // ✅ ICI
-      to: "contact@mind-link.fr",
+      from: "Mindlink Support <onboarding@resend.dev>",
+            to: "contact@mind-link.fr",
       replyTo: userEmail,
       subject: `🎫 Ticket Mindlink — ${subject}`,
       html,
