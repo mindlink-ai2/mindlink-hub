@@ -155,7 +155,7 @@ export default function SupportPage() {
       }
 
       setSent("ok");
-      setServerMsg("Message envoyé, on revient vers toi au plus vite.");
+      setServerMsg("Message envoyé, nous te recontactons dès que possible.");
       setForm({ category: form.category, subject: "", message: "" });
     } catch (e) {
       console.error(e);
@@ -178,11 +178,11 @@ export default function SupportPage() {
           <div className="flex items-start justify-between gap-6">
             <div className="space-y-2">
               <h1 className="text-3xl sm:text-[34px] font-semibold tracking-tight text-slate-50">
-                Support / Ticketing
+                Support
               </h1>
               <p className="text-sm text-slate-300/80 max-w-2xl">
                 Une question, un changement de cibles ou une règle mail à ajouter
-                ? Envoie-nous un ticket et on te répond rapidement.
+                ? Envoie-nous un ticket et nous te recontactons dès que possible.
               </p>
             </div>
 
