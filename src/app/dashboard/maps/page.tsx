@@ -10,6 +10,11 @@ export default function MapsPage() {
   const [openLead, setOpenLead] = useState<any>(null);
   const [loaded, setLoaded] = useState(false);
 
+  // ✅ NEW: Selection mode
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selectedCount = selectedIds.size;
+
   /* --------------------------------------------
       FETCH LEADS
   -------------------------------------------- */
@@ -45,6 +50,100 @@ export default function MapsPage() {
     });
   }, [safeLeads, searchTerm]);
 
+  const colCount = selectionMode ? 9 : 8;
+
+  // ✅ NEW: cleanup selection when list changes (ex: deleted)
+  useEffect(() => {
+    if (!selectionMode) return;
+
+    const existing = new Set(safeLeads.map((l) => String(l.id)));
+    setSelectedIds((prev: Set<string>) => {
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (existing.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [safeLeads, selectionMode]);
+
+  // ✅ NEW: selection helpers
+  const toggleSelectionMode = () => {
+    setSelectionMode((prev) => {
+      const next = !prev;
+      if (!next) setSelectedIds(new Set());
+      return next;
+    });
+  };
+
+  const toggleSelected = (leadId: string) => {
+    setSelectedIds((prev: Set<string>) => {
+      const next = new Set(prev);
+      if (next.has(leadId)) next.delete(leadId);
+      else next.add(leadId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllFiltered = () => {
+    const filteredIds = filteredLeads.map((l) => String(l.id));
+    const allSelected = filteredIds.every((id) => selectedIds.has(id));
+
+    setSelectedIds((prev: Set<string>) => {
+      const next = new Set(prev);
+
+      if (allSelected) {
+        filteredIds.forEach((id) => next.delete(id));
+      } else {
+        filteredIds.forEach((id) => next.add(id));
+      }
+
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    const ok = confirm(
+      `Voulez-vous vraiment supprimer ${selectedIds.size} lead(s) ?`
+    );
+    if (!ok) return;
+
+    const ids = Array.from(selectedIds)
+      .map((v) => Number(v))
+      .filter((n) => Number.isFinite(n));
+
+    try {
+      const res = await fetch("/dashboard/maps/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data?.error || "Impossible de supprimer ces leads. Réessayez.");
+        return;
+      }
+
+      // ✅ instant UI update
+      setSafeLeads((prev: any[]) =>
+        prev.filter((l) => !selectedIds.has(String(l.id)))
+      );
+      setSelectedIds(new Set());
+      setOpenLead((prev: any) =>
+        prev && selectedIds.has(String(prev.id)) ? null : prev
+      );
+    } catch (e) {
+      console.error(e);
+      alert("Erreur réseau pendant la suppression.");
+    }
+  };
+
+  const allFilteredSelected =
+    filteredLeads.length > 0 &&
+    filteredLeads.every((l) => selectedIds.has(String(l.id)));
+
   /* --------------------------------------------
       ✅ LIVE UI UPDATE via events (Traité / Delete)
       (same pattern as LinkedIn)
@@ -66,7 +165,9 @@ export default function MapsPage() {
       );
 
       setOpenLead((prev: any) =>
-        prev && String(prev.id) === leadIdStr ? { ...prev, traite: detail.traite } : prev
+        prev && String(prev.id) === leadIdStr
+          ? { ...prev, traite: detail.traite }
+          : prev
       );
     };
 
@@ -80,14 +181,28 @@ export default function MapsPage() {
       setOpenLead((prev: any) =>
         prev && String(prev.id) === leadIdStr ? null : prev
       );
+
+      // ✅ NEW: remove from selection if needed
+      setSelectedIds((prev: Set<string>) => {
+        if (!prev.has(leadIdStr)) return prev;
+        const next = new Set(prev);
+        next.delete(leadIdStr);
+        return next;
+      });
     };
 
     window.addEventListener("mindlink:lead-treated", onTreated as EventListener);
     window.addEventListener("mindlink:lead-deleted", onDeleted as EventListener);
 
     return () => {
-      window.removeEventListener("mindlink:lead-treated", onTreated as EventListener);
-      window.removeEventListener("mindlink:lead-deleted", onDeleted as EventListener);
+      window.removeEventListener(
+        "mindlink:lead-treated",
+        onTreated as EventListener
+      );
+      window.removeEventListener(
+        "mindlink:lead-deleted",
+        onDeleted as EventListener
+      );
     };
   }, []);
 
@@ -250,9 +365,21 @@ export default function MapsPage() {
 
         {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <KPI title="Total leads" value={total} text="Importés depuis Google Maps" />
-          <KPI title="À traiter" value={remainingToTreat} text={`${remainingToTreat} restants`} />
-          <KPI title="Prochaine importation" value={nextImportText} text="Tous les jours à 8h00" />
+          <KPI
+            title="Total leads"
+            value={total}
+            text="Importés depuis Google Maps"
+          />
+          <KPI
+            title="À traiter"
+            value={remainingToTreat}
+            text={`${remainingToTreat} restants`}
+          />
+          <KPI
+            title="Prochaine importation"
+            value={nextImportText}
+            text="Tous les jours à 8h00"
+          />
         </div>
 
         {/* TABLE */}
@@ -267,8 +394,56 @@ export default function MapsPage() {
                 Triés du plus récent au plus ancien
               </p>
             </div>
-            <div className="text-[11px] text-slate-400">
-              {filteredLeads.length} lead(s)
+
+            <div className="flex items-center gap-3">
+              {/* ✅ NEW: Selection controls */}
+              <button
+                type="button"
+                onClick={toggleSelectionMode}
+                className="
+                  px-3 py-1.5 text-[11px] rounded-xl
+                  bg-slate-900 border border-slate-700
+                  hover:bg-slate-800 transition
+                "
+              >
+                {selectionMode ? "Annuler" : "Sélection"}
+              </button>
+
+              {selectionMode && (
+                <>
+                  <button
+                    type="button"
+                    onClick={toggleSelectAllFiltered}
+                    className="
+                      px-3 py-1.5 text-[11px] rounded-xl
+                      bg-slate-900 border border-slate-700
+                      hover:bg-slate-800 transition
+                    "
+                  >
+                    {allFilteredSelected
+                      ? "Tout désélectionner"
+                      : "Tout sélectionner"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    disabled={selectedCount === 0}
+                    className={[
+                      "px-3 py-1.5 text-[11px] rounded-xl transition border",
+                      selectedCount === 0
+                        ? "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed"
+                        : "bg-red-600/15 border-red-500/30 text-red-300 hover:bg-red-600/25",
+                    ].join(" ")}
+                  >
+                    Supprimer ({selectedCount})
+                  </button>
+                </>
+              )}
+
+              <div className="text-[11px] text-slate-400">
+                {filteredLeads.length} lead(s)
+              </div>
             </div>
           </div>
 
@@ -277,116 +452,165 @@ export default function MapsPage() {
             <table className="w-full text-sm border-separate border-spacing-0">
               <thead>
                 <tr className="bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide">
-                  <th className="py-3 px-4 border-b border-slate-800">Traité</th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-left">Nom</th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-left">Email</th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-left">Téléphone</th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-left">Site</th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-left">Google Maps</th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-center">Date</th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-center">Supprimer</th>
+                  {/* ✅ NEW: selection column */}
+                  {selectionMode && (
+                    <th className="py-3 px-4 border-b border-slate-800 text-center">
+                      Sel.
+                    </th>
+                  )}
+
+                  <th className="py-3 px-4 border-b border-slate-800">
+                    Traité
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-left">
+                    Nom
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-left">
+                    Email
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-left">
+                    Téléphone
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-left">
+                    Site
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-left">
+                    Google Maps
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-center">
+                    Date
+                  </th>
+                  <th className="py-3 px-4 border-b border-slate-800 text-center">
+                    Supprimer
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
                 {filteredLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-10 text-center text-slate-500">
+                    <td
+                      colSpan={colCount}
+                      className="py-10 text-center text-slate-500"
+                    >
                       Aucun résultat.
                     </td>
                   </tr>
                 ) : (
-                  filteredLeads.map((lead) => (
-                    <tr
-                      key={lead.id}
-                      className="border-b border-slate-900 hover:bg-slate-900/60 transition group"
-                    >
-                      {/* TRAITE */}
-                      <td className="py-3 px-4 text-center">
-                        <TraiteCheckbox
-                          leadId={lead.id}
-                          defaultChecked={Boolean(lead.traite)}
-                        />
-                      </td>
+                  filteredLeads.map((lead) => {
+                    const idStr = String(lead.id);
+                    const isSelected = selectedIds.has(idStr);
 
-                      {/* NOM + pastille + bouton voir */}
-                      <td className="py-3 px-4 text-slate-50 relative pr-14 flex items-center gap-2">
-                        {lead.title || "—"}
-
-                        {lead.message_sent && (
-                          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
+                    return (
+                      <tr
+                        key={lead.id}
+                        className="border-b border-slate-900 hover:bg-slate-900/60 transition group"
+                      >
+                        {/* ✅ NEW: selection checkbox */}
+                        {selectionMode && (
+                          <td className="py-3 px-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelected(idStr)}
+                              className="h-4 w-4 cursor-pointer accent-indigo-500"
+                            />
+                          </td>
                         )}
 
-                        <button
-                          onClick={() =>
-                            setOpenLead({
-                              ...lead,
-                              message_sent: lead.message_sent ?? false,
-                              message_sent_at: lead.message_sent_at ?? null,
-                              next_followup_at: lead.next_followup_at ?? null,
-                            })
-                          }
-                          className="
-                            opacity-0 group-hover:opacity-100
-                            absolute right-3 top-1/2 -translate-y-1/2
-                            text-[11px] px-3 py-1.5 rounded-lg
-                            bg-indigo-600/70 hover:bg-indigo-500
-                            text-white shadow-sm hover:shadow-md transition
-                          "
-                        >
-                          Voir →
-                        </button>
-                      </td>
+                        {/* TRAITE */}
+                        <td className="py-3 px-4 text-center">
+                          <TraiteCheckbox
+                            leadId={lead.id}
+                            defaultChecked={Boolean(lead.traite)}
+                          />
+                        </td>
 
-                      {/* EMAIL */}
-                      <td className="py-3 px-4 text-slate-300">{lead.email || "—"}</td>
+                        {/* NOM + pastille + bouton voir */}
+                        <td className="py-3 px-4 text-slate-50 relative pr-14 flex items-center gap-2">
+                          {lead.title || "—"}
 
-                      {/* PHONE */}
-                      <td className="py-3 px-4 text-slate-300">{lead.phoneNumber || "—"}</td>
+                          {lead.message_sent && (
+                            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
+                          )}
 
-                      {/* WEBSITE */}
-                      <td className="py-3 px-4">
-                        {lead.website ? (
-                          <a
-                            href={lead.website}
-                            target="_blank"
-                            className="text-sky-400 hover:underline"
+                          <button
+                            onClick={() =>
+                              setOpenLead({
+                                ...lead,
+                                message_sent: lead.message_sent ?? false,
+                                message_sent_at: lead.message_sent_at ?? null,
+                                next_followup_at: lead.next_followup_at ?? null,
+                              })
+                            }
+                            className="
+                              opacity-0 group-hover:opacity-100
+                              absolute right-3 top-1/2 -translate-y-1/2
+                              text-[11px] px-3 py-1.5 rounded-lg
+                              bg-indigo-600/70 hover:bg-indigo-500
+                              text-white shadow-sm hover:shadow-md transition
+                            "
                           >
-                            Voir site
-                          </a>
-                        ) : (
-                          <span className="text-slate-500">—</span>
-                        )}
-                      </td>
+                            Voir →
+                          </button>
+                        </td>
 
-                      {/* MAPS */}
-                      <td className="py-3 px-4">
-                        {lead.placeUrl ? (
-                          <a
-                            href={lead.placeUrl}
-                            target="_blank"
-                            className="text-green-400 hover:underline"
-                          >
-                            Ouvrir Map
-                          </a>
-                        ) : (
-                          <span className="text-slate-500">—</span>
-                        )}
-                      </td>
+                        {/* EMAIL */}
+                        <td className="py-3 px-4 text-slate-300">
+                          {lead.email || "—"}
+                        </td>
 
-                      {/* DATE */}
-                      <td className="py-3 px-4 text-center text-slate-400">
-                        {lead.created_at
-                          ? new Date(lead.created_at).toLocaleDateString("fr-FR")
-                          : "—"}
-                      </td>
+                        {/* PHONE */}
+                        <td className="py-3 px-4 text-slate-300">
+                          {lead.phoneNumber || "—"}
+                        </td>
 
-                      {/* DELETE */}
-                      <td className="py-3 px-4 text-center">
-                        <DeleteLeadButton leadId={lead.id} />
-                      </td>
-                    </tr>
-                  ))
+                        {/* WEBSITE */}
+                        <td className="py-3 px-4">
+                          {lead.website ? (
+                            <a
+                              href={lead.website}
+                              target="_blank"
+                              className="text-sky-400 hover:underline"
+                            >
+                              Voir site
+                            </a>
+                          ) : (
+                            <span className="text-slate-500">—</span>
+                          )}
+                        </td>
+
+                        {/* MAPS */}
+                        <td className="py-3 px-4">
+                          {lead.placeUrl ? (
+                            <a
+                              href={lead.placeUrl}
+                              target="_blank"
+                              className="text-green-400 hover:underline"
+                            >
+                              Ouvrir Map
+                            </a>
+                          ) : (
+                            <span className="text-slate-500">—</span>
+                          )}
+                        </td>
+
+                        {/* DATE */}
+                        <td className="py-3 px-4 text-center text-slate-400">
+                          {lead.created_at
+                            ? new Date(lead.created_at).toLocaleDateString(
+                                "fr-FR"
+                              )
+                            : "—"}
+                        </td>
+
+                        {/* DELETE */}
+                        <td className="py-3 px-4 text-center">
+                          <DeleteLeadButton leadId={lead.id} />
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -482,7 +706,7 @@ export default function MapsPage() {
                 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
                 transition
               "
-            ></textarea>
+            />
           </div>
 
           {/* 🔵 AJOUT — bouton message envoyé */}
@@ -521,7 +745,15 @@ export default function MapsPage() {
 }
 
 /* KPI Component */
-function KPI({ title, value, text }: { title: string; value: any; text: string }) {
+function KPI({
+  title,
+  value,
+  text,
+}: {
+  title: string;
+  value: any;
+  text: string;
+}) {
   return (
     <div className="rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center shadow-inner">
       <div className="text-[11px] text-slate-500 uppercase tracking-wide">

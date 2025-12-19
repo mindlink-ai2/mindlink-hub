@@ -26,10 +26,17 @@ export default function LeadsPage() {
   const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
+  // ✅ NEW: Selection mode
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selectedCount = selectedIds.size;
+
   // ✅ DERIVED filtered list (no state = no desync)
   const filteredLeads = useMemo(() => {
     return filterLeads(safeLeads, searchTerm);
   }, [safeLeads, searchTerm]);
+
+  const colCount = selectionMode ? 8 : 7;
 
   // Load leads
   useEffect(() => {
@@ -43,9 +50,97 @@ export default function LeadsPage() {
     })();
   }, []);
 
+  // ✅ NEW: cleanup selection when list changes (ex: deleted)
+  useEffect(() => {
+    if (!selectionMode) return;
+
+    const existing = new Set(safeLeads.map((l) => String(l.id)));
+    setSelectedIds((prev: Set<string>) => {
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (existing.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [safeLeads, selectionMode]);
+
   // SEARCH FUNCTION
   const handleSearch = (value: string) => {
     setSearchTerm(value);
+  };
+
+  // ✅ NEW: selection helpers
+  const toggleSelectionMode = () => {
+    setSelectionMode((prev) => {
+      const next = !prev;
+      if (!next) setSelectedIds(new Set());
+      return next;
+    });
+  };
+
+  const toggleSelected = (leadId: string) => {
+    setSelectedIds((prev: Set<string>) => {
+      const next = new Set(prev);
+      if (next.has(leadId)) next.delete(leadId);
+      else next.add(leadId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllFiltered = () => {
+    const filteredIds = filteredLeads.map((l) => String(l.id));
+    const allSelected = filteredIds.every((id) => selectedIds.has(id));
+
+    setSelectedIds((prev: Set<string>) => {
+      const next = new Set(prev);
+
+      if (allSelected) {
+        filteredIds.forEach((id) => next.delete(id));
+      } else {
+        filteredIds.forEach((id) => next.add(id));
+      }
+
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    const ok = confirm(
+      `Voulez-vous vraiment supprimer ${selectedIds.size} lead(s) ?`
+    );
+    if (!ok) return;
+
+    const ids = Array.from(selectedIds)
+      .map((v) => Number(v))
+      .filter((n) => Number.isFinite(n));
+
+    try {
+      const res = await fetch("/dashboard/leads/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data?.error || "Impossible de supprimer ces leads. Réessayez.");
+        return;
+      }
+
+      // ✅ instant UI update
+      setSafeLeads((prev: Lead[]) =>
+        prev.filter((l) => !selectedIds.has(String(l.id)))
+      );
+      setSelectedIds(new Set());
+      setOpenLead((prev: Lead | null) =>
+        prev && selectedIds.has(String(prev.id)) ? null : prev
+      );
+    } catch (e) {
+      console.error(e);
+      alert("Erreur réseau pendant la suppression.");
+    }
   };
 
   // ✅ LIVE UI UPDATE via events from child components
@@ -57,7 +152,7 @@ export default function LeadsPage() {
       };
       if (!detail?.leadId) return;
 
-      setSafeLeads((prev) =>
+      setSafeLeads((prev: Lead[]) =>
         prev.map((l) =>
           l.id === detail.leadId ? { ...l, traite: detail.traite } : l
         )
@@ -71,21 +166,25 @@ export default function LeadsPage() {
     const onDeleted = (e: Event) => {
       const detail = (e as CustomEvent).detail as { leadId: string };
       if (!detail?.leadId) return;
-    
-      setSafeLeads((prev) => prev.filter((l) => String(l.id) !== detail.leadId));
+
+      setSafeLeads((prev: Lead[]) =>
+        prev.filter((l) => String(l.id) !== detail.leadId)
+      );
       setOpenLead((prev: Lead | null) =>
         prev && String(prev.id) === detail.leadId ? null : prev
       );
+
+      // ✅ NEW: remove from selection if needed
+      setSelectedIds((prev: Set<string>) => {
+        if (!prev.has(detail.leadId)) return prev;
+        const next = new Set(prev);
+        next.delete(detail.leadId);
+        return next;
+      });
     };
 
-    window.addEventListener(
-      "mindlink:lead-treated",
-      onTreated as EventListener
-    );
-    window.addEventListener(
-      "mindlink:lead-deleted",
-      onDeleted as EventListener
-    );
+    window.addEventListener("mindlink:lead-treated", onTreated as EventListener);
+    window.addEventListener("mindlink:lead-deleted", onDeleted as EventListener);
 
     return () => {
       window.removeEventListener(
@@ -113,7 +212,7 @@ export default function LeadsPage() {
         }),
       });
 
-      setSafeLeads((prev) =>
+      setSafeLeads((prev: Lead[]) =>
         prev.map((l) =>
           l.id === openLead.id
             ? { ...l, internal_message: openLead.internal_message }
@@ -149,7 +248,7 @@ export default function LeadsPage() {
       next_followup_at: data.lead?.next_followup_at,
     }));
 
-    setSafeLeads((prev) =>
+    setSafeLeads((prev: Lead[]) =>
       prev.map((l) =>
         l.id === openLead.id
           ? {
@@ -186,6 +285,10 @@ export default function LeadsPage() {
   const minutes = diffMinutes % 60;
   const nextImportText =
     hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
+
+  const allFilteredSelected =
+    filteredLeads.length > 0 &&
+    filteredLeads.every((l) => selectedIds.has(String(l.id)));
 
   return (
     <>
@@ -273,8 +376,56 @@ export default function LeadsPage() {
                 Triés du plus récent au plus ancien
               </p>
             </div>
-            <div className="text-[11px] text-slate-400">
-              {filteredLeads.length} lead(s)
+
+            <div className="flex items-center gap-3">
+              {/* ✅ NEW: Selection controls */}
+              <button
+                type="button"
+                onClick={toggleSelectionMode}
+                className="
+                  px-3 py-1.5 text-[11px] rounded-xl
+                  bg-slate-900 border border-slate-700
+                  hover:bg-slate-800 transition
+                "
+              >
+                {selectionMode ? "Annuler" : "Sélection"}
+              </button>
+
+              {selectionMode && (
+                <>
+                  <button
+                    type="button"
+                    onClick={toggleSelectAllFiltered}
+                    className="
+                      px-3 py-1.5 text-[11px] rounded-xl
+                      bg-slate-900 border border-slate-700
+                      hover:bg-slate-800 transition
+                    "
+                  >
+                    {allFilteredSelected
+                      ? "Tout désélectionner"
+                      : "Tout sélectionner"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    disabled={selectedCount === 0}
+                    className={[
+                      "px-3 py-1.5 text-[11px] rounded-xl transition border",
+                      selectedCount === 0
+                        ? "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed"
+                        : "bg-red-600/15 border-red-500/30 text-red-300 hover:bg-red-600/25",
+                    ].join(" ")}
+                  >
+                    Supprimer ({selectedCount})
+                  </button>
+                </>
+              )}
+
+              <div className="text-[11px] text-slate-400">
+                {filteredLeads.length} lead(s)
+              </div>
             </div>
           </div>
 
@@ -283,6 +434,13 @@ export default function LeadsPage() {
             <table className="w-full text-sm border-separate border-spacing-0">
               <thead>
                 <tr className="bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide">
+                  {/* ✅ NEW: selection column */}
+                  {selectionMode && (
+                    <th className="py-3 px-4 border-b border-slate-800 text-center">
+                      Sel.
+                    </th>
+                  )}
+
                   <th className="py-3 px-4 border-b border-slate-800">
                     Traité
                   </th>
@@ -311,7 +469,7 @@ export default function LeadsPage() {
                 {filteredLeads.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={colCount}
                       className="py-10 text-center text-slate-500"
                     >
                       Aucun résultat.
@@ -324,11 +482,26 @@ export default function LeadsPage() {
                       lead.Name ||
                       "—";
 
+                    const idStr = String(lead.id);
+                    const isSelected = selectedIds.has(idStr);
+
                     return (
                       <tr
                         key={lead.id}
                         className="border-b border-slate-900 hover:bg-slate-900/60 transition group"
                       >
+                        {/* ✅ NEW: selection checkbox */}
+                        {selectionMode && (
+                          <td className="py-3 px-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelected(idStr)}
+                              className="h-4 w-4 cursor-pointer accent-indigo-500"
+                            />
+                          </td>
+                        )}
+
                         <td className="py-3 px-4 text-center">
                           <TraiteCheckbox
                             leadId={lead.id}
@@ -472,7 +645,7 @@ export default function LeadsPage() {
               onChange={(e) => {
                 const newMsg = e.target.value;
                 setOpenLead({ ...openLead, internal_message: newMsg });
-                setSafeLeads((prev) =>
+                setSafeLeads((prev: Lead[]) =>
                   prev.map((l) =>
                     l.id === openLead.id
                       ? { ...l, internal_message: newMsg }
@@ -488,7 +661,7 @@ export default function LeadsPage() {
                 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
                 transition
               "
-            ></textarea>
+            />
           </div>
 
           <div className="mt-4">
@@ -525,15 +698,7 @@ export default function LeadsPage() {
 }
 
 /* KPI Component */
-function KPI({
-  title,
-  value,
-  text,
-}: {
-  title: string;
-  value: any;
-  text: string;
-}) {
+function KPI({ title, value, text }: { title: string; value: any; text: string }) {
   return (
     <div className="rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center shadow-inner">
       <div className="text-[11px] text-slate-500 uppercase tracking-wide">
