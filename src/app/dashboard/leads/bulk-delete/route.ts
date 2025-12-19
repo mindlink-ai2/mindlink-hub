@@ -33,11 +33,30 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // ✅ 1) Récupérer le client_id (BIGINT) à partir du Clerk userId (string)
+    // ⚠️ adapte "clerk_user_id" si ta colonne s'appelle différemment
+    const { data: client, error: clientErr } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    if (clientErr || !client?.id) {
+      console.error("CLIENT LOOKUP ERROR", clientErr);
+      return NextResponse.json(
+        { error: "Client not found" },
+        { status: 404 }
+      );
+    }
+
+    const clientId = client.id; // BIGINT (souvent number côté JS)
+
+    // ✅ 2) Suppression sécurisée par client_id
     const { error } = await supabase
       .from("leads")
       .delete()
       .in("id", ids)
-      .eq("client_id", userId); // ✅ sécurité : adapte si ta colonne est différente
+      .eq("client_id", clientId);
 
     if (error) {
       console.error("BULK DELETE LEADS ERROR", error);
@@ -47,6 +66,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, deletedIds: ids });
   } catch (err) {
     console.error("BULK DELETE LEADS API ERROR", err);
-    return NextResponse.json({ error: "Unexpected server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Unexpected server error" },
+      { status: 500 }
+    );
   }
 }
