@@ -1,222 +1,176 @@
-"use client";
+import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { createClient } from "@supabase/supabase-js";
 
-import { useEffect, useState } from "react";
+export async function GET(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ items: [] });
 
-export default function FollowupsPage() {
-  const [leads, setLeads] = useState<any[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [openLead, setOpenLead] = useState<any>(null);
+  const { searchParams } = new URL(req.url);
+  const type = searchParams.get("type");
 
-  // Fetch all leads with followups
-  useEffect(() => {
-    (async () => {
-      const res1 = await fetch("/api/get-leads");
-      const res2 = await fetch("/api/get-map-leads");
+  if (!type) {
+    return NextResponse.json({ items: [] });
+  }
 
-      const data1 = await res1.json();
-      const data2 = await res2.json();
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
-      const merged = [...(data1.leads ?? []), ...(data2.leads ?? [])];
+  // Récup client
+  const { data: client } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("clerk_user_id", userId)
+    .single();
 
-      // Only leads with next_followup_at
-      const filtered = merged.filter((l) => l.next_followup_at != null);
+  if (!client) return NextResponse.json({ items: [] });
 
-      setLeads(filtered);
-      setLoaded(true);
-    })();
-  }, []);
+  const clientId = client.id;
 
-  if (!loaded) return <p className="text-slate-400">Chargement…</p>;
-
-  // Paris timezone date
-  const today = new Date(
+  // Dates Paris
+  const now = new Date(
     new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
   );
 
-  // 🔧 FIX 1 : éviter crash si la date n’est pas une string
-  const cleanDate = (d: any) => {
-    if (!d || typeof d !== "string") return new Date("2100-01-01"); 
-    return new Date(d.split("T")[0] + "T00:00:00");
-  };
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
 
-  const overdue = leads.filter(
-    (l) => cleanDate(l.next_followup_at) < cleanDate(today.toISOString())
-  );
-  const todayList = leads.filter(
-    (l) =>
-      cleanDate(l.next_followup_at).getTime() ===
-      cleanDate(today.toISOString()).getTime()
-  );
-  const upcoming = leads.filter(
-    (l) => cleanDate(l.next_followup_at) > cleanDate(today.toISOString())
-  );
+  const startOfWeek = new Date(startOfDay);
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay() + 1); // lundi
 
-  // 🔵 Fonction : marquer comme répondu (LinkedIn OU Maps)
-  const markAsResponded = async (leadId: string) => {
+  let items: any[] = [];
 
-    // 🔧 FIX 2 : éviter crash si openLead est null
-    const isMapLead = !!openLead?.placeUrl;
+  /* --------------------------------------------
+      LEADS AUJOURD'HUI
+  -------------------------------------------- */
+  if (type === "leads_today") {
+    const [linkedin, maps] = await Promise.all([
+      supabase
+        .from("leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .gte("created_at", startOfDay.toISOString()),
 
-    const endpoint = isMapLead
-      ? "/api/map-leads/responded"
-      : "/api/leads/responded";
+      supabase
+        .from("map_leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .gte("created_at", startOfDay.toISOString()),
+    ]);
 
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId }),
-    });
+    items = [
+      ...(linkedin.data ?? []).map((l) => ({ ...l, source: "linkedin" })),
+      ...(maps.data ?? []).map((l) => ({ ...l, source: "maps" })),
+    ];
+  }
 
-    if (res.ok) {
-      setLeads((prev) => prev.filter((l) => l.id !== leadId));
-      setOpenLead(null);
-    }
-  };
+  /* --------------------------------------------
+      LEADS CETTE SEMAINE
+  -------------------------------------------- */
+  if (type === "leads_week") {
+    const [linkedin, maps] = await Promise.all([
+      supabase
+        .from("leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .gte("created_at", startOfWeek.toISOString()),
 
-  const Section = ({ title, data }: any) => (
-    <div>
-      <h2 className="text-xl font-semibold text-slate-100 mb-4 mt-10">{title}</h2>
+      supabase
+        .from("map_leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .gte("created_at", startOfWeek.toISOString()),
+    ]);
 
-      {data.length === 0 ? (
-        <p className="text-slate-600 text-sm">Aucune relance</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {data.map((lead: any) => (
-            <div
-              key={lead.id}
-              onClick={() => setOpenLead(lead)}
-              className="
-                p-5 rounded-xl bg-slate-900/70 border border-slate-800 
-                hover:border-indigo-500/60 hover:bg-slate-900 
-                transition cursor-pointer shadow-md hover:shadow-indigo-500/10
-              "
-            >
-              <h3 className="text-slate-100 font-medium">
-                {lead.FirstName || lead.title || "—"} {lead.LastName || ""}
-              </h3>
+    items = [
+      ...(linkedin.data ?? []).map((l) => ({ ...l, source: "linkedin" })),
+      ...(maps.data ?? []).map((l) => ({ ...l, source: "maps" })),
+    ];
+  }
 
-              <p className="text-slate-400 text-sm mt-1">
-                Prochaine relance :{" "}
-                <span className="text-slate-200 font-semibold">
-                  {new Date(lead.next_followup_at).toLocaleDateString("fr-FR")}
-                </span>
-              </p>
+  /* --------------------------------------------
+      LEADS TRAITÉS
+  -------------------------------------------- */
+  if (type === "treated") {
+    const [linkedin, maps] = await Promise.all([
+      supabase
+        .from("leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("traite", true),
 
-              {lead.Company && (
-                <p className="text-slate-500 text-xs mt-2">{lead.Company}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+      supabase
+        .from("map_leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .eq("traite", true),
+    ]);
 
-  return (
-    <>
-      <div className="space-y-10">
-        <div>
-          <h1 className="text-3xl font-semibold text-slate-50">
-            Relances clients
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Suivi des relances en retard, du jour et à venir.
-          </p>
-        </div>
+    items = [
+      ...(linkedin.data ?? []).map((l) => ({ ...l, source: "linkedin" })),
+      ...(maps.data ?? []).map((l) => ({ ...l, source: "maps" })),
+    ];
+  }
 
-        <Section title="🔥 En retard" data={overdue} />
-        <Section title="📅 Aujourd’hui" data={todayList} />
-        <Section title="⏳ À venir" data={upcoming} />
-      </div>
+  /* --------------------------------------------
+      RELANCES À VENIR (même logique que /dashboard/relances)
+      = leads + map_leads avec next_followup_at >= startOfDay
+  -------------------------------------------- */
+  if (type === "followups_upcoming") {
+    const [linkedin, maps] = await Promise.all([
+      supabase
+        .from("leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .not("next_followup_at", "is", null)
+        .gte("next_followup_at", startOfDay.toISOString())
+        .order("next_followup_at", { ascending: true }),
 
-      {/* SIDEBAR PREMIUM */}
-      {openLead && (
-        <div
-          className="
-            fixed right-0 top-0 h-full w-[420px]
-            bg-slate-900/95 backdrop-blur-xl
-            border-l border-slate-800 z-50 p-6
-            shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)]
-            animate-slideLeft
-          "
-        >
-          <button
-            onClick={() => setOpenLead(null)}
-            className="text-slate-400 text-xs mb-4 hover:text-slate-200"
-          >
-            ✕ Fermer
-          </button>
+      supabase
+        .from("map_leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .not("next_followup_at", "is", null)
+        .gte("next_followup_at", startOfDay.toISOString())
+        .order("next_followup_at", { ascending: true }),
+    ]);
 
-          <h2 className="text-2xl font-semibold text-slate-50">
-            {openLead.FirstName || openLead.title} {openLead.LastName || ""}
-          </h2>
+    items = [
+      ...(linkedin.data ?? []).map((l) => ({ ...l, source: "linkedin" })),
+      ...(maps.data ?? []).map((l) => ({ ...l, source: "maps" })),
+    ];
+  }
 
-          <p className="text-slate-400 text-sm mt-1 mb-4">
-            Prochaine relance :{" "}
-            <span className="text-indigo-400 font-medium">
-              {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
-            </span>
-          </p>
+  /* --------------------------------------------
+      RELANCES EN RETARD (même logique que /dashboard/relances)
+      = leads + map_leads avec next_followup_at < startOfDay
+  -------------------------------------------- */
+  if (type === "followups_late") {
+    const [linkedin, maps] = await Promise.all([
+      supabase
+        .from("leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .not("next_followup_at", "is", null)
+        .lt("next_followup_at", startOfDay.toISOString())
+        .order("next_followup_at", { ascending: true }),
 
-          {/* ⭐️ BOUTON MARQUER COMME RÉPONDU */}
-          <button
-            onClick={() => markAsResponded(openLead.id)}
-            className="
-              w-full text-center py-2 mt-4 rounded-lg 
-              bg-emerald-600 hover:bg-emerald-500 
-              text-sm font-medium text-white transition
-            "
-          >
-            Marquer comme répondu ✓
-          </button>
+      supabase
+        .from("map_leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .not("next_followup_at", "is", null)
+        .lt("next_followup_at", startOfDay.toISOString())
+        .order("next_followup_at", { ascending: true }),
+    ]);
 
-          <div className="border-t border-slate-800 mt-4 pt-4 space-y-3 text-sm text-slate-300">
-            {openLead.Company && (
-              <p>
-                <strong>Entreprise :</strong> {openLead.Company}
-              </p>
-            )}
+    items = [
+      ...(linkedin.data ?? []).map((l) => ({ ...l, source: "linkedin" })),
+      ...(maps.data ?? []).map((l) => ({ ...l, source: "maps" })),
+    ];
+  }
 
-            {openLead.email && (
-              <p>
-                <strong>Email :</strong> {openLead.email}
-              </p>
-            )}
-
-            {openLead.phoneNumber && (
-              <p>
-                <strong>Téléphone :</strong> {openLead.phoneNumber}
-              </p>
-            )}
-
-            {openLead.LinkedInURL && (
-              <p>
-                <strong>LinkedIn :</strong>{" "}
-                <a
-                  href={openLead.LinkedInURL}
-                  className="text-sky-400 underline"
-                  target="_blank"
-                >
-                  Voir →
-                </a>
-              </p>
-            )}
-
-            {openLead.placeUrl && (
-              <p>
-                <strong>Google Maps :</strong>{" "}
-                <a
-                  href={openLead.placeUrl}
-                  className="text-green-400 underline"
-                  target="_blank"
-                >
-                  Ouvrir →
-                </a>
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  );
+  return NextResponse.json({ items });
 }

@@ -278,43 +278,57 @@ export default function DashboardPage() {
                   <thead>
                     <tr className="bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide">
                       <th className="py-3 px-4 border-b border-slate-800 text-left">
-                        Type
+                        Source
                       </th>
                       <th className="py-3 px-4 border-b border-slate-800 text-left">
-                        Statut
+                        Nom
+                      </th>
+                      <th className="py-3 px-4 border-b border-slate-800 text-left">
+                        Contact
                       </th>
                       <th className="py-3 px-4 border-b border-slate-800 text-center">
-                        Date prévue
-                      </th>
-                      <th className="py-3 px-4 border-b border-slate-800 text-center">
-                        Lead ID
+                        Prochaine relance
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((f) => (
-                      <tr
-                        key={String(f.id)}
-                        className="border-b border-slate-900 hover:bg-slate-900/60 transition"
-                      >
-                        <td className="py-3 px-4 text-slate-50">
-                          {f.type || "—"}
-                        </td>
-                        <td className="py-3 px-4 text-slate-300">
-                          {f.status || "—"}
-                        </td>
-                        <td className="py-3 px-4 text-center text-slate-400">
-                          {f.scheduled_date
-                            ? new Date(f.scheduled_date).toLocaleDateString(
-                                "fr-FR"
-                              )
-                            : "—"}
-                        </td>
-                        <td className="py-3 px-4 text-center text-slate-300">
-                          {f.lead_id ?? "—"}
-                        </td>
-                      </tr>
-                    ))}
+                    {items.map((it) => {
+                      const source = it.source === "maps" ? "Maps" : "LinkedIn";
+
+                      const name =
+                        it.source === "maps"
+                          ? it.title || "—"
+                          : (
+                              `${it.FirstName ?? ""} ${it.LastName ?? ""}`.trim() ||
+                              it.Name ||
+                              "—"
+                            );
+
+                      const contact =
+                        it.source === "maps"
+                          ? it.email || it.phoneNumber || it.website || "—"
+                          : it.Company || it.location || "—";
+
+                      return (
+                        <tr
+                          key={`${it.source ?? "x"}-${it.id}`}
+                          className="border-b border-slate-900 hover:bg-slate-900/60 transition"
+                        >
+                          <td className="py-3 px-4 text-slate-300">{source}</td>
+                          <td className="py-3 px-4 text-slate-50">{name}</td>
+                          <td className="py-3 px-4 text-slate-300">
+                            {contact}
+                          </td>
+                          <td className="py-3 px-4 text-center text-slate-400">
+                            {it.next_followup_at
+                              ? new Date(it.next_followup_at).toLocaleDateString(
+                                  "fr-FR"
+                                )
+                              : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
