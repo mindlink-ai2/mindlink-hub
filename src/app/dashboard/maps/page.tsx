@@ -275,6 +275,25 @@ export default function MapsPage() {
     );
   };
 
+  /* --------------------------------------------
+      🟣 AJOUT — OUVRIR EMAIL PRÉ-REMPLI (ne l’envoie pas)
+  -------------------------------------------- */
+  const openPrefilledEmail = () => {
+    if (!openLead) return;
+
+    const to = (openLead.email ?? "").trim();
+    if (!to) return;
+
+    const subject = `Mindlink — ${openLead.title ?? "Contact"}`;
+    const body = (openLead.internal_message ?? "").trim();
+
+    const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(
+      subject
+    )}&body=${encodeURIComponent(body)}`;
+
+    window.location.href = mailto;
+  };
+
   if (!loaded) {
     return <div className="text-slate-400 text-sm">Chargement des leads…</div>;
   }
@@ -709,8 +728,26 @@ export default function MapsPage() {
             />
           </div>
 
-          {/* 🔵 AJOUT — bouton message envoyé */}
+          {/* 🟣 AJOUT — bouton ouvrir email */}
           <div className="mt-5">
+            <button
+              onClick={openPrefilledEmail}
+              disabled={!openLead.email}
+              className={`
+                w-full px-4 py-3 rounded-xl text-sm font-medium transition
+                ${
+                  !openLead.email
+                    ? "bg-slate-800/60 border border-slate-700 text-slate-500 cursor-not-allowed"
+                    : "bg-slate-900 border border-slate-700 text-slate-100 hover:bg-slate-800"
+                }
+              `}
+            >
+              Ouvrir l’email pré-rempli
+            </button>
+          </div>
+
+          {/* 🔵 AJOUT — bouton message envoyé */}
+          <div className="mt-3">
             <button
               onClick={handleMessageSent}
               disabled={openLead.message_sent}
