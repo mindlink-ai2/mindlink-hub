@@ -15,6 +15,22 @@ export default function MapsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectedCount = selectedIds.size;
 
+  // ✅ NEW: open lead from query param (?open=ID)
+  const [openFromQuery, setOpenFromQuery] = useState<string | null>(null);
+
+  /* --------------------------------------------
+      ✅ Read query param once on mount
+  -------------------------------------------- */
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const openId = url.searchParams.get("open");
+      if (openId) setOpenFromQuery(openId);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   /* --------------------------------------------
       FETCH LEADS
   -------------------------------------------- */
@@ -26,6 +42,35 @@ export default function MapsPage() {
       setLoaded(true);
     })();
   }, []);
+
+  /* --------------------------------------------
+      ✅ After leads loaded, open sidebar if query exists
+  -------------------------------------------- */
+  useEffect(() => {
+    if (!loaded) return;
+    if (!openFromQuery) return;
+
+    const target = safeLeads.find((l) => String(l.id) === String(openFromQuery));
+    if (target) {
+      setOpenLead({
+        ...target,
+        message_sent: target.message_sent ?? false,
+        message_sent_at: target.message_sent_at ?? null,
+        next_followup_at: target.next_followup_at ?? null,
+      });
+
+      // ✅ clean URL (remove ?open=)
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("open");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      } catch (e) {
+        console.error(e);
+      }
+
+      setOpenFromQuery(null);
+    }
+  }, [loaded, openFromQuery, safeLeads]);
 
   /* --------------------------------------------
       SEARCH FUNCTION (same quality as LinkedIn)

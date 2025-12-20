@@ -104,6 +104,32 @@ export default function DashboardPage() {
     }
   };
 
+  /* --------------------------------------------
+      ✅ NEW: open row -> open correct page + sidebar
+  -------------------------------------------- */
+  const openFromRow = (it: any) => {
+    const src = it?.source === "maps" ? "maps" : "linkedin";
+
+    // Relances: open followups page + sidebar
+    if (active === "followups_upcoming" || active === "followups_late") {
+      const url = `/dashboard/followups?open=${encodeURIComponent(
+        String(it.id)
+      )}&source=${src}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    // Leads: open correct source page + sidebar
+    if (src === "maps") {
+      const url = `/dashboard/maps?open=${encodeURIComponent(String(it.id))}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    const url = `/dashboard/leads?open=${encodeURIComponent(String(it.id))}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   const isFollowupsView =
     active === "followups_upcoming" || active === "followups_late";
 
@@ -251,7 +277,8 @@ export default function DashboardPage() {
                       return (
                         <tr
                           key={`${it.source ?? "x"}-${it.id}`}
-                          className="border-b border-slate-900 hover:bg-slate-900/60 transition"
+                          onClick={() => openFromRow(it)}
+                          className="border-b border-slate-900 hover:bg-slate-900/60 transition cursor-pointer"
                         >
                           <td className="py-3 px-4 text-slate-300">{source}</td>
                           <td className="py-3 px-4 text-slate-50">{name}</td>
@@ -312,7 +339,8 @@ export default function DashboardPage() {
                       return (
                         <tr
                           key={`${it.source ?? "x"}-${it.id}`}
-                          className="border-b border-slate-900 hover:bg-slate-900/60 transition"
+                          onClick={() => openFromRow(it)}
+                          className="border-b border-slate-900 hover:bg-slate-900/60 transition cursor-pointer"
                         >
                           <td className="py-3 px-4 text-slate-300">{source}</td>
                           <td className="py-3 px-4 text-slate-50">{name}</td>

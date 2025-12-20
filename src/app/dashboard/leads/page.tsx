@@ -31,12 +31,26 @@ export default function LeadsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectedCount = selectedIds.size;
 
+  // ✅ NEW: open lead from query param (?open=ID)
+  const [openFromQuery, setOpenFromQuery] = useState<string | null>(null);
+
   // ✅ DERIVED filtered list (no state = no desync)
   const filteredLeads = useMemo(() => {
     return filterLeads(safeLeads, searchTerm);
   }, [safeLeads, searchTerm]);
 
   const colCount = selectionMode ? 8 : 7;
+
+  // ✅ Read query param once on mount
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const openId = url.searchParams.get("open");
+      if (openId) setOpenFromQuery(openId);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   // Load leads
   useEffect(() => {
@@ -49,6 +63,28 @@ export default function LeadsPage() {
       setClientLoaded(true);
     })();
   }, []);
+
+  // ✅ After leads loaded, open sidebar if query exists
+  useEffect(() => {
+    if (!clientLoaded) return;
+    if (!openFromQuery) return;
+
+    const target = safeLeads.find((l) => String(l.id) === String(openFromQuery));
+    if (target) {
+      setOpenLead(target);
+
+      // ✅ clean URL (remove ?open=)
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("open");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      } catch (e) {
+        console.error(e);
+      }
+
+      setOpenFromQuery(null);
+    }
+  }, [clientLoaded, openFromQuery, safeLeads]);
 
   // ✅ NEW: cleanup selection when list changes (ex: deleted)
   useEffect(() => {
@@ -698,7 +734,15 @@ export default function LeadsPage() {
 }
 
 /* KPI Component */
-function KPI({ title, value, text }: { title: string; value: any; text: string }) {
+function KPI({
+  title,
+  value,
+  text,
+}: {
+  title: string;
+  value: any;
+  text: string;
+}) {
   return (
     <div className="rounded-2xl bg-slate-950 border border-slate-800 p-6 flex flex-col items-center text-center shadow-inner">
       <div className="text-[11px] text-slate-500 uppercase tracking-wide">
