@@ -294,6 +294,44 @@ export default function MapsPage() {
     window.location.href = mailto;
   };
 
+  /* --------------------------------------------
+      🟣 AJOUT — FALLBACK GMAIL WEB
+  -------------------------------------------- */
+  const openGmailWeb = () => {
+    if (!openLead) return;
+
+    const to = (openLead.email ?? "").trim();
+    if (!to) return;
+
+    const subject = `Mindlink — ${openLead.title ?? "Contact"}`;
+    const body = (openLead.internal_message ?? "").trim();
+
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+      to
+    )}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    window.open(url, "_blank");
+  };
+
+  /* --------------------------------------------
+      🟣 AJOUT — FALLBACK OUTLOOK WEB
+  -------------------------------------------- */
+  const openOutlookWeb = () => {
+    if (!openLead) return;
+
+    const to = (openLead.email ?? "").trim();
+    if (!to) return;
+
+    const subject = `Mindlink — ${openLead.title ?? "Contact"}`;
+    const body = (openLead.internal_message ?? "").trim();
+
+    const url = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(
+      to
+    )}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    window.open(url, "_blank");
+  };
+
   if (!loaded) {
     return <div className="text-slate-400 text-sm">Chargement des leads…</div>;
   }
@@ -743,6 +781,39 @@ export default function MapsPage() {
               `}
             >
               Ouvrir l’email pré-rempli
+            </button>
+          </div>
+
+          {/* 🟣 AJOUT — fallback Gmail / Outlook web */}
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={openGmailWeb}
+              disabled={!openLead.email}
+              className={`
+                flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
+                ${
+                  !openLead.email
+                    ? "bg-slate-800/60 border-slate-700 text-slate-500 cursor-not-allowed"
+                    : "bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900"
+                }
+              `}
+            >
+              Gmail
+            </button>
+
+            <button
+              onClick={openOutlookWeb}
+              disabled={!openLead.email}
+              className={`
+                flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
+                ${
+                  !openLead.email
+                    ? "bg-slate-800/60 border-slate-700 text-slate-500 cursor-not-allowed"
+                    : "bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900"
+                }
+              `}
+            >
+              Outlook
             </button>
           </div>
 
