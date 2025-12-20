@@ -40,6 +40,10 @@ export async function GET(req: Request) {
   const startOfWeek = new Date(startOfDay);
   startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay() + 1); // lundi
 
+  // ✅ pour "à venir" on veut STRICTEMENT > aujourd’hui (comme ta page followups)
+  const startOfTomorrow = new Date(startOfDay);
+  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
   let items: any[] = [];
 
   /* --------------------------------------------
@@ -115,33 +119,59 @@ export async function GET(req: Request) {
   }
 
   /* --------------------------------------------
-      RELANCES À VENIR
+      RELANCES À VENIR (✅ basé sur next_followup_at)
   -------------------------------------------- */
   if (type === "followups_upcoming") {
-    const { data } = await supabase
-      .from("followups")
-      .select("*")
-      .eq("client_id", clientId)
-      .gte("scheduled_date", startOfDay.toISOString())
-      .neq("status", "done")
-      .order("scheduled_date", { ascending: true });
+    const [linkedin, maps] = await Promise.all([
+      supabase
+        .from("leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .not("next_followup_at", "is", null)
+        .gte("next_followup_at", startOfTomorrow.toISOString())
+        .order("next_followup_at", { ascending: true }),
 
-    items = data ?? [];
+      supabase
+        .from("map_leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .not("next_followup_at", "is", null)
+        .gte("next_followup_at", startOfTomorrow.toISOString())
+        .order("next_followup_at", { ascending: true }),
+    ]);
+
+    items = [
+      ...(linkedin.data ?? []).map((l) => ({ ...l, source: "linkedin" })),
+      ...(maps.data ?? []).map((l) => ({ ...l, source: "maps" })),
+    ];
   }
 
   /* --------------------------------------------
-      RELANCES EN RETARD
+      RELANCES EN RETARD (✅ basé sur next_followup_at)
   -------------------------------------------- */
   if (type === "followups_late") {
-    const { data } = await supabase
-      .from("followups")
-      .select("*")
-      .eq("client_id", clientId)
-      .lt("scheduled_date", startOfDay.toISOString())
-      .neq("status", "done")
-      .order("scheduled_date", { ascending: true });
+    const [linkedin, maps] = await Promise.all([
+      supabase
+        .from("leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .not("next_followup_at", "is", null)
+        .lt("next_followup_at", startOfDay.toISOString())
+        .order("next_followup_at", { ascending: true }),
 
-    items = data ?? [];
+      supabase
+        .from("map_leads")
+        .select("*")
+        .eq("client_id", clientId)
+        .not("next_followup_at", "is", null)
+        .lt("next_followup_at", startOfDay.toISOString())
+        .order("next_followup_at", { ascending: true }),
+    ]);
+
+    items = [
+      ...(linkedin.data ?? []).map((l) => ({ ...l, source: "linkedin" })),
+      ...(maps.data ?? []).map((l) => ({ ...l, source: "maps" })),
+    ];
   }
 
   return NextResponse.json({ items });
