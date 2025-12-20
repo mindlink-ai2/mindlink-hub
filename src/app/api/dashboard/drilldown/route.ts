@@ -122,7 +122,9 @@ export async function GET(req: Request) {
       .from("followups")
       .select("*")
       .eq("client_id", clientId)
-      .gte("scheduled_date", now.toISOString());
+      .gte("scheduled_date", startOfDay.toISOString())
+      .neq("status", "done")
+      .order("scheduled_date", { ascending: true });
 
     items = data ?? [];
   }
@@ -135,8 +137,9 @@ export async function GET(req: Request) {
       .from("followups")
       .select("*")
       .eq("client_id", clientId)
-      .lt("scheduled_date", now.toISOString())
-      .neq("status", "done");
+      .lt("scheduled_date", startOfDay.toISOString())
+      .neq("status", "done")
+      .order("scheduled_date", { ascending: true });
 
     items = data ?? [];
   }
