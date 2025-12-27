@@ -3,22 +3,24 @@ import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+export const runtime = "nodejs";
 
-// mapping simple côté server
-const PRICE_BY_PLAN: Record<string, string> = {
-  essential: process.env.STRIPE_PRICE_ESSENTIAL!,
-  premium: process.env.STRIPE_PRICE_PREMIUM!,
-  // automated: process.env.STRIPE_PRICE_AUTOMATED!,
+const PRICE_BY_PLAN: Record<string, string | undefined> = {
+  premium: process.env.STRIPE_PRICE_PREMIUM,
+  essential: process.env.STRIPE_PRICE_ESSENTIAL,
 };
 
 export async function POST(req: Request) {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) return NextResponse.json({ error: "Missing STRIPE_SECRET_KEY" }, { status: 500 });
+  const stripe = new Stripe(stripeKey);
+
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { plan } = await req.json(); // "premium" etc.
+  const { plan } = await req.json();
   const priceId = PRICE_BY_PLAN[plan];
-  if (!priceId) return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+  if (!priceId) return NextResponse.json({ error: "Invalid plan/price" }, { status: 400 });
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,16 +35,12 @@ export async function POST(req: Request) {
 
   if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
 
-  // 1) Créer customer Stripe si absent
   let stripeCustomerId = client.stripe_customer_id as string | null;
 
   if (!stripeCustomerId) {
     const customer = await stripe.customers.create({
       email: client.email ?? undefined,
-      metadata: {
-        client_id: client.id,
-        clerk_user_id: userId,
-      },
+      metadata: { client_id: client.id, clerk_user_id: userId },
     });
     stripeCustomerId = customer.id;
 
@@ -52,21 +50,15 @@ export async function POST(req: Request) {
       .eq("id", client.id);
   }
 
-  // 2) Checkout Session
-  const origin = req.headers.get("origin") ?? process.env.APP_URL!;
+  const origin = req.headers.get("origin") ?? "https://mind-link.fr";
+
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: stripeCustomerId,
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${origin}/hub/billing?success=1`,
-    cancel_url: `${origin}/hub/billing?canceled=1`,
-    client_reference_id: userId, // 🔥 super utile pour le webhook
-    subscription_data: {
-      metadata: {
-        client_id: client.id,
-        plan_requested: plan,
-      },
-    },
+    success_url: `${origin}/dashboard/hub/billing?success=1`,
+    cancel_url: `${origin}/dashboard/hub/billing?canceled=1`,
+    client_reference_id: userId,
   });
 
   return NextResponse.json({ url: session.url });
