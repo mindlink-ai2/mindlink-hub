@@ -9,55 +9,6 @@ export const metadata: Metadata = {
   description: "Espace client pour agences & freelances",
 };
 
-/* 🔹 Menu Compte */
-function AccountMenu() {
-  return (
-    <div className="relative group">
-      <button className="text-[11px] text-slate-400 hover:text-slate-100 transition">
-        Compte ▾
-      </button>
-
-      <div className="absolute right-0 mt-2 w-44 rounded-xl border border-slate-800 bg-slate-900 shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition">
-        <div className="flex flex-col py-2 text-xs">
-          <Link
-            href="/dashboard"
-            className="px-4 py-2 hover:bg-slate-800 transition"
-          >
-            Tableau de bord
-          </Link>
-          <Link
-            href="/dashboard/prospection"
-            className="px-4 py-2 hover:bg-slate-800 transition"
-          >
-            Prospection
-          </Link>
-          <Link
-            href="/dashboard/followups"
-            className="px-4 py-2 hover:bg-slate-800 transition"
-          >
-            Relances
-          </Link>
-
-          <div className="my-1 border-t border-slate-800" />
-
-          <Link
-            href="/dashboard/hub/billing"
-            className="px-4 py-2 hover:bg-slate-800 transition"
-          >
-            Facturation
-          </Link>
-          <Link
-            href="/dashboard/support"
-            className="px-4 py-2 hover:bg-slate-800 transition"
-          >
-            Support
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
@@ -87,27 +38,40 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {/* 🔹 Navigation + User */}
                 <div className="flex items-center gap-4 text-xs">
                   <SignedIn>
-                  <nav className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
-  <Link href="/dashboard" className="hover:text-slate-100 transition">
-    Dashboard
-  </Link>
-  <Link href="/dashboard/prospection" className="hover:text-slate-100 transition">
-    Prospection
-  </Link>
-  <Link href="/dashboard/followups" className="hover:text-slate-100 transition">
-    Relances
-  </Link>
-  <Link href="/dashboard/hub/billing" className="hover:text-slate-100 transition">
-    Abonnement
-  </Link>
-  <Link href="/dashboard/support" className="hover:text-slate-100 transition">
-    Support
-  </Link>
-</nav>
+                    <nav className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
+                      <Link
+                        href="/dashboard"
+                        className="hover:text-slate-100 transition"
+                      >
+                        Dashboard
+                      </Link>
+                      <Link
+                        href="/dashboard/prospection"
+                        className="hover:text-slate-100 transition"
+                      >
+                        Prospection
+                      </Link>
+                      <Link
+                        href="/dashboard/followups"
+                        className="hover:text-slate-100 transition"
+                      >
+                        Relances
+                      </Link>
+                      <Link
+                        href="/dashboard/hub/billing"
+                        className="hover:text-slate-100 transition"
+                      >
+                        Abonnement
+                      </Link>
+                      <Link
+                        href="/dashboard/support"
+                        className="hover:text-slate-100 transition"
+                      >
+                        Support
+                      </Link>
+                    </nav>
 
-                    <div className="flex items-center gap-4">
-                      <AccountMenu />
-
+                    <div className="flex items-center gap-3">
                       <span className="hidden sm:inline text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-full">
                         Connecté
                       </span>
@@ -149,8 +113,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
                 <span>© Mindlink</span>
                 <div className="flex gap-4">
-                  <button className="hover:text-slate-300 transition">Statut</button>
-                  <button className="hover:text-slate-300 transition">Mentions légales</button>
+                  <button className="hover:text-slate-300 transition">
+                    Statut
+                  </button>
+                  <button className="hover:text-slate-300 transition">
+                    Mentions légales
+                  </button>
                 </div>
               </div>
             </footer>
