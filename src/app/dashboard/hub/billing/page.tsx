@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Check } from "lucide-react";
 
 export default function BillingPage() {
   const [loading, setLoading] = useState<"premium" | "portal" | null>(null);
@@ -42,30 +43,49 @@ export default function BillingPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-12">
+    <div className="max-w-4xl mx-auto px-6 py-14">
       {/* Header */}
-      <div className="mb-10">
+      <div className="mb-12">
         <h1 className="text-3xl font-semibold text-white">
           Facturation & abonnement
         </h1>
-        <p className="text-sm text-gray-400 mt-2">
-          Gérez votre abonnement Mindlink en toute simplicité.
+        <p className="text-gray-400 mt-2 max-w-xl">
+          Gérez votre abonnement Mindlink, changez d’offre ou mettez à jour vos
+          informations de paiement.
         </p>
       </div>
 
-      {/* Card */}
-      <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0b1220] to-[#0a0f1a] p-8 shadow-lg">
-        <div className="flex flex-col gap-6">
-          {/* Plan info */}
+      {/* Main Card */}
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#0b1220] to-[#070b14] p-10 shadow-xl">
+        {/* Glow */}
+        <div className="absolute inset-0 bg-indigo-500/5 blur-3xl pointer-events-none" />
+
+        <div className="relative flex flex-col gap-10">
+          {/* Premium pitch */}
           <div>
-            <h2 className="text-lg font-medium text-white">
+            <h2 className="text-xl font-medium text-white">
               Passer à l’offre Premium
             </h2>
-            <p className="text-sm text-gray-400 mt-1">
-              Débloquez Google Maps, plus de flexibilité sur les cibles et un
-              assistant commercial plus avancé.
+            <p className="text-gray-400 mt-2 max-w-2xl">
+              Accédez à une prospection plus puissante et plus flexible pour
+              générer davantage d’opportunités sans effort supplémentaire.
             </p>
           </div>
+
+          {/* Benefits */}
+          <ul className="grid sm:grid-cols-2 gap-4 text-sm text-gray-300">
+            {[
+              "Prospection Google Maps incluse",
+              "Changement de cibles en illimité",
+              "Assistant commercial plus avancé",
+              "Meilleure priorisation des prospects",
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-indigo-400 mt-0.5" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
 
           {/* Error */}
           {error && (
@@ -75,7 +95,7 @@ export default function BillingPage() {
           )}
 
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 pt-2">
             <button
               onClick={upgradeToPremium}
               disabled={loading !== null}
@@ -97,8 +117,8 @@ export default function BillingPage() {
             </button>
           </div>
 
-          {/* Footer */}
-          <div className="text-xs text-gray-500 pt-2">
+          {/* Trust */}
+          <div className="text-xs text-gray-500">
             Paiement sécurisé via Stripe · Sans engagement · Annulable à tout
             moment
           </div>
