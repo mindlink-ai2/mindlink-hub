@@ -18,6 +18,7 @@ export async function POST(req: Request) {
   if (!sig) return new Response("Missing stripe-signature", { status: 400 });
 
   let event: Stripe.Event;
+
   try {
     event = stripe.webhooks.constructEvent(
       body,
@@ -30,12 +31,13 @@ export async function POST(req: Request) {
 
   try {
     switch (event.type) {
-      // 1) On sécurise le lien Clerk -> Stripe customer (si besoin)
+      // ✅ 1) Lier Clerk user -> Stripe customer
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        const clerkUserId = session.client_reference_id; // 👈 ce qu’on a mis
-        const stripeCustomerId = session.customer as string | null;
+        const clerkUserId = session.client_reference_id || null;
+        const stripeCustomerId =
+          typeof session.customer === "string" ? session.customer : null;
 
         if (clerkUserId && stripeCustomerId) {
           await supabase
@@ -46,20 +48,26 @@ export async function POST(req: Request) {
         break;
       }
 
-      // 2) Sync subscription (création/modif/annulation)
+      // ✅ 2) Sync subscription
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
-        const sub = event.data.object as Stripe.Subscription;
+        // ⚠️ on cast en any pour éviter les soucis de typing Stripe “clover”
+        const sub = event.data.object as any;
 
-        const stripeCustomerId = sub.customer as string;
-        const priceId = sub.items.data[0]?.price?.id ?? null;
+        const stripeCustomerId = String(sub.customer);
+        const priceId = sub.items?.data?.[0]?.price?.id ?? null;
 
-        // à toi de mapper priceId -> plan
         const plan =
-          priceId === process.env.STRIPE_PRICE_ESSENTIAL ? "essential" :
-          priceId === process.env.STRIPE_PRICE_PREMIUM ? "premium" :
-          "unknown";
+          priceId === process.env.STRIPE_PRICE_ESSENTIAL
+            ? "essential"
+            : priceId === process.env.STRIPE_PRICE_PREMIUM
+            ? "premium"
+            : "unknown";
+
+        const periodEndIso = sub.current_period_end
+          ? new Date(sub.current_period_end * 1000).toISOString()
+          : null;
 
         await supabase
           .from("clients")
@@ -67,15 +75,17 @@ export async function POST(req: Request) {
             stripe_subscription_id: sub.id,
             subscription_status: sub.status,
             plan,
-            current_period_end: sub.current_period_end
-              ? new Date(sub.current_period_end * 1000).toISOString()
-              : null,
+            current_period_end: periodEndIso,
             cancel_at_period_end: sub.cancel_at_period_end ?? false,
           })
           .eq("stripe_customer_id", stripeCustomerId);
 
         break;
       }
+
+      default:
+        // on ignore le reste
+        break;
     }
 
     return new Response("ok", { status: 200 });
