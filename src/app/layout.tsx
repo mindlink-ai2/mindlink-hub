@@ -6,7 +6,7 @@ import DashboardContainer from "@/components/DashboardContainer";
 
 export const metadata: Metadata = {
   title: "Mindlink Hub",
-  description: "Espace client pour agences & freelances",
+  description: "Espace client",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         Mindlink Hub
                       </span>
                       <span className="text-xs text-slate-400 leading-tight">
-                        Espace client • Agences & freelances
+                        Espace client • Freelances & Agences
                       </span>
                     </div>
                   </Link>
