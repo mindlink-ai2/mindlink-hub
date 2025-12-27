@@ -4,18 +4,20 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function POST(req: Request) {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    return new Response("Missing STRIPE_SECRET_KEY", { status: 500 });
+  }
+
+  const stripe = new Stripe(stripeKey);
+
   const body = await req.text();
   const sig = (await headers()).get("stripe-signature");
 
-  if (!sig) return new Response("Missing stripe-signature", { status: 400 });
+  if (!sig) {
+    return new Response("Missing stripe-signature", { status: 400 });
+  }
 
   let event: Stripe.Event;
 
@@ -29,13 +31,17 @@ export async function POST(req: Request) {
     return new Response(`Webhook Error: ${err.message}`, { status: 400 });
   }
 
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   try {
     switch (event.type) {
-      // ✅ 1) Lier Clerk user -> Stripe customer
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        const clerkUserId = session.client_reference_id || null;
+        const clerkUserId = session.client_reference_id;
         const stripeCustomerId =
           typeof session.customer === "string" ? session.customer : null;
 
@@ -48,21 +54,19 @@ export async function POST(req: Request) {
         break;
       }
 
-      // ✅ 2) Sync subscription
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
-        // ⚠️ on cast en any pour éviter les soucis de typing Stripe “clover”
         const sub = event.data.object as any;
 
         const stripeCustomerId = String(sub.customer);
         const priceId = sub.items?.data?.[0]?.price?.id ?? null;
 
         const plan =
-          priceId === process.env.STRIPE_PRICE_ESSENTIAL
-            ? "essential"
-            : priceId === process.env.STRIPE_PRICE_PREMIUM
+          priceId === process.env.STRIPE_PRICE_PREMIUM
             ? "premium"
+            : priceId === process.env.STRIPE_PRICE_ESSENTIAL
+            ? "essential"
             : "unknown";
 
         const periodEndIso = sub.current_period_end
@@ -82,10 +86,6 @@ export async function POST(req: Request) {
 
         break;
       }
-
-      default:
-        // on ignore le reste
-        break;
     }
 
     return new Response("ok", { status: 200 });
