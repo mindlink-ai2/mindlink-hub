@@ -87,20 +87,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {/* 🔹 Navigation + User */}
                 <div className="flex items-center gap-4 text-xs">
                   <SignedIn>
-                    <nav className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
-                      <Link href="/dashboard" className="hover:text-slate-100 transition">
-                        Dashboard
-                      </Link>
-                      <Link href="/dashboard/prospection" className="hover:text-slate-100 transition">
-                        Prospection
-                      </Link>
-                      <Link href="/dashboard/followups" className="hover:text-slate-100 transition">
-                        Relances
-                      </Link>
-                      <Link href="/dashboard/support" className="hover:text-slate-100 transition">
-                        Support
-                      </Link>
-                    </nav>
+                  <nav className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
+  <Link href="/dashboard" className="hover:text-slate-100 transition">
+    Dashboard
+  </Link>
+  <Link href="/dashboard/prospection" className="hover:text-slate-100 transition">
+    Prospection
+  </Link>
+  <Link href="/dashboard/followups" className="hover:text-slate-100 transition">
+    Relances
+  </Link>
+  <Link href="/dashboard/hub/billing" className="hover:text-slate-100 transition">
+    Abonnement
+  </Link>
+  <Link href="/dashboard/support" className="hover:text-slate-100 transition">
+    Support
+  </Link>
+</nav>
 
                     <div className="flex items-center gap-4">
                       <AccountMenu />
