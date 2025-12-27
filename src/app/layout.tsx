@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         Mindlink Hub
                       </span>
                       <span className="text-xs text-slate-400 leading-tight">
-                        Espace client • Freelances & Agences
+                        Espace client
                       </span>
                     </div>
                   </Link>
