@@ -12,7 +12,7 @@ export default function SubscriptionGate({ children, supportEmail }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const run = async () => {
+    (async () => {
       try {
         const res = await fetch("/api/subscription-status", { cache: "no-store" });
         const data = await res.json();
@@ -22,26 +22,21 @@ export default function SubscriptionGate({ children, supportEmail }: Props) {
       } finally {
         setLoading(false);
       }
-    };
-    run();
+    })();
   }, []);
 
   const isPending = (status || "").toLowerCase() === "attente";
 
-  // Pendant le chargement : on laisse la page normale (ou tu peux loader si tu veux)
   if (loading) return <>{children}</>;
-
   if (!isPending) return <>{children}</>;
 
   return (
     <div className="relative">
-      {/* Contenu flouté + bloqué */}
       <div className="pointer-events-none select-none blur-sm opacity-60">
         {children}
       </div>
 
-      {/* Overlay */}
-      <div className="absolute inset-0 flex items-center justify-center p-6">
+      <div className="fixed inset-0 flex items-center justify-center p-6">
         <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-black/70 p-6 shadow-xl backdrop-blur">
           <div className="text-lg font-semibold">Paiement en attente</div>
 
