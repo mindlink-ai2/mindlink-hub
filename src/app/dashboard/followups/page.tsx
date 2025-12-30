@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import SubscriptionGate from "@/components/SubscriptionGate";
 
 export default function FollowupsPage() {
   const [leads, setLeads] = useState<any[]>([]);
@@ -114,110 +115,112 @@ export default function FollowupsPage() {
   );
 
   return (
-    <>
-      <div className="space-y-10">
-        <div>
-          <h1 className="text-3xl font-semibold text-slate-50">
-            Relances clients
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Suivi des relances en retard, du jour et à venir.
-          </p>
+    <SubscriptionGate supportEmail="contact@mindlink.fr">
+      <>
+        <div className="space-y-10">
+          <div>
+            <h1 className="text-3xl font-semibold text-slate-50">
+              Relances clients
+            </h1>
+            <p className="text-slate-400 text-sm mt-1">
+              Suivi des relances en retard, du jour et à venir.
+            </p>
+          </div>
+
+          <Section title="🔥 En retard" data={overdue} />
+          <Section title="📅 Aujourd’hui" data={todayList} />
+          <Section title="⏳ À venir" data={upcoming} />
         </div>
 
-        <Section title="🔥 En retard" data={overdue} />
-        <Section title="📅 Aujourd’hui" data={todayList} />
-        <Section title="⏳ À venir" data={upcoming} />
-      </div>
-
-      {/* SIDEBAR PREMIUM */}
-      {openLead && (
-        <div
-          className="
+        {/* SIDEBAR PREMIUM */}
+        {openLead && (
+          <div
+            className="
             fixed right-0 top-0 h-full w-[420px]
             bg-slate-900/95 backdrop-blur-xl
             border-l border-slate-800 z-50 p-6
             shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)]
             animate-slideLeft
           "
-        >
-          <button
-            onClick={() => setOpenLead(null)}
-            className="text-slate-400 text-xs mb-4 hover:text-slate-200"
           >
-            ✕ Fermer
-          </button>
+            <button
+              onClick={() => setOpenLead(null)}
+              className="text-slate-400 text-xs mb-4 hover:text-slate-200"
+            >
+              ✕ Fermer
+            </button>
 
-          <h2 className="text-2xl font-semibold text-slate-50">
-            {openLead.FirstName || openLead.title} {openLead.LastName || ""}
-          </h2>
+            <h2 className="text-2xl font-semibold text-slate-50">
+              {openLead.FirstName || openLead.title} {openLead.LastName || ""}
+            </h2>
 
-          <p className="text-slate-400 text-sm mt-1 mb-4">
-            Prochaine relance :{" "}
-            <span className="text-indigo-400 font-medium">
-              {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
-            </span>
-          </p>
+            <p className="text-slate-400 text-sm mt-1 mb-4">
+              Prochaine relance :{" "}
+              <span className="text-indigo-400 font-medium">
+                {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
+              </span>
+            </p>
 
-          {/* ⭐️ BOUTON MARQUER COMME RÉPONDU */}
-          <button
-            onClick={() => markAsResponded(openLead.id)}
-            className="
+            {/* ⭐️ BOUTON MARQUER COMME RÉPONDU */}
+            <button
+              onClick={() => markAsResponded(openLead.id)}
+              className="
               w-full text-center py-2 mt-4 rounded-lg 
               bg-emerald-600 hover:bg-emerald-500 
               text-sm font-medium text-white transition
             "
-          >
-            Marquer comme répondu ✓
-          </button>
+            >
+              Marquer comme répondu ✓
+            </button>
 
-          <div className="border-t border-slate-800 mt-4 pt-4 space-y-3 text-sm text-slate-300">
-            {openLead.Company && (
-              <p>
-                <strong>Entreprise :</strong> {openLead.Company}
-              </p>
-            )}
+            <div className="border-t border-slate-800 mt-4 pt-4 space-y-3 text-sm text-slate-300">
+              {openLead.Company && (
+                <p>
+                  <strong>Entreprise :</strong> {openLead.Company}
+                </p>
+              )}
 
-            {openLead.email && (
-              <p>
-                <strong>Email :</strong> {openLead.email}
-              </p>
-            )}
+              {openLead.email && (
+                <p>
+                  <strong>Email :</strong> {openLead.email}
+                </p>
+              )}
 
-            {openLead.phoneNumber && (
-              <p>
-                <strong>Téléphone :</strong> {openLead.phoneNumber}
-              </p>
-            )}
+              {openLead.phoneNumber && (
+                <p>
+                  <strong>Téléphone :</strong> {openLead.phoneNumber}
+                </p>
+              )}
 
-            {openLead.LinkedInURL && (
-              <p>
-                <strong>LinkedIn :</strong>{" "}
-                <a
-                  href={openLead.LinkedInURL}
-                  className="text-sky-400 underline"
-                  target="_blank"
-                >
-                  Voir →
-                </a>
-              </p>
-            )}
+              {openLead.LinkedInURL && (
+                <p>
+                  <strong>LinkedIn :</strong>{" "}
+                  <a
+                    href={openLead.LinkedInURL}
+                    className="text-sky-400 underline"
+                    target="_blank"
+                  >
+                    Voir →
+                  </a>
+                </p>
+              )}
 
-            {openLead.placeUrl && (
-              <p>
-                <strong>Google Maps :</strong>{" "}
-                <a
-                  href={openLead.placeUrl}
-                  className="text-green-400 underline"
-                  target="_blank"
-                >
-                  Ouvrir →
-                </a>
-              </p>
-            )}
+              {openLead.placeUrl && (
+                <p>
+                  <strong>Google Maps :</strong>{" "}
+                  <a
+                    href={openLead.placeUrl}
+                    className="text-green-400 underline"
+                    target="_blank"
+                  >
+                    Ouvrir →
+                  </a>
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-    </>
+        )}
+      </>
+    </SubscriptionGate>
   );
 }
