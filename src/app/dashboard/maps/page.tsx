@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import TraiteCheckbox from "./TraiteCheckbox";
 import DeleteLeadButton from "./DeleteLeadButton";
+import SubscriptionGate from "@/components/SubscriptionGate";
 
 export default function MapsPage() {
   const [safeLeads, setSafeLeads] = useState<any[]>([]);
@@ -403,420 +404,421 @@ export default function MapsPage() {
   const nextImportText = h <= 0 ? `Dans ${m} min` : `Dans ${h}h ${m}min`;
 
   return (
-    <>
-      <div className="space-y-10">
-        {/* HEADER */}
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
-              Leads Google Maps
-            </h1>
-            <p className="text-slate-400 text-sm mt-1">
-              Tous vos leads importés automatiquement depuis Google Maps.
-            </p>
-          </div>
+    <SubscriptionGate supportEmail="contact@mindlink.fr">
+      <>
+        <div className="space-y-10">
+          {/* HEADER */}
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
+                Leads Google Maps
+              </h1>
+              <p className="text-slate-400 text-sm mt-1">
+                Tous vos leads importés automatiquement depuis Google Maps.
+              </p>
+            </div>
 
-          <a
-            href="/dashboard/maps/export"
-            className="
+            <a
+              href="/dashboard/maps/export"
+              className="
               px-4 py-2 text-xs rounded-xl
               bg-slate-900 border border-slate-700
               hover:bg-slate-800 transition
             "
-          >
-            Exporter CSV
-          </a>
-        </div>
+            >
+              Exporter CSV
+            </a>
+          </div>
 
-        {/* 🔍 SEARCH BAR — même design premium que LinkedIn */}
-        <div className="w-full max-w-md">
-          <div
-            className="
+          {/* 🔍 SEARCH BAR — même design premium que LinkedIn */}
+          <div className="w-full max-w-md">
+            <div
+              className="
               flex items-center gap-3
               bg-slate-900/60 border border-slate-700 rounded-xl
               px-4 py-2.5 shadow-inner backdrop-blur-md
               focus-within:ring-2 focus-within:ring-indigo-500/50
               transition
             "
-          >
-            <svg
-              className="w-4 h-4 text-slate-500"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
-              />
-            </svg>
+              <svg
+                className="w-4 h-4 text-slate-500"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+                />
+              </svg>
 
-            <input
-              value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Rechercher un lead (nom, email, téléphone, site)…"
-              className="
+              <input
+                value={searchTerm}
+                onChange={(e) => handleSearch(e.target.value)}
+                placeholder="Rechercher un lead (nom, email, téléphone, site)…"
+                className="
                 bg-transparent w-full text-sm text-slate-200 placeholder-slate-500
                 focus:outline-none
               "
+              />
+            </div>
+          </div>
+
+          {/* KPIs */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <KPI
+              title="Total leads"
+              value={total}
+              text="Importés depuis Google Maps"
+            />
+            <KPI
+              title="À traiter"
+              value={remainingToTreat}
+              text={`${remainingToTreat} restants`}
+            />
+            <KPI
+              title="Prochaine importation"
+              value={nextImportText}
+              text="Tous les jours à 8h00"
             />
           </div>
-        </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <KPI
-            title="Total leads"
-            value={total}
-            text="Importés depuis Google Maps"
-          />
-          <KPI
-            title="À traiter"
-            value={remainingToTreat}
-            text={`${remainingToTreat} restants`}
-          />
-          <KPI
-            title="Prochaine importation"
-            value={nextImportText}
-            text="Tous les jours à 8h00"
-          />
-        </div>
+          {/* TABLE */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/90 shadow-xl overflow-hidden">
+            {/* TOP BAR */}
+            <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+              <div>
+                <h2 className="text-slate-100 text-sm font-medium">
+                  Liste des leads Google Maps
+                </h2>
+                <p className="text-[11px] text-slate-500">
+                  Triés du plus récent au plus ancien
+                </p>
+              </div>
 
-        {/* TABLE */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/90 shadow-xl overflow-hidden">
-          {/* TOP BAR */}
-          <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
-            <div>
-              <h2 className="text-slate-100 text-sm font-medium">
-                Liste des leads Google Maps
-              </h2>
-              <p className="text-[11px] text-slate-500">
-                Triés du plus récent au plus ancien
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {/* ✅ NEW: Selection controls */}
-              <button
-                type="button"
-                onClick={toggleSelectionMode}
-                className="
+              <div className="flex items-center gap-3">
+                {/* ✅ NEW: Selection controls */}
+                <button
+                  type="button"
+                  onClick={toggleSelectionMode}
+                  className="
                   px-3 py-1.5 text-[11px] rounded-xl
                   bg-slate-900 border border-slate-700
                   hover:bg-slate-800 transition
                 "
-              >
-                {selectionMode ? "Annuler" : "Sélection"}
-              </button>
+                >
+                  {selectionMode ? "Annuler" : "Sélection"}
+                </button>
 
-              {selectionMode && (
-                <>
-                  <button
-                    type="button"
-                    onClick={toggleSelectAllFiltered}
-                    className="
+                {selectionMode && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={toggleSelectAllFiltered}
+                      className="
                       px-3 py-1.5 text-[11px] rounded-xl
                       bg-slate-900 border border-slate-700
                       hover:bg-slate-800 transition
                     "
-                  >
-                    {allFilteredSelected
-                      ? "Tout désélectionner"
-                      : "Tout sélectionner"}
-                  </button>
+                    >
+                      {allFilteredSelected
+                        ? "Tout désélectionner"
+                        : "Tout sélectionner"}
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={handleBulkDelete}
-                    disabled={selectedCount === 0}
-                    className={[
-                      "px-3 py-1.5 text-[11px] rounded-xl transition border",
-                      selectedCount === 0
-                        ? "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed"
-                        : "bg-red-600/15 border-red-500/30 text-red-300 hover:bg-red-600/25",
-                    ].join(" ")}
-                  >
-                    Supprimer ({selectedCount})
-                  </button>
-                </>
-              )}
+                    <button
+                      type="button"
+                      onClick={handleBulkDelete}
+                      disabled={selectedCount === 0}
+                      className={[
+                        "px-3 py-1.5 text-[11px] rounded-xl transition border",
+                        selectedCount === 0
+                          ? "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed"
+                          : "bg-red-600/15 border-red-500/30 text-red-300 hover:bg-red-600/25",
+                      ].join(" ")}
+                    >
+                      Supprimer ({selectedCount})
+                    </button>
+                  </>
+                )}
 
-              <div className="text-[11px] text-slate-400">
-                {filteredLeads.length} lead(s)
+                <div className="text-[11px] text-slate-400">
+                  {filteredLeads.length} lead(s)
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* TABLE CONTENT */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-separate border-spacing-0">
-              <thead>
-                <tr className="bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide">
-                  {/* ✅ NEW: selection column */}
-                  {selectionMode && (
-                    <th className="py-3 px-4 border-b border-slate-800 text-center">
-                      Sel.
+            {/* TABLE CONTENT */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-separate border-spacing-0">
+                <thead>
+                  <tr className="bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide">
+                    {/* ✅ NEW: selection column */}
+                    {selectionMode && (
+                      <th className="py-3 px-4 border-b border-slate-800 text-center">
+                        Sel.
+                      </th>
+                    )}
+
+                    <th className="py-3 px-4 border-b border-slate-800">
+                      Traité
                     </th>
-                  )}
-
-                  <th className="py-3 px-4 border-b border-slate-800">
-                    Traité
-                  </th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-left">
-                    Nom
-                  </th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-left">
-                    Email
-                  </th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-left">
-                    Téléphone
-                  </th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-left">
-                    Site
-                  </th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-left">
-                    Google Maps
-                  </th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-center">
-                    Date
-                  </th>
-                  <th className="py-3 px-4 border-b border-slate-800 text-center">
-                    Supprimer
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredLeads.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={colCount}
-                      className="py-10 text-center text-slate-500"
-                    >
-                      Aucun résultat.
-                    </td>
+                    <th className="py-3 px-4 border-b border-slate-800 text-left">
+                      Nom
+                    </th>
+                    <th className="py-3 px-4 border-b border-slate-800 text-left">
+                      Email
+                    </th>
+                    <th className="py-3 px-4 border-b border-slate-800 text-left">
+                      Téléphone
+                    </th>
+                    <th className="py-3 px-4 border-b border-slate-800 text-left">
+                      Site
+                    </th>
+                    <th className="py-3 px-4 border-b border-slate-800 text-left">
+                      Google Maps
+                    </th>
+                    <th className="py-3 px-4 border-b border-slate-800 text-center">
+                      Date
+                    </th>
+                    <th className="py-3 px-4 border-b border-slate-800 text-center">
+                      Supprimer
+                    </th>
                   </tr>
-                ) : (
-                  filteredLeads.map((lead) => {
-                    const idStr = String(lead.id);
-                    const isSelected = selectedIds.has(idStr);
+                </thead>
 
-                    return (
-                      <tr
-                        key={lead.id}
-                        className="border-b border-slate-900 hover:bg-slate-900/60 transition group"
+                <tbody>
+                  {filteredLeads.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={colCount}
+                        className="py-10 text-center text-slate-500"
                       >
-                        {/* ✅ NEW: selection checkbox */}
-                        {selectionMode && (
-                          <td className="py-3 px-4 text-center">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleSelected(idStr)}
-                              className="h-4 w-4 cursor-pointer accent-indigo-500"
-                            />
-                          </td>
-                        )}
+                        Aucun résultat.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLeads.map((lead) => {
+                      const idStr = String(lead.id);
+                      const isSelected = selectedIds.has(idStr);
 
-                        {/* TRAITE */}
-                        <td className="py-3 px-4 text-center">
-                          <TraiteCheckbox
-                            leadId={lead.id}
-                            defaultChecked={Boolean(lead.traite)}
-                          />
-                        </td>
-
-                        {/* NOM + pastille + bouton voir */}
-                        <td className="py-3 px-4 text-slate-50 relative pr-14 flex items-center gap-2">
-                          {lead.title || "—"}
-
-                          {lead.message_sent && (
-                            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
+                      return (
+                        <tr
+                          key={lead.id}
+                          className="border-b border-slate-900 hover:bg-slate-900/60 transition group"
+                        >
+                          {/* ✅ NEW: selection checkbox */}
+                          {selectionMode && (
+                            <td className="py-3 px-4 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelected(idStr)}
+                                className="h-4 w-4 cursor-pointer accent-indigo-500"
+                              />
+                            </td>
                           )}
 
-                          <button
-                            onClick={() =>
-                              setOpenLead({
-                                ...lead,
-                                message_sent: lead.message_sent ?? false,
-                                message_sent_at: lead.message_sent_at ?? null,
-                                next_followup_at: lead.next_followup_at ?? null,
-                              })
-                            }
-                            className="
+                          {/* TRAITE */}
+                          <td className="py-3 px-4 text-center">
+                            <TraiteCheckbox
+                              leadId={lead.id}
+                              defaultChecked={Boolean(lead.traite)}
+                            />
+                          </td>
+
+                          {/* NOM + pastille + bouton voir */}
+                          <td className="py-3 px-4 text-slate-50 relative pr-14 flex items-center gap-2">
+                            {lead.title || "—"}
+
+                            {lead.message_sent && (
+                              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" />
+                            )}
+
+                            <button
+                              onClick={() =>
+                                setOpenLead({
+                                  ...lead,
+                                  message_sent: lead.message_sent ?? false,
+                                  message_sent_at: lead.message_sent_at ?? null,
+                                  next_followup_at: lead.next_followup_at ?? null,
+                                })
+                              }
+                              className="
                               opacity-0 group-hover:opacity-100
                               absolute right-3 top-1/2 -translate-y-1/2
                               text-[11px] px-3 py-1.5 rounded-lg
                               bg-indigo-600/70 hover:bg-indigo-500
                               text-white shadow-sm hover:shadow-md transition
                             "
-                          >
-                            Voir →
-                          </button>
-                        </td>
-
-                        {/* EMAIL */}
-                        <td className="py-3 px-4 text-slate-300">
-                          {lead.email || "—"}
-                        </td>
-
-                        {/* PHONE */}
-                        <td className="py-3 px-4 text-slate-300">
-                          {lead.phoneNumber || "—"}
-                        </td>
-
-                        {/* WEBSITE */}
-                        <td className="py-3 px-4">
-                          {lead.website ? (
-                            <a
-                              href={lead.website}
-                              target="_blank"
-                              className="text-sky-400 hover:underline"
                             >
-                              Voir site
-                            </a>
-                          ) : (
-                            <span className="text-slate-500">—</span>
-                          )}
-                        </td>
+                              Voir →
+                            </button>
+                          </td>
 
-                        {/* MAPS */}
-                        <td className="py-3 px-4">
-                          {lead.placeUrl ? (
-                            <a
-                              href={lead.placeUrl}
-                              target="_blank"
-                              className="text-green-400 hover:underline"
-                            >
-                              Ouvrir Map
-                            </a>
-                          ) : (
-                            <span className="text-slate-500">—</span>
-                          )}
-                        </td>
+                          {/* EMAIL */}
+                          <td className="py-3 px-4 text-slate-300">
+                            {lead.email || "—"}
+                          </td>
 
-                        {/* DATE */}
-                        <td className="py-3 px-4 text-center text-slate-400">
-                          {lead.created_at
-                            ? new Date(lead.created_at).toLocaleDateString(
-                                "fr-FR"
-                              )
-                            : "—"}
-                        </td>
+                          {/* PHONE */}
+                          <td className="py-3 px-4 text-slate-300">
+                            {lead.phoneNumber || "—"}
+                          </td>
 
-                        {/* DELETE */}
-                        <td className="py-3 px-4 text-center">
-                          <DeleteLeadButton leadId={lead.id} />
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                          {/* WEBSITE */}
+                          <td className="py-3 px-4">
+                            {lead.website ? (
+                              <a
+                                href={lead.website}
+                                target="_blank"
+                                className="text-sky-400 hover:underline"
+                              >
+                                Voir site
+                              </a>
+                            ) : (
+                              <span className="text-slate-500">—</span>
+                            )}
+                          </td>
+
+                          {/* MAPS */}
+                          <td className="py-3 px-4">
+                            {lead.placeUrl ? (
+                              <a
+                                href={lead.placeUrl}
+                                target="_blank"
+                                className="text-green-400 hover:underline"
+                              >
+                                Ouvrir Map
+                              </a>
+                            ) : (
+                              <span className="text-slate-500">—</span>
+                            )}
+                          </td>
+
+                          {/* DATE */}
+                          <td className="py-3 px-4 text-center text-slate-400">
+                            {lead.created_at
+                              ? new Date(lead.created_at).toLocaleDateString(
+                                  "fr-FR"
+                                )
+                              : "—"}
+                          </td>
+
+                          {/* DELETE */}
+                          <td className="py-3 px-4 text-center">
+                            <DeleteLeadButton leadId={lead.id} />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* SIDEBAR PREMIUM */}
-      {openLead && (
-        <div
-          className="
+        {/* SIDEBAR PREMIUM */}
+        {openLead && (
+          <div
+            className="
             fixed right-0 top-0 h-full w-[420px]
             bg-slate-900/95 backdrop-blur-xl
             border-l border-slate-800
             shadow-[0_0_30px_-6px_rgba(79,70,229,0.4)]
             p-6 z-50 animate-slideLeft
           "
-        >
-          <button
-            className="text-slate-400 text-xs mb-4 hover:text-slate-200 transition"
-            onClick={() => setOpenLead(null)}
           >
-            ✕ Fermer
-          </button>
+            <button
+              className="text-slate-400 text-xs mb-4 hover:text-slate-200 transition"
+              onClick={() => setOpenLead(null)}
+            >
+              ✕ Fermer
+            </button>
 
-          <h2 className="text-xl font-semibold text-slate-50 mb-4">
-            {openLead.title}
-          </h2>
+            <h2 className="text-xl font-semibold text-slate-50 mb-4">
+              {openLead.title}
+            </h2>
 
-          <div className="text-sm text-slate-300 space-y-2 mb-6">
-            <p>
-              <strong>Email :</strong> {openLead.email || "—"}
-            </p>
-            <p>
-              <strong>Téléphone :</strong> {openLead.phoneNumber || "—"}
-            </p>
-            <p>
-              <strong>Site :</strong>{" "}
-              {openLead.website ? (
-                <a
-                  href={openLead.website}
-                  target="_blank"
-                  className="text-sky-400 underline"
-                >
-                  Voir site
-                </a>
-              ) : (
-                "—"
-              )}
-            </p>
-            <p>
-              <strong>Google Maps :</strong>{" "}
-              {openLead.placeUrl ? (
-                <a
-                  href={openLead.placeUrl}
-                  target="_blank"
-                  className="text-green-400 underline"
-                >
-                  Ouvrir map
-                </a>
-              ) : (
-                "—"
-              )}
-            </p>
-            <p>
-              <strong>Créé le :</strong> {openLead.created_at?.slice(0, 10)}
-            </p>
-          </div>
+            <div className="text-sm text-slate-300 space-y-2 mb-6">
+              <p>
+                <strong>Email :</strong> {openLead.email || "—"}
+              </p>
+              <p>
+                <strong>Téléphone :</strong> {openLead.phoneNumber || "—"}
+              </p>
+              <p>
+                <strong>Site :</strong>{" "}
+                {openLead.website ? (
+                  <a
+                    href={openLead.website}
+                    target="_blank"
+                    className="text-sky-400 underline"
+                  >
+                    Voir site
+                  </a>
+                ) : (
+                  "—"
+                )}
+              </p>
+              <p>
+                <strong>Google Maps :</strong>{" "}
+                {openLead.placeUrl ? (
+                  <a
+                    href={openLead.placeUrl}
+                    target="_blank"
+                    className="text-green-400 underline"
+                  >
+                    Ouvrir map
+                  </a>
+                ) : (
+                  "—"
+                )}
+              </p>
+              <p>
+                <strong>Créé le :</strong> {openLead.created_at?.slice(0, 10)}
+              </p>
+            </div>
 
-          {/* Message interne */}
-          <div className="mt-6">
-            <label className="text-xs text-slate-400 mb-2 block">
-              Message interne
-            </label>
+            {/* Message interne */}
+            <div className="mt-6">
+              <label className="text-xs text-slate-400 mb-2 block">
+                Message interne
+              </label>
 
-            <textarea
-              value={openLead.internal_message ?? ""}
-              onChange={(e) => {
-                const msg = e.target.value;
-                setOpenLead({ ...openLead, internal_message: msg });
+              <textarea
+                value={openLead.internal_message ?? ""}
+                onChange={(e) => {
+                  const msg = e.target.value;
+                  setOpenLead({ ...openLead, internal_message: msg });
 
-                setSafeLeads((prev) =>
-                  prev.map((l) =>
-                    l.id === openLead.id ? { ...l, internal_message: msg } : l
-                  )
-                );
-              }}
-              placeholder="Écris une note interne…"
-              className="
+                  setSafeLeads((prev) =>
+                    prev.map((l) =>
+                      l.id === openLead.id ? { ...l, internal_message: msg } : l
+                    )
+                  );
+                }}
+                placeholder="Écris une note interne…"
+                className="
                 w-full h-40 p-4 rounded-xl
                 bg-slate-800/60 border border-slate-700
                 text-sm text-slate-200
                 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
                 transition
               "
-            />
-          </div>
+              />
+            </div>
 
-          {/* 🟣 AJOUT — bouton ouvrir email */}
-          <div className="mt-5">
-            <button
-              onClick={openPrefilledEmail}
-              disabled={!openLead.email}
-              className={`
+            {/* 🟣 AJOUT — bouton ouvrir email */}
+            <div className="mt-5">
+              <button
+                onClick={openPrefilledEmail}
+                disabled={!openLead.email}
+                className={`
                 w-full px-4 py-3 rounded-xl text-sm font-medium transition
                 ${
                   !openLead.email
@@ -824,17 +826,17 @@ export default function MapsPage() {
                     : "bg-slate-900 border border-slate-700 text-slate-100 hover:bg-slate-800"
                 }
               `}
-            >
-              Ouvrir l’email pré-rempli
-            </button>
-          </div>
+              >
+                Ouvrir l’email pré-rempli
+              </button>
+            </div>
 
-          {/* 🟣 AJOUT — fallback Gmail / Outlook web */}
-          <div className="mt-2 flex gap-2">
-            <button
-              onClick={openGmailWeb}
-              disabled={!openLead.email}
-              className={`
+            {/* 🟣 AJOUT — fallback Gmail / Outlook web */}
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={openGmailWeb}
+                disabled={!openLead.email}
+                className={`
                 flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
                 ${
                   !openLead.email
@@ -842,14 +844,14 @@ export default function MapsPage() {
                     : "bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900"
                 }
               `}
-            >
-              Gmail
-            </button>
+              >
+                Gmail
+              </button>
 
-            <button
-              onClick={openOutlookWeb}
-              disabled={!openLead.email}
-              className={`
+              <button
+                onClick={openOutlookWeb}
+                disabled={!openLead.email}
+                className={`
                 flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
                 ${
                   !openLead.email
@@ -857,17 +859,17 @@ export default function MapsPage() {
                     : "bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900"
                 }
               `}
-            >
-              Outlook
-            </button>
-          </div>
+              >
+                Outlook
+              </button>
+            </div>
 
-          {/* 🔵 AJOUT — bouton message envoyé */}
-          <div className="mt-3">
-            <button
-              onClick={handleMessageSent}
-              disabled={openLead.message_sent}
-              className={`
+            {/* 🔵 AJOUT — bouton message envoyé */}
+            <div className="mt-3">
+              <button
+                onClick={handleMessageSent}
+                disabled={openLead.message_sent}
+                className={`
                 w-full px-4 py-3 rounded-xl text-sm font-medium transition
                 ${
                   openLead.message_sent
@@ -875,25 +877,28 @@ export default function MapsPage() {
                     : "bg-indigo-600 hover:bg-indigo-500 text-white"
                 }
               `}
-            >
-              {openLead.message_sent
-                ? "Message envoyé ✓"
-                : "Marquer comme envoyé"}
-            </button>
-          </div>
+              >
+                {openLead.message_sent
+                  ? "Message envoyé ✓"
+                  : "Marquer comme envoyé"}
+              </button>
+            </div>
 
-          {/* 🔵 AJOUT — prochaine relance */}
-          {openLead.next_followup_at && (
-            <p className="text-xs text-slate-400 mt-2">
-              Prochaine relance :{" "}
-              <span className="text-slate-200 font-medium">
-                {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
-              </span>
-            </p>
-          )}
-        </div>
-      )}
-    </>
+            {/* 🔵 AJOUT — prochaine relance */}
+            {openLead.next_followup_at && (
+              <p className="text-xs text-slate-400 mt-2">
+                Prochaine relance :{" "}
+                <span className="text-slate-200 font-medium">
+                  {new Date(openLead.next_followup_at).toLocaleDateString(
+                    "fr-FR"
+                  )}
+                </span>
+              </p>
+            )}
+          </div>
+        )}
+      </>
+    </SubscriptionGate>
   );
 }
 
