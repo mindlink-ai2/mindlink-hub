@@ -176,7 +176,7 @@ export default function BillingPage() {
               <ul className="mt-6 space-y-3 text-sm text-gray-300">
                 {[
                   "Prospection LinkedIn",
-                  "15 prospects/jour",
+                  "10 prospects/jour",
                   "Tableau de bord centralisé",
                   "Relances & suivi",
                 ].map((item) => (
@@ -223,7 +223,7 @@ export default function BillingPage() {
               <ul className="mt-6 space-y-3 text-sm text-gray-200">
                 {[
                   "Tout Essential",
-                  "Google Maps inclus (10/jour)",
+                  "Prospection Google Maps incluse (10/jour)",
                   "Changement de cibles illimité",
                   "Assistant commercial plus avancé",
                 ].map((item) => (
