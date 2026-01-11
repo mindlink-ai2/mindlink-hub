@@ -135,10 +135,10 @@ export default function DashboardPage() {
     active === "followups_upcoming" || active === "followups_late";
 
   return (
-    <SubscriptionGate supportEmail="contact@mindlink.fr">
+    <SubscriptionGate supportEmail="contact@lidmeo.com">
       <div className="min-h-screen w-full px-6 pt-20 pb-32">
         <h1 className="text-5xl font-extrabold tracking-tight mb-3 bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-400 bg-clip-text text-transparent">
-          Tableau de bord Mindlink
+          Tableau de bord Lidmeo
         </h1>
 
         <p className="text-slate-400 text-lg mb-12">
