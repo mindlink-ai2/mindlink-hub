@@ -27,13 +27,13 @@ export default function HomePage() {
             <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
               Bienvenue sur{" "}
               <span className="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
-                Mindlink Hub
+                Lidmeo Hub
               </span>
               .
             </h1>
             <p className="text-sm md:text-base text-slate-300 max-w-xl">
               Centralisez vos automatisations, vos intégrations et vos performances.
-              Un seul espace pour suivre ce que Mindlink fait tourner pour votre entreprise,
+              Un seul espace pour suivre ce que Lidmeo fait tourner pour votre entreprise,
               en arrière-plan.
             </p>
           </div>
@@ -103,19 +103,19 @@ export default function HomePage() {
             </Link>
 
             <a
-              href="https://mind-link.fr"
+              href="https://lidmeo.com"
               target="_blank"
               rel="noreferrer"
               className="rounded-xl border border-slate-700 px-4 py-2 text-xs md:text-sm text-slate-200 hover:bg-slate-800 transition"
             >
-              Découvrir Mindlink
+              Découvrir Lidmeo
             </a>
           </div>
 
           <p className="text-[11px] text-slate-500">
-            Vous êtes client Mindlink et vous n’avez pas encore reçu vos accès ?{" "}
+            Vous êtes client Lidmeo et vous n’avez pas encore reçu vos accès ?{" "}
             <span className="text-sky-400">
-              Contactez votre référent Mindlink ou créez votre compte depuis le Hub.
+              Contactez votre référent Lidmeo ou créez votre compte depuis le Hub.
             </span>
           </p>
         </SignedOut>
@@ -126,7 +126,7 @@ export default function HomePage() {
         <SignedIn>
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Vous êtes connecté à Mindlink Hub
+            Vous êtes connecté à Lidmeo Hub
           </div>
 
           {firstName && (
@@ -138,7 +138,7 @@ export default function HomePage() {
           <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
             Bienvenue sur votre espace{" "}
             <span className="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
-              Mindlink Hub
+              Lidmeo Hub
             </span>{" "}
             ⚡️
           </h1>
@@ -146,7 +146,7 @@ export default function HomePage() {
           <div className="space-y-4 text-sm md:text-base text-slate-300 max-w-xl">
             <p>
               Vous êtes ici chez vous. Cet espace a été conçu pour vous offrir une vision claire,
-              précise et instantanée de tout ce que Mindlink automatise pour votre activité.
+              précise et instantanée de tout ce que Lidmeo automatise pour votre activité.
             </p>
 
             <p>
@@ -167,7 +167,7 @@ export default function HomePage() {
               <p className="text-slate-200">Avancez plus vite.</p>
               <p className="text-slate-200">Restez concentré sur l’essentiel.</p>
               <p className="text-slate-200">
-                <span className="font-semibold">Mindlink</span> s’occupe du reste.
+                <span className="font-semibold">Lidmeo</span> s’occupe du reste.
               </p>
             </div>
           </div>
