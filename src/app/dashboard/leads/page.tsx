@@ -328,7 +328,7 @@ export default function LeadsPage() {
     filteredLeads.every((l) => selectedIds.has(String(l.id)));
 
   return (
-    <SubscriptionGate supportEmail="contact@mindlink.fr">
+    <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
         <div className="space-y-10">
           {/* HEADER */}
@@ -339,7 +339,7 @@ export default function LeadsPage() {
               </h1>
               <p className="text-slate-400 text-sm mt-1">
                 Tous vos prospects qualifiés, importés automatiquement par
-                Mindlink.
+                Lidmeo.
               </p>
             </div>
 
