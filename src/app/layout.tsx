@@ -5,7 +5,7 @@ import "./globals.css";
 import DashboardContainer from "@/components/DashboardContainer";
 
 export const metadata: Metadata = {
-  title: "Mindlink Hub",
+  title: "Lidmeo Hub",
   description: "Espace client",
 };
 
@@ -22,11 +22,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div className="flex items-center gap-2">
                   <Link href="/" className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-500 flex items-center justify-center text-xs font-bold tracking-tight">
-                      ML
+                      LM
                     </div>
                     <div className="flex flex-col">
                       <span className="font-semibold text-sm leading-tight">
-                        Mindlink Hub
+                        Lidmeo Hub
                       </span>
                       <span className="text-xs text-slate-400 leading-tight">
                         Espace client
@@ -111,7 +111,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {/* 🔵 FOOTER */}
             <footer className="border-t border-slate-900 text-xs text-slate-500">
               <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-                <span>© Mindlink</span>
+                <span>© Lidmeo</span>
                 <div className="flex gap-4">
                   <button className="hover:text-slate-300 transition">
                     Statut
