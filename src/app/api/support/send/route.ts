@@ -20,19 +20,25 @@ export async function POST(req: Request) {
     const priority = String(body?.priority ?? "normal");
 
     if (!subject || !message) {
-      return NextResponse.json({ error: "Missing subject or message" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing subject or message" },
+        { status: 400 }
+      );
     }
 
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "Missing RESEND_API_KEY in Vercel env" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Missing RESEND_API_KEY in Vercel env" },
+        { status: 500 }
+      );
     }
 
     const resend = new Resend(apiKey);
 
     // ✅ Tu peux mettre TON from direct maintenant que le domaine est vérifié
-    const from = "Mindlink Support <contact@mind-link.fr>";
-    const to = "contact@mind-link.fr";
+    const from = "Lidmeo Support <contact@lidmeo.com>";
+    const to = "contact@lidmeo.com";
 
     const html = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6">
@@ -50,19 +56,25 @@ export async function POST(req: Request) {
       from,
       to,
       replyTo: userEmail,
-      subject: `🎫 Ticket Mindlink — ${subject}`,
+      subject: `🎫 Ticket Lidmeo — ${subject}`,
       html,
     });
 
     // ✅ Resend renvoie parfois { error } même sans throw
     if ((result as any)?.error) {
       return NextResponse.json(
-        { error: (result as any).error?.message ?? "Resend error", details: (result as any).error },
+        {
+          error: (result as any).error?.message ?? "Resend error",
+          details: (result as any).error,
+        },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true, id: (result as any)?.data?.id ?? null });
+    return NextResponse.json({
+      success: true,
+      id: (result as any)?.data?.id ?? null,
+    });
   } catch (err: any) {
     // ✅ On renvoie la vraie erreur au front
     console.error("SUPPORT API ERROR", err);
