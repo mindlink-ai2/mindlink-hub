@@ -46,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         Dashboard
                       </Link>
                       <Link
-                        href="/dashboard/prospection"
+                        href="/dashboard/leads"
                         className="hover:text-slate-100 transition"
                       >
                         Prospection

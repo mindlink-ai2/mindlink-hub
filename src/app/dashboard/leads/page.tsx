@@ -27,6 +27,10 @@ export default function LeadsPage() {
   const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
+  // ✅ NEW: client options (email / phone enrichment)
+  const [emailOption, setEmailOption] = useState<boolean>(false);
+  const [phoneOption, setPhoneOption] = useState<boolean>(false);
+
   // ✅ NEW: Selection mode
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -40,7 +44,10 @@ export default function LeadsPage() {
     return filterLeads(safeLeads, searchTerm);
   }, [safeLeads, searchTerm]);
 
-  const colCount = selectionMode ? 8 : 7;
+  // ✅ Column count for empty state colSpan
+  const baseCols =
+    7 + (emailOption ? 1 : 0) + (phoneOption ? 1 : 0); // treated, name, company, location, linkedin, date, delete + options
+  const colCount = (selectionMode ? 1 : 0) + baseCols;
 
   // ✅ Read query param once on mount
   useEffect(() => {
@@ -53,7 +60,7 @@ export default function LeadsPage() {
     }
   }, []);
 
-  // Load leads
+  // Load leads + options
   useEffect(() => {
     (async () => {
       const res = await fetch("/api/get-leads");
@@ -61,6 +68,15 @@ export default function LeadsPage() {
 
       const leads = data.leads ?? [];
       setSafeLeads(leads);
+
+      // ✅ options from API (fallback false if null/undefined)
+      const client = data.client ?? data.options ?? null;
+      const eo = client?.email_option;
+      const po = client?.phone_option;
+
+      setEmailOption(Boolean(eo));
+      setPhoneOption(Boolean(po));
+
       setClientLoaded(true);
     })();
   }, []);
@@ -494,6 +510,19 @@ export default function LeadsPage() {
                     <th className="py-3 px-4 border-b border-slate-800 text-left">
                       LinkedIn
                     </th>
+
+                    {/* ✅ NEW: conditional columns */}
+                    {emailOption && (
+                      <th className="py-3 px-4 border-b border-slate-800 text-left">
+                        Email
+                      </th>
+                    )}
+                    {phoneOption && (
+                      <th className="py-3 px-4 border-b border-slate-800 text-left">
+                        Téléphone
+                      </th>
+                    )}
+
                     <th className="py-3 px-4 border-b border-slate-800 text-center">
                       Date
                     </th>
@@ -584,6 +613,18 @@ export default function LeadsPage() {
                             )}
                           </td>
 
+                          {/* ✅ NEW: conditional cells */}
+                          {emailOption && (
+                            <td className="py-3 px-4 text-slate-300">
+                              {lead.email || "—"}
+                            </td>
+                          )}
+                          {phoneOption && (
+                            <td className="py-3 px-4 text-slate-300">
+                              {lead.phone || "—"}
+                            </td>
+                          )}
+
                           <td className="py-3 px-4 text-center text-slate-400">
                             {lead.created_at
                               ? new Date(lead.created_at).toLocaleDateString(
@@ -662,6 +703,25 @@ export default function LeadsPage() {
                   )}
                 </p>
               </div>
+
+              {/* ✅ NEW: conditional info in sidebar */}
+              {emailOption && (
+                <div>
+                  <span className="text-slate-500 text-xs uppercase tracking-wide">
+                    Email
+                  </span>
+                  <p className="text-slate-200 mt-1">{openLead.email || "—"}</p>
+                </div>
+              )}
+
+              {phoneOption && (
+                <div>
+                  <span className="text-slate-500 text-xs uppercase tracking-wide">
+                    Téléphone
+                  </span>
+                  <p className="text-slate-200 mt-1">{openLead.phone || "—"}</p>
+                </div>
+              )}
 
               <div>
                 <span className="text-slate-500 text-xs uppercase tracking-wide">

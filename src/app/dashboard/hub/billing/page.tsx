@@ -204,7 +204,7 @@ export default function BillingPage() {
                 <div>
                   <div className="text-white text-lg font-semibold">Premium</div>
                   <div className="mt-1 text-gray-300/80 text-sm">
-                    Pour accélérer avec Google Maps + flexibilité totale.
+                    Pour accélérer sur LinkedIn avec plus de volume et de flexibilité.
                   </div>
                 </div>
 
@@ -223,8 +223,7 @@ export default function BillingPage() {
               <ul className="mt-6 space-y-3 text-sm text-gray-200">
                 {[
                   "Tout Essential",
-                  "Prospection LinkedIn (15 prospects/jour)",
-                  "Prospection Google Maps incluse (10/jour)",
+                  "Prospection LinkedIn (20 prospects/jour)",
                   "Changement de cibles illimité",
                   "Assistant commercial plus avancé",
                 ].map((item) => (
