@@ -367,7 +367,8 @@ export default function LeadsPage() {
     const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
     const body = (openLead.message_mail ?? "").trim();
 
-    const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(
+    // ✅ FIX: do NOT encode the email in mailto:
+    const mailto = `mailto:${to}?subject=${encodeURIComponent(
       subject
     )}&body=${encodeURIComponent(body)}`;
 
@@ -392,7 +393,8 @@ export default function LeadsPage() {
       to
     )}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
-    window.open(url, "_blank");
+    // ✅ safer open
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   const openOutlookWeb = () => {
@@ -413,7 +415,8 @@ export default function LeadsPage() {
       to
     )}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
-    window.open(url, "_blank");
+    // ✅ safer open
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   if (!clientLoaded) {
@@ -931,43 +934,61 @@ export default function LeadsPage() {
                   readOnly={!isPremium}
                 />
 
-{/* Boutons email SOUS le message email */}
-<div className="mt-4">
-  <button
-    type="button"
-    onClick={openPrefilledEmail}
-    className="
-      w-full px-4 py-3 rounded-xl text-sm font-medium transition
-      bg-slate-900 border border-slate-700 text-slate-100 hover:bg-slate-800
-    "
-  >
-    Ouvrir l’email pré-rempli
-  </button>
-</div>
+                {/* ✅ disable buttons if no email */}
+                {(() => {
+                  const hasEmail = Boolean((openLead.email ?? "").trim());
 
-<div className="mt-2 flex gap-2">
-  <button
-    type="button"
-    onClick={openGmailWeb}
-    className="
-      flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
-      bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900
-    "
-  >
-    Gmail
-  </button>
+                  return (
+                    <>
+                      {/* Boutons email SOUS le message email */}
+                      <div className="mt-4">
+                        <button
+                          type="button"
+                          onClick={openPrefilledEmail}
+                          disabled={!hasEmail}
+                          className={[
+                            "w-full px-4 py-3 rounded-xl text-sm font-medium transition border",
+                            !hasEmail
+                              ? "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed"
+                              : "bg-slate-900 border-slate-700 text-slate-100 hover:bg-slate-800",
+                          ].join(" ")}
+                        >
+                          Ouvrir l’email pré-rempli
+                        </button>
+                      </div>
 
-  <button
-    type="button"
-    onClick={openOutlookWeb}
-    className="
-      flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
-      bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900
-    "
-  >
-    Outlook
-  </button>
-</div>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={openGmailWeb}
+                          disabled={!hasEmail}
+                          className={[
+                            "flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border",
+                            !hasEmail
+                              ? "bg-slate-950/40 border-slate-800 text-slate-600 cursor-not-allowed"
+                              : "bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900",
+                          ].join(" ")}
+                        >
+                          Gmail
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={openOutlookWeb}
+                          disabled={!hasEmail}
+                          className={[
+                            "flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border",
+                            !hasEmail
+                              ? "bg-slate-950/40 border-slate-800 text-slate-600 cursor-not-allowed"
+                              : "bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900",
+                          ].join(" ")}
+                        >
+                          Outlook
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
