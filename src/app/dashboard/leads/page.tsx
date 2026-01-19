@@ -841,14 +841,8 @@ export default function LeadsPage() {
               </label>
 
               <textarea
-                value={
-                  emailOption
-                    ? openLead.internal_message ?? ""
-                    : "Fonctionnalité Premium : vous pouvez débloquer l’email personnalisé + les boutons d’envoi avec l’abonnement Premium."
-                }
+                value={openLead.internal_message ?? ""}
                 onChange={(e) => {
-                  if (!emailOption) return;
-
                   const newMsg = e.target.value;
                   setOpenLead({ ...openLead, internal_message: newMsg });
                   setSafeLeads((prev: Lead[]) =>
@@ -867,9 +861,16 @@ export default function LeadsPage() {
                 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
                 transition
               "
-                readOnly={!emailOption}
               />
             </div>
+
+            {/* ✅ NEW: premium message (added below, without replacing) */}
+            {!emailOption && (
+              <div className="mt-3 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 text-xs text-indigo-200">
+                Fonctionnalité Premium : débloquez l’email personnalisé + les
+                boutons d’envoi avec l’abonnement Premium.
+              </div>
+            )}
 
             <div className="mt-4">
               <button
