@@ -254,7 +254,7 @@ export default function LeadsPage() {
     };
   }, []);
 
-  // Auto-save internal message
+  // Auto-save internal message (LinkedIn)
   useEffect(() => {
     if (!openLead) return;
 
@@ -279,6 +279,33 @@ export default function LeadsPage() {
 
     return () => clearTimeout(delay);
   }, [openLead?.internal_message]);
+
+  // ✅ NEW: Auto-save mail message (Email) — only when option is enabled
+  useEffect(() => {
+    if (!openLead) return;
+    if (!emailOption) return;
+
+    const delay = setTimeout(async () => {
+      await fetch("/api/update-mail-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: openLead.id,
+          message: openLead.message_mail ?? "",
+        }),
+      });
+
+      setSafeLeads((prev: Lead[]) =>
+        prev.map((l) =>
+          l.id === openLead.id
+            ? { ...l, message_mail: openLead.message_mail }
+            : l
+        )
+      );
+    }, 300);
+
+    return () => clearTimeout(delay);
+  }, [openLead?.message_mail, emailOption]);
 
   // 🔵 Fonction pour marquer "Message envoyé"
   const handleMessageSent = async () => {
@@ -318,7 +345,7 @@ export default function LeadsPage() {
     );
   };
 
-  // ✅ NEW: open email actions (premium-gated)
+  // ✅ Email actions (premium-gated) — uses message_mail
   const openPrefilledEmail = () => {
     if (!openLead) return;
 
@@ -331,7 +358,7 @@ export default function LeadsPage() {
     if (!to) return;
 
     const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
-    const body = (openLead.internal_message ?? "").trim();
+    const body = (openLead.message_mail ?? "").trim();
 
     const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(
       subject
@@ -352,7 +379,7 @@ export default function LeadsPage() {
     if (!to) return;
 
     const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
-    const body = (openLead.internal_message ?? "").trim();
+    const body = (openLead.message_mail ?? "").trim();
 
     const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
       to
@@ -373,7 +400,7 @@ export default function LeadsPage() {
     if (!to) return;
 
     const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
-    const body = (openLead.internal_message ?? "").trim();
+    const body = (openLead.message_mail ?? "").trim();
 
     const url = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(
       to
@@ -499,7 +526,6 @@ export default function LeadsPage() {
               </div>
 
               <div className="flex items-center gap-3">
-                {/* ✅ NEW: Selection controls */}
                 <button
                   type="button"
                   onClick={toggleSelectionMode}
@@ -550,12 +576,10 @@ export default function LeadsPage() {
               </div>
             </div>
 
-            {/* TABLE */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-separate border-spacing-0">
                 <thead>
                   <tr className="bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide">
-                    {/* ✅ NEW: selection column */}
                     {selectionMode && (
                       <th className="py-3 px-4 border-b border-slate-800 text-center">
                         Sel.
@@ -578,7 +602,6 @@ export default function LeadsPage() {
                       LinkedIn
                     </th>
 
-                    {/* ✅ NEW: conditional columns */}
                     {emailOption && (
                       <th className="py-3 px-4 border-b border-slate-800 text-left">
                         Email
@@ -624,7 +647,6 @@ export default function LeadsPage() {
                           key={lead.id}
                           className="border-b border-slate-900 hover:bg-slate-900/60 transition group"
                         >
-                          {/* ✅ NEW: selection checkbox */}
                           {selectionMode && (
                             <td className="py-3 px-4 text-center">
                               <input
@@ -680,7 +702,6 @@ export default function LeadsPage() {
                             )}
                           </td>
 
-                          {/* ✅ NEW: conditional cells */}
                           {emailOption && (
                             <td className="py-3 px-4 text-slate-300">
                               {lead.email || "—"}
@@ -713,7 +734,7 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        {/* --- PREMIUM SIDEBAR --- */}
+        {/* --- SIDEBAR --- */}
         {openLead && (
           <div
             className="
@@ -721,10 +742,12 @@ export default function LeadsPage() {
             bg-gradient-to-b from-slate-900/95 to-slate-900/80
             backdrop-blur-2xl border-l border-slate-800
             shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)]
-            p-6 z-50 animate-slideLeft
+            z-50 animate-slideLeft
+            flex flex-col
           "
           >
-            <div className="sticky top-0 pb-3 bg-slate-900/80 backdrop-blur-xl">
+            {/* Header sticky */}
+            <div className="sticky top-0 z-10 p-6 pb-4 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800">
               <button
                 className="text-slate-400 text-xs mb-4 hover:text-slate-200 transition"
                 onClick={() => setOpenLead(null)}
@@ -732,179 +755,213 @@ export default function LeadsPage() {
                 ✕ Fermer
               </button>
 
-              <h2 className="text-2xl font-semibold text-slate-50 mb-2">
+              <h2 className="text-2xl font-semibold text-slate-50">
                 {openLead.FirstName} {openLead.LastName}
               </h2>
             </div>
 
-            <div className="mt-4 space-y-4 text-sm text-slate-300 border-b border-slate-800 pb-6">
-              <div>
-                <span className="text-slate-500 text-xs uppercase tracking-wide">
-                  Entreprise
-                </span>
-                <p className="text-slate-200 mt-1">{openLead.Company || "—"}</p>
-              </div>
-
-              <div>
-                <span className="text-slate-500 text-xs uppercase tracking-wide">
-                  Localisation
-                </span>
-                <p className="text-slate-200 mt-1">{openLead.location || "—"}</p>
-              </div>
-
-              <div>
-                <span className="text-slate-500 text-xs uppercase tracking-wide">
-                  LinkedIn
-                </span>
-                <p className="mt-1">
-                  {openLead.LinkedInURL ? (
-                    <a
-                      href={openLead.LinkedInURL}
-                      target="_blank"
-                      className="text-indigo-400 hover:underline"
-                    >
-                      Voir profil →
-                    </a>
-                  ) : (
-                    "—"
-                  )}
-                </p>
-              </div>
-
-              {/* ✅ NEW: conditional info in sidebar */}
-              {emailOption && (
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4 text-sm text-slate-300 border-b border-slate-800 pb-6">
                 <div>
                   <span className="text-slate-500 text-xs uppercase tracking-wide">
-                    Email
+                    Entreprise
                   </span>
-                  <p className="text-slate-200 mt-1">{openLead.email || "—"}</p>
+                  <p className="text-slate-200 mt-1">{openLead.Company || "—"}</p>
                 </div>
-              )}
 
-              {phoneOption && (
                 <div>
                   <span className="text-slate-500 text-xs uppercase tracking-wide">
-                    Téléphone
+                    Localisation
                   </span>
-                  <p className="text-slate-200 mt-1">{openLead.phone || "—"}</p>
+                  <p className="text-slate-200 mt-1">{openLead.location || "—"}</p>
                 </div>
+
+                <div>
+                  <span className="text-slate-500 text-xs uppercase tracking-wide">
+                    LinkedIn
+                  </span>
+                  <p className="mt-1">
+                    {openLead.LinkedInURL ? (
+                      <a
+                        href={openLead.LinkedInURL}
+                        target="_blank"
+                        className="text-indigo-400 hover:underline"
+                      >
+                        Voir profil →
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </p>
+                </div>
+
+                {/* ✅ Email/Phone visible only if option enabled */}
+                {emailOption && (
+                  <div>
+                    <span className="text-slate-500 text-xs uppercase tracking-wide">
+                      Email
+                    </span>
+                    <p className="text-slate-200 mt-1">{openLead.email || "—"}</p>
+                  </div>
+                )}
+
+                {phoneOption && (
+                  <div>
+                    <span className="text-slate-500 text-xs uppercase tracking-wide">
+                      Téléphone
+                    </span>
+                    <p className="text-slate-200 mt-1">{openLead.phone || "—"}</p>
+                  </div>
+                )}
+
+                <div>
+                  <span className="text-slate-500 text-xs uppercase tracking-wide">
+                    Créé le
+                  </span>
+                  <p className="text-slate-200 mt-1">
+                    {openLead.created_at?.slice(0, 10)}
+                  </p>
+                </div>
+              </div>
+
+              {/* 1) Message LinkedIn */}
+              <div className="mt-6">
+                <label className="text-xs text-slate-400 mb-2 block">
+                  Message LinkedIn
+                </label>
+
+                <textarea
+                  value={openLead.internal_message ?? ""}
+                  onChange={(e) => {
+                    const newMsg = e.target.value;
+                    setOpenLead({ ...openLead, internal_message: newMsg });
+                    setSafeLeads((prev: Lead[]) =>
+                      prev.map((l) =>
+                        l.id === openLead.id
+                          ? { ...l, internal_message: newMsg }
+                          : l
+                      )
+                    );
+                  }}
+                  placeholder="Écris ton message LinkedIn…"
+                  className="
+                    w-full h-44 p-4 rounded-xl
+                    bg-slate-800/60 border border-slate-700
+                    text-sm text-slate-200
+                    focus:outline-none focus:ring-2 focus:ring-indigo-500/60
+                    transition
+                  "
+                />
+              </div>
+
+              {/* 2) Message envoyé (juste en dessous) */}
+              <div className="mt-3">
+                <button
+                  onClick={handleMessageSent}
+                  disabled={openLead.message_sent}
+                  className={`
+                    w-full px-4 py-3 rounded-xl text-sm font-medium transition
+                    ${
+                      openLead.message_sent
+                        ? "bg-emerald-600 text-white cursor-default"
+                        : "bg-indigo-600 hover:bg-indigo-500 text-white"
+                    }
+                  `}
+                >
+                  {openLead.message_sent
+                    ? "Message envoyé ✓"
+                    : "Marquer comme envoyé"}
+                </button>
+              </div>
+
+              {openLead.next_followup_at && (
+                <p className="text-xs text-slate-400 mt-2">
+                  Prochaine relance :{" "}
+                  <span className="text-slate-200 font-medium">
+                    {new Date(openLead.next_followup_at).toLocaleDateString(
+                      "fr-FR"
+                    )}
+                  </span>
+                </p>
               )}
 
-              <div>
-                <span className="text-slate-500 text-xs uppercase tracking-wide">
-                  Créé le
-                </span>
-                <p className="text-slate-200 mt-1">
-                  {openLead.created_at?.slice(0, 10)}
-                </p>
+              {/* 3) Section Email */}
+              <div className="mt-7 border-t border-slate-800 pt-6">
+                <label className="text-xs text-slate-400 mb-2 block">
+                  Message email
+                </label>
+
+                <textarea
+                  value={
+                    emailOption
+                      ? openLead.message_mail ?? ""
+                      : "Fonctionnalité Premium : débloquez l’email personnalisé + les boutons d’envoi avec l’abonnement Premium."
+                  }
+                  onChange={(e) => {
+                    if (!emailOption) return;
+
+                    const newMsg = e.target.value;
+                    setOpenLead({ ...openLead, message_mail: newMsg });
+                    setSafeLeads((prev: Lead[]) =>
+                      prev.map((l) =>
+                        l.id === openLead.id
+                          ? { ...l, message_mail: newMsg }
+                          : l
+                      )
+                    );
+                  }}
+                  placeholder="Écris ton message email…"
+                  className="
+                    w-full h-44 p-4 rounded-xl
+                    bg-slate-800/60 border border-slate-700
+                    text-sm text-slate-200
+                    focus:outline-none focus:ring-2 focus:ring-indigo-500/60
+                    transition
+                  "
+                  readOnly={!emailOption}
+                />
+
+                {/* Boutons email SOUS le message email */}
+                <div className="mt-4">
+                  <button
+                    onClick={openPrefilledEmail}
+                    className="
+                      w-full px-4 py-3 rounded-xl text-sm font-medium transition
+                      bg-slate-900 border border-slate-700 text-slate-100 hover:bg-slate-800
+                    "
+                  >
+                    Ouvrir l’email pré-rempli
+                  </button>
+                </div>
+
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={openGmailWeb}
+                    className="
+                      flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
+                      bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900
+                    "
+                  >
+                    Gmail
+                  </button>
+
+                  <button
+                    onClick={openOutlookWeb}
+                    className="
+                      flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
+                      bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900
+                    "
+                  >
+                    Outlook
+                  </button>
+                </div>
               </div>
             </div>
-
-            {/* ✅ NEW: email actions always visible (premium-gated) */}
-            <div className="mt-5">
-              <button
-                onClick={openPrefilledEmail}
-                className="
-                w-full px-4 py-3 rounded-xl text-sm font-medium transition
-                bg-slate-900 border border-slate-700 text-slate-100 hover:bg-slate-800
-              "
-              >
-                Ouvrir l’email pré-rempli
-              </button>
-            </div>
-
-            <div className="mt-2 flex gap-2">
-              <button
-                onClick={openGmailWeb}
-                className="
-                flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
-                bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900
-              "
-              >
-                Gmail
-              </button>
-
-              <button
-                onClick={openOutlookWeb}
-                className="
-                flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
-                bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900
-              "
-              >
-                Outlook
-              </button>
-            </div>
-
-            <div className="mt-6">
-              <label className="text-xs text-slate-400 mb-2 block">
-                Message interne
-              </label>
-
-              <textarea
-                value={openLead.internal_message ?? ""}
-                onChange={(e) => {
-                  const newMsg = e.target.value;
-                  setOpenLead({ ...openLead, internal_message: newMsg });
-                  setSafeLeads((prev: Lead[]) =>
-                    prev.map((l) =>
-                      l.id === openLead.id
-                        ? { ...l, internal_message: newMsg }
-                        : l
-                    )
-                  );
-                }}
-                placeholder="Écris une note interne…"
-                className="
-                w-full h-44 p-4 rounded-xl
-                bg-slate-800/60 border border-slate-700
-                text-sm text-slate-200
-                focus:outline-none focus:ring-2 focus:ring-indigo-500/60
-                transition
-              "
-              />
-            </div>
-
-            {/* ✅ NEW: premium message (added below, without replacing) */}
-            {!emailOption && (
-              <div className="mt-3 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 text-xs text-indigo-200">
-                Fonctionnalité Premium : débloquez l’email personnalisé + les
-                boutons d’envoi avec l’abonnement Premium.
-              </div>
-            )}
-
-            <div className="mt-4">
-              <button
-                onClick={handleMessageSent}
-                disabled={openLead.message_sent}
-                className={`
-                w-full px-4 py-3 rounded-xl text-sm font-medium transition
-                ${
-                  openLead.message_sent
-                    ? "bg-emerald-600 text-white cursor-default"
-                    : "bg-indigo-600 hover:bg-indigo-500 text-white"
-                }
-              `}
-              >
-                {openLead.message_sent
-                  ? "Message envoyé ✓"
-                  : "Marquer comme envoyé"}
-              </button>
-            </div>
-
-            {openLead.next_followup_at && (
-              <p className="text-xs text-slate-400 mt-2">
-                Prochaine relance :{" "}
-                <span className="text-slate-200 font-medium">
-                  {new Date(openLead.next_followup_at).toLocaleDateString(
-                    "fr-FR"
-                  )}
-                </span>
-              </p>
-            )}
           </div>
         )}
 
-        {/* ✅ NEW: premium modal */}
+        {/* ✅ premium modal */}
         {premiumModalOpen && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center">
             <div

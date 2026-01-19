@@ -44,7 +44,7 @@ export async function GET() {
 
   const selectFields =
     baseSelect +
-    (email_option ? `, email` : ``) +
+    (email_option ? `, email, message_mail` : ``) +
     (phone_option ? `, phone` : ``);
 
   const { data: leads } = await supabase
