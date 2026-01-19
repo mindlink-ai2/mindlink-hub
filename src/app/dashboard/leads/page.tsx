@@ -27,19 +27,23 @@ export default function LeadsPage() {
   const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
-  // ✅ NEW: client options (email / phone enrichment)
+  // ✅ client options (email / phone enrichment)
   const [emailOption, setEmailOption] = useState<boolean>(false);
   const [phoneOption, setPhoneOption] = useState<boolean>(false);
 
-  // ✅ NEW: premium modal
+  // ✅ NEW: plan from Supabase
+  const [plan, setPlan] = useState<string>("essential");
+  const isPremium = plan === "premium";
+
+  // ✅ premium modal
   const [premiumModalOpen, setPremiumModalOpen] = useState(false);
 
-  // ✅ NEW: Selection mode
+  // ✅ Selection mode
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectedCount = selectedIds.size;
 
-  // ✅ NEW: open lead from query param (?open=ID)
+  // ✅ open lead from query param (?open=ID)
   const [openFromQuery, setOpenFromQuery] = useState<string | null>(null);
 
   // ✅ DERIVED filtered list (no state = no desync)
@@ -63,7 +67,7 @@ export default function LeadsPage() {
     }
   }, []);
 
-  // Load leads + options
+  // Load leads + options + plan
   useEffect(() => {
     (async () => {
       const res = await fetch("/api/get-leads");
@@ -72,13 +76,16 @@ export default function LeadsPage() {
       const leads = data.leads ?? [];
       setSafeLeads(leads);
 
-      // ✅ options from API (fallback false if null/undefined)
+      // ✅ client from API
       const client = data.client ?? data.options ?? null;
       const eo = client?.email_option;
       const po = client?.phone_option;
 
       setEmailOption(Boolean(eo));
       setPhoneOption(Boolean(po));
+
+      // ✅ plan (fallback essential)
+      setPlan(String(client?.plan ?? "essential").toLowerCase());
 
       setClientLoaded(true);
     })();
@@ -106,7 +113,7 @@ export default function LeadsPage() {
     }
   }, [clientLoaded, openFromQuery, safeLeads]);
 
-  // ✅ NEW: cleanup selection when list changes (ex: deleted)
+  // ✅ cleanup selection when list changes (ex: deleted)
   useEffect(() => {
     if (!selectionMode) return;
 
@@ -125,7 +132,7 @@ export default function LeadsPage() {
     setSearchTerm(value);
   };
 
-  // ✅ NEW: selection helpers
+  // ✅ selection helpers
   const toggleSelectionMode = () => {
     setSelectionMode((prev) => {
       const next = !prev;
@@ -230,7 +237,7 @@ export default function LeadsPage() {
         prev && String(prev.id) === detail.leadId ? null : prev
       );
 
-      // ✅ NEW: remove from selection if needed
+      // ✅ remove from selection if needed
       setSelectedIds((prev: Set<string>) => {
         if (!prev.has(detail.leadId)) return prev;
         const next = new Set(prev);
@@ -280,10 +287,10 @@ export default function LeadsPage() {
     return () => clearTimeout(delay);
   }, [openLead?.internal_message]);
 
-  // ✅ NEW: Auto-save mail message (Email) — only when option is enabled
+  // ✅ Auto-save mail message (Email) — only when PREMIUM (plan)
   useEffect(() => {
     if (!openLead) return;
-    if (!emailOption) return;
+    if (!isPremium) return;
 
     const delay = setTimeout(async () => {
       await fetch("/api/update-mail-message", {
@@ -305,7 +312,7 @@ export default function LeadsPage() {
     }, 300);
 
     return () => clearTimeout(delay);
-  }, [openLead?.message_mail, emailOption]);
+  }, [openLead?.message_mail, isPremium]);
 
   // 🔵 Fonction pour marquer "Message envoyé"
   const handleMessageSent = async () => {
@@ -345,11 +352,11 @@ export default function LeadsPage() {
     );
   };
 
-  // ✅ Email actions (premium-gated) — uses message_mail
+  // ✅ Email actions (plan-gated) — uses message_mail
   const openPrefilledEmail = () => {
     if (!openLead) return;
 
-    if (!emailOption) {
+    if (!isPremium) {
       setPremiumModalOpen(true);
       return;
     }
@@ -370,7 +377,7 @@ export default function LeadsPage() {
   const openGmailWeb = () => {
     if (!openLead) return;
 
-    if (!emailOption) {
+    if (!isPremium) {
       setPremiumModalOpen(true);
       return;
     }
@@ -391,7 +398,7 @@ export default function LeadsPage() {
   const openOutlookWeb = () => {
     if (!openLead) return;
 
-    if (!emailOption) {
+    if (!isPremium) {
       setPremiumModalOpen(true);
       return;
     }
@@ -774,7 +781,9 @@ export default function LeadsPage() {
                   <span className="text-slate-500 text-xs uppercase tracking-wide">
                     Localisation
                   </span>
-                  <p className="text-slate-200 mt-1">{openLead.location || "—"}</p>
+                  <p className="text-slate-200 mt-1">
+                    {openLead.location || "—"}
+                  </p>
                 </div>
 
                 <div>
@@ -886,7 +895,7 @@ export default function LeadsPage() {
                 </p>
               )}
 
-              {/* 3) Section Email */}
+              {/* 3) Section Email (plan-based) */}
               <div className="mt-7 border-t border-slate-800 pt-6">
                 <label className="text-xs text-slate-400 mb-2 block">
                   Message email
@@ -894,12 +903,12 @@ export default function LeadsPage() {
 
                 <textarea
                   value={
-                    emailOption
+                    isPremium
                       ? openLead.message_mail ?? ""
                       : "Fonctionnalité Premium : débloquez l’email personnalisé + les boutons d’envoi avec l’abonnement Premium."
                   }
                   onChange={(e) => {
-                    if (!emailOption) return;
+                    if (!isPremium) return;
 
                     const newMsg = e.target.value;
                     setOpenLead({ ...openLead, message_mail: newMsg });
@@ -919,7 +928,7 @@ export default function LeadsPage() {
                     focus:outline-none focus:ring-2 focus:ring-indigo-500/60
                     transition
                   "
-                  readOnly={!emailOption}
+                  readOnly={!isPremium}
                 />
 
                 {/* Boutons email SOUS le message email */}

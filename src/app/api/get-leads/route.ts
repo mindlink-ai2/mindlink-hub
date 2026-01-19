@@ -21,6 +21,10 @@ export async function GET() {
 
   const clientId = client.id;
 
+  // ✅ plan
+  const plan = (client.plan ?? "").toLowerCase();
+  const is_premium = plan === "premium";
+
   // ✅ options (fallback false if null/undefined)
   const email_option = Boolean(client.email_option);
   const phone_option = Boolean(client.phone_option);
@@ -37,6 +41,7 @@ export async function GET() {
       created_at,
       traite,
       internal_message,
+      message_mail,
       message_sent,
       message_sent_at,
       next_followup_at
@@ -44,7 +49,7 @@ export async function GET() {
 
   const selectFields =
     baseSelect +
-    (email_option ? `, email, message_mail` : ``) +
+    (email_option ? `, email` : ``) +
     (phone_option ? `, phone` : ``);
 
   const { data: leads } = await supabase
@@ -56,6 +61,8 @@ export async function GET() {
   return NextResponse.json({
     leads: leads ?? [],
     client: {
+      plan,
+      is_premium,
       email_option,
       phone_option,
     },
