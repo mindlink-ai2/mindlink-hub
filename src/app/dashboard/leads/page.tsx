@@ -931,40 +931,43 @@ export default function LeadsPage() {
                   readOnly={!isPremium}
                 />
 
-                {/* Boutons email SOUS le message email */}
-                <div className="mt-4">
-                  <button
-                    onClick={openPrefilledEmail}
-                    className="
-                      w-full px-4 py-3 rounded-xl text-sm font-medium transition
-                      bg-slate-900 border border-slate-700 text-slate-100 hover:bg-slate-800
-                    "
-                  >
-                    Ouvrir l’email pré-rempli
-                  </button>
-                </div>
+{/* Boutons email SOUS le message email */}
+<div className="mt-4">
+  <button
+    type="button"
+    onClick={openPrefilledEmail}
+    className="
+      w-full px-4 py-3 rounded-xl text-sm font-medium transition
+      bg-slate-900 border border-slate-700 text-slate-100 hover:bg-slate-800
+    "
+  >
+    Ouvrir l’email pré-rempli
+  </button>
+</div>
 
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={openGmailWeb}
-                    className="
-                      flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
-                      bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900
-                    "
-                  >
-                    Gmail
-                  </button>
+<div className="mt-2 flex gap-2">
+  <button
+    type="button"
+    onClick={openGmailWeb}
+    className="
+      flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
+      bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900
+    "
+  >
+    Gmail
+  </button>
 
-                  <button
-                    onClick={openOutlookWeb}
-                    className="
-                      flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
-                      bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900
-                    "
-                  >
-                    Outlook
-                  </button>
-                </div>
+  <button
+    type="button"
+    onClick={openOutlookWeb}
+    className="
+      flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
+      bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900
+    "
+  >
+    Outlook
+  </button>
+</div>
               </div>
             </div>
           </div>
