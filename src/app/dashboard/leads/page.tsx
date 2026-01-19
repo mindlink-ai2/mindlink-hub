@@ -31,6 +31,9 @@ export default function LeadsPage() {
   const [emailOption, setEmailOption] = useState<boolean>(false);
   const [phoneOption, setPhoneOption] = useState<boolean>(false);
 
+  // ✅ NEW: premium modal
+  const [premiumModalOpen, setPremiumModalOpen] = useState(false);
+
   // ✅ NEW: Selection mode
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -313,6 +316,70 @@ export default function LeadsPage() {
           : l
       )
     );
+  };
+
+  // ✅ NEW: open email actions (premium-gated)
+  const openPrefilledEmail = () => {
+    if (!openLead) return;
+
+    if (!emailOption) {
+      setPremiumModalOpen(true);
+      return;
+    }
+
+    const to = (openLead.email ?? "").trim();
+    if (!to) return;
+
+    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
+    const body = (openLead.internal_message ?? "").trim();
+
+    const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(
+      subject
+    )}&body=${encodeURIComponent(body)}`;
+
+    window.location.href = mailto;
+  };
+
+  const openGmailWeb = () => {
+    if (!openLead) return;
+
+    if (!emailOption) {
+      setPremiumModalOpen(true);
+      return;
+    }
+
+    const to = (openLead.email ?? "").trim();
+    if (!to) return;
+
+    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
+    const body = (openLead.internal_message ?? "").trim();
+
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+      to
+    )}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    window.open(url, "_blank");
+  };
+
+  const openOutlookWeb = () => {
+    if (!openLead) return;
+
+    if (!emailOption) {
+      setPremiumModalOpen(true);
+      return;
+    }
+
+    const to = (openLead.email ?? "").trim();
+    if (!to) return;
+
+    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
+    const body = (openLead.internal_message ?? "").trim();
+
+    const url = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(
+      to
+    )}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    window.open(url, "_blank");
   };
 
   if (!clientLoaded) {
@@ -733,14 +800,55 @@ export default function LeadsPage() {
               </div>
             </div>
 
+            {/* ✅ NEW: email actions always visible (premium-gated) */}
+            <div className="mt-5">
+              <button
+                onClick={openPrefilledEmail}
+                className="
+                w-full px-4 py-3 rounded-xl text-sm font-medium transition
+                bg-slate-900 border border-slate-700 text-slate-100 hover:bg-slate-800
+              "
+              >
+                Ouvrir l’email pré-rempli
+              </button>
+            </div>
+
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={openGmailWeb}
+                className="
+                flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
+                bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900
+              "
+              >
+                Gmail
+              </button>
+
+              <button
+                onClick={openOutlookWeb}
+                className="
+                flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border
+                bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900
+              "
+              >
+                Outlook
+              </button>
+            </div>
+
             <div className="mt-6">
               <label className="text-xs text-slate-400 mb-2 block">
                 Message interne
               </label>
 
               <textarea
-                value={openLead.internal_message ?? ""}
+                value={
+                  emailOption
+                    ? openLead.internal_message ?? ""
+                    : "Fonctionnalité Premium : vous pouvez débloquer l’email personnalisé + les boutons d’envoi avec l’abonnement Premium."
+                }
                 onChange={(e) => {
+                  if (!emailOption) return;
+
                   const newMsg = e.target.value;
                   setOpenLead({ ...openLead, internal_message: newMsg });
                   setSafeLeads((prev: Lead[]) =>
@@ -759,6 +867,7 @@ export default function LeadsPage() {
                 focus:outline-none focus:ring-2 focus:ring-indigo-500/60
                 transition
               "
+                readOnly={!emailOption}
               />
             </div>
 
@@ -791,6 +900,38 @@ export default function LeadsPage() {
                 </span>
               </p>
             )}
+          </div>
+        )}
+
+        {/* ✅ NEW: premium modal */}
+        {premiumModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center">
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setPremiumModalOpen(false)}
+            />
+            <div className="relative w-[92%] max-w-md rounded-2xl border border-indigo-500/25 bg-slate-950 p-6 shadow-2xl">
+              <div className="text-sm font-semibold text-slate-50">
+                Fonctionnalité Premium
+              </div>
+              <p className="mt-2 text-sm text-slate-300">
+                Cette fonctionnalité est disponible avec l’abonnement Premium.
+              </p>
+              <div className="mt-5 flex gap-2">
+                <a
+                  href="/dashboard/hub/billing"
+                  className="flex-1 text-center px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+                >
+                  Passer en Premium
+                </a>
+                <button
+                  onClick={() => setPremiumModalOpen(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-200 text-sm font-medium transition"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </>
