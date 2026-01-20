@@ -8,6 +8,12 @@ export default function FollowupsPage() {
   const [loaded, setLoaded] = useState(false);
   const [openLead, setOpenLead] = useState<any>(null);
 
+  // UI state (ajout UX uniquement)
+  const [tab, setTab] = useState<"overdue" | "today" | "upcoming">("overdue");
+  const [q, setQ] = useState("");
+  const [sort, setSort] = useState<"date" | "name" | "company">("date");
+  const [compact, setCompact] = useState(true);
+
   // Fetch all leads with followups (LOGIQUE INCHANGÉE)
   useEffect(() => {
     (async () => {
@@ -31,15 +37,16 @@ export default function FollowupsPage() {
     return (
       <div className="min-h-[60vh] w-full flex items-center justify-center">
         <div className="w-full max-w-xl px-6">
-          <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/60 p-6 shadow-[0_20px_80px_-40px_rgba(99,102,241,0.35)]">
-            <div className="absolute inset-0 bg-[radial-gradient(800px_circle_at_20%_10%,rgba(99,102,241,0.18),transparent_55%),radial-gradient(700px_circle_at_90%_70%,rgba(16,185,129,0.14),transparent_55%)]" />
+          <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/60 p-6 shadow-[0_20px_80px_-40px_rgba(2,6,23,0.6)]">
             <div className="relative">
               <div className="flex items-center gap-3">
                 <div className="h-11 w-11 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center">
                   <div className="h-5 w-5 rounded-full border-2 border-slate-400 border-t-slate-200 animate-spin" />
                 </div>
                 <div>
-                  <p className="text-slate-100 font-medium">Chargement des relances…</p>
+                  <p className="text-slate-100 font-medium">
+                    Chargement des relances…
+                  </p>
                   <p className="text-slate-400 text-sm">
                     On prépare ta liste (LinkedIn + Google Maps).
                   </p>
@@ -106,6 +113,8 @@ export default function FollowupsPage() {
   const leadDisplayName = (lead: any) =>
     `${lead.FirstName || lead.title || "—"} ${lead.LastName || ""}`.trim();
 
+  const formatFR = (d: any) => new Date(d).toLocaleDateString("fr-FR");
+
   const stats = useMemo(() => {
     const total = leads.length;
     const mapCount = leads.filter((l) => isMapLead(l)).length;
@@ -113,240 +122,278 @@ export default function FollowupsPage() {
     return { total, mapCount, liCount };
   }, [leads]);
 
-  const formatFR = (d: any) => new Date(d).toLocaleDateString("fr-FR");
+  const activeList = tab === "overdue" ? overdue : tab === "today" ? todayList : upcoming;
 
-  const badgeTone = (kind: "overdue" | "today" | "upcoming") => {
-    if (kind === "overdue")
-      return "border-rose-500/30 bg-rose-500/10 text-rose-200";
-    if (kind === "today")
-      return "border-amber-500/30 bg-amber-500/10 text-amber-200";
-    return "border-sky-500/30 bg-sky-500/10 text-sky-200";
-  };
+  const filteredSorted = useMemo(() => {
+    const needle = q.trim().toLowerCase();
 
-  const Section = ({
-    title,
-    data,
-    kind,
-  }: any) => (
-    <section className="space-y-4">
-      <div className="flex items-end justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg sm:text-xl font-semibold text-slate-100">
-            {title}
-          </h2>
+    const base = !needle
+      ? activeList
+      : activeList.filter((l) => {
+          const name = leadDisplayName(l).toLowerCase();
+          const company = (l.Company ?? "").toLowerCase();
+          const location = (l.location ?? "").toLowerCase();
+          return (
+            name.includes(needle) ||
+            company.includes(needle) ||
+            location.includes(needle)
+          );
+        });
+
+    const byDate = (a: any, b: any) =>
+      cleanDate(a.next_followup_at).getTime() - cleanDate(b.next_followup_at).getTime();
+
+    const byName = (a: any, b: any) =>
+      leadDisplayName(a).localeCompare(leadDisplayName(b));
+
+    const byCompany = (a: any, b: any) =>
+      String(a.Company ?? "").localeCompare(String(b.Company ?? ""));
+
+    const sorted = [...base].sort(
+      sort === "date" ? byDate : sort === "name" ? byName : byCompany
+    );
+
+    return sorted;
+  }, [activeList, q, sort]); // cleanDate + leadDisplayName stables
+
+  const TabButton = ({
+    value,
+    label,
+    count,
+    tone,
+  }: {
+    value: "overdue" | "today" | "upcoming";
+    label: string;
+    count: number;
+    tone: string;
+  }) => {
+    const active = tab === value;
+    return (
+      <button
+        type="button"
+        onClick={() => setTab(value)}
+        className={[
+          "relative flex-1 rounded-2xl border px-4 py-3 text-left transition",
+          active
+            ? "border-slate-700 bg-slate-900/50 shadow-[0_20px_60px_-45px_rgba(2,6,23,0.8)]"
+            : "border-slate-800 bg-slate-950/30 hover:bg-slate-950/50 hover:border-slate-700",
+        ].join(" ")}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-100">{label}</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {value === "overdue"
+                ? "À traiter en priorité"
+                : value === "today"
+                ? "À faire aujourd’hui"
+                : "Planifiées plus tard"}
+            </p>
+          </div>
+
           <span
             className={[
-              "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
-              badgeTone(kind),
+              "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold",
+              tone,
             ].join(" ")}
           >
-            {data.length} {data.length > 1 ? "relances" : "relance"}
+            {count}
           </span>
         </div>
+      </button>
+    );
+  };
 
-        <div className="hidden md:flex items-center gap-2 text-xs text-slate-400">
-          <span className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/50 px-2 py-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
-            LinkedIn / CRM
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/50 px-2 py-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            Google Maps
-          </span>
-        </div>
-      </div>
+  const Row = ({ lead }: { lead: any }) => {
+    const name = leadDisplayName(lead);
+    const company = lead.Company;
+    const when = lead.next_followup_at ? formatFR(lead.next_followup_at) : "—";
+    const map = isMapLead(lead);
 
-      {data.length === 0 ? (
-        <div className="rounded-3xl border border-slate-800 bg-slate-950/40 p-6">
-          <p className="text-slate-400 text-sm">
-            Rien à traiter ici pour le moment.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {data.map((lead: any) => {
-            const name = leadDisplayName(lead);
-            const company = lead.Company;
-            const when = lead.next_followup_at ? formatFR(lead.next_followup_at) : "—";
-            const map = isMapLead(lead);
+    return (
+      <button
+        type="button"
+        onClick={() => setOpenLead(lead)}
+        className={[
+          "group w-full text-left rounded-2xl border transition",
+          "border-slate-800 bg-slate-950/25 hover:bg-slate-950/45 hover:border-slate-700",
+          "focus:outline-none focus:ring-2 focus:ring-indigo-500/30",
+          compact ? "px-4 py-3" : "px-5 py-4",
+        ].join(" ")}
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0 flex items-center gap-3">
+            <div
+              className={[
+                "h-10 w-10 rounded-2xl border flex items-center justify-center shrink-0",
+                "border-slate-800 bg-slate-900/30",
+              ].join(" ")}
+            >
+              <span className={map ? "text-emerald-300" : "text-sky-300"}>
+                {map ? "⌁" : "in"}
+              </span>
+            </div>
 
-            return (
-              <button
-                key={lead.id}
-                type="button"
-                onClick={() => setOpenLead(lead)}
-                className={[
-                  "group text-left rounded-3xl border p-5 transition",
-                  "bg-slate-950/35 border-slate-800 hover:border-indigo-500/50 hover:bg-slate-950/55",
-                  "shadow-[0_20px_60px_-45px_rgba(99,102,241,0.35)]",
-                  "focus:outline-none focus:ring-2 focus:ring-indigo-500/40",
-                ].join(" ")}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={[
-                          "inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium",
-                          map
-                            ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-                            : "border-sky-500/25 bg-sky-500/10 text-sky-200",
-                        ].join(" ")}
-                      >
-                        <span
-                          className={[
-                            "h-1.5 w-1.5 rounded-full",
-                            map ? "bg-emerald-400" : "bg-sky-400",
-                          ].join(" ")}
-                        />
-                        {map ? "Google Maps" : "LinkedIn"}
-                      </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="text-slate-100 font-semibold truncate">{name}</p>
+                <span
+                  className={[
+                    "hidden sm:inline-flex items-center gap-2 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                    map
+                      ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
+                      : "border-sky-500/25 bg-sky-500/10 text-sky-200",
+                  ].join(" ")}
+                >
+                  <span className={map ? "h-1.5 w-1.5 rounded-full bg-emerald-400" : "h-1.5 w-1.5 rounded-full bg-sky-400"} />
+                  {map ? "Maps" : "LinkedIn"}
+                </span>
+              </div>
 
-                      {company && (
-                        <span className="hidden sm:inline text-xs text-slate-400 truncate">
-                          {company}
-                        </span>
-                      )}
-                    </div>
-
-                    <h3 className="mt-2 text-slate-100 font-semibold text-base sm:text-lg leading-snug truncate">
-                      {name}
-                    </h3>
-
-                    {company && (
-                      <p className="sm:hidden mt-1 text-slate-400 text-xs truncate">
-                        {company}
-                      </p>
-                    )}
-
-                    <div className="mt-3 flex items-center gap-2 text-sm">
-                      <span className="text-slate-400">Prochaine relance</span>
-                      <span className="text-slate-200 font-semibold">
-                        {when}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="h-12 w-12 rounded-2xl border border-slate-800 bg-slate-900/40 flex items-center justify-center">
-                      <span className="text-slate-200 text-lg">↗</span>
-                    </div>
-
-                    <span className="text-[11px] text-slate-500 group-hover:text-slate-400">
-                      Ouvrir
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    {lead.location && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/40 px-2 py-1">
-                        <span className="text-slate-400">📍</span>
-                        <span className="truncate max-w-[210px]">{lead.location}</span>
-                      </span>
-                    )}
-                  </div>
-
-                  <span className="text-xs text-slate-500 group-hover:text-slate-300">
-                    Voir détails →
+              <div className="mt-0.5 flex items-center gap-2 min-w-0">
+                {company && (
+                  <p className="text-slate-400 text-xs truncate">{company}</p>
+                )}
+                {lead.location && (
+                  <span className="text-slate-600 text-xs truncate hidden md:inline">
+                    • {lead.location}
                   </span>
-                </div>
-              </button>
-            );
-          })}
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="shrink-0 text-right">
+            <p className="text-xs text-slate-400">Relance</p>
+            <p className="text-sm font-semibold text-slate-200">{when}</p>
+            <p className="text-[11px] text-slate-500 group-hover:text-slate-400 mt-0.5">
+              Ouvrir →
+            </p>
+          </div>
         </div>
-      )}
-    </section>
-  );
+      </button>
+    );
+  };
 
   return (
     <SubscriptionGate supportEmail="contact@mindlink.fr">
       <>
-        {/* Background */}
-        <div className="relative">
-          <div className="pointer-events-none absolute inset-0 -z-10">
-            <div className="absolute inset-0 bg-[radial-gradient(1100px_circle_at_15%_0%,rgba(99,102,241,0.16),transparent_55%),radial-gradient(1000px_circle_at_90%_30%,rgba(16,185,129,0.12),transparent_55%),radial-gradient(900px_circle_at_50%_100%,rgba(56,189,248,0.10),transparent_55%)]" />
-            <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-950/85 to-slate-950" />
+        {/* PAGE (pas de fond spécial, clean) */}
+        <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+          {/* Header */}
+          <div className="flex flex-col gap-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/40 px-3 py-1 text-xs text-slate-300">
+                  <span className="h-2 w-2 rounded-full bg-slate-400" />
+                  Relances clients
+                  <span className="text-slate-600">•</span>
+                  <span className="text-slate-400">Europe/Paris</span>
+                </div>
+
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-slate-50">
+                  Relances
+                </h1>
+
+                <p className="text-slate-400 text-sm sm:text-base max-w-2xl">
+                  Une vue simple et scalable : filtre, recherche, ouvre, traite.
+                </p>
+              </div>
+
+              <div className="hidden md:flex items-center gap-3">
+                <div className="rounded-3xl border border-slate-800 bg-slate-950/30 px-4 py-3">
+                  <p className="text-xs text-slate-400">Aujourd’hui</p>
+                  <p className="text-sm font-semibold text-slate-100">
+                    {today.toLocaleDateString("fr-FR")}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabs + counts */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <TabButton
+                value="overdue"
+                label="🔥 En retard"
+                count={overdue.length}
+                tone="border-rose-500/30 bg-rose-500/10 text-rose-200"
+              />
+              <TabButton
+                value="today"
+                label="📅 Aujourd’hui"
+                count={todayList.length}
+                tone="border-amber-500/30 bg-amber-500/10 text-amber-200"
+              />
+              <TabButton
+                value="upcoming"
+                label="⏳ À venir"
+                count={upcoming.length}
+                tone="border-sky-500/30 bg-sky-500/10 text-sky-200"
+              />
+            </div>
+
+            {/* Controls */}
+            <div className="rounded-3xl border border-slate-800 bg-slate-950/25 p-4">
+              <div className="flex flex-col md:flex-row md:items-center gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-950/40 px-3 py-2">
+                    <span className="text-slate-500">⌕</span>
+                    <input
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      placeholder="Rechercher (nom, entreprise, localisation)…"
+                      className="w-full bg-transparent outline-none text-sm text-slate-200 placeholder:text-slate-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value as any)}
+                    className="rounded-2xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
+                  >
+                    <option value="date">Trier : date</option>
+                    <option value="name">Trier : nom</option>
+                    <option value="company">Trier : entreprise</option>
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => setCompact((v) => !v)}
+                    className="rounded-2xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 hover:bg-slate-950/70 transition"
+                  >
+                    {compact ? "Compact" : "Confort"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/40 px-2 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+                  LinkedIn : {stats.liCount}
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/40 px-2 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  Maps : {stats.mapCount}
+                </span>
+                <span className="text-slate-600">•</span>
+                <span>{filteredSorted.length} résultat(s)</span>
+              </div>
+            </div>
           </div>
 
-          <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
-            {/* Header */}
-            <div className="flex flex-col gap-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/40 px-3 py-1 text-xs text-slate-300">
-                    <span className="h-2 w-2 rounded-full bg-indigo-400" />
-                    Relances & suivi
-                    <span className="text-slate-500">•</span>
-                    <span className="text-slate-400">
-                      Fuseau : Europe/Paris
-                    </span>
-                  </div>
-
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-slate-50">
-                    Relances clients
-                  </h1>
-                  <p className="text-slate-300/80 text-sm sm:text-base max-w-2xl">
-                    Priorise ce qui est en retard, traite aujourd’hui, et anticipe
-                    le reste. Tout au même endroit (LinkedIn + Google Maps).
-                  </p>
-                </div>
-
-                <div className="hidden md:flex items-center gap-3">
-                  <div className="rounded-3xl border border-slate-800 bg-slate-950/35 px-4 py-3">
-                    <p className="text-xs text-slate-400">Aujourd’hui</p>
-                    <p className="text-sm font-semibold text-slate-100">
-                      {today.toLocaleDateString("fr-FR")}
-                    </p>
-                  </div>
-                </div>
+          {/* List */}
+          <div className="mt-6 space-y-2">
+            {filteredSorted.length === 0 ? (
+              <div className="rounded-3xl border border-slate-800 bg-slate-950/25 p-6">
+                <p className="text-slate-400 text-sm">
+                  Aucune relance à afficher pour ce filtre.
+                </p>
               </div>
-
-              {/* Stats cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/35 p-4">
-                  <p className="text-xs text-slate-400">Total relances</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-100">
-                    {stats.total}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Leads avec <span className="text-slate-300">next_followup_at</span>
-                  </p>
-                </div>
-
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/35 p-4">
-                  <p className="text-xs text-slate-400">En retard</p>
-                  <p className="mt-1 text-2xl font-semibold text-rose-200">
-                    {overdue.length}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    À traiter en priorité
-                  </p>
-                </div>
-
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/35 p-4">
-                  <p className="text-xs text-slate-400">Sources</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-100">
-                    <span className="text-sky-200">{stats.liCount}</span>{" "}
-                    LinkedIn{" "}
-                    <span className="text-slate-600">•</span>{" "}
-                    <span className="text-emerald-200">{stats.mapCount}</span>{" "}
-                    Maps
-                  </p>
-                  <p className="mt-2 text-xs text-slate-500">
-                    Même workflow, deux canaux.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="mt-8 space-y-10">
-              <Section title="🔥 En retard" data={overdue} kind="overdue" />
-              <Section title="📅 Aujourd’hui" data={todayList} kind="today" />
-              <Section title="⏳ À venir" data={upcoming} kind="upcoming" />
-            </div>
+            ) : (
+              filteredSorted.map((lead: any) => <Row key={lead.id} lead={lead} />)
+            )}
           </div>
 
           {/* SIDEBAR PREMIUM (LOGIQUE INCHANGÉE) */}
@@ -365,7 +412,7 @@ export default function FollowupsPage() {
                   fixed right-0 top-0 z-50 h-full w-full sm:w-[520px]
                   bg-slate-950/85 backdrop-blur-2xl
                   border-l border-slate-800
-                  shadow-[0_0_80px_-20px_rgba(99,102,241,0.45)]
+                  shadow-[0_0_80px_-20px_rgba(2,6,23,0.85)]
                   animate-slideLeft
                 "
               >
@@ -386,7 +433,9 @@ export default function FollowupsPage() {
                             <span
                               className={[
                                 "h-1.5 w-1.5 rounded-full",
-                                openLead?.placeUrl ? "bg-emerald-400" : "bg-sky-400",
+                                openLead?.placeUrl
+                                  ? "bg-emerald-400"
+                                  : "bg-sky-400",
                               ].join(" ")}
                             />
                             {openLead?.placeUrl ? "Google Maps" : "LinkedIn"}
@@ -400,7 +449,7 @@ export default function FollowupsPage() {
 
                         <p className="mt-1 text-slate-300/80 text-sm">
                           Prochaine relance :{" "}
-                          <span className="text-indigo-300 font-semibold">
+                          <span className="text-slate-100 font-semibold">
                             {new Date(openLead.next_followup_at).toLocaleDateString(
                               "fr-FR"
                             )}
@@ -412,8 +461,8 @@ export default function FollowupsPage() {
                         onClick={() => setOpenLead(null)}
                         className="
                           shrink-0 rounded-2xl border border-slate-800
-                          bg-slate-900/40 px-3 py-2 text-xs text-slate-300
-                          hover:bg-slate-900/70 hover:text-slate-100 transition
+                          bg-slate-900/30 px-3 py-2 text-xs text-slate-300
+                          hover:bg-slate-900/60 hover:text-slate-100 transition
                         "
                       >
                         ✕ Fermer
@@ -427,7 +476,7 @@ export default function FollowupsPage() {
                         mt-5 w-full rounded-2xl py-3
                         bg-emerald-600 hover:bg-emerald-500
                         text-sm font-semibold text-white transition
-                        shadow-[0_18px_50px_-30px_rgba(16,185,129,0.65)]
+                        shadow-[0_18px_50px_-30px_rgba(16,185,129,0.6)]
                         focus:outline-none focus:ring-2 focus:ring-emerald-400/40
                       "
                     >
@@ -441,113 +490,53 @@ export default function FollowupsPage() {
 
                   {/* body */}
                   <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                    <div className="rounded-3xl border border-slate-800 bg-slate-950/35 p-5">
+                    <div className="rounded-3xl border border-slate-800 bg-slate-950/25 p-5">
                       <p className="text-xs uppercase tracking-wide text-slate-500">
                         Informations
                       </p>
 
                       <div className="mt-3 space-y-3 text-sm text-slate-200">
                         {openLead.Company && (
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-slate-400">Entreprise</p>
-                            <p className="text-right font-medium">{openLead.Company}</p>
-                          </div>
+                          <p>
+                            <strong>Entreprise :</strong> {openLead.Company}
+                          </p>
                         )}
 
                         {openLead.email && (
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-slate-400">Email</p>
-                            <p className="text-right font-medium break-all">
-                              {openLead.email}
-                            </p>
-                          </div>
+                          <p>
+                            <strong>Email :</strong> {openLead.email}
+                          </p>
                         )}
 
                         {openLead.phoneNumber && (
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-slate-400">Téléphone</p>
-                            <p className="text-right font-medium">
-                              {openLead.phoneNumber}
-                            </p>
-                          </div>
+                          <p>
+                            <strong>Téléphone :</strong> {openLead.phoneNumber}
+                          </p>
                         )}
 
-                        {openLead.location && (
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-slate-400">Localisation</p>
-                            <p className="text-right font-medium">{openLead.location}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-800 bg-slate-950/35 p-5">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">
-                        Liens
-                      </p>
-
-                      <div className="mt-4 grid grid-cols-1 gap-3">
                         {openLead.LinkedInURL && (
-                          <a
-                            href={openLead.LinkedInURL}
-                            className="
-                              group flex items-center justify-between rounded-2xl
-                              border border-slate-800 bg-slate-900/40 px-4 py-3
-                              hover:bg-slate-900/70 hover:border-sky-500/40 transition
-                            "
-                            target="_blank"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-2xl border border-slate-800 bg-slate-950/40 flex items-center justify-center">
-                                <span className="text-sky-300 text-lg">in</span>
-                              </div>
-                              <div>
-                                <p className="text-slate-100 font-medium text-sm">
-                                  LinkedIn
-                                </p>
-                                <p className="text-slate-500 text-xs">
-                                  Ouvrir le profil
-                                </p>
-                              </div>
-                            </div>
-                            <span className="text-slate-400 group-hover:text-slate-200">
-                              →
-                            </span>
-                          </a>
+                          <p>
+                            <strong>LinkedIn :</strong>{" "}
+                            <a
+                              href={openLead.LinkedInURL}
+                              className="text-sky-400 underline"
+                              target="_blank"
+                            >
+                              Voir →
+                            </a>
+                          </p>
                         )}
 
                         {openLead.placeUrl && (
-                          <a
-                            href={openLead.placeUrl}
-                            className="
-                              group flex items-center justify-between rounded-2xl
-                              border border-slate-800 bg-slate-900/40 px-4 py-3
-                              hover:bg-slate-900/70 hover:border-emerald-500/40 transition
-                            "
-                            target="_blank"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-2xl border border-slate-800 bg-slate-950/40 flex items-center justify-center">
-                                <span className="text-emerald-300 text-lg">⌁</span>
-                              </div>
-                              <div>
-                                <p className="text-slate-100 font-medium text-sm">
-                                  Google Maps
-                                </p>
-                                <p className="text-slate-500 text-xs">
-                                  Ouvrir la fiche établissement
-                                </p>
-                              </div>
-                            </div>
-                            <span className="text-slate-400 group-hover:text-slate-200">
-                              →
-                            </span>
-                          </a>
-                        )}
-
-                        {!openLead.LinkedInURL && !openLead.placeUrl && (
-                          <p className="text-slate-500 text-sm">
-                            Aucun lien disponible pour ce lead.
+                          <p>
+                            <strong>Google Maps :</strong>{" "}
+                            <a
+                              href={openLead.placeUrl}
+                              className="text-green-400 underline"
+                              target="_blank"
+                            >
+                              Ouvrir →
+                            </a>
                           </p>
                         )}
                       </div>
@@ -557,7 +546,7 @@ export default function FollowupsPage() {
                   {/* footer */}
                   <div className="p-6 border-t border-slate-800">
                     <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>Astuce : clique sur une carte pour ouvrir les détails.</span>
+                      <span>Astuce : recherche + tri pour traiter vite.</span>
                       <span className="text-slate-600">LIDMEO</span>
                     </div>
                   </div>
