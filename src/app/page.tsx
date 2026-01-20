@@ -8,85 +8,66 @@ export default function HomePage() {
   const firstName = user?.firstName || user?.username || "";
 
   return (
-    <div className="grid gap-8 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-start">
-
-
+    <div className="grid gap-8 md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] items-start">
       {/* ======================= */}
       {/* COLONNE GAUCHE */}
       {/* ======================= */}
       <section className="space-y-6">
-
         {/* 🔓 VERSION NON CONNECTÉE */}
         <SignedOut>
-          <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs text-sky-300">
+          <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs text-sky-200">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             Espace client sécurisé • Accès réservé
           </div>
 
           <div className="space-y-3">
             <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
-              Bienvenue sur{" "}
+              Votre cockpit{" "}
               <span className="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
                 Lidmeo Hub
               </span>
-              .
             </h1>
+
             <p className="text-sm md:text-base text-slate-300 max-w-xl">
-              Centralisez vos automatisations, vos intégrations et vos performances.
-              Un seul espace pour suivre ce que Lidmeo fait tourner pour votre entreprise,
-              en arrière-plan.
+              Suivez vos automatisations, vos résultats et vos intégrations au même endroit.
+              Lidmeo travaille en arrière-plan — vous gardez juste le contrôle.
             </p>
           </div>
 
-          <div className="grid gap-3 text-xs md:text-sm">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 h-5 w-5 rounded-full border border-sky-500/40 flex items-center justify-center text-[10px] text-sky-300">
-                1
-              </div>
-              <div>
-                <p className="font-medium text-slate-100">
-                  Connectez-vous à votre espace sécurisé
-                </p>
-                <p className="text-slate-400">
-                  L’accès se fait via un compte personnel (email),
-                  avec authentification moderne et sécurisée.
-                </p>
-              </div>
+          {/* 3 bénéfices (scannable) */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
+              <p className="text-xs text-slate-400">⚡ Prospection</p>
+              <p className="mt-1 text-sm font-medium text-slate-100">
+                Des leads générés sans effort
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Ciblage + extraction + suivi centralisé.
+              </p>
             </div>
 
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 h-5 w-5 rounded-full border border-sky-500/40 flex items-center justify-center text-[10px] text-sky-300">
-                2
-              </div>
-              <div>
-                <p className="font-medium text-slate-100">
-                  Visualisez votre dashboard en temps réel
-                </p>
-                <p className="text-slate-400">
-                  Votre dashboard intégré vous affiche automatiquement vos chiffres,
-                  vos leads, vos tâches et tout ce qui compte pour piloter votre
-                  activité, en un seul endroit.
-                </p>
-              </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
+              <p className="text-xs text-slate-400">📩 Emails</p>
+              <p className="mt-1 text-sm font-medium text-slate-100">
+                Boîte allégée, réponses plus rapides
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Tri, priorités, relances, suivi.
+              </p>
             </div>
 
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 h-5 w-5 rounded-full border border-sky-500/40 flex items-center justify-center text-[10px] text-sky-300">
-                3
-              </div>
-              <div>
-                <p className="font-medium text-slate-100">
-                  Accédez à toutes vos données en un clic
-                </p>
-                <p className="text-slate-400">
-                  Retrouvez instantanément tous vos leads, vos automatisations et 
-                  votre profil directement depuis le Hub, sans aucune friction.
-                </p>
-              </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
+              <p className="text-xs text-slate-400">🔁 Relances</p>
+              <p className="mt-1 text-sm font-medium text-slate-100">
+                Aucun lead oublié
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Relances prêtes et calendrier clair.
+              </p>
             </div>
           </div>
 
-          {/* Boutons déconnecté */}
+          {/* CTA */}
           <div className="flex flex-wrap gap-3 pt-2">
             <Link
               href="/sign-in"
@@ -113,173 +94,330 @@ export default function HomePage() {
           </div>
 
           <p className="text-[11px] text-slate-500">
-            Vous êtes client Lidmeo et vous n’avez pas encore reçu vos accès ?{" "}
+            Vous êtes déjà client et vous n’avez pas vos accès ?{" "}
             <span className="text-sky-400">
-              Contactez votre référent Lidmeo ou créez votre compte depuis le Hub.
+              Créez votre compte avec votre email pro ou contactez votre référent Lidmeo.
             </span>
           </p>
         </SignedOut>
 
-
-
         {/* 🔒 VERSION CONNECTÉE */}
         <SignedIn>
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Vous êtes connecté à Lidmeo Hub
+            Connecté • Lidmeo Hub actif
           </div>
 
-          {firstName && (
-            <p className="text-xs text-slate-400">
-              Bonjour <span className="font-medium text-slate-100">{firstName}</span> 👋
-            </p>
-          )}
-
-          <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
-            Bienvenue sur votre espace{" "}
-            <span className="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
-              Lidmeo Hub
-            </span>{" "}
-            ⚡️
-          </h1>
-
-          <div className="space-y-4 text-sm md:text-base text-slate-300 max-w-xl">
-            <p>
-              Vous êtes ici chez vous. Cet espace a été conçu pour vous offrir une vision claire,
-              précise et instantanée de tout ce que Lidmeo automatise pour votre activité.
-            </p>
-
-            <p>
-              Chaque jour, vos automatisations travaillent en arrière-plan pour vous faire gagner du temps sur :
-            </p>
-
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Votre prospection</li>
-              <li>Votre gestion d’emails</li>
-            </ul>
-
-            <p>
-              Ici, vous pouvez suivre vos résultats, vos connexions et l’ensemble de vos automatisations.
-              Le tout en un seul endroit, sans effort.
-            </p>
-
-            <div className="space-y-1 pt-2">
-              <p className="text-slate-200">Avancez plus vite.</p>
-              <p className="text-slate-200">Restez concentré sur l’essentiel.</p>
-              <p className="text-slate-200">
-                <span className="font-semibold">Lidmeo</span> s’occupe du reste.
+          <div className="space-y-2">
+            {firstName && (
+              <p className="text-xs text-slate-400">
+                Bonjour <span className="font-medium text-slate-100">{firstName}</span> 👋
               </p>
-            </div>
+            )}
+
+            <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
+              Votre espace{" "}
+              <span className="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
+                Lidmeo Hub
+              </span>
+            </h1>
+
+            <p className="text-sm md:text-base text-slate-300 max-w-xl">
+              Un endroit unique pour piloter ce que Lidmeo automatise pour vous.
+              Objectif : moins d’opérations, plus d’opportunités.
+            </p>
           </div>
 
-          {/* Boutons connecté */}
-          <div className="flex flex-wrap gap-3 pt-4">
+          {/* NEXT BEST ACTION */}
+          <NextBestAction />
+
+          {/* Checklist onboarding */}
+          <OnboardingChecklist />
+
+          {/* CTAs (1 primaire + 2 secondaires) */}
+          <div className="flex flex-wrap gap-3 pt-2">
             <Link
               href="/dashboard"
               className="rounded-xl bg-sky-500 px-4 py-2 text-xs md:text-sm font-medium text-slate-950 hover:bg-sky-400 transition shadow-lg shadow-sky-500/30"
             >
-              Accéder à votre dashboard
+              Voir mes résultats
             </Link>
 
             <Link
               href="/dashboard/prospection"
-              className="rounded-xl border border-[#0033FF] px-4 py-2 text-xs md:text-sm font-medium text-[#6FA3FF] hover:border-[#4D7DFF] hover:text-white transition shadow-[0_0_0px_0px_rgba(0,51,255,0)] hover:shadow-[0_0_8px_2px_rgba(0,51,255,0.4)] active:shadow-[0_0_10px_3px_rgba(0,51,255,0.5)]"
+              className="rounded-xl border border-slate-700 bg-slate-900/40 px-4 py-2 text-xs md:text-sm font-medium text-slate-200 hover:bg-slate-900 transition"
             >
-              Accéder à la prospection
+              Prospection
             </Link>
 
-            {/* ⭐ AJOUT EXACT DEMANDÉ — 3ᵉ bouton */}
             <Link
               href="/dashboard/followups"
-              className="rounded-xl border border-emerald-500 px-4 py-2 text-xs md:text-sm font-medium text-emerald-300 hover:border-emerald-400 hover:text-white transition shadow-[0_0_0px_0px_rgba(16,185,129,0)] hover:shadow-[0_0_8px_2px_rgba(16,185,129,0.4)] active:shadow-[0_0_10px_3px_rgba(16,185,129,0.5)]"
+              className="rounded-xl border border-slate-700 bg-slate-900/40 px-4 py-2 text-xs md:text-sm font-medium text-slate-200 hover:bg-slate-900 transition"
             >
-              Accéder à mes relances
+              Relances
             </Link>
           </div>
+
+          {/* Signature value */}
+          <p className="text-[12px] text-slate-400 pt-2">
+            <span className="text-slate-200 font-medium">
+              Pendant que vous lisez ceci, Lidmeo prospecte pour vous.
+            </span>
+          </p>
         </SignedIn>
       </section>
 
-
-
       {/* =============================== */}
-      {/* COLONNE DROITE : CARTE EXEMPLE */}
+      {/* COLONNE DROITE */}
       {/* =============================== */}
-
-      {/* 🔓 Version déconnectée */}
       <SignedOut>
-        <ExampleCard />
+        <ExampleCard mode="signedOut" />
       </SignedOut>
 
-      {/* 🔒 Version connectée — nouvelle */}
       <SignedIn>
-        <ExampleCard />
+        <ExampleCard mode="signedIn" />
       </SignedIn>
-
     </div>
   );
 }
 
+/* ========================= */
+/* COMPONENTS */
+/* ========================= */
 
-
-/* COMPONENT : BLOCK D’EXEMPLE */
-function ExampleCard() {
+function NextBestAction() {
   return (
-    <aside className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 md:p-5 shadow-[0_0_40px_rgba(15,23,42,0.9)]">
-      <div className="flex items-center justify-between mb-4">
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 md:p-5">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs text-slate-400">Aperçu du compte</p>
-          <p className="text-sm font-medium text-slate-100">
-            Agence démo · Bêta
+          <p className="text-xs text-slate-400">Action recommandée aujourd’hui</p>
+          <p className="mt-1 text-sm md:text-base font-semibold text-slate-100">
+            Lancez (ou vérifiez) votre prospection automatique
+          </p>
+          <p className="mt-1 text-xs md:text-sm text-slate-400 max-w-xl">
+            2 minutes : cible, message et volume. Ensuite Lidmeo tourne en arrière-plan.
           </p>
         </div>
-        <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] text-emerald-300 border border-emerald-500/30">
+
+        <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] text-emerald-200">
+          Impact immédiat
+        </span>
+      </div>
+
+      <div className="flex flex-wrap gap-3 pt-4">
+        <Link
+          href="/dashboard/prospection"
+          className="rounded-xl bg-emerald-500 px-4 py-2 text-xs md:text-sm font-medium text-slate-950 hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20"
+        >
+          Configurer / Lancer la prospection
+        </Link>
+
+        <Link
+          href="/dashboard"
+          className="rounded-xl border border-slate-700 bg-slate-900/40 px-4 py-2 text-xs md:text-sm font-medium text-slate-200 hover:bg-slate-900 transition"
+        >
+          Voir le dashboard
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingChecklist() {
+  // Version statique (sans backend). Quand vous brancherez les vraies datas,
+  // il suffira de remplacer "done" par vos flags réels.
+  const items = [
+    { label: "Définir votre cible", hint: "Secteur, zone, mots-clés", done: true },
+    { label: "Valider votre message", hint: "Accroche + CTA", done: false },
+    { label: "Lancer la première séquence", hint: "Volume + rythme", done: false },
+    { label: "Suivre les réponses", hint: "Relances & pipeline", done: false },
+  ];
+
+  const doneCount = items.filter((i) => i.done).length;
+  const percent = Math.round((doneCount / items.length) * 100);
+
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 md:p-5">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-xs text-slate-400">Mise en route</p>
+          <p className="mt-1 text-sm font-semibold text-slate-100">
+            Checklist d’activation
+          </p>
+        </div>
+
+        <span className="rounded-full border border-slate-700 bg-slate-900/60 px-3 py-1 text-[11px] text-slate-200">
+          {percent}% complété
+        </span>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {items.map((it, idx) => (
+          <div
+            key={idx}
+            className="flex items-start justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/20 px-3 py-2"
+          >
+            <div className="min-w-0">
+              <p className="text-xs text-slate-200">
+                {it.done ? "✅" : "⬜️"} <span className="font-medium">{it.label}</span>
+              </p>
+              <p className="text-[11px] text-slate-400">{it.hint}</p>
+            </div>
+
+            {!it.done && (
+              <Link
+                href="/dashboard/prospection"
+                className="shrink-0 text-[11px] text-sky-300 hover:text-sky-200 transition"
+              >
+                Ouvrir →
+              </Link>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* COMPONENT : CARTE DROITE */
+function ExampleCard({ mode }: { mode: "signedOut" | "signedIn" }) {
+  const title =
+    mode === "signedIn" ? "Aperçu de votre compte" : "Aperçu (exemple)";
+
+  const subtitle =
+    mode === "signedIn" ? "Compte actif · Version bêta" : "Agence démo · Bêta";
+
+  return (
+    <aside className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 md:p-5 shadow-[0_0_40px_rgba(15,23,42,0.9)]">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <p className="text-xs text-slate-400">{title}</p>
+          <p className="text-sm font-medium text-slate-100">{subtitle}</p>
+
+          <p className="mt-1 text-[11px] text-slate-500">
+            {mode === "signedIn"
+              ? "Vos données remonteront automatiquement au fur et à mesure."
+              : "Exemple : vos chiffres seront automatiquement remontés."}
+          </p>
+        </div>
+
+        <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] text-emerald-200 border border-emerald-500/30">
           10h / semaine gagnées
         </span>
       </div>
 
-      <div className="space-y-3 text-xs">
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-            <p className="text-[11px] text-slate-400">Prospection</p>
-            <p className="text-lg font-semibold text-slate-50">+37</p>
-            <p className="text-[11px] text-emerald-400 mt-1">leads cette semaine</p>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-            <p className="text-[11px] text-slate-400">Emails traités</p>
-            <p className="text-lg font-semibold text-slate-50">124</p>
-            <p className="text-[11px] text-emerald-400 mt-1">boîte allégée</p>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-            <p className="text-[11px] text-slate-400">Contenus créés</p>
-            <p className="text-lg font-semibold text-slate-50">9</p>
-            <p className="text-[11px] text-emerald-400 mt-1">
-              posts programmés
-            </p>
-          </div>
-        </div>
+      {/* Stats (actionnables) */}
+      <div className="grid grid-cols-3 gap-3 text-xs">
+        <StatCard
+          label="Prospection"
+          value="+37"
+          sub="leads cette semaine"
+          href="/dashboard/prospection"
+        />
+        <StatCard
+          label="Emails traités"
+          value="124"
+          sub="boîte allégée"
+          href="/dashboard"
+        />
+        <StatCard
+          label="Contenus créés"
+          value="9"
+          sub="posts programmés"
+          href="/dashboard"
+        />
+      </div>
 
-        <div className="mt-1 space-y-2">
-          <p className="text-[11px] text-slate-400">Intégrations prévues</p>
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-full bg-slate-900/70 border border-slate-700 px-3 py-1 text-[11px]">
-              HubSpot · CRM
-            </span>
-            <span className="rounded-full bg-slate-900/70 border border-slate-700 px-3 py-1 text-[11px]">
-              Gmail · Emails clients
-            </span>
-            <span className="rounded-full bg-slate-900/70 border border-slate-700 px-3 py-1 text-[11px]">
-              Notion · Suivi interne
-            </span>
-          </div>
+      {/* Feed valeur */}
+      <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/20 p-3">
+        <p className="text-[11px] text-slate-400">🤖 Lidmeo a fait pour vous</p>
+        <ul className="mt-2 space-y-1 text-[12px] text-slate-200">
+          <li className="flex items-center justify-between gap-3">
+            <span className="text-slate-300">12 nouveaux leads détectés</span>
+            <span className="text-[11px] text-slate-500">aujourd’hui</span>
+          </li>
+          <li className="flex items-center justify-between gap-3">
+            <span className="text-slate-300">4 relances prêtes à envoyer</span>
+            <span className="text-[11px] text-slate-500">aujourd’hui</span>
+          </li>
+          <li className="flex items-center justify-between gap-3">
+            <span className="text-slate-300">2 réponses positives repérées</span>
+            <span className="text-[11px] text-slate-500">cette semaine</span>
+          </li>
+        </ul>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link
+            href="/dashboard/prospection"
+            className="rounded-xl bg-slate-900/60 border border-slate-700 px-3 py-1 text-[11px] text-slate-200 hover:bg-slate-900 transition"
+          >
+            Voir les leads →
+          </Link>
+          <Link
+            href="/dashboard/followups"
+            className="rounded-xl bg-slate-900/60 border border-slate-700 px-3 py-1 text-[11px] text-slate-200 hover:bg-slate-900 transition"
+          >
+            Ouvrir les relances →
+          </Link>
         </div>
       </div>
 
+      {/* Integrations */}
+      <div className="mt-4 space-y-2">
+        <p className="text-[11px] text-slate-400">Intégrations prévues</p>
+        <div className="flex flex-wrap gap-2">
+          <Pill>HubSpot · CRM</Pill>
+          <Pill>Gmail · Emails clients</Pill>
+          <Pill>Notion · Suivi interne</Pill>
+        </div>
+      </div>
+
+      {/* Footer */}
       <div className="mt-4 border-t border-slate-800 pt-3 flex items-center justify-between">
         <p className="text-[11px] text-slate-500 max-w-[70%]">
-          Cet aperçu est un exemple. À terme, vos chiffres seront automatiquement remontés.
+          {mode === "signedIn"
+            ? "Astuce : cliquez sur une statistique pour accéder directement à la section."
+            : "Astuce : une fois connecté, vous accédez à vos stats et vos actions."}
         </p>
-        <span className="text-[11px] text-slate-400">v0.1 · Pré-Hub</span>
+        <span className="text-[11px] text-slate-400">v0.2 · Hub UX</span>
       </div>
     </aside>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  href,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-xl border border-slate-800 bg-slate-900/60 p-3 hover:bg-slate-900 transition"
+    >
+      <p className="text-[11px] text-slate-400 group-hover:text-slate-300 transition">
+        {label}
+      </p>
+      <p className="text-lg font-semibold text-slate-50">{value}</p>
+      <p className="text-[11px] text-emerald-400 mt-1">{sub}</p>
+      <p className="mt-2 text-[11px] text-sky-300 opacity-0 group-hover:opacity-100 transition">
+        Ouvrir →
+      </p>
+    </Link>
+  );
+}
+
+function Pill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full bg-slate-900/70 border border-slate-700 px-3 py-1 text-[11px] text-slate-200">
+      {children}
+    </span>
   );
 }
