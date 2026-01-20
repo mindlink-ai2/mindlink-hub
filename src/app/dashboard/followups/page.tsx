@@ -70,10 +70,24 @@ export default function FollowupsPage() {
       </div>
     );
 
-  // Paris timezone date (LOGIQUE INCHANGÉE)
-  const today = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
-  );
+  // ✅ Paris timezone day key (incassable) -> "YYYY-MM-DD"
+  const todayKey = (() => {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Europe/Paris",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date());
+
+      const y = parts.find((p) => p.type === "year")?.value;
+      const m = parts.find((p) => p.type === "month")?.value;
+      const d = parts.find((p) => p.type === "day")?.value;
+
+      if (y && m && d) return `${y}-${m}-${d}`;
+    } catch {}
+    return new Date().toISOString().split("T")[0];
+  })();
 
   // 🔧 FIX 1 : éviter crash si la date n’est pas une string (LOGIQUE INCHANGÉE)
   const cleanDate = (d: any) => {
@@ -84,15 +98,14 @@ export default function FollowupsPage() {
   };
 
   const overdue = leads.filter(
-    (l) => cleanDate(l.next_followup_at) < cleanDate(today.toISOString())
+    (l) => cleanDate(l.next_followup_at) < cleanDate(todayKey)
   );
   const todayList = leads.filter(
     (l) =>
-      cleanDate(l.next_followup_at).getTime() ===
-      cleanDate(today.toISOString()).getTime()
+      cleanDate(l.next_followup_at).getTime() === cleanDate(todayKey).getTime()
   );
   const upcoming = leads.filter(
-    (l) => cleanDate(l.next_followup_at) > cleanDate(today.toISOString())
+    (l) => cleanDate(l.next_followup_at) > cleanDate(todayKey)
   );
 
   // 🔵 Fonction : marquer comme répondu (LinkedIn OU Maps) (LOGIQUE INCHANGÉE)
@@ -123,7 +136,8 @@ export default function FollowupsPage() {
 
   const safeFormatFR = (d: any) => {
     if (!d) return "—";
-    const dt = typeof d === "string" ? new Date(d) : d instanceof Date ? d : null;
+    const dt =
+      typeof d === "string" ? new Date(d) : d instanceof Date ? d : null;
     if (!dt || isNaN(dt.getTime())) return "—";
     return dt.toLocaleDateString("fr-FR");
   };
@@ -135,7 +149,8 @@ export default function FollowupsPage() {
     return { total, mapCount, liCount };
   }, [leads]);
 
-  const activeList = tab === "overdue" ? overdue : tab === "today" ? todayList : upcoming;
+  const activeList =
+    tab === "overdue" ? overdue : tab === "today" ? todayList : upcoming;
 
   const filteredSorted = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -154,7 +169,8 @@ export default function FollowupsPage() {
         });
 
     const byDate = (a: any, b: any) =>
-      cleanDate(a.next_followup_at).getTime() - cleanDate(b.next_followup_at).getTime();
+      cleanDate(a.next_followup_at).getTime() -
+      cleanDate(b.next_followup_at).getTime();
 
     const byName = (a: any, b: any) =>
       leadDisplayName(a).localeCompare(leadDisplayName(b));
@@ -258,7 +274,13 @@ export default function FollowupsPage() {
                       : "border-sky-500/25 bg-sky-500/10 text-sky-200",
                   ].join(" ")}
                 >
-                  <span className={map ? "h-1.5 w-1.5 rounded-full bg-emerald-400" : "h-1.5 w-1.5 rounded-full bg-sky-400"} />
+                  <span
+                    className={
+                      map
+                        ? "h-1.5 w-1.5 rounded-full bg-emerald-400"
+                        : "h-1.5 w-1.5 rounded-full bg-sky-400"
+                    }
+                  />
                   {map ? "Maps" : "LinkedIn"}
                 </span>
               </div>
@@ -317,7 +339,7 @@ export default function FollowupsPage() {
                 <div className="rounded-3xl border border-slate-800 bg-slate-950/30 px-4 py-3">
                   <p className="text-xs text-slate-400">Aujourd’hui</p>
                   <p className="text-sm font-semibold text-slate-100">
-                    {today.toLocaleDateString("fr-FR")}
+                    {safeFormatFR(todayKey)}
                   </p>
                 </div>
               </div>
