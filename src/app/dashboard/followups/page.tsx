@@ -17,19 +17,25 @@ export default function FollowupsPage() {
   // Fetch all leads with followups (LOGIQUE INCHANGÉE)
   useEffect(() => {
     (async () => {
-      const res1 = await fetch("/api/get-leads");
-      const res2 = await fetch("/api/get-map-leads");
+      try {
+        const res1 = await fetch("/api/get-leads");
+        const res2 = await fetch("/api/get-map-leads");
 
-      const data1 = await res1.json();
-      const data2 = await res2.json();
+        const data1 = res1.ok ? await res1.json() : { leads: [] };
+        const data2 = res2.ok ? await res2.json() : { leads: [] };
 
-      const merged = [...(data1.leads ?? []), ...(data2.leads ?? [])];
+        const merged = [...(data1.leads ?? []), ...(data2.leads ?? [])];
 
-      // Only leads with next_followup_at
-      const filtered = merged.filter((l) => l.next_followup_at != null);
+        // Only leads with next_followup_at
+        const filtered = merged.filter((l) => l.next_followup_at != null);
 
-      setLeads(filtered);
-      setLoaded(true);
+        setLeads(filtered);
+      } catch {
+        // En cas d'erreur réseau/JSON, on évite le crash et on affiche une liste vide
+        setLeads([]);
+      } finally {
+        setLoaded(true);
+      }
     })();
   }, []);
 
@@ -72,7 +78,9 @@ export default function FollowupsPage() {
   // 🔧 FIX 1 : éviter crash si la date n’est pas une string (LOGIQUE INCHANGÉE)
   const cleanDate = (d: any) => {
     if (!d || typeof d !== "string") return new Date("2100-01-01");
-    return new Date(d.split("T")[0] + "T00:00:00");
+    const dt = new Date(d.split("T")[0] + "T00:00:00");
+    if (isNaN(dt.getTime())) return new Date("2100-01-01");
+    return dt;
   };
 
   const overdue = leads.filter(
@@ -113,7 +121,12 @@ export default function FollowupsPage() {
   const leadDisplayName = (lead: any) =>
     `${lead.FirstName || lead.title || "—"} ${lead.LastName || ""}`.trim();
 
-  const formatFR = (d: any) => new Date(d).toLocaleDateString("fr-FR");
+  const safeFormatFR = (d: any) => {
+    if (!d) return "—";
+    const dt = typeof d === "string" ? new Date(d) : d instanceof Date ? d : null;
+    if (!dt || isNaN(dt.getTime())) return "—";
+    return dt.toLocaleDateString("fr-FR");
+  };
 
   const stats = useMemo(() => {
     const total = leads.length;
@@ -207,7 +220,7 @@ export default function FollowupsPage() {
   const Row = ({ lead }: { lead: any }) => {
     const name = leadDisplayName(lead);
     const company = lead.Company;
-    const when = lead.next_followup_at ? formatFR(lead.next_followup_at) : "—";
+    const when = safeFormatFR(lead.next_followup_at);
     const map = isMapLead(lead);
 
     return (
@@ -450,9 +463,7 @@ export default function FollowupsPage() {
                         <p className="mt-1 text-slate-300/80 text-sm">
                           Prochaine relance :{" "}
                           <span className="text-slate-100 font-semibold">
-                            {new Date(openLead.next_followup_at).toLocaleDateString(
-                              "fr-FR"
-                            )}
+                            {safeFormatFR(openLead.next_followup_at)}
                           </span>
                         </p>
                       </div>
