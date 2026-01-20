@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, ReactNode } from "react";
 import TraiteCheckbox from "./TraiteCheckbox";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
@@ -96,7 +96,9 @@ export default function LeadsPage() {
     if (!clientLoaded) return;
     if (!openFromQuery) return;
 
-    const target = safeLeads.find((l) => String(l.id) === String(openFromQuery));
+    const target = safeLeads.find(
+      (l) => String(l.id) === String(openFromQuery)
+    );
     if (target) {
       setOpenLead(target);
 
@@ -367,7 +369,9 @@ export default function LeadsPage() {
       return;
     }
 
-    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
+    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${
+      openLead.LastName ?? ""
+    }`.trim();
     const body = (openLead.message_mail ?? "").trim();
 
     const mailto = `mailto:${to}?subject=${encodeURIComponent(
@@ -391,7 +395,9 @@ export default function LeadsPage() {
       return;
     }
 
-    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
+    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${
+      openLead.LastName ?? ""
+    }`.trim();
     const body = (openLead.message_mail ?? "").trim();
 
     const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
@@ -415,7 +421,9 @@ export default function LeadsPage() {
       return;
     }
 
-    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
+    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${
+      openLead.LastName ?? ""
+    }`.trim();
     const body = (openLead.message_mail ?? "").trim();
 
     const url = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(
@@ -465,8 +473,9 @@ export default function LeadsPage() {
                   Prospection
                 </h1>
                 <p className="text-slate-400 text-sm md:text-base mt-2 max-w-2xl">
-                  Tous vos prospects qualifiés, importés automatiquement par Lidmeo.
-                  Recherchez, traitez, et ouvrez un lead pour préparer votre message.
+                  Tous vos prospects qualifiés, importés automatiquement par
+                  Lidmeo. Recherchez, traitez, et ouvrez un lead pour préparer
+                  votre message.
                 </p>
               </div>
 
@@ -725,7 +734,9 @@ export default function LeadsPage() {
 
                             <td className="py-3 px-4 text-center text-slate-400">
                               {lead.created_at
-                                ? new Date(lead.created_at).toLocaleDateString("fr-FR")
+                                ? new Date(lead.created_at).toLocaleDateString(
+                                    "fr-FR"
+                                  )
                                 : "—"}
                             </td>
 
@@ -789,20 +800,26 @@ export default function LeadsPage() {
 
                   {emailOption && (
                     <InfoBlock title="Email">
-                      <span className="text-slate-200">{openLead.email || "—"}</span>
+                      <span className="text-slate-200">
+                        {openLead.email || "—"}
+                      </span>
                     </InfoBlock>
                   )}
 
                   {phoneOption && (
                     <InfoBlock title="Téléphone">
-                      <span className="text-slate-200">{openLead.phone || "—"}</span>
+                      <span className="text-slate-200">
+                        {openLead.phone || "—"}
+                      </span>
                     </InfoBlock>
                   )}
 
                   <InfoBlock title="Créé le">
                     <span className="text-slate-200">
                       {openLead.created_at
-                        ? new Date(openLead.created_at).toLocaleDateString("fr-FR")
+                        ? new Date(openLead.created_at).toLocaleDateString(
+                            "fr-FR"
+                          )
                         : "—"}
                     </span>
                   </InfoBlock>
@@ -842,7 +859,9 @@ export default function LeadsPage() {
                           : "bg-indigo-600 hover:bg-indigo-500 text-white",
                       ].join(" ")}
                     >
-                      {openLead.message_sent ? "Message envoyé ✓" : "Marquer comme envoyé"}
+                      {openLead.message_sent
+                        ? "Message envoyé ✓"
+                        : "Marquer comme envoyé"}
                     </button>
                   </div>
 
@@ -850,7 +869,9 @@ export default function LeadsPage() {
                     <p className="text-xs text-slate-400 mt-2">
                       Prochaine relance :{" "}
                       <span className="text-slate-200 font-medium">
-                        {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
+                        {new Date(openLead.next_followup_at).toLocaleDateString(
+                          "fr-FR"
+                        )}
                       </span>
                     </p>
                   )}
@@ -1032,7 +1053,7 @@ function InfoBlock({
   children,
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-4">
