@@ -1,495 +1,476 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import SubscriptionGate from "@/components/SubscriptionGate";
 
+type Lead = any;
+
 export default function FollowupsPage() {
-  const [leads, setLeads] = useState<any[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [openLead, setOpenLead] = useState<any>(null);
+  const [openLead, setOpenLead] = useState<Lead | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc"); // prochaine relance la + proche par défaut
 
   // Fetch all leads with followups
   useEffect(() => {
     (async () => {
-      const res1 = await fetch("/api/get-leads");
-      const res2 = await fetch("/api/get-map-leads");
+      try {
+        const [res1, res2] = await Promise.all([
+          fetch("/api/get-leads"),
+          fetch("/api/get-map-leads"),
+        ]);
 
-      const data1 = await res1.json();
-      const data2 = await res2.json();
+        const data1 = await res1.json();
+        const data2 = await res2.json();
 
-      const merged = [...(data1.leads ?? []), ...(data2.leads ?? [])];
+        const merged = [...(data1.leads ?? []), ...(data2.leads ?? [])];
 
-      // Only leads with next_followup_at
-      const filtered = merged.filter((l) => l.next_followup_at != null);
+        // Only leads with next_followup_at
+        const filtered = merged.filter((l) => l?.next_followup_at != null);
 
-      setLeads(filtered);
-      setLoaded(true);
+        setLeads(filtered);
+      } catch (e) {
+        console.error(e);
+        setLeads([]);
+      } finally {
+        setLoaded(true);
+      }
     })();
   }, []);
 
   // Paris timezone date
-  const today = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
-  );
+  const today = useMemo(() => {
+    return new Date(
+      new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
+    );
+  }, []);
 
-  // 🔧 FIX 1 : éviter crash si la date n’est pas une string
+  // ✅ Safe date parser (kept)
   const cleanDate = (d: any) => {
     if (!d || typeof d !== "string") return new Date("2100-01-01");
     return new Date(d.split("T")[0] + "T00:00:00");
   };
 
-  const overdue = leads.filter(
-    (l) => cleanDate(l.next_followup_at) < cleanDate(today.toISOString())
-  );
-  const todayList = leads.filter(
-    (l) =>
-      cleanDate(l.next_followup_at).getTime() ===
-      cleanDate(today.toISOString()).getTime()
-  );
-  const upcoming = leads.filter(
-    (l) => cleanDate(l.next_followup_at) > cleanDate(today.toISOString())
-  );
+  const todayISO = useMemo(() => today.toISOString(), [today]);
 
-  // 🔵 Fonction : marquer comme répondu (LinkedIn OU Maps)
+  const filteredBySearch = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    if (!s) return leads;
+
+    return leads.filter((l) => {
+      const name = `${l?.FirstName ?? ""} ${l?.LastName ?? ""}`.toLowerCase();
+      const company = String(l?.Company ?? "").toLowerCase();
+      const title = String(l?.title ?? "").toLowerCase(); // maps
+      return (
+        name.includes(s) || company.includes(s) || title.includes(s)
+      );
+    });
+  }, [leads, search]);
+
+  const sorted = useMemo(() => {
+    const copy = [...filteredBySearch];
+    copy.sort((a, b) => {
+      const da = cleanDate(a?.next_followup_at).getTime();
+      const db = cleanDate(b?.next_followup_at).getTime();
+      return sortDir === "asc" ? da - db : db - da;
+    });
+    return copy;
+  }, [filteredBySearch, sortDir]);
+
+  const overdue = useMemo(() => {
+    return sorted.filter(
+      (l) => cleanDate(l.next_followup_at) < cleanDate(todayISO)
+    );
+  }, [sorted, todayISO]);
+
+  const todayList = useMemo(() => {
+    return sorted.filter(
+      (l) =>
+        cleanDate(l.next_followup_at).getTime() ===
+        cleanDate(todayISO).getTime()
+    );
+  }, [sorted, todayISO]);
+
+  const upcoming = useMemo(() => {
+    return sorted.filter(
+      (l) => cleanDate(l.next_followup_at) > cleanDate(todayISO)
+    );
+  }, [sorted, todayISO]);
+
+  // 🔵 Marquer comme répondu (LinkedIn OU Maps)
   const markAsResponded = async (leadId: string) => {
-    // 🔧 FIX 2 : éviter crash si openLead est null
     const isMapLead = !!openLead?.placeUrl;
 
     const endpoint = isMapLead
       ? "/api/map-leads/responded"
       : "/api/leads/responded";
 
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId }),
-    });
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId }),
+      });
 
-    if (res.ok) {
-      setLeads((prev) => prev.filter((l) => l.id !== leadId));
+      if (!res.ok) return;
+
+      setLeads((prev) => prev.filter((l) => String(l.id) !== String(leadId)));
       setOpenLead(null);
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  const LeadCard = ({ lead, tone }: any) => {
-    const name = `${lead.FirstName || lead.title || "—"} ${lead.LastName || ""}`.trim();
-    const dateLabel = new Date(lead.next_followup_at).toLocaleDateString("fr-FR");
-    const sourceLabel = lead.placeUrl ? "Google Maps" : "LinkedIn";
-    const company = lead.Company;
+  const total = leads.length;
 
-    const toneStyles =
-      tone === "overdue"
-        ? "border-rose-500/30 hover:border-rose-400/60 shadow-rose-500/10"
-        : tone === "today"
-        ? "border-amber-500/30 hover:border-amber-400/60 shadow-amber-500/10"
-        : "border-slate-800 hover:border-indigo-500/50 shadow-indigo-500/10";
-
-    const badgeStyles =
-      tone === "overdue"
-        ? "bg-rose-500/10 text-rose-300 border-rose-500/20"
-        : tone === "today"
-        ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
-        : "bg-slate-700/30 text-slate-200 border-slate-600/30";
-
-    return (
-      <button
-        type="button"
-        onClick={() => setOpenLead(lead)}
-        className={`
-          group w-full text-left
-          rounded-2xl border ${toneStyles}
-          bg-slate-900/60 hover:bg-slate-900
-          transition shadow-sm hover:shadow-lg
-          p-5 md:p-6
-          focus:outline-none focus:ring-2 focus:ring-indigo-500/60
-        `}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-slate-50 font-semibold truncate">{name}</h3>
-
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span
-                className={`
-                  inline-flex items-center gap-1.5
-                  px-2.5 py-1 rounded-full text-[11px]
-                  border ${badgeStyles}
-                `}
-              >
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-current opacity-70" />
-                {sourceLabel}
-              </span>
-
-              {company && (
-                <span className="text-slate-400 text-xs truncate max-w-[260px]">
-                  {company}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="shrink-0 text-right">
-            <p className="text-[11px] text-slate-400">Relance</p>
-            <p className="text-sm font-semibold text-slate-100">{dateLabel}</p>
-          </div>
-        </div>
-
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-xs text-slate-500">
-            Cliquez pour ouvrir le détail
-          </p>
-          <span className="text-xs text-slate-300 opacity-0 group-hover:opacity-100 transition">
-            Ouvrir →
-          </span>
-        </div>
-      </button>
-    );
-  };
-
-  const Section = ({ title, subtitle, data, tone }: any) => (
-    <div className="space-y-4">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h2 className="text-lg md:text-xl font-semibold text-slate-50">
-            {title}
-          </h2>
-          {subtitle && (
-            <p className="text-slate-400 text-sm mt-1">{subtitle}</p>
-          )}
-        </div>
-
-        <div className="text-sm text-slate-400">
-          <span className="px-2 py-1 rounded-full bg-slate-900/60 border border-slate-800">
-            {data.length} {data.length > 1 ? "relances" : "relance"}
-          </span>
-        </div>
-      </div>
-
-      {data.length === 0 ? (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-          <p className="text-slate-400 text-sm">Aucune relance ici ✅</p>
-          <p className="text-slate-600 text-xs mt-1">
-            Quand une prochaine date de relance est définie, elle apparaîtra automatiquement.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {data.map((lead: any) => (
-            <LeadCard key={lead.id} lead={lead} tone={tone} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  // Loading state (UX premium)
   if (!loaded) {
     return (
-      <SubscriptionGate supportEmail="contact@mindlink.fr">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 py-10">
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6 md:p-8">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="h-7 w-56 bg-slate-800/60 rounded-lg animate-pulse" />
-                <div className="mt-3 h-4 w-80 bg-slate-800/50 rounded-md animate-pulse" />
-              </div>
-              <div className="h-9 w-28 bg-slate-800/50 rounded-xl animate-pulse" />
-            </div>
-
-            <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6"
-                >
-                  <div className="h-5 w-52 bg-slate-800/60 rounded-md animate-pulse" />
-                  <div className="mt-3 h-4 w-40 bg-slate-800/50 rounded-md animate-pulse" />
-                  <div className="mt-6 h-4 w-24 bg-slate-800/40 rounded-md animate-pulse" />
-                </div>
-              ))}
-            </div>
-
-            <p className="text-slate-500 text-sm mt-6">Chargement des relances…</p>
-          </div>
-        </div>
-      </SubscriptionGate>
+      <div className="text-slate-400 text-sm px-6 pt-20">
+        Chargement…
+      </div>
     );
   }
 
   return (
-    <SubscriptionGate supportEmail="contact@mindlink.fr">
+    <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
-        <div className="max-w-6xl mx-auto px-4 md:px-8 py-10">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <div className="space-y-2">
-              <h1 className="text-2xl md:text-3xl font-semibold text-slate-50 tracking-tight">
-                Relances
-              </h1>
-              <p className="text-slate-400 text-sm md:text-base">
-                Gérez vos relances en priorité : <span className="text-slate-200">en retard</span>,{" "}
-                <span className="text-slate-200">aujourd’hui</span>, et{" "}
-                <span className="text-slate-200">à venir</span>.
-              </p>
+        <div className="min-h-screen w-full px-6 pt-20 pb-32">
+          <div className="mx-auto w-full max-w-6xl space-y-10">
+            {/* HEADER */}
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-50">
+                  Relances
+                </h1>
+                <p className="text-slate-400 text-sm md:text-base mt-2 max-w-2xl">
+                  Suivez vos relances en retard, du jour et à venir. Ouvrez une fiche pour accéder au contact et marquer “répondu”.
+                </p>
+              </div>
 
-              <div className="flex flex-wrap items-center gap-2 pt-2">
-                <span className="px-3 py-1 rounded-full text-xs bg-slate-900/60 border border-slate-800 text-slate-300">
-                  Aujourd’hui :{" "}
-                  <span className="text-slate-100 font-semibold">
-                    {today.toLocaleDateString("fr-FR")}
-                  </span>
-                </span>
-
-                <span className="px-3 py-1 rounded-full text-xs bg-slate-900/60 border border-slate-800 text-slate-300">
-                  Total :{" "}
-                  <span className="text-slate-100 font-semibold">
-                    {leads.length}
-                  </span>
-                </span>
+              <div className="flex flex-wrap gap-2">
+                <StatChip title="Total" value={total} />
+                <StatChip title="En retard" value={overdue.length} />
+                <StatChip title="Aujourd’hui" value={todayList.length} />
+                <StatChip title="À venir" value={upcoming.length} />
               </div>
             </div>
 
-            {/* Right summary */}
-            <div className="grid grid-cols-3 gap-2 w-full md:w-auto">
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
-                <p className="text-[11px] text-slate-400">En retard</p>
-                <p className="text-xl font-semibold text-slate-50 mt-1">
-                  {overdue.length}
-                </p>
+            {/* SEARCH + SORT */}
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="w-full max-w-xl">
+                <div
+                  className="
+                    flex items-center gap-3
+                    bg-slate-900/60 border border-slate-700 rounded-2xl
+                    px-4 py-3 shadow-inner backdrop-blur-md
+                    focus-within:ring-2 focus-within:ring-indigo-500/50
+                    transition
+                  "
+                >
+                  <svg
+                    className="w-4 h-4 text-slate-500"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+                    />
+                  </svg>
+
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Rechercher (nom, entreprise)…"
+                    className="
+                      bg-transparent w-full text-sm text-slate-200 placeholder-slate-500
+                      focus:outline-none
+                    "
+                  />
+                </div>
+
+                <div className="mt-2 text-[11px] text-slate-500">
+                  {sorted.length} relance(s) affichée(s)
+                </div>
               </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
-                <p className="text-[11px] text-slate-400">Aujourd’hui</p>
-                <p className="text-xl font-semibold text-slate-50 mt-1">
-                  {todayList.length}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
-                <p className="text-[11px] text-slate-400">À venir</p>
-                <p className="text-xl font-semibold text-slate-50 mt-1">
-                  {upcoming.length}
-                </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSortDir((p) => (p === "asc" ? "desc" : "asc"))}
+                  className="px-4 py-2 text-xs md:text-sm rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 transition text-slate-200"
+                >
+                  Trier : {sortDir === "asc" ? "plus proche" : "plus lointaine"}
+                </button>
               </div>
             </div>
-          </div>
 
-          {/* Content */}
-          <div className="mt-10 space-y-10">
+            {/* SECTIONS */}
             <Section
               title="🔥 En retard"
-              subtitle="À traiter en priorité pour ne rien laisser filer."
+              subtitle="À traiter en priorité"
+              empty="Aucune relance en retard."
               data={overdue}
-              tone="overdue"
+              onOpen={setOpenLead}
             />
+
             <Section
               title="📅 Aujourd’hui"
-              subtitle="Les relances du jour : rapide à exécuter."
+              subtitle="Relances prévues aujourd’hui"
+              empty="Aucune relance prévue aujourd’hui."
               data={todayList}
-              tone="today"
+              onOpen={setOpenLead}
             />
+
             <Section
               title="⏳ À venir"
-              subtitle="Gardez une vue claire sur les prochaines actions."
+              subtitle="Relances à venir"
+              empty="Aucune relance à venir."
               data={upcoming}
-              tone="upcoming"
+              onOpen={setOpenLead}
             />
-          </div>
-
-          {/* Hint */}
-          <div className="mt-10 rounded-3xl border border-slate-800 bg-slate-900/30 p-6">
-            <p className="text-slate-300 text-sm">
-              Astuce : cliquez sur une relance pour ouvrir le détail et{" "}
-              <span className="text-slate-100 font-semibold">marquer comme répondu</span>.
-            </p>
-            <p className="text-slate-500 text-xs mt-1">
-              Les relances marquées comme répondu disparaissent automatiquement de la liste.
-            </p>
           </div>
         </div>
 
-        {/* Sidebar (garde EXACTEMENT la logique : openLead, close, markAsResponded) */}
+        {/* SIDEBAR */}
         {openLead && (
-          <>
-            {/* Overlay */}
-            <button
-              type="button"
+          <div className="fixed inset-0 z-50">
+            {/* overlay */}
+            <div
+              className="absolute inset-0 bg-black/55 backdrop-blur-sm"
               onClick={() => setOpenLead(null)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-40 cursor-default"
-              aria-label="Fermer"
             />
 
+            {/* panel */}
             <div
               className="
-                fixed right-0 top-0 h-full w-full sm:w-[460px]
-                bg-slate-950/80 backdrop-blur-xl
-                border-l border-slate-800 z-50
-                shadow-[0_0_60px_-15px_rgba(99,102,241,0.45)]
+                absolute right-0 top-0 h-full w-full sm:w-[420px]
+                bg-slate-900/95 backdrop-blur-2xl
+                border-l border-slate-800 p-6
+                shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)]
+                animate-slideLeft
+                flex flex-col
               "
             >
-              <div className="h-full flex flex-col">
-                {/* Header */}
-                <div className="p-6 border-b border-slate-800">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="text-xs text-slate-400">Détail de la relance</p>
-                      <h2 className="text-xl md:text-2xl font-semibold text-slate-50 truncate mt-1">
-                        {openLead.FirstName || openLead.title} {openLead.LastName || ""}
-                      </h2>
+              <div className="flex items-start justify-between gap-3">
+                <button
+                  onClick={() => setOpenLead(null)}
+                  className="text-slate-400 text-xs hover:text-slate-200 transition"
+                >
+                  ✕ Fermer
+                </button>
 
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <span className="px-3 py-1 rounded-full text-xs bg-slate-900/70 border border-slate-800 text-slate-300">
-                          Prochaine relance :{" "}
-                          <span className="text-indigo-300 font-semibold">
-                            {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
-                          </span>
-                        </span>
+                <span className="text-[11px] px-2 py-1 rounded-full border border-slate-700 bg-slate-900/60 text-slate-200">
+                  {openLead.placeUrl ? "Google Maps" : "LinkedIn"}
+                </span>
+              </div>
 
-                        <span className="px-3 py-1 rounded-full text-xs bg-slate-900/70 border border-slate-800 text-slate-300">
-                          Source :{" "}
-                          <span className="text-slate-100 font-semibold">
-                            {openLead.placeUrl ? "Google Maps" : "LinkedIn"}
-                          </span>
-                        </span>
-                      </div>
-                    </div>
+              <h2 className="text-2xl font-semibold text-slate-50 mt-4">
+                {(openLead.FirstName || openLead.title || "—") as any}{" "}
+                {(openLead.LastName || "") as any}
+              </h2>
 
-                    <button
-                      onClick={() => setOpenLead(null)}
-                      className="
-                        shrink-0 rounded-xl px-3 py-2 text-xs
-                        border border-slate-800 bg-slate-900/40
-                        text-slate-300 hover:text-slate-100 hover:bg-slate-900/70
-                        transition
-                      "
+              <p className="text-slate-400 text-sm mt-1">
+                Prochaine relance :{" "}
+                <span className="text-indigo-300 font-medium">
+                  {openLead.next_followup_at
+                    ? new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")
+                    : "—"}
+                </span>
+              </p>
+
+              {openLead.Company && (
+                <p className="text-slate-500 text-sm mt-2">{openLead.Company}</p>
+              )}
+
+              <button
+                onClick={() => markAsResponded(openLead.id)}
+                className="
+                  w-full text-center py-3 mt-6 rounded-2xl
+                  bg-emerald-600 hover:bg-emerald-500
+                  text-sm font-semibold text-white transition
+                "
+              >
+                Marquer comme répondu ✓
+              </button>
+
+              <div className="border-t border-slate-800 mt-6 pt-5 space-y-3 text-sm text-slate-300">
+                {openLead.email && (
+                  <Row label="Email">
+                    <span className="text-slate-200">{openLead.email}</span>
+                  </Row>
+                )}
+
+                {openLead.phoneNumber && (
+                  <Row label="Téléphone">
+                    <span className="text-slate-200">{openLead.phoneNumber}</span>
+                  </Row>
+                )}
+
+                {openLead.LinkedInURL && (
+                  <Row label="LinkedIn">
+                    <a
+                      href={openLead.LinkedInURL}
+                      className="text-sky-400 hover:underline"
+                      target="_blank"
+                      rel="noreferrer"
                     >
-                      ✕ Fermer
-                    </button>
-                  </div>
+                      Voir →
+                    </a>
+                  </Row>
+                )}
 
-                  {/* CTA */}
-                  <button
-                    onClick={() => markAsResponded(openLead.id)}
-                    className="
-                      w-full mt-5
-                      rounded-2xl py-3
-                      bg-emerald-600 hover:bg-emerald-500
-                      text-sm font-semibold text-white
-                      transition
-                      shadow-lg shadow-emerald-600/15
-                    "
-                  >
-                    Marquer comme répondu ✓
-                  </button>
+                {openLead.placeUrl && (
+                  <Row label="Google Maps">
+                    <a
+                      href={openLead.placeUrl}
+                      className="text-emerald-400 hover:underline"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Ouvrir →
+                    </a>
+                  </Row>
+                )}
+              </div>
 
-                  <p className="text-slate-500 text-xs mt-2">
-                    Une fois marqué comme répondu, le lead est retiré des relances.
-                  </p>
-                </div>
-
-                {/* Body */}
-                <div className="p-6 overflow-y-auto space-y-4">
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
-                    <p className="text-xs text-slate-500">Informations</p>
-
-                    <div className="mt-4 space-y-3 text-sm text-slate-200">
-                      {openLead.Company && (
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-slate-400">Entreprise</p>
-                          <p className="text-right font-medium text-slate-100">
-                            {openLead.Company}
-                          </p>
-                        </div>
-                      )}
-
-                      {openLead.email && (
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-slate-400">Email</p>
-                          <p className="text-right font-medium text-slate-100">
-                            {openLead.email}
-                          </p>
-                        </div>
-                      )}
-
-                      {openLead.phoneNumber && (
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-slate-400">Téléphone</p>
-                          <p className="text-right font-medium text-slate-100">
-                            {openLead.phoneNumber}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Links */}
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
-                    <p className="text-xs text-slate-500">Liens</p>
-
-                    <div className="mt-4 space-y-2">
-                      {openLead.LinkedInURL && (
-                        <a
-                          href={openLead.LinkedInURL}
-                          className="
-                            block w-full rounded-xl px-4 py-3
-                            border border-slate-800 bg-slate-900/50
-                            text-slate-200 hover:text-white hover:bg-slate-900
-                            transition
-                          "
-                          target="_blank"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Ouvrir LinkedIn</span>
-                            <span className="text-xs text-slate-400">→</span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1 truncate">
-                            {openLead.LinkedInURL}
-                          </p>
-                        </a>
-                      )}
-
-                      {openLead.placeUrl && (
-                        <a
-                          href={openLead.placeUrl}
-                          className="
-                            block w-full rounded-xl px-4 py-3
-                            border border-slate-800 bg-slate-900/50
-                            text-slate-200 hover:text-white hover:bg-slate-900
-                            transition
-                          "
-                          target="_blank"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Ouvrir Google Maps</span>
-                            <span className="text-xs text-slate-400">→</span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1 truncate">
-                            {openLead.placeUrl}
-                          </p>
-                        </a>
-                      )}
-
-                      {!openLead.LinkedInURL && !openLead.placeUrl && (
-                        <p className="text-slate-500 text-sm">
-                          Aucun lien disponible pour ce lead.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Footer helper */}
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-5">
-                    <p className="text-slate-300 text-sm">
-                      Besoin d’aller vite ? Ouvre le lien, répond, puis reviens ici pour marquer comme répondu.
-                    </p>
-                    <p className="text-slate-500 text-xs mt-2">
-                      Lidmeo garde ton suivi clean et actionnable.
-                    </p>
-                  </div>
-                </div>
+              <div className="mt-auto pt-6 text-[11px] text-slate-500">
+                Astuce : traite d’abord “🔥 En retard” pour garder ton pipeline propre.
               </div>
             </div>
-          </>
+          </div>
         )}
+
+        {/* Anim */}
+        <style jsx global>{`
+          @keyframes slideLeft {
+            from {
+              transform: translateX(24px);
+              opacity: 0;
+            }
+            to {
+              transform: translateX(0);
+              opacity: 1;
+            }
+          }
+          .animate-slideLeft {
+            animation: slideLeft 180ms ease-out;
+          }
+        `}</style>
       </>
     </SubscriptionGate>
+  );
+}
+
+/* ------------------------- */
+/* UI blocks                 */
+/* ------------------------- */
+
+function StatChip({ title, value }: { title: string; value: any }) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-center shadow-inner">
+      <div className="text-[10px] uppercase tracking-wide text-slate-500">
+        {title}
+      </div>
+      <div className="text-base font-semibold text-slate-100 mt-1">{value}</div>
+    </div>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-slate-500">{label}</span>
+      <span className="text-right">{children}</span>
+    </div>
+  );
+}
+
+function Section({
+  title,
+  subtitle,
+  empty,
+  data,
+  onOpen,
+}: {
+  title: string;
+  subtitle: string;
+  empty: string;
+  data: any[];
+  onOpen: (lead: any) => void;
+}) {
+  return (
+    <section>
+      <div className="flex items-end justify-between gap-4 mb-4">
+        <div>
+          <h2 className="text-xl md:text-2xl font-semibold text-slate-100">
+            {title}
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">{subtitle}</p>
+        </div>
+
+        <span className="text-[11px] px-2 py-1 rounded-full border border-slate-800 bg-slate-950/60 text-slate-200">
+          {data.length} relance(s)
+        </span>
+      </div>
+
+      {data.length === 0 ? (
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-6 text-slate-500 text-sm">
+          {empty}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {data.map((lead: any) => {
+            const name =
+              `${lead.FirstName ?? ""} ${lead.LastName ?? ""}`.trim() ||
+              lead.title ||
+              "—";
+
+            return (
+              <button
+                key={lead.id}
+                type="button"
+                onClick={() => onOpen(lead)}
+                className="
+                  text-left p-5 rounded-2xl
+                  bg-slate-900/70 border border-slate-800
+                  hover:border-indigo-500/60 hover:bg-slate-900
+                  transition shadow-md hover:shadow-indigo-500/10
+                "
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-slate-100 font-semibold">{name}</div>
+                    {lead.Company && (
+                      <div className="text-slate-500 text-xs mt-1">
+                        {lead.Company}
+                      </div>
+                    )}
+                  </div>
+
+                  <span className="text-[11px] px-2 py-1 rounded-full border border-slate-700 bg-slate-900/60 text-slate-200">
+                    {lead.placeUrl ? "Maps" : "Lead"}
+                  </span>
+                </div>
+
+                <div className="mt-3 text-slate-400 text-sm">
+                  Prochaine relance :{" "}
+                  <span className="text-slate-200 font-semibold">
+                    {lead.next_followup_at
+                      ? new Date(lead.next_followup_at).toLocaleDateString("fr-FR")
+                      : "—"}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
