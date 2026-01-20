@@ -934,23 +934,33 @@ export default function LeadsPage() {
                   readOnly={!isPremium}
                 />
 
-                {/* ✅ disable buttons if no email */}
+                {/* ✅ Buttons:
+                    - if no email => disabled
+                    - if essential => clickable and opens premium modal
+                    - if premium => works */}
                 {(() => {
                   const hasEmail = Boolean((openLead.email ?? "").trim());
+                  const isDisabledBecauseNoEmail = !hasEmail;
+
+                  const commonDisabledClasses =
+                    "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed";
+                  const commonEnabledPrimaryClasses =
+                    "bg-slate-900 border-slate-700 text-slate-100 hover:bg-slate-800";
+                  const commonEnabledSecondaryClasses =
+                    "bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900";
 
                   return (
                     <>
-                      {/* Boutons email SOUS le message email */}
                       <div className="mt-4">
                         <button
                           type="button"
                           onClick={openPrefilledEmail}
-                          disabled={!hasEmail}
+                          disabled={isDisabledBecauseNoEmail}
                           className={[
                             "w-full px-4 py-3 rounded-xl text-sm font-medium transition border",
-                            !hasEmail
-                              ? "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed"
-                              : "bg-slate-900 border-slate-700 text-slate-100 hover:bg-slate-800",
+                            isDisabledBecauseNoEmail
+                              ? commonDisabledClasses
+                              : commonEnabledPrimaryClasses,
                           ].join(" ")}
                         >
                           Ouvrir l’email pré-rempli
@@ -961,12 +971,12 @@ export default function LeadsPage() {
                         <button
                           type="button"
                           onClick={openGmailWeb}
-                          disabled={!hasEmail}
+                          disabled={isDisabledBecauseNoEmail}
                           className={[
                             "flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border",
-                            !hasEmail
+                            isDisabledBecauseNoEmail
                               ? "bg-slate-950/40 border-slate-800 text-slate-600 cursor-not-allowed"
-                              : "bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900",
+                              : commonEnabledSecondaryClasses,
                           ].join(" ")}
                         >
                           Gmail
@@ -975,12 +985,12 @@ export default function LeadsPage() {
                         <button
                           type="button"
                           onClick={openOutlookWeb}
-                          disabled={!hasEmail}
+                          disabled={isDisabledBecauseNoEmail}
                           className={[
                             "flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border",
-                            !hasEmail
+                            isDisabledBecauseNoEmail
                               ? "bg-slate-950/40 border-slate-800 text-slate-600 cursor-not-allowed"
-                              : "bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900",
+                              : commonEnabledSecondaryClasses,
                           ].join(" ")}
                         >
                           Outlook
