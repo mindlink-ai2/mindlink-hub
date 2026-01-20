@@ -515,15 +515,7 @@ export default function LeadsPage() {
             {/* SEARCH + META */}
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="w-full max-w-xl">
-                <div
-                  className="
-                    flex items-center gap-3
-                    bg-slate-900/60 border border-slate-700 rounded-2xl
-                    px-4 py-3 shadow-inner backdrop-blur-md
-                    focus-within:ring-2 focus-within:ring-indigo-500/50
-                    transition
-                  "
-                >
+                <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-700 rounded-2xl px-4 py-3 shadow-inner backdrop-blur-md focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
                   <svg
                     className="w-4 h-4 text-slate-500"
                     fill="none"
@@ -542,10 +534,7 @@ export default function LeadsPage() {
                     value={searchTerm}
                     onChange={(e) => handleSearch(e.target.value)}
                     placeholder="Rechercher (nom, entreprise, ville)…"
-                    className="
-                      bg-transparent w-full text-sm text-slate-200 placeholder-slate-500
-                      focus:outline-none
-                    "
+                    className="bg-transparent w-full text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
                   />
                 </div>
 
