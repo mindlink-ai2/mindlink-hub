@@ -31,7 +31,7 @@ export default function LeadsPage() {
   const [emailOption, setEmailOption] = useState<boolean>(false);
   const [phoneOption, setPhoneOption] = useState<boolean>(false);
 
-  // ✅ NEW: plan from Supabase
+  // ✅ plan
   const [plan, setPlan] = useState<string>("essential");
   const isPremium = plan === "premium";
 
@@ -52,8 +52,7 @@ export default function LeadsPage() {
   }, [safeLeads, searchTerm]);
 
   // ✅ Column count for empty state colSpan
-  const baseCols =
-    7 + (emailOption ? 1 : 0) + (phoneOption ? 1 : 0); // treated, name, company, location, linkedin, date, delete + options
+  const baseCols = 7 + (emailOption ? 1 : 0) + (phoneOption ? 1 : 0);
   const colCount = (selectionMode ? 1 : 0) + baseCols;
 
   // ✅ Read query param once on mount
@@ -692,6 +691,7 @@ export default function LeadsPage() {
                               </div>
 
                               <button
+                                type="button"
                                 onClick={() => setOpenLead(lead)}
                                 className="opacity-0 group-hover:opacity-100 absolute right-3 top-1/2 -translate-y-1/2 text-[11px] px-3 py-1.5 rounded-lg bg-indigo-600/70 hover:bg-indigo-500 backdrop-blur-md text-white transition shadow-sm hover:shadow-md"
                               >
@@ -760,6 +760,7 @@ export default function LeadsPage() {
               <div className="sticky top-0 z-10 p-6 pb-4 bg-slate-900/75 backdrop-blur-xl border-b border-slate-800">
                 <div className="flex items-start justify-between gap-3">
                   <button
+                    type="button"
                     className="text-slate-400 text-xs hover:text-slate-200 transition"
                     onClick={() => setOpenLead(null)}
                   >
@@ -850,6 +851,7 @@ export default function LeadsPage() {
 
                   <div className="mt-3">
                     <button
+                      type="button"
                       onClick={handleMessageSent}
                       disabled={openLead.message_sent}
                       className={[
@@ -1001,6 +1003,7 @@ export default function LeadsPage() {
                     Passer en Premium
                   </a>
                   <button
+                    type="button"
                     onClick={() => setPremiumModalOpen(false)}
                     className="flex-1 px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-200 text-sm font-medium transition"
                   >
@@ -1012,7 +1015,6 @@ export default function LeadsPage() {
           )}
         </div>
 
-        {/* optional: tiny keyframes without external deps */}
         <style jsx global>{`
           @keyframes slideLeft {
             from {
@@ -1048,13 +1050,7 @@ function Chip({ title, value }: { title: string; value: any }) {
   );
 }
 
-function InfoBlock({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+function InfoBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-4">
       <div className="text-[10px] uppercase tracking-wide text-slate-500">
