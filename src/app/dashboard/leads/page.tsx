@@ -362,7 +362,10 @@ export default function LeadsPage() {
     }
 
     const to = (openLead.email ?? "").trim();
-    if (!to) return;
+    if (!to) {
+      alert("Aucun email disponible pour ce prospect.");
+      return;
+    }
 
     const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
     const body = (openLead.message_mail ?? "").trim();
@@ -384,7 +387,10 @@ export default function LeadsPage() {
     }
 
     const to = (openLead.email ?? "").trim();
-    if (!to) return;
+    if (!to) {
+      alert("Aucun email disponible pour ce prospect.");
+      return;
+    }
 
     const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
     const body = (openLead.message_mail ?? "").trim();
@@ -406,7 +412,10 @@ export default function LeadsPage() {
     }
 
     const to = (openLead.email ?? "").trim();
-    if (!to) return;
+    if (!to) {
+      alert("Aucun email disponible pour ce prospect.");
+      return;
+    }
 
     const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
     const body = (openLead.message_mail ?? "").trim();
@@ -935,19 +944,18 @@ export default function LeadsPage() {
                 />
 
                 {/* ✅ Buttons:
-                    - if no email => disabled
-                    - if essential => clickable and opens premium modal
-                    - if premium => works */}
+                    - if essential => clickable and opens premium modal (handled in functions)
+                    - if premium => works
+                    - if no email => still clickable, but visually dimmed (no forbidden cursor) */}
                 {(() => {
                   const hasEmail = Boolean((openLead.email ?? "").trim());
-                  const isDisabledBecauseNoEmail = !hasEmail;
 
-                  const commonDisabledClasses =
-                    "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed";
-                  const commonEnabledPrimaryClasses =
+                  const commonPrimaryClasses =
                     "bg-slate-900 border-slate-700 text-slate-100 hover:bg-slate-800";
-                  const commonEnabledSecondaryClasses =
+                  const commonSecondaryClasses =
                     "bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900";
+
+                  const dimIfNoEmail = hasEmail ? "" : "opacity-50";
 
                   return (
                     <>
@@ -955,12 +963,10 @@ export default function LeadsPage() {
                         <button
                           type="button"
                           onClick={openPrefilledEmail}
-                          disabled={isDisabledBecauseNoEmail}
                           className={[
-                            "w-full px-4 py-3 rounded-xl text-sm font-medium transition border",
-                            isDisabledBecauseNoEmail
-                              ? commonDisabledClasses
-                              : commonEnabledPrimaryClasses,
+                            "w-full px-4 py-3 rounded-xl text-sm font-medium transition border cursor-pointer",
+                            commonPrimaryClasses,
+                            dimIfNoEmail,
                           ].join(" ")}
                         >
                           Ouvrir l’email pré-rempli
@@ -971,12 +977,10 @@ export default function LeadsPage() {
                         <button
                           type="button"
                           onClick={openGmailWeb}
-                          disabled={isDisabledBecauseNoEmail}
                           className={[
-                            "flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border",
-                            isDisabledBecauseNoEmail
-                              ? "bg-slate-950/40 border-slate-800 text-slate-600 cursor-not-allowed"
-                              : commonEnabledSecondaryClasses,
+                            "flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border cursor-pointer",
+                            commonSecondaryClasses,
+                            dimIfNoEmail,
                           ].join(" ")}
                         >
                           Gmail
@@ -985,12 +989,10 @@ export default function LeadsPage() {
                         <button
                           type="button"
                           onClick={openOutlookWeb}
-                          disabled={isDisabledBecauseNoEmail}
                           className={[
-                            "flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border",
-                            isDisabledBecauseNoEmail
-                              ? "bg-slate-950/40 border-slate-800 text-slate-600 cursor-not-allowed"
-                              : commonEnabledSecondaryClasses,
+                            "flex-1 px-3 py-2 rounded-xl text-[12px] font-medium transition border cursor-pointer",
+                            commonSecondaryClasses,
+                            dimIfNoEmail,
                           ].join(" ")}
                         >
                           Outlook
