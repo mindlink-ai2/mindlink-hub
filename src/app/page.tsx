@@ -8,7 +8,7 @@ export default function HomePage() {
   const firstName = user?.firstName || user?.username || "";
 
   return (
-    <div className="grid gap-8 md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] items-start">
+    <div className="grid gap-8 md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] items-start md:items-center min-h-[70vh]">
       {/* ======================= */}
       {/* COLONNE GAUCHE */}
       {/* ======================= */}
@@ -31,8 +31,8 @@ export default function HomePage() {
 
             <p className="text-sm md:text-base text-slate-300 max-w-xl">
               Votre espace client pour retrouver au même endroit votre prospection,
-              vos relances et votre suivi. Un Hub simple, clair, pensé pour piloter
-              ce que Lidmeo automatise pour vous.
+              vos relances et l’accès à vos écrans de suivi. Un Hub simple, clair,
+              pensé pour piloter ce que Lidmeo automatise pour vous.
             </p>
           </div>
 
@@ -89,8 +89,8 @@ export default function HomePage() {
             </h1>
 
             <p className="text-sm md:text-base text-slate-300 max-w-xl">
-              Ici, vous retrouvez tout ce qui compte pour suivre votre activité avec Lidmeo :
-              prospection, relances et accès à vos écrans de suivi. Simple, sans bruit.
+              Ici, vous retrouvez tout ce qui compte pour piloter votre activité avec Lidmeo :
+              prospection, relances, et accès rapide à vos écrans de suivi. Simple, sans bruit.
             </p>
           </div>
 
@@ -120,7 +120,7 @@ export default function HomePage() {
           <p className="text-[12px] text-slate-500">
             Astuce : commencez par <span className="text-slate-200 font-medium">Prospection</span> si vous
             souhaitez lancer votre acquisition, ou par{" "}
-            <span className="text-slate-200 font-medium">Relances</span> si vous êtes déjà en suivi.
+            <span className="text-slate-200 font-medium">Relances</span> si vous souhaitez gérer votre suivi.
           </p>
         </SignedIn>
       </section>
@@ -137,11 +137,11 @@ export default function HomePage() {
         <div className="mt-4 space-y-3">
           <FeatureRow
             title="Prospection"
-            desc="Accéder à vos écrans de prospection : ciblage, messages, suivi."
+            desc="Accéder à vos écrans de prospection : ciblage, messages et suivi des actions."
           />
           <FeatureRow
             title="Relances"
-            desc="Retrouver vos relances et le suivi des échanges au même endroit."
+            desc="Retrouver vos relances à traiter et garder un suivi simple de vos actions."
           />
           <FeatureRow
             title="Dashboard"
@@ -158,7 +158,7 @@ export default function HomePage() {
             </li>
             <li className="flex gap-2">
               <span className="text-slate-500">2.</span>
-              <span>Vous consultez vos leads et vos relances depuis le Hub.</span>
+              <span>Vous accédez à vos leads et à vos relances depuis le Hub.</span>
             </li>
             <li className="flex gap-2">
               <span className="text-slate-500">3.</span>
@@ -169,7 +169,7 @@ export default function HomePage() {
 
         <div className="mt-4 border-t border-slate-800 pt-3">
           <p className="text-[11px] text-slate-500">
-            Les données affichées dans vos écrans dépendent des modules activés sur votre compte.
+            Les fonctionnalités visibles dans votre Hub dépendent des modules activés sur votre compte.
           </p>
         </div>
       </aside>
