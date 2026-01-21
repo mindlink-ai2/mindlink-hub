@@ -489,20 +489,23 @@ export default function LeadsPage() {
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
         <div className="min-h-screen w-full px-6 pt-20 pb-32">
-          <div className="mx-auto w-full max-w-6xl space-y-8">
-            {/* TOP HEADER */}
-            <div className="relative rounded-3xl border border-slate-800 bg-gradient-to-b from-slate-950/80 to-slate-950/40 p-6 md:p-7 overflow-hidden">
+          <div className="mx-auto w-full max-w-6xl space-y-6">
+            {/* HERO / COMMAND CENTER */}
+            <div className="relative rounded-3xl border border-slate-800 bg-gradient-to-b from-slate-950/80 to-slate-950/35 p-6 md:p-7 overflow-hidden">
+              {/* subtle glow */}
               <div className="pointer-events-none absolute inset-0 opacity-70 [mask-image:radial-gradient(60%_60%_at_50%_0%,black,transparent)]">
-                <div className="absolute -top-24 left-1/2 h-64 w-[520px] -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
+                <div className="absolute -top-28 left-1/2 h-72 w-[560px] -translate-x-1/2 rounded-full bg-indigo-500/12 blur-3xl" />
               </div>
 
-              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between relative">
-                <div>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+              <div className="relative grid grid-cols-1 gap-5 md:grid-cols-12 md:gap-6">
+                {/* LEFT: title + search */}
+                <div className="md:col-span-7">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
                     <span className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-950/60 px-2 py-1">
                       <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
                       Hub • Prospection
                     </span>
+
                     {selectionMode && (
                       <span className="inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2 py-1 text-indigo-200">
                         Mode sélection
@@ -516,88 +519,96 @@ export default function LeadsPage() {
                   <h1 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-slate-50">
                     Prospection
                   </h1>
-                  <p className="text-slate-400 text-sm mt-2 max-w-2xl">
+
+                  <p className="mt-2 text-sm text-slate-400 max-w-2xl">
                     Tous vos prospects qualifiés, importés automatiquement par
                     Lidmeo. Recherchez, traitez, et ouvrez un lead pour préparer
                     votre message.
                   </p>
-                </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <a
-                    href="/dashboard/leads/export"
-                    className="px-4 py-2.5 text-xs md:text-sm rounded-2xl bg-slate-900/70 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 shadow-sm"
-                  >
-                    Exporter CSV
-                  </a>
+                  <div className="mt-5">
+                    <div className="flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/45 px-4 py-3 shadow-inner backdrop-blur-md focus-within:ring-2 focus-within:ring-indigo-500/40 transition">
+                      <svg
+                        className="h-4 w-4 text-slate-500"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+                        />
+                      </svg>
 
-                  <button
-                    type="button"
-                    onClick={toggleSelectionMode}
-                    className="px-4 py-2.5 text-xs md:text-sm rounded-2xl bg-slate-900/70 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 shadow-sm"
-                  >
-                    {selectionMode ? "Annuler la sélection" : "Mode sélection"}
-                  </button>
-
-                  {selectionMode && (
-                    <button
-                      type="button"
-                      onClick={handleBulkDelete}
-                      disabled={selectedCount === 0}
-                      className={[
-                        "px-4 py-2.5 text-xs md:text-sm rounded-2xl transition border shadow-sm",
-                        selectedCount === 0
-                          ? "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed"
-                          : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
-                      ].join(" ")}
-                    >
-                      Supprimer ({selectedCount})
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Command / Meta row */}
-              <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between relative">
-                <div className="w-full max-w-xl">
-                  <div className="flex items-center gap-3 bg-slate-900/50 border border-slate-700 rounded-2xl px-4 py-3 shadow-inner backdrop-blur-md focus-within:ring-2 focus-within:ring-indigo-500/40 transition">
-                    <svg
-                      className="w-4 h-4 text-slate-500"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+                      <input
+                        value={searchTerm}
+                        onChange={(e) => handleSearch(e.target.value)}
+                        placeholder="Rechercher (nom, entreprise, ville)…"
+                        className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
                       />
-                    </svg>
+                    </div>
 
-                    <input
-                      value={searchTerm}
-                      onChange={(e) => handleSearch(e.target.value)}
-                      placeholder="Rechercher (nom, entreprise, ville)…"
-                      className="bg-transparent w-full text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                    <span>{filteredLeads.length} résultat(s) affiché(s)</span>
-                    {selectionMode && (
-                      <>
-                        <span className="opacity-60">•</span>
-                        <span>{selectedCount} sélectionné(s)</span>
-                      </>
-                    )}
+                    <div className="mt-2 text-[11px] text-slate-500">
+                      {filteredLeads.length} résultat(s) affiché(s)
+                      {selectionMode ? ` • ${selectedCount} sélectionné(s)` : ""}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <Chip title="Total leads" value={total} />
-                  <Chip title="À traiter" value={remainingToTreat} />
-                  <Chip title="Prochaine importation" value={nextImportText} />
+                {/* RIGHT: actions + stats panel */}
+                <div className="md:col-span-5">
+                  <div className="rounded-3xl border border-slate-800 bg-slate-950/35 p-4 md:p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-[12px] font-semibold text-slate-200">
+                        Actions
+                      </div>
+
+                      <span className="text-[11px] px-2 py-1 rounded-full border border-slate-800 bg-slate-950/40 text-slate-300">
+                        {filteredLeads.length} lead(s)
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        href="/dashboard/leads/export"
+                        className="px-4 py-2.5 text-xs md:text-sm rounded-2xl bg-slate-900/70 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 shadow-sm"
+                      >
+                        Exporter CSV
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={toggleSelectionMode}
+                        className="px-4 py-2.5 text-xs md:text-sm rounded-2xl bg-slate-900/70 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 shadow-sm"
+                      >
+                        {selectionMode ? "Annuler la sélection" : "Mode sélection"}
+                      </button>
+
+                      {selectionMode && (
+                        <button
+                          type="button"
+                          onClick={handleBulkDelete}
+                          disabled={selectedCount === 0}
+                          className={[
+                            "px-4 py-2.5 text-xs md:text-sm rounded-2xl transition border shadow-sm",
+                            selectedCount === 0
+                              ? "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed"
+                              : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
+                          ].join(" ")}
+                        >
+                          Supprimer ({selectedCount})
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      <Chip title="Total" value={total} compact />
+                      <Chip title="À traiter" value={remainingToTreat} compact />
+                      <Chip title="Import" value={nextImportText} compact />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -682,10 +693,7 @@ export default function LeadsPage() {
                   <tbody>
                     {filteredLeads.length === 0 ? (
                       <tr>
-                        <td
-                          colSpan={colCount}
-                          className="py-14 text-center"
-                        >
+                        <td colSpan={colCount} className="py-14 text-center">
                           <div className="mx-auto max-w-md">
                             <div className="text-slate-200 font-medium">
                               Aucun résultat
@@ -770,8 +778,7 @@ export default function LeadsPage() {
                                   rel="noreferrer"
                                   className="inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-1.5 text-sky-300 hover:text-sky-200 hover:bg-slate-900/60 transition"
                                 >
-                                  Voir profil
-                                  <span className="text-slate-500">↗</span>
+                                  Voir profil <span className="text-slate-500">↗</span>
                                 </a>
                               ) : (
                                 <span className="text-slate-500">—</span>
@@ -791,9 +798,7 @@ export default function LeadsPage() {
 
                             <td className="py-3.5 px-4 text-center text-slate-400">
                               {lead.created_at
-                                ? new Date(lead.created_at).toLocaleDateString(
-                                    "fr-FR"
-                                  )
+                                ? new Date(lead.created_at).toLocaleDateString("fr-FR")
                                 : "—"}
                             </td>
 
@@ -813,11 +818,9 @@ export default function LeadsPage() {
           {/* --- SIDEBAR --- */}
           {openLead && (
             <>
-              {/* Backdrop purely visual (no new close behavior) */}
               <div className="fixed inset-0 z-40 pointer-events-none bg-black/30 backdrop-blur-[2px]" />
 
               <div className="fixed right-0 top-0 z-50 h-full w-full sm:w-[440px] animate-slideLeft bg-gradient-to-b from-slate-900/95 to-slate-950/85 backdrop-blur-2xl border-l border-slate-800 shadow-[0_0_50px_-14px_rgba(99,102,241,0.55)] flex flex-col">
-                {/* Header sticky */}
                 <div className="sticky top-0 z-10 p-6 pb-4 bg-slate-950/35 backdrop-blur-xl border-b border-slate-800">
                   <div className="flex items-start justify-between gap-3">
                     <button
@@ -850,37 +853,10 @@ export default function LeadsPage() {
                     <p className="text-[12px] text-slate-400 mt-1">
                       {openLead.Company || "—"} • {openLead.location || "—"}
                     </p>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {openLead.message_sent ? (
-                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[12px] text-emerald-200">
-                          <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                          Message envoyé
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/40 px-3 py-1 text-[12px] text-slate-300">
-                          <span className="h-2 w-2 rounded-full bg-slate-600" />
-                          À envoyer
-                        </span>
-                      )}
-
-                      {openLead.next_followup_at && (
-                        <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/40 px-3 py-1 text-[12px] text-slate-300">
-                          Relance :
-                          <span className="text-slate-100 font-medium">
-                            {new Date(openLead.next_followup_at).toLocaleDateString(
-                              "fr-FR"
-                            )}
-                          </span>
-                        </span>
-                      )}
-                    </div>
                   </div>
                 </div>
 
-                {/* Scrollable content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                  {/* Summary cards */}
                   <div className="grid grid-cols-1 gap-3">
                     <InfoBlock title="LinkedIn">
                       {openLead.LinkedInURL ? (
@@ -890,8 +866,7 @@ export default function LeadsPage() {
                           rel="noreferrer"
                           className="inline-flex items-center gap-2 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-indigo-200 hover:bg-indigo-500/15 transition"
                         >
-                          Voir profil
-                          <span className="opacity-80">↗</span>
+                          Voir profil <span className="opacity-80">↗</span>
                         </a>
                       ) : (
                         <span className="text-slate-500">—</span>
@@ -917,23 +892,18 @@ export default function LeadsPage() {
                     <InfoBlock title="Créé le">
                       <span className="text-slate-200">
                         {openLead.created_at
-                          ? new Date(openLead.created_at).toLocaleDateString(
-                              "fr-FR"
-                            )
+                          ? new Date(openLead.created_at).toLocaleDateString("fr-FR")
                           : "—"}
                       </span>
                     </InfoBlock>
                   </div>
 
-                  {/* 1) Message LinkedIn */}
                   <div className="rounded-3xl border border-slate-800 bg-slate-950/30 p-4">
                     <div className="flex items-center justify-between">
                       <label className="text-xs text-slate-300 font-medium">
                         Message LinkedIn
                       </label>
-                      <span className="text-[11px] text-slate-500">
-                        Autosave
-                      </span>
+                      <span className="text-[11px] text-slate-500">Autosave</span>
                     </div>
 
                     <textarea
@@ -965,25 +935,11 @@ export default function LeadsPage() {
                             : "bg-indigo-600 hover:bg-indigo-500 text-white",
                         ].join(" ")}
                       >
-                        {openLead.message_sent
-                          ? "Message envoyé ✓"
-                          : "Marquer comme envoyé"}
+                        {openLead.message_sent ? "Message envoyé ✓" : "Marquer comme envoyé"}
                       </button>
                     </div>
-
-                    {openLead.message_sent_at && (
-                      <p className="text-[11px] text-slate-500 mt-2">
-                        Envoyé le{" "}
-                        <span className="text-slate-200 font-medium">
-                          {new Date(openLead.message_sent_at).toLocaleDateString(
-                            "fr-FR"
-                          )}
-                        </span>
-                      </p>
-                    )}
                   </div>
 
-                  {/* 2) Email (Premium only) */}
                   <div className="rounded-3xl border border-slate-800 bg-slate-950/30 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <label className="text-xs text-slate-300 font-medium">
@@ -1030,7 +986,6 @@ export default function LeadsPage() {
                       readOnly={!isPremium}
                     />
 
-                    {/* Buttons (gated in handlers) */}
                     {(() => {
                       const hasEmail = Boolean((openLead.email ?? "").trim());
                       const dimIfNoEmail = hasEmail ? "" : "opacity-50";
@@ -1091,7 +1046,6 @@ export default function LeadsPage() {
             </>
           )}
 
-          {/* ✅ premium modal */}
           {premiumModalOpen && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center">
               <div
@@ -1149,7 +1103,28 @@ export default function LeadsPage() {
 /* Small UI blocks           */
 /* ------------------------- */
 
-function Chip({ title, value }: { title: string; value: any }) {
+function Chip({
+  title,
+  value,
+  compact,
+}: {
+  title: string;
+  value: any;
+  compact?: boolean;
+}) {
+  if (compact) {
+    return (
+      <div className="rounded-2xl border border-slate-800 bg-slate-950/55 px-3 py-3 shadow-inner">
+        <div className="text-[10px] uppercase tracking-wide text-slate-500">
+          {title}
+        </div>
+        <div className="mt-1 text-lg font-semibold text-slate-100 leading-none">
+          {value}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-center shadow-inner min-w-[150px]">
       <div className="text-[10px] uppercase tracking-wide text-slate-500">
