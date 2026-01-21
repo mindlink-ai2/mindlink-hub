@@ -8,6 +8,9 @@ export default function FollowupsPage() {
   const [loaded, setLoaded] = useState(false);
   const [openLead, setOpenLead] = useState<any>(null);
 
+  // UI state (UX only)
+  const [tab, setTab] = useState<"overdue" | "today" | "upcoming">("overdue");
+
   // Fetch all leads with followups
   useEffect(() => {
     (async () => {
@@ -49,6 +52,23 @@ export default function FollowupsPage() {
   const upcoming = leads.filter(
     (l) => cleanDate(l.next_followup_at) > cleanDate(today.toISOString())
   );
+
+  const activeData =
+    tab === "overdue" ? overdue : tab === "today" ? todayList : upcoming;
+
+  const activeTitle =
+    tab === "overdue"
+      ? "🔥 En retard"
+      : tab === "today"
+      ? "📅 Aujourd’hui"
+      : "⏳ À venir";
+
+  const activeSubtitle =
+    tab === "overdue"
+      ? "À traiter en priorité pour éviter de perdre le fil."
+      : tab === "today"
+      ? "Relances prévues pour la journée."
+      : "Relances planifiées pour les prochains jours.";
 
   // 🔵 Fonction : marquer comme répondu (LinkedIn OU Maps)
   const markAsResponded = async (leadId: string) => {
@@ -102,10 +122,10 @@ export default function FollowupsPage() {
     `${lead.FirstName || lead.title || "—"} ${lead.LastName || ""}`.trim();
 
   const LeadCard = ({ lead, tone }: any) => {
-    // tone is purely visual
+    // ✅ no red (overdue uses amber)
     const toneRing =
       tone === "overdue"
-        ? "hover:border-rose-500/50 hover:shadow-rose-500/10"
+        ? "hover:border-amber-500/40 hover:shadow-amber-500/10"
         : tone === "today"
         ? "hover:border-indigo-500/55 hover:shadow-indigo-500/10"
         : "hover:border-emerald-500/45 hover:shadow-emerald-500/10";
@@ -119,7 +139,7 @@ export default function FollowupsPage() {
 
     const badgeStyle =
       tone === "overdue"
-        ? "bg-rose-500/10 text-rose-300 border-rose-500/20"
+        ? "bg-amber-500/10 text-amber-200 border-amber-500/20"
         : tone === "today"
         ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/20"
         : "bg-emerald-500/10 text-emerald-300 border-emerald-500/20";
@@ -217,22 +237,57 @@ export default function FollowupsPage() {
   );
 
   const HeaderStat = ({ label, value, variant }: any) => {
+    // ✅ no red (overdue uses amber)
     const styles =
       variant === "overdue"
-        ? "border-rose-500/20 bg-rose-500/5 text-rose-200"
+        ? "border-amber-500/20 bg-amber-500/5 text-amber-200"
         : variant === "today"
         ? "border-indigo-500/20 bg-indigo-500/5 text-indigo-200"
         : "border-emerald-500/20 bg-emerald-500/5 text-emerald-200";
 
+    const isActive =
+      (variant === "overdue" && tab === "overdue") ||
+      (variant === "today" && tab === "today") ||
+      (variant === "upcoming" && tab === "upcoming");
+
     return (
-      <div className="rounded-2xl border px-4 py-3 bg-slate-900/40 border-slate-800/70">
+      <button
+        type="button"
+        onClick={() =>
+          setTab(
+            variant === "overdue"
+              ? "overdue"
+              : variant === "today"
+              ? "today"
+              : "upcoming"
+          )
+        }
+        className={[
+          "rounded-2xl border px-4 py-3 transition text-left w-full",
+          "bg-slate-900/40 border-slate-800/70 hover:border-slate-700",
+          "focus:outline-none focus:ring-2 focus:ring-indigo-500/40",
+          isActive ? "ring-1 ring-indigo-500/25 border-slate-700" : "",
+        ].join(" ")}
+      >
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-slate-400">{label}</p>
-          <span className={["text-xs px-2 py-0.5 rounded-full border", styles].join(" ")}>
+          <p className="text-xs text-slate-300">{label}</p>
+          <span
+            className={[
+              "text-xs px-2 py-0.5 rounded-full border",
+              styles,
+            ].join(" ")}
+          >
             {value}
           </span>
         </div>
-      </div>
+        <p className="text-[11px] text-slate-500 mt-2">
+          {variant === "overdue"
+            ? "Prioritaire"
+            : variant === "today"
+            ? "À faire aujourd’hui"
+            : "Planifié"}
+        </p>
+      </button>
     );
   };
 
@@ -242,9 +297,9 @@ export default function FollowupsPage() {
       <div className="h-4 w-80 rounded-lg bg-slate-800/50 animate-pulse" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-6">
-        <div className="h-16 rounded-2xl bg-slate-900/50 border border-slate-800/70 animate-pulse" />
-        <div className="h-16 rounded-2xl bg-slate-900/50 border border-slate-800/70 animate-pulse" />
-        <div className="h-16 rounded-2xl bg-slate-900/50 border border-slate-800/70 animate-pulse" />
+        <div className="h-20 rounded-2xl bg-slate-900/50 border border-slate-800/70 animate-pulse" />
+        <div className="h-20 rounded-2xl bg-slate-900/50 border border-slate-800/70 animate-pulse" />
+        <div className="h-20 rounded-2xl bg-slate-900/50 border border-slate-800/70 animate-pulse" />
       </div>
 
       <div className="space-y-3 mt-8">
@@ -272,9 +327,10 @@ export default function FollowupsPage() {
                         Relances clients
                       </h1>
                       <p className="text-sm text-slate-400 mt-1">
-                        Suivi des relances <span className="text-slate-300">en retard</span>,{" "}
-                        <span className="text-slate-300">du jour</span> et{" "}
-                        <span className="text-slate-300">à venir</span>.
+                        Clique sur un bloc pour afficher la liste{" "}
+                        <span className="text-slate-300">En retard</span>,{" "}
+                        <span className="text-slate-300">Aujourd’hui</span> ou{" "}
+                        <span className="text-slate-300">À venir</span>.
                       </p>
                     </div>
 
@@ -287,33 +343,33 @@ export default function FollowupsPage() {
                     </div>
                   </div>
 
-                  {/* Stats */}
+                  {/* Clickable tabs */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <HeaderStat label="🔥 En retard" value={overdue.length} variant="overdue" />
-                    <HeaderStat label="📅 Aujourd’hui" value={todayList.length} variant="today" />
-                    <HeaderStat label="⏳ À venir" value={upcoming.length} variant="upcoming" />
+                    <HeaderStat
+                      label="🔥 En retard"
+                      value={overdue.length}
+                      variant="overdue"
+                    />
+                    <HeaderStat
+                      label="📅 Aujourd’hui"
+                      value={todayList.length}
+                      variant="today"
+                    />
+                    <HeaderStat
+                      label="⏳ À venir"
+                      value={upcoming.length}
+                      variant="upcoming"
+                    />
                   </div>
                 </div>
 
-                {/* Content */}
+                {/* Active content only */}
                 <div className="grid grid-cols-1 gap-4">
                   <Section
-                    title="🔥 En retard"
-                    subtitle="À traiter en priorité pour éviter de perdre le fil."
-                    data={overdue}
-                    tone="overdue"
-                  />
-                  <Section
-                    title="📅 Aujourd’hui"
-                    subtitle="Relances prévues pour la journée."
-                    data={todayList}
-                    tone="today"
-                  />
-                  <Section
-                    title="⏳ À venir"
-                    subtitle="Relances planifiées pour les prochains jours."
-                    data={upcoming}
-                    tone="upcoming"
+                    title={activeTitle}
+                    subtitle={activeSubtitle}
+                    data={activeData}
+                    tone={tab}
                   />
                 </div>
               </div>
@@ -346,9 +402,12 @@ export default function FollowupsPage() {
                 <div className="p-5 border-b border-slate-800/70">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xs text-slate-500">Détail de la relance</p>
+                      <p className="text-xs text-slate-500">
+                        Détail de la relance
+                      </p>
                       <h2 className="text-xl font-semibold text-slate-50 truncate mt-1">
-                        {openLead.FirstName || openLead.title} {openLead.LastName || ""}
+                        {openLead.FirstName || openLead.title}{" "}
+                        {openLead.LastName || ""}
                       </h2>
                       <p className="text-slate-400 text-sm mt-1">
                         Prochaine relance :{" "}
@@ -387,7 +446,8 @@ export default function FollowupsPage() {
                   </button>
 
                   <p className="text-[11px] text-slate-500 mt-2">
-                    Astuce : appuyez sur <span className="text-slate-300">Échap</span> pour fermer.
+                    Astuce : appuyez sur{" "}
+                    <span className="text-slate-300">Échap</span> pour fermer.
                   </p>
                 </div>
 
@@ -417,7 +477,9 @@ export default function FollowupsPage() {
                         <p>
                           <span className="text-slate-400">Téléphone</span>
                           <br />
-                          <span className="text-slate-100">{openLead.phoneNumber}</span>
+                          <span className="text-slate-100">
+                            {openLead.phoneNumber}
+                          </span>
                         </p>
                       )}
                     </div>
