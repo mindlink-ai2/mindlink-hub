@@ -615,84 +615,102 @@ export default function LeadsPage() {
                   </div>
 
                   {/* Command center */}
-                  <div className="w-full lg:w-[520px] shrink-0">
-                    <div className="rounded-[26px] border border-slate-800 bg-slate-950/40 p-4 sm:p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-[12px] font-semibold text-slate-200 leading-none">
-                            Commandes
-                          </div>
-                          <div className="mt-1 text-[11px] text-slate-500">
-                            Export, sélection, suppression.
-                          </div>
-                        </div>
+<div className="w-full lg:w-[520px] shrink-0">
+  <div className="rounded-[26px] border border-slate-800 bg-slate-950/40 p-4 sm:p-5">
+    {/* Header */}
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="text-[12px] font-semibold text-slate-200 leading-none">
+          Commandes
+        </div>
+        <div className="mt-1 text-[11px] text-slate-500">
+          Export, sélection, suppression.
+        </div>
+      </div>
 
-                        {/* ✅ CHANGEMENT 2 (bis): badge plus visible */}
-                        <span className="inline-flex items-center rounded-2xl border border-slate-800 bg-slate-950/35 px-4 py-2 text-[13px] font-semibold text-slate-100 tabular-nums">
-                          {total} leads
-                        </span>
-                      </div>
+      <div className="shrink-0 flex flex-col items-end gap-1">
+        <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] text-slate-300 tabular-nums">
+          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+          {isPremium ? "Premium" : "Essential"}
+        </span>
 
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-                        <a
-                          href="/dashboard/leads/export"
-                          className="inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap"
-                        >
-                          Exporter CSV
-                        </a>
+        <span className="inline-flex items-center rounded-2xl border border-slate-800 bg-slate-950/35 px-4 py-2 text-[13px] font-semibold text-slate-100 tabular-nums">
+          {total} leads
+        </span>
+      </div>
+    </div>
 
-                        <button
-                          type="button"
-                          onClick={toggleSelectionMode}
-                          className="inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap"
-                        >
-                          {selectionMode ? "Annuler" : "Mode sélection"}
-                        </button>
-                      </div>
+    {/* Actions */}
+    <div className="mt-4 grid grid-cols-2 gap-2">
+      <a
+        href="/dashboard/leads/export"
+        className="inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+      >
+        Exporter CSV
+      </a>
 
-                      {selectionMode && (
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={toggleSelectAllFiltered}
-                            className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/45 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap"
-                          >
-                            {allFilteredSelected
-                              ? "Tout désélectionner"
-                              : "Tout sélectionner"}
-                          </button>
+      <button
+        type="button"
+        onClick={toggleSelectionMode}
+        className="inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+      >
+        {selectionMode ? "Annuler" : "Mode sélection"}
+      </button>
+    </div>
 
-                          <button
-                            type="button"
-                            onClick={handleBulkDelete}
-                            disabled={selectedCount === 0}
-                            className={[
-                              "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap",
-                              selectedCount === 0
-                                ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
-                                : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
-                            ].join(" ")}
-                          >
-                            Supprimer ({selectedCount})
-                          </button>
-                        </div>
-                      )}
+    {/* Selection mode actions */}
+    {selectionMode && (
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={toggleSelectAllFiltered}
+          className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/45 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
+        >
+          {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
+        </button>
 
-                      <div className="mt-4 grid grid-cols-3 gap-2">
-                        {/* ✅ garde les mêmes composants Metric, mais total/traités sont déjà mis en avant au-dessus */}
-                        <Metric title="Total" value={total} />
-                        <Metric title="À traiter" value={remainingToTreat} />
-                        <Metric title="Prochain import" value={nextImportText} />
-                      </div>
+        <button
+          type="button"
+          onClick={handleBulkDelete}
+          disabled={selectedCount === 0}
+          className={[
+            "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-amber-500/20",
+            selectedCount === 0
+              ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
+              : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
+          ].join(" ")}
+        >
+          Supprimer ({selectedCount})
+        </button>
+      </div>
+    )}
 
-                      <div className="mt-3 text-[11px] text-slate-500">
-                        Import quotidien à{" "}
-                        <span className="text-slate-300 tabular-nums">
-                          08:00 (Paris)
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+    {/* Metrics */}
+    <div className="mt-4 grid grid-cols-3 gap-2">
+      <Metric title="Total" value={total} />
+      <Metric title="À traiter" value={remainingToTreat} />
+      <Metric title="Prochain import" value={nextImportText} />
+    </div>
+
+    {/* Footer */}
+    <div className="mt-3 flex items-center justify-between gap-3">
+      <div className="text-[11px] text-slate-500">
+        Import quotidien à{" "}
+        <span className="text-slate-300 tabular-nums">08:00 (Paris)</span>
+      </div>
+
+      {selectionMode ? (
+        <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
+          {selectedCount} sélectionné(s)
+        </span>
+      ) : (
+        <span className="text-[11px] px-3 py-1 rounded-full border border-slate-800 bg-slate-950/35 text-slate-300 whitespace-nowrap tabular-nums">
+          {filteredLeads.length} affiché(s)
+        </span>
+      )}
+    </div>
+  </div>
+</div>
                 </div>
 
                 {/* Selection hint bar (UX only) */}
@@ -716,6 +734,8 @@ export default function LeadsPage() {
               </div>
             </div>
 
+            <div className="h-8 sm:h-10 border-t border-slate-800/40" />
+            
             {/* TABLE CARD */}
             <div className="rounded-[28px] border border-slate-800 bg-slate-950/70 shadow-xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
