@@ -616,110 +616,221 @@ export default function LeadsPage() {
 
                   {/* Command center */}
 <div className="w-full lg:w-[520px] shrink-0">
-  <div className="rounded-[26px] border border-slate-800 bg-slate-950/40 p-4 sm:p-5">
-    {/* Header */}
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <div className="text-[12px] font-semibold text-slate-200 leading-none">
-          Commandes
-        </div>
-        <div className="mt-1 text-[11px] text-slate-500">
-          Export, sélection, suppression.
-        </div>
-      </div>
+  <div className="relative overflow-hidden rounded-[26px] border border-slate-800 bg-slate-950/40 p-4 sm:p-5 shadow-[0_16px_40px_-26px_rgba(0,0,0,0.75)]">
+    {/* subtle glow */}
+    <div className="pointer-events-none absolute inset-0">
+      <div className="absolute -top-24 right-[-120px] h-56 w-56 rounded-full bg-indigo-500/12 blur-3xl" />
+      <div className="absolute -bottom-24 left-[-120px] h-56 w-56 rounded-full bg-sky-400/8 blur-3xl" />
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/0 via-slate-950/15 to-slate-950/35" />
+    </div>
 
-      <div className="shrink-0 flex flex-col items-end gap-2">
-        <span
-          className={[
-            "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] tabular-nums whitespace-nowrap",
-            isPremium
-              ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-200"
-              : "border-slate-800 bg-slate-950/35 text-slate-300",
-          ].join(" ")}
-        >
+    <div className="relative">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/45 text-slate-200">
+              {/* icon */}
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M10 6H5a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
+            </div>
+
+            <div className="min-w-0">
+              <div className="text-[12px] font-semibold text-slate-100 leading-none">
+                Commandes
+              </div>
+              <div className="mt-1 text-[11px] text-slate-500">
+                Export, sélection, suppression.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="shrink-0 flex flex-col items-end gap-2">
+          {/* plan pill */}
           <span
             className={[
-              "h-1.5 w-1.5 rounded-full",
-              isPremium ? "bg-indigo-400" : "bg-slate-600",
+              "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] tabular-nums whitespace-nowrap",
+              isPremium
+                ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-200"
+                : "border-slate-800 bg-slate-950/35 text-slate-300",
             ].join(" ")}
-          />
-          {isPremium ? "Premium" : "Essential"}
-        </span>
+          >
+            <span
+              className={[
+                "h-1.5 w-1.5 rounded-full",
+                isPremium ? "bg-indigo-400" : "bg-slate-600",
+              ].join(" ")}
+            />
+            {isPremium ? "Premium" : "Essential"}
+          </span>
 
-        <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">
-            Prochain import
-          </div>
-          <div className="mt-1 inline-flex items-center rounded-2xl border border-slate-800 bg-slate-950/35 px-3 py-2 text-[13px] font-semibold text-slate-100 tabular-nums whitespace-nowrap">
-            {nextImportText}
-          </div>
-          <div className="mt-1 text-[11px] text-slate-500">
-            08:00 (Paris)
+          {/* next import chip */}
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-wide text-slate-500">
+              Prochain import
+            </div>
+            <div className="mt-1 inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-950/35 px-3 py-2 text-[13px] font-semibold text-slate-100 tabular-nums whitespace-nowrap">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-xl border border-slate-800 bg-slate-950/40 text-slate-300">
+                <svg
+                  className="h-3.5 w-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 6v6l4 2"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </span>
+              {nextImportText}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-500">
+              08:00 (Paris)
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    {/* Actions */}
-    <div className="mt-4 grid grid-cols-2 gap-2">
-      <a
-        href="/dashboard/leads/export"
-        className="inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-      >
-        Exporter CSV
-      </a>
+      {/* Divider */}
+      <div className="mt-4 h-px w-full bg-gradient-to-r from-transparent via-slate-800/70 to-transparent" />
 
-      <button
-        type="button"
-        onClick={toggleSelectionMode}
-        className="inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-      >
-        {selectionMode ? "Annuler" : "Mode sélection"}
-      </button>
-    </div>
-
-    {/* Selection mode actions */}
-    {selectionMode && (
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={toggleSelectAllFiltered}
-          className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/45 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
+      {/* Primary actions */}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <a
+          href="/dashboard/leads/export"
+          className="group inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
         >
-          {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
-        </button>
+          <span className="inline-flex items-center gap-2">
+            <svg
+              className="h-4 w-4 text-slate-300 group-hover:text-slate-100 transition"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 3v12m0 0l4-4m-4 4l-4-4"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 17v3h16v-3"
+              />
+            </svg>
+            Exporter CSV
+          </span>
+        </a>
 
         <button
           type="button"
-          onClick={handleBulkDelete}
-          disabled={selectedCount === 0}
+          onClick={toggleSelectionMode}
           className={[
-            "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-amber-500/20",
-            selectedCount === 0
-              ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
-              : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
+            "group inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl border transition shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30",
+            selectionMode
+              ? "bg-indigo-600/15 border-indigo-500/25 text-indigo-100 hover:bg-indigo-600/20"
+              : "bg-slate-900/70 border-slate-800 text-slate-200 hover:bg-slate-800/70",
           ].join(" ")}
         >
-          Supprimer ({selectedCount})
+          <span className="inline-flex items-center gap-2">
+            <svg
+              className="h-4 w-4 text-slate-300 group-hover:text-slate-100 transition"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 11l3 3L22 4"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"
+              />
+            </svg>
+            {selectionMode ? "Annuler" : "Mode sélection"}
+          </span>
         </button>
       </div>
-    )}
 
-    {/* Footer */}
-    <div className="mt-4 flex items-center justify-between gap-3">
-      <div className="text-[11px] text-slate-500">
-        Astuce : filtrez avec la recherche, puis exportez ou sélectionnez.
-      </div>
+      {/* Selection mode actions */}
+      {selectionMode && (
+        <div className="mt-2 rounded-2xl border border-indigo-500/15 bg-indigo-500/8 p-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={toggleSelectAllFiltered}
+              className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/45 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
+            >
+              {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
+            </button>
 
-      {selectionMode ? (
-        <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
-          {selectedCount} sélectionné(s)
-        </span>
-      ) : (
-        <span className="text-[11px] px-3 py-1 rounded-full border border-slate-800 bg-slate-950/35 text-slate-300 whitespace-nowrap tabular-nums">
-          {filteredLeads.length} affiché(s)
-        </span>
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={selectedCount === 0}
+              className={[
+                "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-amber-500/20",
+                selectedCount === 0
+                  ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
+                  : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
+              ].join(" ")}
+            >
+              Supprimer ({selectedCount})
+            </button>
+          </div>
+
+          <div className="mt-2 flex items-center justify-between gap-3 px-1">
+            <div className="text-[11px] text-indigo-200/70">
+              Sélection active
+            </div>
+            <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
+              {selectedCount} sélectionné(s)
+            </span>
+          </div>
+        </div>
       )}
+
+      {/* Footer */}
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="text-[11px] text-slate-500">
+          Astuce : filtrez avec la recherche, puis exportez ou sélectionnez.
+        </div>
+
+        {!selectionMode && (
+          <span className="text-[11px] px-3 py-1 rounded-full border border-slate-800 bg-slate-950/35 text-slate-300 whitespace-nowrap tabular-nums">
+            {filteredLeads.length} affiché(s)
+          </span>
+        )}
+      </div>
     </div>
   </div>
 </div>
