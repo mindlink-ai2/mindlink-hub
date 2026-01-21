@@ -52,9 +52,7 @@ export default function LeadsPage() {
   }, [safeLeads, searchTerm]);
 
   // ✅ Column count for empty state colSpan
-  // NOTE: Table now uses a single "Contact" column when email/phone options enabled (UX regrouping only)
-  const showContact = emailOption || phoneOption;
-  const baseCols = 7 + (showContact ? 1 : 0); // Traité, Nom, Entreprise, Localisation, LinkedIn, (Contact?), Date, Supprimer
+  const baseCols = 7 + (emailOption ? 1 : 0) + (phoneOption ? 1 : 0);
   const colCount = (selectionMode ? 1 : 0) + baseCols;
 
   // ✅ Read query param once on mount
@@ -491,7 +489,8 @@ export default function LeadsPage() {
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
         <div className="min-h-screen w-full px-6 pt-20 pb-32">
-          <div className="mx-auto w-full max-w-6xl space-y-6">
+          {/* ✅ wider container to fit all columns WITHOUT horizontal drag */}
+          <div className="mx-auto w-full max-w-[1480px] space-y-6">
             {/* COMMAND HEADER */}
             <div className="relative rounded-[28px] border border-slate-800 bg-gradient-to-b from-slate-950/85 via-slate-950/55 to-slate-950/35 p-6 md:p-7 overflow-hidden">
               {/* glow */}
@@ -559,10 +558,9 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                {/* RIGHT: COMMAND CENTER (redesigned) */}
+                {/* RIGHT: COMMAND CENTER */}
                 <div className="md:col-span-5">
                   <div className="rounded-[26px] border border-slate-800 bg-slate-950/35 p-4 md:p-5">
-                    {/* Header row */}
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-[12px] font-semibold text-slate-200 leading-none">
@@ -578,7 +576,6 @@ export default function LeadsPage() {
                       </span>
                     </div>
 
-                    {/* Primary actions */}
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       <a
                         href="/dashboard/leads/export"
@@ -596,7 +593,6 @@ export default function LeadsPage() {
                       </button>
                     </div>
 
-                    {/* Selection sub-actions */}
                     {selectionMode && (
                       <div className="mt-2 grid grid-cols-2 gap-2">
                         <button
@@ -625,7 +621,6 @@ export default function LeadsPage() {
                       </div>
                     )}
 
-                    {/* Metrics */}
                     <div className="mt-4 grid grid-cols-3 gap-2">
                       <Metric title="Total" value={total} />
                       <Metric title="À traiter" value={remainingToTreat} />
@@ -636,7 +631,7 @@ export default function LeadsPage() {
               </div>
             </div>
 
-            {/* TABLE */}
+            {/* TABLE (full width, no clipping, no drag needed) */}
             <div className="rounded-[28px] border border-slate-800 bg-slate-950/70 shadow-xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
                 <div>
@@ -653,43 +648,48 @@ export default function LeadsPage() {
                 </span>
               </div>
 
-              {/* IMPORTANT: table-fixed + truncation to avoid horizontal scrolling */}
-              <div className="overflow-x-hidden">
-                <table className="w-full text-sm table-fixed">
+              <div className="overflow-x-visible">
+                <table className="w-full text-[13px] table-fixed">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-900/95 backdrop-blur text-slate-300 text-[11px] uppercase tracking-wide">
                       {selectionMode && (
-                        <th className="w-[56px] py-3 px-4 border-b border-slate-800 text-center whitespace-nowrap">
+                        <th className="w-[54px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
                           Sel.
                         </th>
                       )}
 
-                      <th className="w-[70px] py-3 px-4 border-b border-slate-800 text-center whitespace-nowrap">
+                      <th className="w-[64px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
                         Traité
                       </th>
-                      <th className="w-[260px] py-3 px-4 border-b border-slate-800 text-left whitespace-nowrap">
+                      <th className="w-[240px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
                         Nom
                       </th>
-                      <th className="w-[220px] py-3 px-4 border-b border-slate-800 text-left whitespace-nowrap">
+                      <th className="w-[210px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
                         Entreprise
                       </th>
-                      <th className="w-[180px] py-3 px-4 border-b border-slate-800 text-left whitespace-nowrap">
+                      <th className="w-[170px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
                         Localisation
                       </th>
-                      <th className="w-[120px] py-3 px-4 border-b border-slate-800 text-left whitespace-nowrap">
+                      <th className="w-[120px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
                         LinkedIn
                       </th>
 
-                      {showContact && (
-                        <th className="w-[260px] py-3 px-4 border-b border-slate-800 text-left whitespace-nowrap">
-                          Contact
+                      {emailOption && (
+                        <th className="w-[230px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
+                          Email
+                        </th>
+                      )}
+                      {phoneOption && (
+                        <th className="w-[150px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
+                          Téléphone
                         </th>
                       )}
 
-                      <th className="w-[120px] py-3 px-4 border-b border-slate-800 text-center whitespace-nowrap">
+                      {/* ✅ ALWAYS visible */}
+                      <th className="w-[120px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
                         Date
                       </th>
-                      <th className="w-[110px] py-3 px-4 border-b border-slate-800 text-center whitespace-nowrap">
+                      <th className="w-[110px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
                         Supprimer
                       </th>
                     </tr>
@@ -725,7 +725,7 @@ export default function LeadsPage() {
                             className="border-b border-slate-900/80 hover:bg-slate-900/45 transition group"
                           >
                             {selectionMode && (
-                              <td className="py-3.5 px-4 text-center">
+                              <td className="py-3 px-3 text-center">
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
@@ -735,14 +735,14 @@ export default function LeadsPage() {
                               </td>
                             )}
 
-                            <td className="py-3.5 px-4 text-center">
+                            <td className="py-3 px-3 text-center">
                               <TraiteCheckbox
                                 leadId={lead.id}
                                 defaultChecked={Boolean(lead.traite)}
                               />
                             </td>
 
-                            <td className="py-3.5 px-4 text-slate-50 relative pr-20">
+                            <td className="py-3 px-3 text-slate-50 relative pr-16">
                               <div className="flex items-center gap-2 min-w-0">
                                 {lead.message_sent ? (
                                   <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-200 whitespace-nowrap leading-none">
@@ -768,15 +768,15 @@ export default function LeadsPage() {
                               </button>
                             </td>
 
-                            <td className="py-3.5 px-4 text-slate-300 truncate">
+                            <td className="py-3 px-3 text-slate-300 truncate">
                               {lead.Company || "—"}
                             </td>
 
-                            <td className="py-3.5 px-4 text-slate-300 truncate">
+                            <td className="py-3 px-3 text-slate-300 truncate">
                               {lead.location || "—"}
                             </td>
 
-                            <td className="py-3.5 px-4">
+                            <td className="py-3 px-3">
                               {lead.LinkedInURL ? (
                                 <a
                                   href={lead.LinkedInURL}
@@ -791,45 +791,25 @@ export default function LeadsPage() {
                               )}
                             </td>
 
-                            {showContact && (
-                              <td className="py-3.5 px-4">
-                                <div className="space-y-1">
-                                  {emailOption ? (
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <span className="text-[11px] text-slate-500 whitespace-nowrap">
-                                        Email
-                                      </span>
-                                      <span className="text-[12px] text-slate-200 truncate">
-                                        {lead.email || "—"}
-                                      </span>
-                                    </div>
-                                  ) : null}
-
-                                  {phoneOption ? (
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <span className="text-[11px] text-slate-500 whitespace-nowrap">
-                                        Tel
-                                      </span>
-                                      <span className="text-[12px] text-slate-200 truncate">
-                                        {lead.phone || "—"}
-                                      </span>
-                                    </div>
-                                  ) : null}
-
-                                  {!emailOption && !phoneOption ? (
-                                    <span className="text-slate-500">—</span>
-                                  ) : null}
-                                </div>
+                            {emailOption && (
+                              <td className="py-3 px-3 text-slate-200 truncate">
+                                {lead.email || "—"}
                               </td>
                             )}
 
-                            <td className="py-3.5 px-4 text-center text-slate-400 whitespace-nowrap">
+                            {phoneOption && (
+                              <td className="py-3 px-3 text-slate-200 truncate">
+                                {lead.phone || "—"}
+                              </td>
+                            )}
+
+                            <td className="py-3 px-3 text-center text-slate-400 whitespace-nowrap tabular-nums">
                               {lead.created_at
                                 ? new Date(lead.created_at).toLocaleDateString("fr-FR")
                                 : "—"}
                             </td>
 
-                            <td className="py-3.5 px-4 text-center">
+                            <td className="py-3 px-3 text-center">
                               <DeleteLeadButton leadId={lead.id} />
                             </td>
                           </tr>
@@ -1031,7 +1011,6 @@ export default function LeadsPage() {
                       readOnly={!isPremium}
                     />
 
-                    {/* Buttons (gated in handlers) */}
                     {(() => {
                       const hasEmail = Boolean((openLead.email ?? "").trim());
                       const dimIfNoEmail = hasEmail ? "" : "opacity-50";
@@ -1146,17 +1125,13 @@ export default function LeadsPage() {
   );
 }
 
-/* ------------------------- */
-/* Small UI blocks           */
-/* ------------------------- */
-
 function Metric({ title, value }: { title: string; value: any }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950/55 px-3 py-3 shadow-inner">
+    <div className="rounded-2xl border border-slate-800 bg-slate-950/55 px-3 py-3 shadow-inner overflow-hidden">
       <div className="text-[10px] uppercase tracking-wide text-slate-500 whitespace-nowrap">
         {title}
       </div>
-      <div className="mt-1 text-lg font-semibold text-slate-100 leading-none whitespace-nowrap">
+      <div className="mt-1 text-[15px] font-semibold text-slate-100 leading-none whitespace-nowrap tabular-nums truncate">
         {value}
       </div>
     </div>
