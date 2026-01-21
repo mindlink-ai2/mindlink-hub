@@ -489,95 +489,121 @@ export default function LeadsPage() {
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
         <div className="min-h-screen w-full px-6 pt-20 pb-32">
-          <div className="mx-auto w-full max-w-6xl space-y-10">
-            {/* HEADER */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-50">
-                  Prospection
-                </h1>
-                <p className="text-slate-400 text-sm md:text-base mt-2 max-w-2xl">
-                  Tous vos prospects qualifiés, importés automatiquement par
-                  Lidmeo. Recherchez, traitez, et ouvrez un lead pour préparer
-                  votre message.
-                </p>
+          <div className="mx-auto w-full max-w-6xl space-y-8">
+            {/* TOP HEADER */}
+            <div className="relative rounded-3xl border border-slate-800 bg-gradient-to-b from-slate-950/80 to-slate-950/40 p-6 md:p-7 overflow-hidden">
+              <div className="pointer-events-none absolute inset-0 opacity-70 [mask-image:radial-gradient(60%_60%_at_50%_0%,black,transparent)]">
+                <div className="absolute -top-24 left-1/2 h-64 w-[520px] -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl" />
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <a
-                  href="/dashboard/leads/export"
-                  className="px-4 py-2 text-xs md:text-sm rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 transition text-slate-200"
-                >
-                  Exporter CSV
-                </a>
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between relative">
+                <div>
+                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-950/60 px-2 py-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                      Hub • Prospection
+                    </span>
+                    {selectionMode && (
+                      <span className="inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2 py-1 text-indigo-200">
+                        Mode sélection
+                        <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2 py-0.5 text-[11px]">
+                          {selectedCount}
+                        </span>
+                      </span>
+                    )}
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={toggleSelectionMode}
-                  className="px-4 py-2 text-xs md:text-sm rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 transition text-slate-200"
-                >
-                  {selectionMode ? "Annuler la sélection" : "Mode sélection"}
-                </button>
+                  <h1 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-slate-50">
+                    Prospection
+                  </h1>
+                  <p className="text-slate-400 text-sm mt-2 max-w-2xl">
+                    Tous vos prospects qualifiés, importés automatiquement par
+                    Lidmeo. Recherchez, traitez, et ouvrez un lead pour préparer
+                    votre message.
+                  </p>
+                </div>
 
-                {selectionMode && (
+                <div className="flex flex-wrap gap-2">
+                  <a
+                    href="/dashboard/leads/export"
+                    className="px-4 py-2.5 text-xs md:text-sm rounded-2xl bg-slate-900/70 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 shadow-sm"
+                  >
+                    Exporter CSV
+                  </a>
+
                   <button
                     type="button"
-                    onClick={handleBulkDelete}
-                    disabled={selectedCount === 0}
-                    className={[
-                      "px-4 py-2 text-xs md:text-sm rounded-xl transition border",
-                      selectedCount === 0
-                        ? "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed"
-                        : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
-                    ].join(" ")}
+                    onClick={toggleSelectionMode}
+                    className="px-4 py-2.5 text-xs md:text-sm rounded-2xl bg-slate-900/70 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 shadow-sm"
                   >
-                    Supprimer ({selectedCount})
+                    {selectionMode ? "Annuler la sélection" : "Mode sélection"}
                   </button>
-                )}
-              </div>
-            </div>
 
-            {/* SEARCH + META */}
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="w-full max-w-xl">
-                <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-700 rounded-2xl px-4 py-3 shadow-inner backdrop-blur-md focus-within:ring-2 focus-within:ring-indigo-500/50 transition">
-                  <svg
-                    className="w-4 h-4 text-slate-500"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+                  {selectionMode && (
+                    <button
+                      type="button"
+                      onClick={handleBulkDelete}
+                      disabled={selectedCount === 0}
+                      className={[
+                        "px-4 py-2.5 text-xs md:text-sm rounded-2xl transition border shadow-sm",
+                        selectedCount === 0
+                          ? "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed"
+                          : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
+                      ].join(" ")}
+                    >
+                      Supprimer ({selectedCount})
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Command / Meta row */}
+              <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between relative">
+                <div className="w-full max-w-xl">
+                  <div className="flex items-center gap-3 bg-slate-900/50 border border-slate-700 rounded-2xl px-4 py-3 shadow-inner backdrop-blur-md focus-within:ring-2 focus-within:ring-indigo-500/40 transition">
+                    <svg
+                      className="w-4 h-4 text-slate-500"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+                      />
+                    </svg>
+
+                    <input
+                      value={searchTerm}
+                      onChange={(e) => handleSearch(e.target.value)}
+                      placeholder="Rechercher (nom, entreprise, ville)…"
+                      className="bg-transparent w-full text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
                     />
-                  </svg>
+                  </div>
 
-                  <input
-                    value={searchTerm}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    placeholder="Rechercher (nom, entreprise, ville)…"
-                    className="bg-transparent w-full text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
-                  />
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                    <span>{filteredLeads.length} résultat(s) affiché(s)</span>
+                    {selectionMode && (
+                      <>
+                        <span className="opacity-60">•</span>
+                        <span>{selectedCount} sélectionné(s)</span>
+                      </>
+                    )}
+                  </div>
                 </div>
 
-                <div className="mt-2 text-[11px] text-slate-500">
-                  {filteredLeads.length} résultat(s) affiché(s)
-                  {selectionMode ? ` • ${selectedCount} sélectionné(s)` : ""}
+                <div className="flex flex-wrap gap-2">
+                  <Chip title="Total leads" value={total} />
+                  <Chip title="À traiter" value={remainingToTreat} />
+                  <Chip title="Prochaine importation" value={nextImportText} />
                 </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Chip title="Total leads" value={total} />
-                <Chip title="À traiter" value={remainingToTreat} />
-                <Chip title="Prochaine importation" value={nextImportText} />
               </div>
             </div>
 
             {/* TABLE CARD */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/90 shadow-xl overflow-hidden">
+            <div className="rounded-3xl border border-slate-800 bg-slate-950/70 shadow-xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h2 className="text-slate-100 text-sm font-semibold">
@@ -593,7 +619,7 @@ export default function LeadsPage() {
                     <button
                       type="button"
                       onClick={toggleSelectAllFiltered}
-                      className="px-3 py-2 text-[12px] rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 transition text-slate-200"
+                      className="px-3 py-2 text-[12px] rounded-2xl bg-slate-900/70 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200"
                     >
                       {allFilteredSelected
                         ? "Tout désélectionner"
@@ -610,7 +636,7 @@ export default function LeadsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-separate border-spacing-0">
                   <thead className="sticky top-0 z-10">
-                    <tr className="bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide">
+                    <tr className="bg-slate-900/95 backdrop-blur text-slate-300 text-[11px] uppercase tracking-wide">
                       {selectionMode && (
                         <th className="py-3 px-4 border-b border-slate-800 text-center">
                           Sel.
@@ -658,9 +684,16 @@ export default function LeadsPage() {
                       <tr>
                         <td
                           colSpan={colCount}
-                          className="py-12 text-center text-slate-500"
+                          className="py-14 text-center"
                         >
-                          Aucun résultat.
+                          <div className="mx-auto max-w-md">
+                            <div className="text-slate-200 font-medium">
+                              Aucun résultat
+                            </div>
+                            <div className="mt-1 text-slate-500 text-sm">
+                              Essayez un autre nom, une entreprise ou une ville.
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     ) : (
@@ -676,10 +709,10 @@ export default function LeadsPage() {
                         return (
                           <tr
                             key={lead.id}
-                            className="border-b border-slate-900 hover:bg-slate-900/60 transition group"
+                            className="border-b border-slate-900/80 hover:bg-slate-900/45 transition group"
                           >
                             {selectionMode && (
-                              <td className="py-3 px-4 text-center">
+                              <td className="py-3.5 px-4 text-center">
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
@@ -689,46 +722,56 @@ export default function LeadsPage() {
                               </td>
                             )}
 
-                            <td className="py-3 px-4 text-center">
+                            <td className="py-3.5 px-4 text-center">
                               <TraiteCheckbox
                                 leadId={lead.id}
                                 defaultChecked={Boolean(lead.traite)}
                               />
                             </td>
 
-                            <td className="py-3 px-4 text-slate-50 relative pr-16">
+                            <td className="py-3.5 px-4 text-slate-50 relative pr-20">
                               <div className="flex items-center gap-2">
-                                {lead.message_sent && (
-                                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-sm" />
+                                {lead.message_sent ? (
+                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                                    Envoyé
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-950/40 px-2 py-0.5 text-[11px] text-slate-400">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-slate-600" />
+                                    À faire
+                                  </span>
                                 )}
+
                                 <span className="font-medium">{fullName}</span>
                               </div>
 
                               <button
                                 type="button"
                                 onClick={() => setOpenLead(lead)}
-                                className="opacity-0 group-hover:opacity-100 absolute right-3 top-1/2 -translate-y-1/2 text-[11px] px-3 py-1.5 rounded-lg bg-indigo-600/70 hover:bg-indigo-500 backdrop-blur-md text-white transition shadow-sm hover:shadow-md"
+                                className="opacity-0 group-hover:opacity-100 absolute right-3 top-1/2 -translate-y-1/2 text-[11px] px-3 py-1.5 rounded-xl bg-indigo-600/70 hover:bg-indigo-500 backdrop-blur-md text-white transition shadow-sm hover:shadow-md"
                               >
                                 Voir →
                               </button>
                             </td>
 
-                            <td className="py-3 px-4 text-slate-300">
+                            <td className="py-3.5 px-4 text-slate-300">
                               {lead.Company || "—"}
                             </td>
-                            <td className="py-3 px-4 text-slate-300">
+                            <td className="py-3.5 px-4 text-slate-300">
                               {lead.location || "—"}
                             </td>
 
-                            <td className="py-3 px-4">
+                            <td className="py-3.5 px-4">
                               {lead.LinkedInURL ? (
                                 <a
                                   href={lead.LinkedInURL}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="text-sky-400 hover:underline"
+                                  className="inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-1.5 text-sky-300 hover:text-sky-200 hover:bg-slate-900/60 transition"
                                 >
                                   Voir profil
+                                  <span className="text-slate-500">↗</span>
                                 </a>
                               ) : (
                                 <span className="text-slate-500">—</span>
@@ -736,17 +779,17 @@ export default function LeadsPage() {
                             </td>
 
                             {emailOption && (
-                              <td className="py-3 px-4 text-slate-300">
+                              <td className="py-3.5 px-4 text-slate-300">
                                 {lead.email || "—"}
                               </td>
                             )}
                             {phoneOption && (
-                              <td className="py-3 px-4 text-slate-300">
+                              <td className="py-3.5 px-4 text-slate-300">
                                 {lead.phone || "—"}
                               </td>
                             )}
 
-                            <td className="py-3 px-4 text-center text-slate-400">
+                            <td className="py-3.5 px-4 text-center text-slate-400">
                               {lead.created_at
                                 ? new Date(lead.created_at).toLocaleDateString(
                                     "fr-FR"
@@ -754,7 +797,7 @@ export default function LeadsPage() {
                                 : "—"}
                             </td>
 
-                            <td className="py-3 px-4 text-center">
+                            <td className="py-3.5 px-4 text-center">
                               <DeleteLeadButton leadId={lead.id} />
                             </td>
                           </tr>
@@ -769,230 +812,283 @@ export default function LeadsPage() {
 
           {/* --- SIDEBAR --- */}
           {openLead && (
-            <div className="fixed right-0 top-0 h-full w-full sm:w-[420px] bg-gradient-to-b from-slate-900/95 to-slate-900/80 backdrop-blur-2xl border-l border-slate-800 shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] z-50 flex flex-col">
-              {/* Header sticky */}
-              <div className="sticky top-0 z-10 p-6 pb-4 bg-slate-900/75 backdrop-blur-xl border-b border-slate-800">
-                <div className="flex items-start justify-between gap-3">
-                  <button
-                    type="button"
-                    className="text-slate-400 text-xs hover:text-slate-200 transition"
-                    onClick={() => setOpenLead(null)}
-                  >
-                    ✕ Fermer
-                  </button>
+            <>
+              {/* Backdrop purely visual (no new close behavior) */}
+              <div className="fixed inset-0 z-40 pointer-events-none bg-black/30 backdrop-blur-[2px]" />
 
-                  <span className="text-[11px] px-2 py-1 rounded-full border border-slate-700 bg-slate-900/60 text-slate-200">
-                    {isPremium ? "Premium" : "Essential"}
-                  </span>
-                </div>
-
-                <h2 className="text-2xl font-semibold text-slate-50 mt-3">
-                  {(openLead.FirstName ?? "")} {(openLead.LastName ?? "")}
-                </h2>
-                <p className="text-[12px] text-slate-400 mt-1">
-                  {openLead.Company || "—"} • {openLead.location || "—"}
-                </p>
-              </div>
-
-              {/* Scrollable content */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                {/* Summary cards */}
-                <div className="grid grid-cols-1 gap-3">
-                  <InfoBlock title="LinkedIn">
-                    {openLead.LinkedInURL ? (
-                      <a
-                        href={openLead.LinkedInURL}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-indigo-400 hover:underline"
-                      >
-                        Voir profil →
-                      </a>
-                    ) : (
-                      <span className="text-slate-500">—</span>
-                    )}
-                  </InfoBlock>
-
-                  {emailOption && (
-                    <InfoBlock title="Email">
-                      <span className="text-slate-200">
-                        {openLead.email || "—"}
-                      </span>
-                    </InfoBlock>
-                  )}
-
-                  {phoneOption && (
-                    <InfoBlock title="Téléphone">
-                      <span className="text-slate-200">
-                        {openLead.phone || "—"}
-                      </span>
-                    </InfoBlock>
-                  )}
-
-                  <InfoBlock title="Créé le">
-                    <span className="text-slate-200">
-                      {openLead.created_at
-                        ? new Date(openLead.created_at).toLocaleDateString(
-                            "fr-FR"
-                          )
-                        : "—"}
-                    </span>
-                  </InfoBlock>
-                </div>
-
-                {/* 1) Message LinkedIn */}
-                <div>
-                  <label className="text-xs text-slate-400 mb-2 block">
-                    Message LinkedIn
-                  </label>
-
-                  <textarea
-                    value={openLead.internal_message ?? ""}
-                    onChange={(e) => {
-                      const newMsg = e.target.value;
-                      setOpenLead({ ...openLead, internal_message: newMsg });
-                      setSafeLeads((prev: Lead[]) =>
-                        prev.map((l) =>
-                          l.id === openLead.id
-                            ? { ...l, internal_message: newMsg }
-                            : l
-                        )
-                      );
-                    }}
-                    placeholder="Écrivez votre message LinkedIn…"
-                    className="w-full h-44 p-4 rounded-2xl bg-slate-800/60 border border-slate-700 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 transition"
-                  />
-
-                  <div className="mt-3">
+              <div className="fixed right-0 top-0 z-50 h-full w-full sm:w-[440px] animate-slideLeft bg-gradient-to-b from-slate-900/95 to-slate-950/85 backdrop-blur-2xl border-l border-slate-800 shadow-[0_0_50px_-14px_rgba(99,102,241,0.55)] flex flex-col">
+                {/* Header sticky */}
+                <div className="sticky top-0 z-10 p-6 pb-4 bg-slate-950/35 backdrop-blur-xl border-b border-slate-800">
+                  <div className="flex items-start justify-between gap-3">
                     <button
                       type="button"
-                      onClick={handleMessageSent}
-                      disabled={openLead.message_sent}
+                      className="text-slate-400 text-xs hover:text-slate-200 transition inline-flex items-center gap-2"
+                      onClick={() => setOpenLead(null)}
+                    >
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-slate-800 bg-slate-950/40">
+                        ✕
+                      </span>
+                      Fermer
+                    </button>
+
+                    <span
                       className={[
-                        "w-full px-4 py-3 rounded-2xl text-sm font-medium transition",
-                        openLead.message_sent
-                          ? "bg-emerald-600 text-white cursor-default"
-                          : "bg-indigo-600 hover:bg-indigo-500 text-white",
+                        "text-[11px] px-2 py-1 rounded-full border bg-slate-900/60",
+                        isPremium
+                          ? "border-indigo-500/30 text-indigo-200"
+                          : "border-slate-700 text-slate-200",
                       ].join(" ")}
                     >
-                      {openLead.message_sent
-                        ? "Message envoyé ✓"
-                        : "Marquer comme envoyé"}
-                    </button>
+                      {isPremium ? "Premium" : "Essential"}
+                    </span>
                   </div>
 
-                  {openLead.next_followup_at && (
-                    <p className="text-xs text-slate-400 mt-2">
-                      Prochaine relance :{" "}
-                      <span className="text-slate-200 font-medium">
-                        {new Date(openLead.next_followup_at).toLocaleDateString(
-                          "fr-FR"
-                        )}
-                      </span>
+                  <div className="mt-4">
+                    <h2 className="text-2xl font-semibold text-slate-50 leading-tight">
+                      {(openLead.FirstName ?? "")} {(openLead.LastName ?? "")}
+                    </h2>
+                    <p className="text-[12px] text-slate-400 mt-1">
+                      {openLead.Company || "—"} • {openLead.location || "—"}
                     </p>
-                  )}
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {openLead.message_sent ? (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[12px] text-emerald-200">
+                          <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                          Message envoyé
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/40 px-3 py-1 text-[12px] text-slate-300">
+                          <span className="h-2 w-2 rounded-full bg-slate-600" />
+                          À envoyer
+                        </span>
+                      )}
+
+                      {openLead.next_followup_at && (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/40 px-3 py-1 text-[12px] text-slate-300">
+                          Relance :
+                          <span className="text-slate-100 font-medium">
+                            {new Date(openLead.next_followup_at).toLocaleDateString(
+                              "fr-FR"
+                            )}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {/* 2) Email (Premium only) */}
-                <div className="border-t border-slate-800 pt-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <label className="text-xs text-slate-400 block">
-                      Message email
-                    </label>
+                {/* Scrollable content */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {/* Summary cards */}
+                  <div className="grid grid-cols-1 gap-3">
+                    <InfoBlock title="LinkedIn">
+                      {openLead.LinkedInURL ? (
+                        <a
+                          href={openLead.LinkedInURL}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-indigo-200 hover:bg-indigo-500/15 transition"
+                        >
+                          Voir profil
+                          <span className="opacity-80">↗</span>
+                        </a>
+                      ) : (
+                        <span className="text-slate-500">—</span>
+                      )}
+                    </InfoBlock>
 
-                    {!isPremium && (
+                    {emailOption && (
+                      <InfoBlock title="Email">
+                        <span className="text-slate-200">
+                          {openLead.email || "—"}
+                        </span>
+                      </InfoBlock>
+                    )}
+
+                    {phoneOption && (
+                      <InfoBlock title="Téléphone">
+                        <span className="text-slate-200">
+                          {openLead.phone || "—"}
+                        </span>
+                      </InfoBlock>
+                    )}
+
+                    <InfoBlock title="Créé le">
+                      <span className="text-slate-200">
+                        {openLead.created_at
+                          ? new Date(openLead.created_at).toLocaleDateString(
+                              "fr-FR"
+                            )
+                          : "—"}
+                      </span>
+                    </InfoBlock>
+                  </div>
+
+                  {/* 1) Message LinkedIn */}
+                  <div className="rounded-3xl border border-slate-800 bg-slate-950/30 p-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs text-slate-300 font-medium">
+                        Message LinkedIn
+                      </label>
+                      <span className="text-[11px] text-slate-500">
+                        Autosave
+                      </span>
+                    </div>
+
+                    <textarea
+                      value={openLead.internal_message ?? ""}
+                      onChange={(e) => {
+                        const newMsg = e.target.value;
+                        setOpenLead({ ...openLead, internal_message: newMsg });
+                        setSafeLeads((prev: Lead[]) =>
+                          prev.map((l) =>
+                            l.id === openLead.id
+                              ? { ...l, internal_message: newMsg }
+                              : l
+                          )
+                        );
+                      }}
+                      placeholder="Écrivez votre message LinkedIn…"
+                      className="mt-3 w-full h-44 p-4 rounded-2xl bg-slate-900/60 border border-slate-700 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition"
+                    />
+
+                    <div className="mt-3">
                       <button
                         type="button"
-                        onClick={() => setPremiumModalOpen(true)}
-                        className="text-[11px] px-2.5 py-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/15 transition"
+                        onClick={handleMessageSent}
+                        disabled={openLead.message_sent}
+                        className={[
+                          "w-full px-4 py-3 rounded-2xl text-sm font-semibold transition",
+                          openLead.message_sent
+                            ? "bg-emerald-600 text-white cursor-default"
+                            : "bg-indigo-600 hover:bg-indigo-500 text-white",
+                        ].join(" ")}
                       >
-                        Débloquer Premium
+                        {openLead.message_sent
+                          ? "Message envoyé ✓"
+                          : "Marquer comme envoyé"}
                       </button>
+                    </div>
+
+                    {openLead.message_sent_at && (
+                      <p className="text-[11px] text-slate-500 mt-2">
+                        Envoyé le{" "}
+                        <span className="text-slate-200 font-medium">
+                          {new Date(openLead.message_sent_at).toLocaleDateString(
+                            "fr-FR"
+                          )}
+                        </span>
+                      </p>
                     )}
                   </div>
 
-                  <textarea
-                    value={
-                      isPremium
-                        ? openLead.message_mail ?? ""
-                        : "Fonctionnalité Premium : débloquez l’email personnalisé + les boutons d’envoi avec l’abonnement Premium."
-                    }
-                    onChange={(e) => {
-                      if (!isPremium) return;
+                  {/* 2) Email (Premium only) */}
+                  <div className="rounded-3xl border border-slate-800 bg-slate-950/30 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-xs text-slate-300 font-medium">
+                        Message email
+                      </label>
 
-                      const newMsg = e.target.value;
-                      setOpenLead({ ...openLead, message_mail: newMsg });
-                      setSafeLeads((prev: Lead[]) =>
-                        prev.map((l) =>
-                          l.id === openLead.id
-                            ? { ...l, message_mail: newMsg }
-                            : l
-                        )
+                      {!isPremium && (
+                        <button
+                          type="button"
+                          onClick={() => setPremiumModalOpen(true)}
+                          className="text-[11px] px-2.5 py-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/15 transition"
+                        >
+                          Débloquer Premium
+                        </button>
+                      )}
+                    </div>
+
+                    <textarea
+                      value={
+                        isPremium
+                          ? openLead.message_mail ?? ""
+                          : "Fonctionnalité Premium : débloquez l’email personnalisé + les boutons d’envoi avec l’abonnement Premium."
+                      }
+                      onChange={(e) => {
+                        if (!isPremium) return;
+
+                        const newMsg = e.target.value;
+                        setOpenLead({ ...openLead, message_mail: newMsg });
+                        setSafeLeads((prev: Lead[]) =>
+                          prev.map((l) =>
+                            l.id === openLead.id
+                              ? { ...l, message_mail: newMsg }
+                              : l
+                          )
+                        );
+                      }}
+                      placeholder="Écrivez votre message email…"
+                      className={[
+                        "mt-3 w-full h-44 p-4 rounded-2xl border text-sm transition focus:outline-none focus:ring-2",
+                        isPremium
+                          ? "bg-slate-900/60 border-slate-700 text-slate-200 placeholder-slate-500 focus:ring-indigo-500/50"
+                          : "bg-slate-900/40 border-slate-800 text-slate-500 focus:ring-transparent",
+                      ].join(" ")}
+                      readOnly={!isPremium}
+                    />
+
+                    {/* Buttons (gated in handlers) */}
+                    {(() => {
+                      const hasEmail = Boolean((openLead.email ?? "").trim());
+                      const dimIfNoEmail = hasEmail ? "" : "opacity-50";
+
+                      return (
+                        <>
+                          <div className="mt-4">
+                            <button
+                              type="button"
+                              onClick={openPrefilledEmail}
+                              className={[
+                                "w-full px-4 py-3 rounded-2xl text-sm font-semibold transition border cursor-pointer",
+                                "bg-slate-900/70 border-slate-700 text-slate-100 hover:bg-slate-800/80",
+                                dimIfNoEmail,
+                              ].join(" ")}
+                            >
+                              Ouvrir l’email pré-rempli
+                            </button>
+                          </div>
+
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={openGmailWeb}
+                              className={[
+                                "flex-1 px-3 py-2.5 rounded-2xl text-[12px] font-semibold transition border cursor-pointer",
+                                "bg-slate-950/70 border-slate-700 text-slate-200 hover:bg-slate-900/80",
+                                dimIfNoEmail,
+                              ].join(" ")}
+                            >
+                              Gmail
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={openOutlookWeb}
+                              className={[
+                                "flex-1 px-3 py-2.5 rounded-2xl text-[12px] font-semibold transition border cursor-pointer",
+                                "bg-slate-950/70 border-slate-700 text-slate-200 hover:bg-slate-900/80",
+                                dimIfNoEmail,
+                              ].join(" ")}
+                            >
+                              Outlook
+                            </button>
+                          </div>
+
+                          {!hasEmail && (
+                            <p className="text-[11px] text-slate-500 mt-2">
+                              Aucun email détecté pour ce lead.
+                            </p>
+                          )}
+                        </>
                       );
-                    }}
-                    placeholder="Écrivez votre message email…"
-                    className="mt-2 w-full h-44 p-4 rounded-2xl bg-slate-800/60 border border-slate-700 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 transition"
-                    readOnly={!isPremium}
-                  />
-
-                  {/* Buttons (gated in handlers) */}
-                  {(() => {
-                    const hasEmail = Boolean((openLead.email ?? "").trim());
-                    const dimIfNoEmail = hasEmail ? "" : "opacity-50";
-
-                    return (
-                      <>
-                        <div className="mt-4">
-                          <button
-                            type="button"
-                            onClick={openPrefilledEmail}
-                            className={[
-                              "w-full px-4 py-3 rounded-2xl text-sm font-medium transition border cursor-pointer",
-                              "bg-slate-900 border-slate-700 text-slate-100 hover:bg-slate-800",
-                              dimIfNoEmail,
-                            ].join(" ")}
-                          >
-                            Ouvrir l’email pré-rempli
-                          </button>
-                        </div>
-
-                        <div className="mt-2 flex gap-2">
-                          <button
-                            type="button"
-                            onClick={openGmailWeb}
-                            className={[
-                              "flex-1 px-3 py-2 rounded-2xl text-[12px] font-medium transition border cursor-pointer",
-                              "bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900",
-                              dimIfNoEmail,
-                            ].join(" ")}
-                          >
-                            Gmail
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={openOutlookWeb}
-                            className={[
-                              "flex-1 px-3 py-2 rounded-2xl text-[12px] font-medium transition border cursor-pointer",
-                              "bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-900",
-                              dimIfNoEmail,
-                            ].join(" ")}
-                          >
-                            Outlook
-                          </button>
-                        </div>
-
-                        {!hasEmail && (
-                          <p className="text-[11px] text-slate-500 mt-2">
-                            Aucun email détecté pour ce lead.
-                          </p>
-                        )}
-                      </>
-                    );
-                  })()}
+                    })()}
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* ✅ premium modal */}
@@ -1002,7 +1098,7 @@ export default function LeadsPage() {
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={() => setPremiumModalOpen(false)}
               />
-              <div className="relative w-[92%] max-w-md rounded-2xl border border-indigo-500/25 bg-slate-950 p-6 shadow-2xl">
+              <div className="relative w-[92%] max-w-md rounded-3xl border border-indigo-500/25 bg-slate-950 p-6 shadow-2xl">
                 <div className="text-sm font-semibold text-slate-50">
                   Fonctionnalité Premium
                 </div>
@@ -1012,14 +1108,14 @@ export default function LeadsPage() {
                 <div className="mt-5 flex gap-2">
                   <a
                     href="/dashboard/hub/billing"
-                    className="flex-1 text-center px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition"
+                    className="flex-1 text-center px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition"
                   >
                     Passer en Premium
                   </a>
                   <button
                     type="button"
                     onClick={() => setPremiumModalOpen(false)}
-                    className="flex-1 px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-200 text-sm font-medium transition"
+                    className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-200 text-sm font-semibold transition"
                   >
                     Fermer
                   </button>
@@ -1055,7 +1151,7 @@ export default function LeadsPage() {
 
 function Chip({ title, value }: { title: string; value: any }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-center shadow-inner min-w-[150px]">
+    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-center shadow-inner min-w-[150px]">
       <div className="text-[10px] uppercase tracking-wide text-slate-500">
         {title}
       </div>
