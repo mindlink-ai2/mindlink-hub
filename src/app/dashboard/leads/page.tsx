@@ -628,15 +628,35 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className="shrink-0 flex flex-col items-end gap-1">
-        <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] text-slate-300 tabular-nums">
-          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+      <div className="shrink-0 flex flex-col items-end gap-2">
+        <span
+          className={[
+            "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] tabular-nums whitespace-nowrap",
+            isPremium
+              ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-200"
+              : "border-slate-800 bg-slate-950/35 text-slate-300",
+          ].join(" ")}
+        >
+          <span
+            className={[
+              "h-1.5 w-1.5 rounded-full",
+              isPremium ? "bg-indigo-400" : "bg-slate-600",
+            ].join(" ")}
+          />
           {isPremium ? "Premium" : "Essential"}
         </span>
 
-        <span className="inline-flex items-center rounded-2xl border border-slate-800 bg-slate-950/35 px-4 py-2 text-[13px] font-semibold text-slate-100 tabular-nums">
-          {total} leads
-        </span>
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-wide text-slate-500">
+            Prochain import
+          </div>
+          <div className="mt-1 inline-flex items-center rounded-2xl border border-slate-800 bg-slate-950/35 px-3 py-2 text-[13px] font-semibold text-slate-100 tabular-nums whitespace-nowrap">
+            {nextImportText}
+          </div>
+          <div className="mt-1 text-[11px] text-slate-500">
+            08:00 (Paris)
+          </div>
+        </div>
       </div>
     </div>
 
@@ -685,18 +705,10 @@ export default function LeadsPage() {
       </div>
     )}
 
-    {/* Metrics */}
-    <div className="mt-4 grid grid-cols-3 gap-2">
-      <Metric title="Total" value={total} />
-      <Metric title="À traiter" value={remainingToTreat} />
-      <Metric title="Prochain import" value={nextImportText} />
-    </div>
-
     {/* Footer */}
-    <div className="mt-3 flex items-center justify-between gap-3">
+    <div className="mt-4 flex items-center justify-between gap-3">
       <div className="text-[11px] text-slate-500">
-        Import quotidien à{" "}
-        <span className="text-slate-300 tabular-nums">08:00 (Paris)</span>
+        Astuce : filtrez avec la recherche, puis exportez ou sélectionnez.
       </div>
 
       {selectionMode ? (
@@ -735,7 +747,7 @@ export default function LeadsPage() {
             </div>
 
             <div className="h-8 sm:h-10 border-t border-slate-800/40" />
-            
+
             {/* TABLE CARD */}
             <div className="rounded-[28px] border border-slate-800 bg-slate-950/70 shadow-xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
