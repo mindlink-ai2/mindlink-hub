@@ -52,7 +52,9 @@ export default function LeadsPage() {
   }, [safeLeads, searchTerm]);
 
   // ✅ Column count for empty state colSpan
-  const baseCols = 7 + (emailOption ? 1 : 0) + (phoneOption ? 1 : 0);
+  // NOTE: Table now uses a single "Contact" column when email/phone options enabled (UX regrouping only)
+  const showContact = emailOption || phoneOption;
+  const baseCols = 7 + (showContact ? 1 : 0); // Traité, Nom, Entreprise, Localisation, LinkedIn, (Contact?), Date, Supprimer
   const colCount = (selectionMode ? 1 : 0) + baseCols;
 
   // ✅ Read query param once on mount
@@ -492,7 +494,7 @@ export default function LeadsPage() {
           <div className="mx-auto w-full max-w-6xl space-y-6">
             {/* COMMAND HEADER */}
             <div className="relative rounded-[28px] border border-slate-800 bg-gradient-to-b from-slate-950/85 via-slate-950/55 to-slate-950/35 p-6 md:p-7 overflow-hidden">
-              {/* premium glow */}
+              {/* glow */}
               <div className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(60%_55%_at_50%_0%,black,transparent)]">
                 <div className="absolute -top-28 left-1/2 h-72 w-[620px] -translate-x-1/2 rounded-full bg-indigo-500/14 blur-3xl" />
                 <div className="absolute -top-14 left-1/2 h-40 w-[520px] -translate-x-1/2 rounded-full bg-sky-400/8 blur-3xl" />
@@ -557,16 +559,17 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                {/* RIGHT: COMMAND PANEL */}
+                {/* RIGHT: COMMAND CENTER (redesigned) */}
                 <div className="md:col-span-5">
                   <div className="rounded-[26px] border border-slate-800 bg-slate-950/35 p-4 md:p-5">
-                    <div className="flex items-center justify-between gap-3">
+                    {/* Header row */}
+                    <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-[12px] font-semibold text-slate-200 leading-none">
                           Commandes
                         </div>
                         <div className="mt-1 text-[11px] text-slate-500">
-                          Gérer l’export et la sélection.
+                          Export, sélection, suppression.
                         </div>
                       </div>
 
@@ -575,10 +578,11 @@ export default function LeadsPage() {
                       </span>
                     </div>
 
-                    <div className="mt-4 flex flex-wrap gap-2">
+                    {/* Primary actions */}
+                    <div className="mt-4 grid grid-cols-2 gap-2">
                       <a
                         href="/dashboard/leads/export"
-                        className="inline-flex items-center justify-center px-4 py-2.5 text-xs md:text-sm rounded-2xl bg-slate-900/75 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 shadow-sm whitespace-nowrap"
+                        className="inline-flex items-center justify-center h-11 px-4 text-xs md:text-sm rounded-2xl bg-slate-900/75 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 shadow-sm whitespace-nowrap"
                       >
                         Exporter CSV
                       </a>
@@ -586,18 +590,31 @@ export default function LeadsPage() {
                       <button
                         type="button"
                         onClick={toggleSelectionMode}
-                        className="inline-flex items-center justify-center px-4 py-2.5 text-xs md:text-sm rounded-2xl bg-slate-900/75 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 shadow-sm whitespace-nowrap"
+                        className="inline-flex items-center justify-center h-11 px-4 text-xs md:text-sm rounded-2xl bg-slate-900/75 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 shadow-sm whitespace-nowrap"
                       >
-                        {selectionMode ? "Annuler la sélection" : "Mode sélection"}
+                        {selectionMode ? "Annuler" : "Mode sélection"}
                       </button>
+                    </div>
 
-                      {selectionMode && (
+                    {/* Selection sub-actions */}
+                    {selectionMode && (
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={toggleSelectAllFiltered}
+                          className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/55 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap"
+                        >
+                          {allFilteredSelected
+                            ? "Tout désélectionner"
+                            : "Tout sélectionner"}
+                        </button>
+
                         <button
                           type="button"
                           onClick={handleBulkDelete}
                           disabled={selectedCount === 0}
                           className={[
-                            "inline-flex items-center justify-center px-4 py-2.5 text-xs md:text-sm rounded-2xl transition border shadow-sm whitespace-nowrap",
+                            "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap",
                             selectedCount === 0
                               ? "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed"
                               : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
@@ -605,9 +622,10 @@ export default function LeadsPage() {
                         >
                           Supprimer ({selectedCount})
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
+                    {/* Metrics */}
                     <div className="mt-4 grid grid-cols-3 gap-2">
                       <Metric title="Total" value={total} />
                       <Metric title="À traiter" value={remainingToTreat} />
@@ -620,7 +638,7 @@ export default function LeadsPage() {
 
             {/* TABLE */}
             <div className="rounded-[28px] border border-slate-800 bg-slate-950/70 shadow-xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-slate-100 text-sm font-semibold">
                     Liste des leads
@@ -630,66 +648,48 @@ export default function LeadsPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {selectionMode && (
-                    <button
-                      type="button"
-                      onClick={toggleSelectAllFiltered}
-                      className="px-3 py-2 text-[12px] rounded-2xl bg-slate-900/70 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 whitespace-nowrap"
-                    >
-                      {allFilteredSelected
-                        ? "Tout désélectionner"
-                        : "Tout sélectionner"}
-                    </button>
-                  )}
-
-                  <span className="text-[11px] px-3 py-1 rounded-full border border-slate-800 bg-slate-950/35 text-slate-300 whitespace-nowrap">
-                    {filteredLeads.length} lead(s)
-                  </span>
-                </div>
+                <span className="text-[11px] px-3 py-1 rounded-full border border-slate-800 bg-slate-950/35 text-slate-300 whitespace-nowrap">
+                  {filteredLeads.length} lead(s)
+                </span>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-separate border-spacing-0">
+              {/* IMPORTANT: table-fixed + truncation to avoid horizontal scrolling */}
+              <div className="overflow-x-hidden">
+                <table className="w-full text-sm table-fixed">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-900/95 backdrop-blur text-slate-300 text-[11px] uppercase tracking-wide">
                       {selectionMode && (
-                        <th className="py-3 px-4 border-b border-slate-800 text-center">
+                        <th className="w-[56px] py-3 px-4 border-b border-slate-800 text-center whitespace-nowrap">
                           Sel.
                         </th>
                       )}
 
-                      <th className="py-3 px-4 border-b border-slate-800 text-center">
+                      <th className="w-[70px] py-3 px-4 border-b border-slate-800 text-center whitespace-nowrap">
                         Traité
                       </th>
-                      <th className="py-3 px-4 border-b border-slate-800 text-left">
+                      <th className="w-[260px] py-3 px-4 border-b border-slate-800 text-left whitespace-nowrap">
                         Nom
                       </th>
-                      <th className="py-3 px-4 border-b border-slate-800 text-left">
+                      <th className="w-[220px] py-3 px-4 border-b border-slate-800 text-left whitespace-nowrap">
                         Entreprise
                       </th>
-                      <th className="py-3 px-4 border-b border-slate-800 text-left">
+                      <th className="w-[180px] py-3 px-4 border-b border-slate-800 text-left whitespace-nowrap">
                         Localisation
                       </th>
-                      <th className="py-3 px-4 border-b border-slate-800 text-left">
+                      <th className="w-[120px] py-3 px-4 border-b border-slate-800 text-left whitespace-nowrap">
                         LinkedIn
                       </th>
 
-                      {emailOption && (
-                        <th className="py-3 px-4 border-b border-slate-800 text-left">
-                          Email
-                        </th>
-                      )}
-                      {phoneOption && (
-                        <th className="py-3 px-4 border-b border-slate-800 text-left">
-                          Téléphone
+                      {showContact && (
+                        <th className="w-[260px] py-3 px-4 border-b border-slate-800 text-left whitespace-nowrap">
+                          Contact
                         </th>
                       )}
 
-                      <th className="py-3 px-4 border-b border-slate-800 text-center">
+                      <th className="w-[120px] py-3 px-4 border-b border-slate-800 text-center whitespace-nowrap">
                         Date
                       </th>
-                      <th className="py-3 px-4 border-b border-slate-800 text-center">
+                      <th className="w-[110px] py-3 px-4 border-b border-slate-800 text-center whitespace-nowrap">
                         Supprimer
                       </th>
                     </tr>
@@ -743,7 +743,7 @@ export default function LeadsPage() {
                             </td>
 
                             <td className="py-3.5 px-4 text-slate-50 relative pr-20">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
                                 {lead.message_sent ? (
                                   <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-200 whitespace-nowrap leading-none">
                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -756,7 +756,7 @@ export default function LeadsPage() {
                                   </span>
                                 )}
 
-                                <span className="font-medium">{fullName}</span>
+                                <span className="font-medium truncate">{fullName}</span>
                               </div>
 
                               <button
@@ -768,10 +768,11 @@ export default function LeadsPage() {
                               </button>
                             </td>
 
-                            <td className="py-3.5 px-4 text-slate-300">
+                            <td className="py-3.5 px-4 text-slate-300 truncate">
                               {lead.Company || "—"}
                             </td>
-                            <td className="py-3.5 px-4 text-slate-300">
+
+                            <td className="py-3.5 px-4 text-slate-300 truncate">
                               {lead.location || "—"}
                             </td>
 
@@ -781,7 +782,7 @@ export default function LeadsPage() {
                                   href={lead.LinkedInURL}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/35 px-3 py-1.5 text-[12px] text-sky-200 hover:bg-slate-900/55 transition whitespace-nowrap"
+                                  className="inline-flex items-center justify-center gap-2 h-9 px-3 rounded-xl border border-slate-800 bg-slate-950/35 text-[12px] text-sky-200 hover:bg-slate-900/55 transition whitespace-nowrap"
                                 >
                                   LinkedIn <span className="text-slate-500">↗</span>
                                 </a>
@@ -790,14 +791,35 @@ export default function LeadsPage() {
                               )}
                             </td>
 
-                            {emailOption && (
-                              <td className="py-3.5 px-4 text-slate-300">
-                                {lead.email || "—"}
-                              </td>
-                            )}
-                            {phoneOption && (
-                              <td className="py-3.5 px-4 text-slate-300">
-                                {lead.phone || "—"}
+                            {showContact && (
+                              <td className="py-3.5 px-4">
+                                <div className="space-y-1">
+                                  {emailOption ? (
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="text-[11px] text-slate-500 whitespace-nowrap">
+                                        Email
+                                      </span>
+                                      <span className="text-[12px] text-slate-200 truncate">
+                                        {lead.email || "—"}
+                                      </span>
+                                    </div>
+                                  ) : null}
+
+                                  {phoneOption ? (
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="text-[11px] text-slate-500 whitespace-nowrap">
+                                        Tel
+                                      </span>
+                                      <span className="text-[12px] text-slate-200 truncate">
+                                        {lead.phone || "—"}
+                                      </span>
+                                    </div>
+                                  ) : null}
+
+                                  {!emailOption && !phoneOption ? (
+                                    <span className="text-slate-500">—</span>
+                                  ) : null}
+                                </div>
                               </td>
                             )}
 
