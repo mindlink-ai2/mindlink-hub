@@ -445,13 +445,19 @@ export default function LeadsPage() {
 
   if (!clientLoaded) {
     return (
-      <div className="min-h-screen w-full px-6 pt-20 pb-32">
-        <div className="mx-auto w-full max-w-6xl">
-          <div className="rounded-3xl border border-slate-800 bg-slate-950/60 p-6">
-            <div className="h-6 w-44 rounded-xl bg-slate-800/60 animate-pulse" />
-            <div className="mt-3 h-4 w-80 rounded-lg bg-slate-800/50 animate-pulse" />
-            <div className="mt-8 h-16 rounded-2xl bg-slate-900/50 border border-slate-800/70 animate-pulse" />
-            <div className="mt-4 h-64 rounded-2xl bg-slate-900/40 border border-slate-800/60 animate-pulse" />
+      <div className="min-h-screen w-full px-5 sm:px-6 pt-20 pb-32">
+        <div className="mx-auto w-full max-w-[1680px]">
+          <div className="rounded-[28px] border border-slate-800 bg-slate-950/70 p-6 sm:p-7">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="h-6 w-44 rounded-xl bg-slate-800/60 animate-pulse" />
+                <div className="mt-3 h-4 w-80 rounded-lg bg-slate-800/50 animate-pulse" />
+              </div>
+              <div className="h-10 w-28 rounded-2xl bg-slate-800/40 animate-pulse" />
+            </div>
+
+            <div className="mt-6 h-12 rounded-2xl bg-slate-900/50 border border-slate-800/70 animate-pulse" />
+            <div className="mt-4 h-72 rounded-2xl bg-slate-900/40 border border-slate-800/60 animate-pulse" />
             <div className="mt-3 text-slate-500 text-xs">
               Chargement des leads…
             </div>
@@ -488,165 +494,198 @@ export default function LeadsPage() {
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
-        <div className="min-h-screen w-full px-6 pt-20 pb-32">
-          {/* ✅ Keep page wide, table can fit when email+phone are enabled */}
-          <div className="mx-auto w-full max-w-[1680px] space-y-8">
-            {/* HEADER / COMMANDS */}
-            <div className="relative rounded-[28px] border border-slate-800 bg-gradient-to-b from-slate-950/85 via-slate-950/55 to-slate-950/35 p-6 md:p-7 overflow-hidden">
-              {/* glow */}
+        <div className="min-h-screen w-full px-5 sm:px-6 pt-20 pb-32">
+          <div className="mx-auto w-full max-w-[1680px] space-y-6">
+            {/* TOP / HEADER */}
+            <div className="relative overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950/70">
+              {/* Ambient glow (purely visual) */}
               <div className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(60%_55%_at_50%_0%,black,transparent)]">
-                <div className="absolute -top-28 left-1/2 h-72 w-[680px] -translate-x-1/2 rounded-full bg-indigo-500/14 blur-3xl" />
-                <div className="absolute -top-14 left-1/2 h-40 w-[560px] -translate-x-1/2 rounded-full bg-sky-400/8 blur-3xl" />
+                <div className="absolute -top-28 left-1/2 h-72 w-[740px] -translate-x-1/2 rounded-full bg-indigo-500/14 blur-3xl" />
+                <div className="absolute -top-16 left-1/2 h-44 w-[560px] -translate-x-1/2 rounded-full bg-sky-400/8 blur-3xl" />
               </div>
 
-              <div className="relative grid grid-cols-1 gap-5 lg:grid-cols-12 lg:gap-6">
-                {/* LEFT */}
-                <div className="lg:col-span-7">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/55 px-3 py-1 text-[11px] text-slate-300 whitespace-nowrap">
-                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
-                      Hub • Prospection
-                    </span>
+              <div className="relative p-6 sm:p-7">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                  {/* Title + context */}
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/40 px-3 py-1 text-[11px] text-slate-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                        Hub • Prospection
+                      </span>
 
-                    {selectionMode && (
-                      <span className="inline-flex items-center gap-2 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-[11px] text-indigo-200 whitespace-nowrap">
-                        Mode sélection
-                        <span className="rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-0.5 text-[11px] leading-none tabular-nums">
-                          {selectedCount}
+                      <span className="inline-flex items-center rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] text-slate-300 tabular-nums">
+                        {filteredLeads.length} affiché(s)
+                      </span>
+
+                      {selectionMode && (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-[11px] text-indigo-200">
+                          Mode sélection
+                          <span className="rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-0.5 text-[11px] leading-none tabular-nums">
+                            {selectedCount}
+                          </span>
                         </span>
-                      </span>
-                    )}
+                      )}
 
-                    <span className="inline-flex items-center rounded-full border border-slate-800 bg-slate-950/45 px-3 py-1 text-[11px] text-slate-300 whitespace-nowrap">
-                      {filteredLeads.length} lead(s)
-                    </span>
-                  </div>
-
-                  <h1 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-slate-50">
-                    Prospection
-                  </h1>
-                  <p className="mt-2 text-sm text-slate-400 max-w-2xl">
-                    Tous vos prospects qualifiés, importés automatiquement par
-                    Lidmeo. Recherchez, traitez, et ouvrez un lead pour préparer
-                    votre message.
-                  </p>
-
-                  <div className="mt-5">
-                    <div className="flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/45 px-4 py-3 shadow-inner backdrop-blur-md focus-within:ring-2 focus-within:ring-indigo-500/40 transition">
-                      <svg
-                        className="h-4 w-4 text-slate-500"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
+                      <span
+                        className={[
+                          "inline-flex items-center rounded-full border px-3 py-1 text-[11px] whitespace-nowrap",
+                          isPremium
+                            ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-200"
+                            : "border-slate-800 bg-slate-950/35 text-slate-300",
+                        ].join(" ")}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+                        {isPremium ? "Premium" : "Essential"}
+                      </span>
+                    </div>
+
+                    <h1 className="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-50">
+                      Prospection
+                    </h1>
+
+                    <p className="mt-2 text-sm text-slate-400 max-w-2xl">
+                      Tous vos prospects qualifiés, importés automatiquement par
+                      Lidmeo. Recherchez, traitez, et ouvrez un lead pour préparer
+                      votre message.
+                    </p>
+
+                    {/* Search */}
+                    <div className="mt-5">
+                      <div className="group flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-3 shadow-inner backdrop-blur-md transition focus-within:ring-2 focus-within:ring-indigo-500/40">
+                        <svg
+                          className="h-4 w-4 text-slate-500 group-focus-within:text-slate-300 transition"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+                          />
+                        </svg>
+
+                        <input
+                          value={searchTerm}
+                          onChange={(e) => handleSearch(e.target.value)}
+                          placeholder="Rechercher (nom, entreprise, ville)…"
+                          className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
+                          aria-label="Rechercher un lead"
                         />
-                      </svg>
+                      </div>
 
-                      <input
-                        value={searchTerm}
-                        onChange={(e) => handleSearch(e.target.value)}
-                        placeholder="Rechercher (nom, entreprise, ville)…"
-                        className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
-                      />
+                      <div className="mt-2 text-[11px] text-slate-500">
+                        {filteredLeads.length} résultat(s) • {total} total
+                        {selectionMode ? ` • ${selectedCount} sélectionné(s)` : ""}
+                      </div>
                     </div>
+                  </div>
 
-                    <div className="mt-2 text-[11px] text-slate-500">
-                      {filteredLeads.length} résultat(s) affiché(s)
-                      {selectionMode ? ` • ${selectedCount} sélectionné(s)` : ""}
+                  {/* Command center */}
+                  <div className="w-full lg:w-[520px] shrink-0">
+                    <div className="rounded-[26px] border border-slate-800 bg-slate-950/40 p-4 sm:p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-[12px] font-semibold text-slate-200 leading-none">
+                            Commandes
+                          </div>
+                          <div className="mt-1 text-[11px] text-slate-500">
+                            Export, sélection, suppression.
+                          </div>
+                        </div>
+                        <span className="inline-flex items-center rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] text-slate-300 tabular-nums">
+                          {total} leads
+                        </span>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <a
+                          href="/dashboard/leads/export"
+                          className="inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap"
+                        >
+                          Exporter CSV
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={toggleSelectionMode}
+                          className="inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap"
+                        >
+                          {selectionMode ? "Annuler" : "Mode sélection"}
+                        </button>
+                      </div>
+
+                      {selectionMode && (
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={toggleSelectAllFiltered}
+                            className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/45 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap"
+                          >
+                            {allFilteredSelected
+                              ? "Tout désélectionner"
+                              : "Tout sélectionner"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleBulkDelete}
+                            disabled={selectedCount === 0}
+                            className={[
+                              "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap",
+                              selectedCount === 0
+                                ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
+                                : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
+                            ].join(" ")}
+                          >
+                            Supprimer ({selectedCount})
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="mt-4 grid grid-cols-3 gap-2">
+                        <Metric title="Total" value={total} />
+                        <Metric title="À traiter" value={remainingToTreat} />
+                        <Metric title="Prochain import" value={nextImportText} />
+                      </div>
+
+                      <div className="mt-3 text-[11px] text-slate-500">
+                        Import quotidien à{" "}
+                        <span className="text-slate-300 tabular-nums">
+                          08:00 (Paris)
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* RIGHT: COMMAND CENTER (better layout, no wrapping) */}
-                <div className="lg:col-span-5">
-                  <div className="rounded-[26px] border border-slate-800 bg-slate-950/35 p-4 md:p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-[12px] font-semibold text-slate-200 leading-none">
-                          Commandes
-                        </div>
-                        <div className="mt-1 text-[11px] text-slate-500">
-                          Export, sélection, suppression.
-                        </div>
+                {/* Selection hint bar (UX only) */}
+                {selectionMode && (
+                  <div className="mt-5 rounded-2xl border border-indigo-500/20 bg-indigo-500/8 px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-[12px] text-indigo-100">
+                        Sélection active •{" "}
+                        <span className="font-semibold tabular-nums">
+                          {selectedCount}
+                        </span>{" "}
+                        lead(s)
                       </div>
-
-                      <span className="inline-flex items-center rounded-full border border-slate-800 bg-slate-950/45 px-3 py-1 text-[11px] text-slate-300 whitespace-nowrap tabular-nums">
-                        {total} total
-                      </span>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <a
-                        href="/dashboard/leads/export"
-                        className="inline-flex items-center justify-center h-11 px-4 text-xs md:text-sm rounded-2xl bg-slate-900/75 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 shadow-sm whitespace-nowrap"
-                      >
-                        Exporter CSV
-                      </a>
-
-                      <button
-                        type="button"
-                        onClick={toggleSelectionMode}
-                        className="inline-flex items-center justify-center h-11 px-4 text-xs md:text-sm rounded-2xl bg-slate-900/75 border border-slate-700 hover:bg-slate-800/80 transition text-slate-200 shadow-sm whitespace-nowrap"
-                      >
-                        {selectionMode ? "Annuler" : "Mode sélection"}
-                      </button>
-                    </div>
-
-                    {selectionMode && (
-                      <div className="mt-2 grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={toggleSelectAllFiltered}
-                          className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/55 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap"
-                        >
-                          {allFilteredSelected
-                            ? "Tout désélectionner"
-                            : "Tout sélectionner"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={handleBulkDelete}
-                          disabled={selectedCount === 0}
-                          className={[
-                            "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap",
-                            selectedCount === 0
-                              ? "bg-slate-900/40 border-slate-800 text-slate-500 cursor-not-allowed"
-                              : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
-                          ].join(" ")}
-                        >
-                          Supprimer ({selectedCount})
-                        </button>
+                      <div className="text-[11px] text-indigo-200/70">
+                        Astuce : utilisez “Tout sélectionner” pour supprimer en
+                        lot.
                       </div>
-                    )}
-
-                    <div className="mt-4 grid grid-cols-3 gap-2">
-                      <Metric title="Total" value={total} />
-                      <Metric title="À traiter" value={remainingToTreat} />
-                      <Metric title="Prochain import" value={nextImportText} />
-                    </div>
-
-                    {/* ✅ avoids overflow in import chip */}
-                    <div className="mt-3 text-[11px] text-slate-500">
-                      Import quotidien à{" "}
-                      <span className="text-slate-300 tabular-nums">
-                        08:00 (Paris)
-                      </span>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* TABLE */}
+            {/* TABLE CARD */}
             <div className="rounded-[28px] border border-slate-800 bg-slate-950/70 shadow-xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <h2 className="text-slate-100 text-sm font-semibold">
                     Liste des leads
                   </h2>
@@ -666,9 +705,9 @@ export default function LeadsPage() {
                 )}
               </div>
 
-              {/* IMPORTANT: allow the table to breathe; still no horizontal drag on wide screens */}
-              <div className="w-full">
-                <table className="w-full text-[13px] table-fixed">
+              {/* Scroll container to avoid layout break on small screens / email+phone */}
+              <div className="w-full overflow-x-auto">
+                <table className="w-full text-[13px] table-fixed min-w-[980px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-900/95 backdrop-blur text-slate-300 text-[11px] uppercase tracking-wide">
                       {selectionMode && (
@@ -681,7 +720,6 @@ export default function LeadsPage() {
                         Traité
                       </th>
 
-                      {/* ✅ tuned widths so Email+Tel+Date+Delete still fit on one line on desktop */}
                       <th className="w-[220px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
                         Nom
                       </th>
@@ -719,7 +757,10 @@ export default function LeadsPage() {
                     {filteredLeads.length === 0 ? (
                       <tr>
                         <td colSpan={colCount} className="py-14 text-center">
-                          <div className="mx-auto max-w-md">
+                          <div className="mx-auto max-w-md px-6">
+                            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/40 text-slate-300">
+                              ⌕
+                            </div>
                             <div className="text-slate-200 font-medium">
                               Aucun résultat
                             </div>
@@ -730,7 +771,7 @@ export default function LeadsPage() {
                         </td>
                       </tr>
                     ) : (
-                      filteredLeads.map((lead) => {
+                      filteredLeads.map((lead, idx) => {
                         const fullName =
                           `${lead.FirstName ?? ""} ${lead.LastName ?? ""}`.trim() ||
                           lead.Name ||
@@ -742,7 +783,11 @@ export default function LeadsPage() {
                         return (
                           <tr
                             key={lead.id}
-                            className="border-b border-slate-900/80 hover:bg-slate-900/45 transition group"
+                            className={[
+                              "border-b border-slate-900/80 transition group",
+                              idx % 2 === 0 ? "bg-transparent" : "bg-slate-950/25",
+                              "hover:bg-slate-900/45",
+                            ].join(" ")}
                           >
                             {selectionMode && (
                               <td className="py-3 px-3 text-center">
@@ -751,6 +796,7 @@ export default function LeadsPage() {
                                   checked={isSelected}
                                   onChange={() => toggleSelected(idStr)}
                                   className="h-4 w-4 cursor-pointer accent-indigo-500"
+                                  aria-label={`Sélectionner le lead ${fullName}`}
                                 />
                               </td>
                             )}
@@ -764,7 +810,6 @@ export default function LeadsPage() {
 
                             <td className="py-3 px-3 text-slate-50 relative pr-16">
                               <div className="flex items-center gap-2 min-w-0">
-                                {/* ✅ NO WRAP for “À faire” */}
                                 {lead.message_sent ? (
                                   <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-200 whitespace-nowrap leading-none">
                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -785,7 +830,7 @@ export default function LeadsPage() {
                               <button
                                 type="button"
                                 onClick={() => setOpenLead(lead)}
-                                className="opacity-0 group-hover:opacity-100 absolute right-3 top-1/2 -translate-y-1/2 text-[11px] px-3 py-1.5 rounded-xl bg-indigo-600/70 hover:bg-indigo-500 backdrop-blur-md text-white transition shadow-sm hover:shadow-md whitespace-nowrap"
+                                className="opacity-0 group-hover:opacity-100 absolute right-3 top-1/2 -translate-y-1/2 text-[11px] px-3 py-1.5 rounded-xl bg-indigo-600/70 hover:bg-indigo-500 text-white transition shadow-sm hover:shadow-md whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                               >
                                 Voir →
                               </button>
@@ -805,7 +850,7 @@ export default function LeadsPage() {
                                   href={lead.LinkedInURL}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex items-center justify-center gap-2 h-9 px-3 rounded-xl border border-slate-800 bg-slate-950/35 text-[12px] text-sky-200 hover:bg-slate-900/55 transition whitespace-nowrap"
+                                  className="inline-flex items-center justify-center gap-2 h-9 px-3 rounded-xl border border-slate-800 bg-slate-950/35 text-[12px] text-sky-200 hover:bg-slate-900/55 transition whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                                 >
                                   Profil <span className="text-slate-500">↗</span>
                                 </a>
@@ -844,24 +889,37 @@ export default function LeadsPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Footer hint */}
+              <div className="px-6 py-3 border-t border-slate-800 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  Astuce : passez la souris sur une ligne pour afficher “Voir →”.
+                </div>
+                <div className="tabular-nums">
+                  {treatedCount} traité(s) • {remainingToTreat} à traiter
+                </div>
+              </div>
             </div>
           </div>
 
           {/* --- SIDEBAR --- */}
           {openLead && (
             <>
-              <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]" />
+              <div
+                className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]"
+                aria-hidden="true"
+              />
 
-              <div className="fixed right-0 top-0 z-50 h-full w-full sm:w-[460px] animate-slideLeft bg-gradient-to-b from-slate-900/95 to-slate-950/85 backdrop-blur-2xl border-l border-slate-800 shadow-[0_0_55px_-16px_rgba(99,102,241,0.6)] flex flex-col">
-                {/* Header sticky */}
-                <div className="sticky top-0 z-10 p-6 pb-4 bg-slate-950/35 backdrop-blur-xl border-b border-slate-800">
+              <div className="fixed right-0 top-0 z-50 h-full w-full sm:w-[480px] animate-slideLeft bg-gradient-to-b from-slate-950/95 to-slate-950/85 backdrop-blur-2xl border-l border-slate-800 shadow-[0_0_55px_-16px_rgba(99,102,241,0.55)] flex flex-col">
+                {/* Header */}
+                <div className="sticky top-0 z-10 p-6 pb-4 bg-slate-950/55 backdrop-blur-xl border-b border-slate-800">
                   <div className="flex items-start justify-between gap-3">
                     <button
                       type="button"
-                      className="text-slate-300 text-xs hover:text-slate-100 transition inline-flex items-center gap-2"
+                      className="text-slate-300 text-xs hover:text-slate-100 transition inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/35 rounded-2xl"
                       onClick={() => setOpenLead(null)}
                     >
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/40">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/40">
                         ✕
                       </span>
                       Fermer
@@ -869,7 +927,7 @@ export default function LeadsPage() {
 
                     <span
                       className={[
-                        "text-[11px] px-3 py-1 rounded-full border bg-slate-900/60 whitespace-nowrap",
+                        "text-[11px] px-3 py-1 rounded-full border bg-slate-950/35 whitespace-nowrap",
                         isPremium
                           ? "border-indigo-500/30 text-indigo-200"
                           : "border-slate-700 text-slate-200",
@@ -879,63 +937,89 @@ export default function LeadsPage() {
                     </span>
                   </div>
 
-                  <h2 className="text-2xl font-semibold text-slate-50 mt-4 leading-tight">
-                    {(openLead.FirstName ?? "")} {(openLead.LastName ?? "")}
-                  </h2>
-                  <p className="text-[12px] text-slate-400 mt-1">
-                    {openLead.Company || "—"} • {openLead.location || "—"}
-                  </p>
+                  <div className="mt-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="text-2xl font-semibold text-slate-50 leading-tight truncate">
+                          {(openLead.FirstName ?? "")} {(openLead.LastName ?? "")}
+                        </h2>
+                        <p className="text-[12px] text-slate-400 mt-1 truncate">
+                          {openLead.Company || "—"} • {openLead.location || "—"}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0">
+                        {openLead.message_sent ? (
+                          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] text-emerald-200 whitespace-nowrap">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                            Envoyé
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] text-slate-300 whitespace-nowrap">
+                            <span className="h-1.5 w-1.5 rounded-full bg-slate-600" />
+                            À faire
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Scrollable content */}
+                {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                  {/* Summary cards */}
-                  <div className="grid grid-cols-1 gap-3">
-                    <InfoBlock title="LinkedIn">
-                      {openLead.LinkedInURL ? (
-                        <a
-                          href={openLead.LinkedInURL}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-indigo-200 hover:bg-indigo-500/15 transition whitespace-nowrap"
-                        >
-                          Ouvrir le profil <span className="opacity-80">↗</span>
-                        </a>
-                      ) : (
-                        <span className="text-slate-500">—</span>
+                  {/* Identity / quick info */}
+                  <div className="rounded-3xl border border-slate-800 bg-slate-950/25 p-4">
+                    <div className="text-[11px] uppercase tracking-wide text-slate-500">
+                      Informations
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1 gap-3">
+                      <InfoBlock title="LinkedIn">
+                        {openLead.LinkedInURL ? (
+                          <a
+                            href={openLead.LinkedInURL}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-indigo-200 hover:bg-indigo-500/15 transition whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/35"
+                          >
+                            Ouvrir le profil <span className="opacity-80">↗</span>
+                          </a>
+                        ) : (
+                          <span className="text-slate-500">—</span>
+                        )}
+                      </InfoBlock>
+
+                      {emailOption && (
+                        <InfoBlock title="Email">
+                          <span className="text-slate-200">
+                            {openLead.email || "—"}
+                          </span>
+                        </InfoBlock>
                       )}
-                    </InfoBlock>
 
-                    {emailOption && (
-                      <InfoBlock title="Email">
+                      {phoneOption && (
+                        <InfoBlock title="Téléphone">
+                          <span className="text-slate-200">
+                            {openLead.phone || "—"}
+                          </span>
+                        </InfoBlock>
+                      )}
+
+                      <InfoBlock title="Créé le">
                         <span className="text-slate-200">
-                          {openLead.email || "—"}
+                          {openLead.created_at
+                            ? new Date(openLead.created_at).toLocaleDateString(
+                                "fr-FR"
+                              )
+                            : "—"}
                         </span>
                       </InfoBlock>
-                    )}
-
-                    {phoneOption && (
-                      <InfoBlock title="Téléphone">
-                        <span className="text-slate-200">
-                          {openLead.phone || "—"}
-                        </span>
-                      </InfoBlock>
-                    )}
-
-                    <InfoBlock title="Créé le">
-                      <span className="text-slate-200">
-                        {openLead.created_at
-                          ? new Date(openLead.created_at).toLocaleDateString(
-                              "fr-FR"
-                            )
-                          : "—"}
-                      </span>
-                    </InfoBlock>
+                    </div>
                   </div>
 
-                  {/* 1) Message LinkedIn */}
-                  <div className="rounded-3xl border border-slate-800 bg-slate-950/30 p-4">
-                    <div className="flex items-center justify-between">
+                  {/* LinkedIn message */}
+                  <div className="rounded-3xl border border-slate-800 bg-slate-950/25 p-4">
+                    <div className="flex items-center justify-between gap-3">
                       <label className="text-xs text-slate-300 font-medium">
                         Message LinkedIn
                       </label>
@@ -958,7 +1042,7 @@ export default function LeadsPage() {
                         );
                       }}
                       placeholder="Écrivez votre message LinkedIn…"
-                      className="mt-3 w-full h-44 p-4 rounded-2xl bg-slate-900/60 border border-slate-700 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition"
+                      className="mt-3 w-full h-44 p-4 rounded-2xl bg-slate-900/55 border border-slate-800 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition"
                     />
 
                     <div className="mt-3">
@@ -967,7 +1051,7 @@ export default function LeadsPage() {
                         onClick={handleMessageSent}
                         disabled={openLead.message_sent}
                         className={[
-                          "w-full px-4 py-3 rounded-2xl text-sm font-semibold transition",
+                          "w-full px-4 py-3 rounded-2xl text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/35",
                           openLead.message_sent
                             ? "bg-emerald-600 text-white cursor-default"
                             : "bg-indigo-600 hover:bg-indigo-500 text-white",
@@ -991,8 +1075,8 @@ export default function LeadsPage() {
                     )}
                   </div>
 
-                  {/* 2) Email (Premium only) */}
-                  <div className="rounded-3xl border border-slate-800 bg-slate-950/30 p-4">
+                  {/* Email (Premium only) */}
+                  <div className="rounded-3xl border border-slate-800 bg-slate-950/25 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <label className="text-xs text-slate-300 font-medium">
                         Message email
@@ -1002,7 +1086,7 @@ export default function LeadsPage() {
                         <button
                           type="button"
                           onClick={() => setPremiumModalOpen(true)}
-                          className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/15 transition whitespace-nowrap"
+                          className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/15 transition whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/35"
                         >
                           Débloquer Premium
                         </button>
@@ -1032,8 +1116,8 @@ export default function LeadsPage() {
                       className={[
                         "mt-3 w-full h-44 p-4 rounded-2xl border text-sm transition focus:outline-none focus:ring-2",
                         isPremium
-                          ? "bg-slate-900/60 border-slate-700 text-slate-200 placeholder-slate-500 focus:ring-indigo-500/50"
-                          : "bg-slate-900/40 border-slate-800 text-slate-500 focus:ring-transparent",
+                          ? "bg-slate-900/55 border-slate-800 text-slate-200 placeholder-slate-500 focus:ring-indigo-500/50"
+                          : "bg-slate-900/35 border-slate-800 text-slate-500 focus:ring-transparent",
                       ].join(" ")}
                       readOnly={!isPremium}
                     />
@@ -1049,8 +1133,8 @@ export default function LeadsPage() {
                               type="button"
                               onClick={openPrefilledEmail}
                               className={[
-                                "w-full px-4 py-3 rounded-2xl text-sm font-semibold transition border cursor-pointer whitespace-nowrap",
-                                "bg-slate-900/70 border-slate-700 text-slate-100 hover:bg-slate-800/80",
+                                "w-full px-4 py-3 rounded-2xl text-sm font-semibold transition border cursor-pointer whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25",
+                                "bg-slate-900/65 border-slate-800 text-slate-100 hover:bg-slate-800/70",
                                 dimIfNoEmail,
                               ].join(" ")}
                             >
@@ -1063,8 +1147,8 @@ export default function LeadsPage() {
                               type="button"
                               onClick={openGmailWeb}
                               className={[
-                                "flex-1 px-3 py-2.5 rounded-2xl text-[12px] font-semibold transition border cursor-pointer whitespace-nowrap",
-                                "bg-slate-950/70 border-slate-700 text-slate-200 hover:bg-slate-900/80",
+                                "flex-1 px-3 py-2.5 rounded-2xl text-[12px] font-semibold transition border cursor-pointer whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25",
+                                "bg-slate-950/55 border-slate-800 text-slate-200 hover:bg-slate-900/70",
                                 dimIfNoEmail,
                               ].join(" ")}
                             >
@@ -1075,8 +1159,8 @@ export default function LeadsPage() {
                               type="button"
                               onClick={openOutlookWeb}
                               className={[
-                                "flex-1 px-3 py-2.5 rounded-2xl text-[12px] font-semibold transition border cursor-pointer whitespace-nowrap",
-                                "bg-slate-950/70 border-slate-700 text-slate-200 hover:bg-slate-900/80",
+                                "flex-1 px-3 py-2.5 rounded-2xl text-[12px] font-semibold transition border cursor-pointer whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25",
+                                "bg-slate-950/55 border-slate-800 text-slate-200 hover:bg-slate-900/70",
                                 dimIfNoEmail,
                               ].join(" ")}
                             >
