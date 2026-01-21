@@ -619,18 +619,17 @@ export default function LeadsPage() {
   <div className="relative overflow-hidden rounded-[26px] border border-slate-800 bg-slate-950/40 p-4 sm:p-5 shadow-[0_16px_40px_-26px_rgba(0,0,0,0.75)]">
     {/* subtle glow */}
     <div className="pointer-events-none absolute inset-0">
-      <div className="absolute -top-24 right-[-120px] h-56 w-56 rounded-full bg-indigo-500/12 blur-3xl" />
+      <div className="absolute -top-24 right-[-120px] h-56 w-56 rounded-full bg-indigo-500/10 blur-3xl" />
       <div className="absolute -bottom-24 left-[-120px] h-56 w-56 rounded-full bg-sky-400/8 blur-3xl" />
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/0 via-slate-950/15 to-slate-950/35" />
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/0 via-slate-950/10 to-slate-950/35" />
     </div>
 
     <div className="relative">
-      {/* Header */}
+      {/* Header (dense) */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/45 text-slate-200">
-              {/* icon */}
               <svg
                 className="h-4 w-4"
                 viewBox="0 0 24 24"
@@ -658,8 +657,8 @@ export default function LeadsPage() {
           </div>
         </div>
 
+        {/* Right stack (compact chips) */}
         <div className="shrink-0 flex flex-col items-end gap-2">
-          {/* plan pill */}
           <span
             className={[
               "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] tabular-nums whitespace-nowrap",
@@ -677,46 +676,19 @@ export default function LeadsPage() {
             {isPremium ? "Premium" : "Essential"}
           </span>
 
-          {/* next import chip */}
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-wide text-slate-500">
+          <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-950/35 px-3 py-2 text-[12px] text-slate-200 whitespace-nowrap tabular-nums">
+            <span className="text-[10px] uppercase tracking-wide text-slate-500">
               Prochain import
-            </div>
-            <div className="mt-1 inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-950/35 px-3 py-2 text-[13px] font-semibold text-slate-100 tabular-nums whitespace-nowrap">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-xl border border-slate-800 bg-slate-950/40 text-slate-300">
-                <svg
-                  className="h-3.5 w-3.5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 6v6l4 2"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </span>
-              {nextImportText}
-            </div>
-            <div className="mt-1 text-[11px] text-slate-500">
-              08:00 (Paris)
-            </div>
-          </div>
+            </span>
+            <span className="h-4 w-px bg-slate-800" />
+            <span className="font-semibold text-slate-100">{nextImportText}</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-slate-400">08:00</span>
+          </span>
         </div>
       </div>
 
-      {/* Divider */}
-      <div className="mt-4 h-px w-full bg-gradient-to-r from-transparent via-slate-800/70 to-transparent" />
-
-      {/* Primary actions */}
+      {/* Primary actions (fills space, no dead zones) */}
       <div className="mt-4 grid grid-cols-2 gap-2">
         <a
           href="/dashboard/leads/export"
@@ -781,7 +753,7 @@ export default function LeadsPage() {
         </button>
       </div>
 
-      {/* Selection mode actions */}
+      {/* Selection mode actions (tight, no extra padding) */}
       {selectionMode && (
         <div className="mt-2 rounded-2xl border border-indigo-500/15 bg-indigo-500/8 p-2">
           <div className="grid grid-cols-2 gap-2">
@@ -809,9 +781,7 @@ export default function LeadsPage() {
           </div>
 
           <div className="mt-2 flex items-center justify-between gap-3 px-1">
-            <div className="text-[11px] text-indigo-200/70">
-              Sélection active
-            </div>
+            <div className="text-[11px] text-indigo-200/70">Sélection active</div>
             <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
               {selectedCount} sélectionné(s)
             </span>
@@ -819,7 +789,7 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Footer */}
+      {/* Footer (aligned + no blank space) */}
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="text-[11px] text-slate-500">
           Astuce : filtrez avec la recherche, puis exportez ou sélectionnez.
