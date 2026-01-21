@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import SubscriptionGate from "@/components/SubscriptionGate";
 
@@ -35,6 +35,9 @@ export default function DashboardPage() {
   // ✅ UX: quick search inside drilldown (client-side only)
   const [q, setQ] = useState("");
 
+  // ✅ scroll target for drilldown
+  const drilldownRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     async function loadStats() {
       setLoadingStats(true);
@@ -65,6 +68,21 @@ export default function DashboardPage() {
 
     loadStats();
   }, []);
+
+  // ✅ UX: when drilldown opens, scroll to it
+  useEffect(() => {
+    if (!active) return;
+
+    // Wait for the drilldown block to render
+    const raf = requestAnimationFrame(() => {
+      drilldownRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [active]);
 
   const activeLabel = useMemo(() => {
     switch (active) {
@@ -256,27 +274,7 @@ export default function DashboardPage() {
               />
             </div>
 
-            {/* Emails */}
-            <SectionHeader title="Emails" subtitle="Tri et charge allégée" />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <KPI
-                label="Emails triés aujourd’hui"
-                value={stats.emailsSortedToday}
-                color="from-indigo-500 to-blue-400"
-                clickable={false}
-                loading={loadingStats}
-              />
-              <KPI
-                label="Emails triés au total"
-                value={stats.emailsSortedTotal}
-                color="from-sky-500 to-blue-300"
-                clickable={false}
-                loading={loadingStats}
-              />
-            </div>
-
-            {/* Relances */}
+            {/* ✅ Relances (swapped ABOVE Emails) */}
             <SectionHeader title="Relances" subtitle="À venir et en retard" />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -297,11 +295,34 @@ export default function DashboardPage() {
                 loading={loadingStats}
               />
             </div>
+
+            {/* ✅ Emails (swapped BELOW Relances) */}
+            <SectionHeader title="Emails" subtitle="Tri et charge allégée" />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <KPI
+                label="Emails triés aujourd’hui"
+                value={stats.emailsSortedToday}
+                color="from-indigo-500 to-blue-400"
+                clickable={false}
+                loading={loadingStats}
+              />
+              <KPI
+                label="Emails triés au total"
+                value={stats.emailsSortedTotal}
+                color="from-sky-500 to-blue-300"
+                clickable={false}
+                loading={loadingStats}
+              />
+            </div>
           </div>
 
           {/* ✅ DRILLDOWN LIST */}
           {active && (
-            <div className="mt-10 rounded-2xl border border-slate-800 bg-slate-950/90 shadow-xl overflow-hidden">
+            <div
+              ref={drilldownRef}
+              className="mt-10 rounded-2xl border border-slate-800 bg-slate-950/90 shadow-xl overflow-hidden"
+            >
               {/* sticky header */}
               <div className="px-6 py-4 border-b border-slate-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-slate-950/80">
                 <div className="min-w-0">
@@ -314,7 +335,8 @@ export default function DashboardPage() {
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-1">
-                    Astuce : re-cliquez sur le KPI pour fermer. Cliquez sur une ligne pour ouvrir le détail.
+                    Astuce : re-cliquez sur le KPI pour fermer. Cliquez sur une
+                    ligne pour ouvrir le détail.
                   </p>
                 </div>
 
@@ -379,21 +401,28 @@ export default function DashboardPage() {
                       </thead>
                       <tbody>
                         {filteredItems.map((it) => {
-                          const src = it?.source === "maps" ? "maps" : "linkedin";
-                          const sourceLabel = src === "maps" ? "Maps" : "LinkedIn";
+                          const src =
+                            it?.source === "maps" ? "maps" : "linkedin";
+                          const sourceLabel =
+                            src === "maps" ? "Maps" : "LinkedIn";
 
                           const name =
                             src === "maps"
                               ? it?.title || "—"
                               : (
-                                  `${it?.FirstName ?? ""} ${it?.LastName ?? ""}`.trim() ||
+                                  `${it?.FirstName ?? ""} ${
+                                    it?.LastName ?? ""
+                                  }`.trim() ||
                                   it?.Name ||
                                   "—"
                                 );
 
                           const contact =
                             src === "maps"
-                              ? it?.email || it?.phoneNumber || it?.website || "—"
+                              ? it?.email ||
+                                it?.phoneNumber ||
+                                it?.website ||
+                                "—"
                               : it?.Company || it?.location || "—";
 
                           return (
@@ -403,7 +432,10 @@ export default function DashboardPage() {
                               className="border-b border-slate-900 hover:bg-slate-900/60 transition cursor-pointer"
                             >
                               <td className="py-3 px-4 text-slate-300">
-                                <SourceBadge value={sourceLabel} variant={src} />
+                                <SourceBadge
+                                  value={sourceLabel}
+                                  variant={src}
+                                />
                               </td>
                               <td className="py-3 px-4 text-slate-50">
                                 {name}
@@ -419,7 +451,9 @@ export default function DashboardPage() {
                               </td>
                               <td className="py-3 px-4 text-center text-slate-400">
                                 {it?.created_at
-                                  ? new Date(it.created_at).toLocaleDateString("fr-FR")
+                                  ? new Date(
+                                      it.created_at
+                                    ).toLocaleDateString("fr-FR")
                                   : "—"}
                               </td>
                             </tr>
@@ -447,21 +481,28 @@ export default function DashboardPage() {
                       </thead>
                       <tbody>
                         {filteredItems.map((it) => {
-                          const src = it?.source === "maps" ? "maps" : "linkedin";
-                          const sourceLabel = src === "maps" ? "Maps" : "LinkedIn";
+                          const src =
+                            it?.source === "maps" ? "maps" : "linkedin";
+                          const sourceLabel =
+                            src === "maps" ? "Maps" : "LinkedIn";
 
                           const name =
                             src === "maps"
                               ? it?.title || "—"
                               : (
-                                  `${it?.FirstName ?? ""} ${it?.LastName ?? ""}`.trim() ||
+                                  `${it?.FirstName ?? ""} ${
+                                    it?.LastName ?? ""
+                                  }`.trim() ||
                                   it?.Name ||
                                   "—"
                                 );
 
                           const contact =
                             src === "maps"
-                              ? it?.email || it?.phoneNumber || it?.website || "—"
+                              ? it?.email ||
+                                it?.phoneNumber ||
+                                it?.website ||
+                                "—"
                               : it?.Company || it?.location || "—";
 
                           return (
@@ -471,7 +512,10 @@ export default function DashboardPage() {
                               className="border-b border-slate-900 hover:bg-slate-900/60 transition cursor-pointer"
                             >
                               <td className="py-3 px-4 text-slate-300">
-                                <SourceBadge value={sourceLabel} variant={src} />
+                                <SourceBadge
+                                  value={sourceLabel}
+                                  variant={src}
+                                />
                               </td>
                               <td className="py-3 px-4 text-slate-50">
                                 {name}
@@ -484,7 +528,9 @@ export default function DashboardPage() {
                               </td>
                               <td className="py-3 px-4 text-center text-slate-400">
                                 {it?.next_followup_at
-                                  ? new Date(it.next_followup_at).toLocaleDateString("fr-FR")
+                                  ? new Date(
+                                      it.next_followup_at
+                                    ).toLocaleDateString("fr-FR")
                                   : "—"}
                               </td>
                             </tr>
@@ -558,7 +604,9 @@ function KPI({
       className={[
         "rounded-2xl border p-6 shadow-xl shadow-black/40 relative overflow-hidden transition-all duration-200",
         "bg-[#0B0E13] border-slate-800",
-        clickable ? "cursor-pointer hover:border-slate-700 hover:bg-slate-950/40" : "opacity-80 cursor-default",
+        clickable
+          ? "cursor-pointer hover:border-slate-700 hover:bg-slate-950/40"
+          : "opacity-80 cursor-default",
         active ? "ring-2 ring-indigo-500/35 border-indigo-500/30" : "",
       ].join(" ")}
     >
@@ -608,7 +656,9 @@ function SourceBadge({
       : "border-sky-500/30 bg-sky-500/10 text-sky-200";
 
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] ${cls}`}>
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] ${cls}`}
+    >
       {value}
     </span>
   );
