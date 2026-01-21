@@ -494,7 +494,8 @@ export default function LeadsPage() {
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
-        <div className="min-h-screen w-full px-5 sm:px-6 pt-20 pb-32">
+        {/* ✅ CHANGEMENT 1: remonter légèrement le header (pt-20 -> pt-14) */}
+        <div className="min-h-screen w-full px-5 sm:px-6 pt-14 pb-32">
           <div className="mx-auto w-full max-w-[1680px] space-y-6">
             {/* TOP / HEADER */}
             <div className="relative overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950/70">
@@ -539,7 +540,7 @@ export default function LeadsPage() {
                       </span>
                     </div>
 
-                    <h1 className="mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-50">
+                    <h1 className="mt-2 text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-50">
                       Prospection
                     </h1>
 
@@ -548,6 +549,36 @@ export default function LeadsPage() {
                       Lidmeo. Recherchez, traitez, et ouvrez un lead pour préparer
                       votre message.
                     </p>
+
+                    {/* ✅ CHANGEMENT 2: rendre Total + Traités + À traiter plus visibles et mieux positionnés */}
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <div className="rounded-2xl border border-slate-800 bg-slate-950/45 px-4 py-3">
+                        <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                          Total leads
+                        </div>
+                        <div className="mt-1 text-3xl font-extrabold text-slate-50 leading-none tabular-nums">
+                          {total}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-800 bg-slate-950/45 px-4 py-3">
+                        <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                          Traités
+                        </div>
+                        <div className="mt-1 text-3xl font-extrabold text-emerald-200 leading-none tabular-nums">
+                          {treatedCount}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-800 bg-slate-950/45 px-4 py-3">
+                        <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                          À traiter
+                        </div>
+                        <div className="mt-1 text-3xl font-extrabold text-amber-200 leading-none tabular-nums">
+                          {remainingToTreat}
+                        </div>
+                      </div>
+                    </div>
 
                     {/* Search */}
                     <div className="mt-5">
@@ -595,7 +626,9 @@ export default function LeadsPage() {
                             Export, sélection, suppression.
                           </div>
                         </div>
-                        <span className="inline-flex items-center rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] text-slate-300 tabular-nums">
+
+                        {/* ✅ CHANGEMENT 2 (bis): badge plus visible */}
+                        <span className="inline-flex items-center rounded-2xl border border-slate-800 bg-slate-950/35 px-4 py-2 text-[13px] font-semibold text-slate-100 tabular-nums">
                           {total} leads
                         </span>
                       </div>
@@ -646,6 +679,7 @@ export default function LeadsPage() {
                       )}
 
                       <div className="mt-4 grid grid-cols-3 gap-2">
+                        {/* ✅ garde les mêmes composants Metric, mais total/traités sont déjà mis en avant au-dessus */}
                         <Metric title="Total" value={total} />
                         <Metric title="À traiter" value={remainingToTreat} />
                         <Metric title="Prochain import" value={nextImportText} />
@@ -785,7 +819,9 @@ export default function LeadsPage() {
                             key={lead.id}
                             className={[
                               "border-b border-slate-900/80 transition group",
-                              idx % 2 === 0 ? "bg-transparent" : "bg-slate-950/25",
+                              idx % 2 === 0
+                                ? "bg-transparent"
+                                : "bg-slate-950/25",
                               "hover:bg-slate-900/45",
                             ].join(" ")}
                           >
@@ -852,7 +888,8 @@ export default function LeadsPage() {
                                   rel="noreferrer"
                                   className="inline-flex items-center justify-center gap-2 h-9 px-3 rounded-xl border border-slate-800 bg-slate-950/35 text-[12px] text-sky-200 hover:bg-slate-900/55 transition whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                                 >
-                                  Profil <span className="text-slate-500">↗</span>
+                                  Profil{" "}
+                                  <span className="text-slate-500">↗</span>
                                 </a>
                               ) : (
                                 <span className="text-slate-500">—</span>
