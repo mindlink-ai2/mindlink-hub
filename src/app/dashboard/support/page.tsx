@@ -166,57 +166,73 @@ export default function SupportPage() {
     }
   };
 
-  const StatusBanner = () => {
-    if (!sent) return null;
-
-    const isOk = sent === "ok";
-    return (
-      <div
-        className={[
-          "rounded-2xl border px-4 py-3 text-[12.5px] leading-relaxed",
-          isOk
-            ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-            : "border-red-500/25 bg-red-500/10 text-red-200",
-        ].join(" ")}
-      >
-        <div className="flex items-start gap-2">
-          <span className="mt-[1px]">{isOk ? "✅" : "❌"}</span>
-          <div className="min-w-0">{serverMsg ?? (isOk ? "OK" : "Erreur")}</div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="w-full min-h-[calc(100vh-120px)]">
-      {/* SHELL */}
-      <div className="mx-auto w-full max-w-6xl">
-        {/* HERO */}
-        <div className="relative overflow-hidden rounded-[28px] border border-slate-800/80 bg-slate-950/60 shadow-[0_20px_70px_-30px_rgba(79,70,229,0.45)]">
-          {/* glow */}
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="relative overflow-hidden rounded-[24px] border border-slate-800/80 bg-slate-950/60">
           <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-600/15 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-sky-500/10 blur-3xl" />
 
-          <div className="px-6 py-7 sm:px-10 sm:py-10">
-            {/* Top header */}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-              <div className="space-y-2">
-                <h1 className="text-3xl sm:text-[34px] font-semibold tracking-tight text-slate-50">
-                  Support
-                </h1>
-                <p className="text-sm text-slate-300/80 max-w-2xl">
-                  Une question, un changement de cibles ou une règle mail à
-                  ajouter ? Envoie-nous un ticket et nous te recontactons dès
-                  que possible.
-                </p>
-              </div>
+          <div className="px-6 py-7 sm:px-9 sm:py-9">
+            {/* Header */}
+            <div className="space-y-2">
+              <h1 className="text-3xl sm:text-[34px] font-semibold tracking-tight text-slate-50">
+                Support
+              </h1>
+              <p className="text-sm text-slate-300/80 max-w-2xl">
+                Envoie-nous un ticket : question, bug, changement de cibles ou
+                règle mail.
+              </p>
+            </div>
 
-              <div className="flex items-center gap-2 sm:pt-1">
+            {/* Tabs */}
+            <div className="mt-6 flex flex-wrap gap-2">
+              {CATEGORIES.map((c) => {
+                const isActive = c.id === form.category;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setField("category", c.id)}
+                    className={[
+                      "px-4 py-2 rounded-full text-[12px] transition border",
+                      isActive
+                        ? "bg-indigo-600/20 border-indigo-500/40 text-slate-50"
+                        : "bg-slate-900/35 border-slate-800 text-slate-200/80 hover:text-slate-50 hover:bg-slate-900/55 hover:border-slate-700",
+                    ].join(" ")}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Compact hint */}
+            <div className="mt-3 text-[12px] text-slate-400">{active.hint}</div>
+
+            {/* Form */}
+            <div className="mt-6 rounded-[20px] border border-slate-800/70 bg-slate-950/50 p-5 sm:p-6">
+              {/* Top row: status + prefill */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-[12.5px]">
+                  {sent === "ok" && (
+                    <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-emerald-200">
+                      ✅ {serverMsg ?? "Message envoyé."}
+                    </div>
+                  )}
+                  {sent === "error" && (
+                    <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-red-200">
+                      ❌ {serverMsg ?? "Une erreur est survenue. Réessaie."}
+                    </div>
+                  )}
+                </div>
+
+                {/* ✅ single prefill button */}
                 <button
                   type="button"
                   onClick={handlePrefill}
                   className="
-                    inline-flex items-center gap-2
+                    shrink-0 inline-flex items-center gap-2
                     rounded-full border border-slate-700/70
                     bg-slate-900/40 px-4 py-2 text-[12px] text-slate-200
                     hover:bg-slate-900/70 hover:border-slate-600
@@ -227,190 +243,79 @@ export default function SupportPage() {
                   Pré-remplir
                 </button>
               </div>
+
+              {/* Subject */}
+              <div className="mt-5 space-y-2">
+                <label className="text-[11px] text-slate-400 uppercase tracking-wider">
+                  Sujet
+                </label>
+                <input
+                  value={form.subject}
+                  onChange={(e) => setField("subject", e.target.value)}
+                  placeholder={active.subjectPH}
+                  className="
+                    w-full rounded-2xl bg-slate-900/35 border border-slate-800/80
+                    px-4 py-3.5 text-sm text-slate-100 placeholder-slate-500
+                    focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40
+                    transition
+                  "
+                />
+              </div>
+
+              {/* Message */}
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] text-slate-400 uppercase tracking-wider">
+                    Message
+                  </label>
+                  <div className="text-[11px] text-slate-500">
+                    {messageCount} caractère{messageCount > 1 ? "s" : ""}
+                  </div>
+                </div>
+
+                <textarea
+                  value={form.message}
+                  onChange={(e) => setField("message", e.target.value)}
+                  placeholder={active.messagePH}
+                  className="
+                    w-full min-h-[220px] rounded-2xl bg-slate-900/35 border border-slate-800/80
+                    px-4 py-4 text-sm text-slate-100 placeholder-slate-500
+                    focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40
+                    transition resize-none
+                  "
+                />
+              </div>
+
+              {/* Footer */}
+              <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="text-[11.5px] text-slate-500">
+                  Si c’est un bug, ajoute les étapes + (si possible) une capture.
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={sending}
+                  className={[
+                    "inline-flex items-center justify-center",
+                    "px-6 py-3 rounded-2xl text-sm font-medium transition",
+                    sending
+                      ? "bg-slate-800/70 text-slate-400 cursor-not-allowed"
+                      : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20",
+                  ].join(" ")}
+                >
+                  {sending ? "Envoi en cours…" : "Envoyer"}
+                </button>
+              </div>
             </div>
 
-            {/* CONTENT GRID */}
-            <div className="mt-8 grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5">
-              {/* LEFT: category panel */}
-              <div className="rounded-[22px] border border-slate-800/70 bg-gradient-to-b from-slate-950/65 to-slate-950/35 p-4 sm:p-5 shadow-inner">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-[11px] text-slate-400 uppercase tracking-wider">
-                      Catégorie
-                    </div>
-                    <div className="mt-1 text-sm font-semibold text-slate-50">
-                      {active.label}
-                    </div>
-                  </div>
-                  <span className="text-[11px] px-2 py-1 rounded-full border border-slate-800 bg-slate-900/40 text-slate-300">
-                    {CATEGORIES.length}
-                  </span>
-                </div>
-
-                <div className="mt-3 text-[12px] text-slate-400">
-                  {active.hint}
-                </div>
-
-                {/* Category choices */}
-                <div className="mt-4 grid grid-cols-2 lg:grid-cols-1 gap-2">
-                  {CATEGORIES.map((c) => {
-                    const activeChip = c.id === form.category;
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => setField("category", c.id)}
-                        className={[
-                          "w-full text-left px-4 py-3 rounded-2xl transition border",
-                          "flex items-start justify-between gap-3",
-                          activeChip
-                            ? "bg-indigo-600/18 border-indigo-500/35 text-slate-50 shadow-[0_0_0_1px_rgba(99,102,241,0.12)]"
-                            : "bg-slate-900/30 border-slate-800 text-slate-200/80 hover:text-slate-50 hover:bg-slate-900/55 hover:border-slate-700",
-                        ].join(" ")}
-                      >
-                        <div className="min-w-0">
-                          <div className="text-[12px] font-medium">
-                            {c.label}
-                          </div>
-                          <div className="mt-1 text-[11px] text-slate-400/90 line-clamp-2">
-                            {c.hint}
-                          </div>
-                        </div>
-                        <span
-                          className={[
-                            "mt-[2px] h-2 w-2 rounded-full shrink-0",
-                            activeChip ? "bg-indigo-400" : "bg-slate-600",
-                          ].join(" ")}
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Tip */}
-                <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/25 px-4 py-3 text-[11.5px] text-slate-400 leading-relaxed">
-                  Astuce : pour les cibles, indique{" "}
-                  <span className="text-slate-200/90">zone</span>,{" "}
-                  <span className="text-slate-200/90">secteurs</span>,{" "}
-                  <span className="text-slate-200/90">taille</span>,{" "}
-                  <span className="text-slate-200/90">exclusions</span> + 2
-                  exemples.
-                </div>
-              </div>
-
-              {/* RIGHT: form card */}
-              <div className="rounded-[22px] border border-slate-800/70 bg-gradient-to-b from-slate-950/70 to-slate-950/40 p-6 sm:p-7 shadow-inner">
-                {/* inline helper header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-[11px] text-slate-400 uppercase tracking-wider">
-                      Ticket
-                    </div>
-                    <div className="mt-1 text-sm text-slate-200/90">
-                      {active.hint}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handlePrefill}
-                      className="
-                        inline-flex items-center gap-2
-                        rounded-full border border-slate-700/70
-                        bg-slate-900/35 px-4 py-2 text-[12px] text-slate-200
-                        hover:bg-slate-900/65 hover:border-slate-600
-                        transition
-                      "
-                    >
-                      <span className="text-[13px]">✨</span>
-                      Pré-remplir
-                    </button>
-                  </div>
-                </div>
-
-                {/* status */}
-                <div className="mt-5">
-                  <StatusBanner />
-                </div>
-
-                {/* subject */}
-                <div className="mt-6 space-y-2">
-                  <label className="text-[11px] text-slate-400 uppercase tracking-wider">
-                    Sujet
-                  </label>
-                  <input
-                    value={form.subject}
-                    onChange={(e) => setField("subject", e.target.value)}
-                    placeholder={active.subjectPH}
-                    className="
-                      w-full rounded-2xl bg-slate-900/35 border border-slate-800/80
-                      px-4 py-3.5 text-sm text-slate-100 placeholder-slate-500
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40
-                      transition
-                    "
-                  />
-                  <div className="text-[11px] text-slate-500">
-                    Conseil : sois spécifique (page, action, résultat attendu).
-                  </div>
-                </div>
-
-                {/* message */}
-                <div className="mt-5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] text-slate-400 uppercase tracking-wider">
-                      Message
-                    </label>
-                    <div className="text-[11px] text-slate-500">
-                      {messageCount} caractère{messageCount > 1 ? "s" : ""}
-                    </div>
-                  </div>
-
-                  <textarea
-                    value={form.message}
-                    onChange={(e) => setField("message", e.target.value)}
-                    placeholder={active.messagePH}
-                    className="
-                      w-full min-h-[240px] rounded-2xl bg-slate-900/35 border border-slate-800/80
-                      px-4 py-4 text-sm text-slate-100 placeholder-slate-500
-                      focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40
-                      transition resize-none
-                    "
-                  />
-                </div>
-
-                {/* footer row */}
-                <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="text-[12px] text-slate-500">
-                    Réponse dès que possible. Ajoute une capture si nécessaire.
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleSend}
-                    disabled={sending}
-                    className={[
-                      "inline-flex items-center justify-center gap-2",
-                      "px-6 py-3 rounded-2xl text-sm font-medium transition",
-                      sending
-                        ? "bg-slate-800/70 text-slate-400 cursor-not-allowed"
-                        : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20",
-                    ].join(" ")}
-                  >
-                    {sending ? "Envoi en cours…" : "Envoyer"}
-                  </button>
-                </div>
-
-                {/* micro footer */}
-                <div className="mt-5 pt-5 border-t border-slate-800/70 text-[11.5px] text-slate-500">
-                  Catégorie sélectionnée :{" "}
-                  <span className="text-slate-200/90">{active.label}</span>
-                </div>
-              </div>
+            {/* Tiny helper */}
+            <div className="mt-5 text-[11.5px] text-slate-500">
+              Tip cibles : zone + secteurs + taille + exclusions + 2 exemples.
             </div>
           </div>
         </div>
-      </div>{" "}
+      </div>
     </div>
   );
 }
