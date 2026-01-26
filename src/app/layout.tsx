@@ -15,33 +15,57 @@ export const metadata: Metadata = {
 
 function PaywallOverlay() {
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-6">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-950 p-7 shadow-2xl">
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-50">
-          Accès non activé
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-6">
+      {/* Glow */}
+      <div className="absolute inset-0 opacity-60">
+        <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl bg-gradient-to-tr from-sky-500/30 via-indigo-500/25 to-violet-500/30" />
+      </div>
+
+      <div className="relative w-full max-w-xl rounded-3xl border border-slate-800/60 bg-slate-950/80 p-8 shadow-2xl">
+        <div className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/50 px-3 py-1 text-[11px] text-slate-300">
+          <span className="h-2 w-2 rounded-full bg-amber-400" />
+          Accès en attente d’activation
+        </div>
+
+        <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-50">
+          Active ton accès à Lidmeo
         </h2>
 
-        <p className="mt-3 text-sm text-slate-300 leading-relaxed">
-          Pour utiliser Lidmeo, tu dois souscrire à une offre.
+        <p className="mt-3 text-sm leading-relaxed text-slate-300">
+          Ton compte est bien créé, mais l’accès au Hub n’est pas encore activé.
           <br />
-          Si tu viens de payer, ton accès sera disponible dans quelques minutes.
+          Pour commencer à recevoir tes leads, il te suffit de choisir une offre.
         </p>
 
-        <div className="mt-6">
+        <div className="mt-5 rounded-2xl border border-slate-800/70 bg-slate-900/40 p-4">
+          <div className="text-sm font-medium text-slate-100">
+            Déjà souscrit ?
+          </div>
+          <div className="mt-1 text-sm text-slate-300 leading-relaxed">
+            Si tu viens de payer, l’activation se fait automatiquement en quelques
+            minutes. Ensuite, recharge cette page.
+          </div>
+        </div>
+
+        <div className="mt-7 flex flex-col gap-3">
           <Link
             href="https://lidmeo.com/offres-prospection-automatique"
-            className="inline-flex w-full items-center justify-center rounded-xl px-5 py-3 text-base font-medium text-slate-950 shadow-lg shadow-sky-500/20 hover:opacity-95 transition"
+            className="group inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-base font-semibold text-slate-950 shadow-lg shadow-sky-500/20 transition hover:opacity-95"
             style={{
               background:
                 "linear-gradient(135deg, #38BDF8 0%, #6366F1 55%, #8B5CF6 100%)",
             }}
           >
-            Voir les offres & activer mon accès
+            Voir les offres
+            <span className="opacity-80 transition group-hover:opacity-100">
+              →
+            </span>
           </Link>
 
-          <p className="mt-3 text-xs text-slate-400 text-center">
-            Une fois activé, recharge cette page.
-          </p>
+          <div className="text-center text-xs text-slate-400">
+            Accès généralement activé en{" "}
+            <span className="text-slate-200">2 à 5 minutes</span> après paiement.
+          </div>
         </div>
       </div>
     </div>
