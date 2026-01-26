@@ -1,15 +1,76 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { currentUser } from "@clerk/nextjs/server";
 import "./globals.css";
 import DashboardContainer from "@/components/DashboardContainer";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Lidmeo Hub",
   description: "Espace client",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+function PaywallOverlay() {
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-6">
+      <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-950 p-7 shadow-2xl">
+        <h2 className="text-2xl font-semibold tracking-tight text-slate-50">
+          Accès non activé
+        </h2>
+
+        <p className="mt-3 text-sm text-slate-300 leading-relaxed">
+          Pour utiliser Lidmeo, tu dois souscrire à une offre.
+          <br />
+          Si tu viens de payer, ton accès sera disponible dans quelques minutes.
+        </p>
+
+        <div className="mt-6">
+          <Link
+            href="https://lidmeo.com/offres-prospection-automatique"
+            className="inline-flex w-full items-center justify-center rounded-xl px-5 py-3 text-base font-medium text-slate-950 shadow-lg shadow-sky-500/20 hover:opacity-95 transition"
+            style={{
+              background:
+                "linear-gradient(135deg, #38BDF8 0%, #6366F1 55%, #8B5CF6 100%)",
+            }}
+          >
+            Voir les offres & activer mon accès
+          </Link>
+
+          <p className="mt-3 text-xs text-slate-400 text-center">
+            Une fois activé, recharge cette page.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await currentUser();
+
+  const email =
+    user?.emailAddresses?.find((e) => e.id === user.primaryEmailAddressId)
+      ?.emailAddress || user?.emailAddresses?.[0]?.emailAddress;
+
+  let hasAccess = false;
+
+  if (user && email) {
+    const { data, error } = await supabaseAdmin
+      .from("clients")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+
+    hasAccess = !error && !!data;
+  }
+
   return (
     <ClerkProvider>
       <html lang="fr">
@@ -125,6 +186,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </footer>
           </div>
+
+          {/* ✅ PAYWALL : si connecté mais email absent dans public.clients */}
+          {user && !hasAccess ? <PaywallOverlay /> : null}
         </body>
       </html>
     </ClerkProvider>
