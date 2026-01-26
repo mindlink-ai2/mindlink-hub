@@ -53,7 +53,7 @@ function PaywallOverlay() {
             className="group inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-base font-semibold text-slate-950 shadow-lg shadow-sky-500/20 transition hover:opacity-95"
             style={{
               background:
-                "linear-gradient(135deg, #38BDF8 0%, #6366F1 55%, #8B5CF6 100%)",
+                "linear-gradient(135deg, #0EA5E9 0%, #2563EB 55%, #1D4ED8 100%)",
             }}
           >
             Voir les offres
