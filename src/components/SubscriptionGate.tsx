@@ -25,10 +25,11 @@ export default function SubscriptionGate({ children, supportEmail }: Props) {
     })();
   }, []);
 
-  const isPending = (status || "").toLowerCase() === "attente";
+  const normalized = (status || "").toLowerCase();
+  const isBlocked = normalized === "attente" || normalized === "past_due";
 
   if (loading) return <>{children}</>;
-  if (!isPending) return <>{children}</>;
+  if (!isBlocked) return <>{children}</>;
 
   return (
     <div className="relative">
@@ -41,15 +42,16 @@ export default function SubscriptionGate({ children, supportEmail }: Props) {
           <div className="text-lg font-semibold">Paiement en attente</div>
 
           <p className="mt-2 text-sm text-white/80">
-            Ton paiement est actuellement en <b>attente</b>. L’accès au Hub est temporairement désactivé.
-            Pour récupérer l’accès (dashboard, prospection, relances…), merci de régulariser le paiement.
+            Ton paiement est actuellement en <b>attente</b>. L’accès au Hub est temporairement
+            désactivé. Pour récupérer l’accès (dashboard, prospection, relances…), merci de
+            régulariser le paiement.
           </p>
 
           <div className="mt-4 rounded-xl bg-white/5 p-4 text-sm text-white/80">
             Contacte-nous :{" "}
             <a
               className="underline underline-offset-4 hover:text-white"
-              href={`mailto:${supportEmail}?subject=Mindlink%20-%20Paiement%20en%20attente`}
+              href={`mailto:${supportEmail}?subject=Lidmeo%20-%20Paiement%20en%20attente`}
             >
               {supportEmail}
             </a>
