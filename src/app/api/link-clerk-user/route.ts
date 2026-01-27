@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
 
-export async function GET() {
+export async function POST() {
   const { userId } = await auth();
 
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = await currentUser();
+  // ✅ IMPORTANT : clerkClient est async dans ta version -> il faut l'appeler
+  const client = await clerkClient();
+
+  const user = await client.users.getUser(userId);
+
   const email =
-    user?.emailAddresses?.find((e) => e.id === user.primaryEmailAddressId)
-      ?.emailAddress || user?.emailAddresses?.[0]?.emailAddress;
+    user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)
+      ?.emailAddress || user.emailAddresses?.[0]?.emailAddress;
 
   if (!email) {
     return NextResponse.json({ error: "No email found on Clerk user" }, { status: 400 });
@@ -23,13 +27,13 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // ✅ Update la ligne existante (créée par Stripe webhook)
-  // On lie juste clerk_user_id à l'email
+  // ✅ update uniquement si clerk_user_id est NULL (ça évite d’écraser)
   const { data, error } = await supabase
     .from("clients")
     .update({ clerk_user_id: userId })
     .eq("email", email)
-    .select("id, clerk_user_id, email")
+    .is("clerk_user_id", null)
+    .select("id, email, clerk_user_id")
     .maybeSingle();
 
   if (error) {
@@ -37,11 +41,9 @@ export async function GET() {
   }
 
   if (!data) {
-    return NextResponse.json(
-      { error: "Client not found for this email (Stripe row not created yet)", email },
-      { status: 404 }
-    );
+    // soit email pas trouvé, soit déjà lié
+    return NextResponse.json({ ok: true, linked: false, reason: "not_found_or_already_linked", email });
   }
 
-  return NextResponse.json({ ok: true, client: data });
+  return NextResponse.json({ ok: true, linked: true, client: data });
 }
