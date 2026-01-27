@@ -1,11 +1,21 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { SignedIn, SignedOut, useUser } from "@clerk/nextjs";
 
 export default function HomePage() {
   const { user } = useUser();
   const firstName = user?.firstName || user?.username || "";
+
+  useEffect(() => {
+    if (!user) return;
+
+    fetch("/api/link-clerk-user", {
+      method: "POST",
+      credentials: "include",
+    }).catch(() => {});
+  }, [user]);
 
   return (
     <div className="grid gap-8 md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] items-start md:items-center min-h-[70vh]">
