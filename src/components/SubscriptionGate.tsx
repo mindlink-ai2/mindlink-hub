@@ -26,7 +26,10 @@ export default function SubscriptionGate({ children, supportEmail }: Props) {
   }, []);
 
   const normalized = (status || "").toLowerCase();
-  const isBlocked = normalized === "attente" || normalized === "past_due";
+  const isBlocked =
+    normalized === "attente" ||
+    normalized === "past_due" ||
+    normalized === "canceled";
 
   if (loading) return <>{children}</>;
   if (!isBlocked) return <>{children}</>;
