@@ -254,8 +254,7 @@ export default function BillingPage() {
                 <div className="grid grid-cols-3 gap-3">
                   {essentialQuotaOptions.map((opt) => {
                     const active = selectedEssentialQuota === opt.value;
-                    const isCurrent =
-                      isEssential && !statusLoading && (currentQuota === opt.value);
+                    const isCurrent = isEssential && !statusLoading && currentQuota === opt.value;
 
                     return (
                       <button
@@ -292,9 +291,7 @@ export default function BillingPage() {
                       pouvez changer via le checkout ou via le portail Stripe.
                     </span>
                   ) : (
-                    <span>
-                      Vous pouvez modifier votre rythme à tout moment.
-                    </span>
+                    <span>Vous pouvez modifier votre rythme à tout moment.</span>
                   )}
                 </div>
               </div>
@@ -372,7 +369,7 @@ export default function BillingPage() {
               </div>
 
               <div className="mt-6 flex items-end gap-2">
-                <div className="text-4xl font-semibold text-white">—</div>
+                <div className="text-4xl font-semibold text-white">199€</div>
                 <div className="pb-1 text-gray-400">/ mois</div>
               </div>
 
@@ -415,7 +412,9 @@ export default function BillingPage() {
 
           <div className="sm:hidden rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-gray-300">
             <span className="text-gray-400">Plan actuel :</span>{" "}
-            {statusLoading ? "Chargement…" : `${prettyPlan(billing.plan)} · ${prettyStatus(billing.subscription_status)}`}
+            {statusLoading
+              ? "Chargement…"
+              : `${prettyPlan(billing.plan)} · ${prettyStatus(billing.subscription_status)}`}
             {currentPaceLabel !== "—" ? <span className="text-gray-500"> · {currentPaceLabel}</span> : null}
             {renewalLabel ? <div className="text-gray-500 mt-1">{renewalLabel}</div> : null}
           </div>
