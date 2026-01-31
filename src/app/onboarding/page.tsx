@@ -1,18 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useUser, SignedIn, SignedOut, RedirectToSignIn } from "@clerk/nextjs";
 
+const COMPANY_SIZE_OPTIONS = [
+  "1-10",
+  "11-20",
+  "21-50",
+  "51-100",
+  "101-200",
+  "201-500",
+  "501-1000",
+  "1001-2000",
+  "2001-5000",
+  "5001-10000",
+  "10001+",
+] as const;
+
+type CompanySize = (typeof COMPANY_SIZE_OPTIONS)[number];
+
 type FormState = {
-  submitted_at: string; // auto
+  submitted_at: string;
   full_name: string;
-  email: string; // forced from Clerk
+  email: string; // forcé depuis Clerk
   phone: string;
   company: string;
   target_company_type: string;
   target_industry: string;
   target_geo_france: string;
-  target_company_size: string;
+  target_company_size: CompanySize[]; // ✅ checkboxes
   target_personas_titles: string;
   ideal_targets: string;
   value_promise: string;
@@ -24,7 +40,6 @@ export default function OnboardingPage() {
       <SignedOut>
         <RedirectToSignIn />
       </SignedOut>
-
       <SignedIn>
         <OnboardingForm />
       </SignedIn>
@@ -49,7 +64,7 @@ function OnboardingForm() {
     target_company_type: "",
     target_industry: "",
     target_geo_france: "",
-    target_company_size: "",
+    target_company_size: [],
     target_personas_titles: "",
     ideal_targets: "",
     value_promise: "",
@@ -58,8 +73,50 @@ function OnboardingForm() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<null | { ok: boolean; msg: string }>(null);
 
+  const progress = useMemo(() => {
+    const requiredFilled =
+      !!form.full_name &&
+      !!clerkEmail &&
+      !!form.phone &&
+      !!form.company &&
+      !!form.target_company_type &&
+      !!form.target_industry &&
+      !!form.target_geo_france &&
+      form.target_company_size.length > 0 &&
+      !!form.target_personas_titles &&
+      !!form.ideal_targets &&
+      !!form.value_promise;
+
+    // mini progress visuel (pas bloquant)
+    const total = 10;
+    let done = 0;
+    if (form.phone) done++;
+    if (form.company) done++;
+    if (form.target_company_type) done++;
+    if (form.target_industry) done++;
+    if (form.target_geo_france) done++;
+    if (form.target_company_size.length) done++;
+    if (form.target_personas_titles) done++;
+    if (form.ideal_targets) done++;
+    if (form.value_promise) done++;
+    if (form.full_name) done++;
+    return { done, total, requiredFilled };
+  }, [form, clerkEmail]);
+
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((p) => ({ ...p, [key]: value }));
+  }
+
+  function toggleCompanySize(v: CompanySize) {
+    setForm((p) => {
+      const exists = p.target_company_size.includes(v);
+      return {
+        ...p,
+        target_company_size: exists
+          ? p.target_company_size.filter((x) => x !== v)
+          : [...p.target_company_size, v],
+      };
+    });
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -68,11 +125,10 @@ function OnboardingForm() {
     setLoading(true);
 
     try {
-      // Reforce côté front : email = email Clerk
       const payload = {
         ...form,
         submitted_at: new Date().toISOString(),
-        email: clerkEmail,
+        email: clerkEmail, // 🔒 forcé
         full_name: form.full_name || clerkName,
       };
 
@@ -89,167 +145,336 @@ function OnboardingForm() {
         return;
       }
 
-      setStatus({ ok: true, msg: "Parfait ✅ On a bien reçu tes infos." });
+      setStatus({ ok: true, msg: "C’est bon ✅ On lance la mise en place." });
     } catch {
-      setStatus({ ok: false, msg: "Erreur réseau. Réessaie." });
+      setStatus({ ok: false, msg: "Erreur réseau. Réessaie dans 30 secondes." });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="mx-auto max-w-2xl px-4 py-10">
-        <h1 className="text-2xl font-semibold">Questionnaire d’onboarding</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Ces infos déclenchent nos automatisations (n8n) et accélèrent la mise en place.
-        </p>
+    <div className="min-h-screen bg-[#070A12]">
+      {/* HERO */}
+      <div className="relative overflow-hidden border-b border-white/10">
+        <div className="absolute inset-0 opacity-60">
+          <div className="absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-gradient-to-r from-[#2b6cff]/30 via-[#00d4ff]/10 to-[#2b6cff]/30 blur-3xl" />
+        </div>
 
-        <form onSubmit={onSubmit} className="mt-8 space-y-4">
-          <Field label="Nom prénom" required>
-            <input
-              className="w-full rounded-xl border px-3 py-2"
-              value={form.full_name}
-              onChange={(e) => update("full_name", e.target.value)}
-              required
-            />
-          </Field>
+        <div className="relative mx-auto max-w-5xl px-4 py-10">
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                Onboarding Lidmeo — connecté
+              </p>
 
-          <Field label="E-mail (doit être le même que celui avec lequel vous avez payé)" required>
-            <input
-              className="w-full rounded-xl border px-3 py-2 bg-gray-50"
-              value={clerkEmail}
-              readOnly
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Cet email est verrouillé car lié à ton compte.
-            </p>
-          </Field>
-
-          <Field label="Téléphone" required>
-            <input
-              className="w-full rounded-xl border px-3 py-2"
-              value={form.phone}
-              onChange={(e) => update("phone", e.target.value)}
-              required
-              placeholder="+33..."
-            />
-          </Field>
-
-          <Field label="Entreprise" required>
-            <input
-              className="w-full rounded-xl border px-3 py-2"
-              value={form.company}
-              onChange={(e) => update("company", e.target.value)}
-              required
-            />
-          </Field>
-
-          <Field label="Quel type d’entreprise souhaitez-vous cibler ?" required>
-            <input
-              className="w-full rounded-xl border px-3 py-2"
-              value={form.target_company_type}
-              onChange={(e) => update("target_company_type", e.target.value)}
-              required
-              placeholder="PME, grands groupes, indépendants..."
-            />
-          </Field>
-
-          <Field label="Secteur d’activité visé" required>
-            <input
-              className="w-full rounded-xl border px-3 py-2"
-              value={form.target_industry}
-              onChange={(e) => update("target_industry", e.target.value)}
-              required
-              placeholder="Ex: formation, retail, SaaS..."
-            />
-          </Field>
-
-          <Field label="Dans quelle zone géographique souhaitez-vous cibler vos prospects en France ?" required>
-            <input
-              className="w-full rounded-xl border px-3 py-2"
-              value={form.target_geo_france}
-              onChange={(e) => update("target_geo_france", e.target.value)}
-              required
-              placeholder="Ex: Île-de-France, Lyon + 50km..."
-            />
-          </Field>
-
-          <Field label="Taille d’entreprise recherchée" required>
-            <input
-              className="w-full rounded-xl border px-3 py-2"
-              value={form.target_company_size}
-              onChange={(e) => update("target_company_size", e.target.value)}
-              required
-              placeholder="Ex: 1-10, 11-50, 51-200, 200+..."
-            />
-          </Field>
-
-          <Field label="Quelles personnes souhaitez-vous contacter ? (poste)" required>
-            <input
-              className="w-full rounded-xl border px-3 py-2"
-              value={form.target_personas_titles}
-              onChange={(e) => update("target_personas_titles", e.target.value)}
-              required
-              placeholder="Ex: DRH, Responsable formation, CEO"
-            />
-          </Field>
-
-          <Field label="Vos cibles idéales" required>
-            <textarea
-              className="w-full rounded-xl border px-3 py-2"
-              value={form.ideal_targets}
-              onChange={(e) => update("ideal_targets", e.target.value)}
-              required
-              rows={4}
-              placeholder="Décris les entreprises / cas d’usage / signaux..."
-            />
-          </Field>
-
-          <Field label="Quelle promesse faites-vous à vos clients, pourquoi travailleraient-ils avec vous ?" required>
-            <textarea
-              className="w-full rounded-xl border px-3 py-2"
-              value={form.value_promise}
-              onChange={(e) => update("value_promise", e.target.value)}
-              required
-              rows={4}
-              placeholder="Promesse, bénéfices, différenciation..."
-            />
-          </Field>
-
-          <button
-            disabled={loading}
-            className="w-full rounded-xl bg-black px-4 py-2 text-white disabled:opacity-60"
-          >
-            {loading ? "Envoi..." : "Envoyer"}
-          </button>
-
-          {status && (
-            <div className={`rounded-xl p-3 text-sm ${status.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-              {status.msg}
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white">
+                Questionnaire d’onboarding
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm text-white/70">
+                Réponds une fois, et on automatise le reste : tes infos déclenchent nos scénarios (n8n) et accélèrent la mise en place.
+              </p>
             </div>
-          )}
-        </form>
+
+            <div className="hidden min-w-[220px] rounded-2xl border border-white/10 bg-white/5 p-4 sm:block">
+              <p className="text-xs text-white/60">Progress</p>
+              <p className="mt-1 text-2xl font-semibold text-white">
+                {progress.done}/{progress.total}
+              </p>
+              <div className="mt-3 h-2 w-full rounded-full bg-white/10">
+                <div
+                  className="h-2 rounded-full bg-white"
+                  style={{ width: `${Math.min(100, Math.round((progress.done / progress.total) * 100))}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-white/60">
+                Plus c’est précis, plus tes leads sont bons.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* FORM */}
+      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 px-4 py-10 lg:grid-cols-12">
+        <div className="lg:col-span-8">
+          <form onSubmit={onSubmit} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+            <SectionTitle title="Identité" subtitle="On verrouille l’email pour éviter les erreurs de paiement." />
+
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input
+                label="Nom prénom"
+                required
+                value={form.full_name}
+                onChange={(v) => update("full_name", v)}
+                placeholder="Ex: Marie Dupont"
+              />
+              <Input
+                label="E-mail (doit être le même que celui avec lequel vous avez payé)"
+                required
+                value={clerkEmail}
+                readOnly
+                helper="Cet email est verrouillé car lié à ton compte."
+              />
+              <Input
+                label="Téléphone"
+                required
+                value={form.phone}
+                onChange={(v) => update("phone", v)}
+                placeholder="+33..."
+              />
+              <Input
+                label="Entreprise"
+                required
+                value={form.company}
+                onChange={(v) => update("company", v)}
+                placeholder="Nom de ton entreprise"
+              />
+            </div>
+
+            <Divider />
+
+            <SectionTitle title="Ciblage" subtitle="On s’aligne sur la cible et le terrain de jeu." />
+
+            <div className="mt-5 grid grid-cols-1 gap-4">
+              <Input
+                label="Quel type d’entreprise souhaitez-vous cibler ?"
+                required
+                value={form.target_company_type}
+                onChange={(v) => update("target_company_type", v)}
+                placeholder="PME, grands groupes, indépendants..."
+              />
+
+              <Input
+                label="Secteur d’activité visé"
+                required
+                value={form.target_industry}
+                onChange={(v) => update("target_industry", v)}
+                placeholder="Ex: formation, immobilier, industrie..."
+              />
+
+              <Input
+                label="Dans quelle zone géographique souhaitez-vous cibler vos prospects en France ?"
+                required
+                value={form.target_geo_france}
+                onChange={(v) => update("target_geo_france", v)}
+                placeholder="Ex: Île-de-France / Lyon + 50km / PACA..."
+              />
+            </div>
+
+            {/* ✅ Checkboxes sizes */}
+            <div className="mt-5">
+              <Label required>Taille d’entreprise recherchée</Label>
+              <p className="mt-1 text-xs text-white/55">
+                Coche les tailles EXACTES que tu veux (mêmes valeurs que ton ancienne liste).
+              </p>
+
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {COMPANY_SIZE_OPTIONS.map((opt) => {
+                  const active = form.target_company_size.includes(opt);
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => toggleCompanySize(opt)}
+                      className={[
+                        "group flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition",
+                        active
+                          ? "border-white/30 bg-white/10 text-white"
+                          : "border-white/10 bg-white/5 text-white/80 hover:border-white/20 hover:bg-white/7",
+                      ].join(" ")}
+                    >
+                      <span className="text-sm font-medium">{opt}</span>
+                      <span
+                        className={[
+                          "flex h-5 w-5 items-center justify-center rounded-md border transition",
+                          active ? "border-white bg-white text-black" : "border-white/20 text-transparent",
+                        ].join(" ")}
+                        aria-hidden="true"
+                      >
+                        ✓
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <Divider />
+
+            <SectionTitle title="Cibles & promesse" subtitle="Ce qui va driver la qualité des prospects." />
+
+            <div className="mt-5 grid grid-cols-1 gap-4">
+              <Input
+                label="Quelles personnes souhaitez-vous contacter ? (poste)"
+                required
+                value={form.target_personas_titles}
+                onChange={(v) => update("target_personas_titles", v)}
+                placeholder="Ex: DRH, Responsable formation, CEO"
+              />
+
+              <Textarea
+                label="Vos cibles idéales"
+                required
+                value={form.ideal_targets}
+                onChange={(v) => update("ideal_targets", v)}
+                placeholder="Décris l’entreprise idéale, signaux, douleurs, contexte..."
+                rows={4}
+              />
+
+              <Textarea
+                label="Quel promesse faites-vous à vos clients, pourquoi travailleraient-ils avec vous ?"
+                required
+                value={form.value_promise}
+                onChange={(v) => update("value_promise", v)}
+                placeholder="Promesse, bénéfices, différenciation, preuves..."
+                rows={4}
+              />
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                disabled={loading}
+                className="rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:opacity-90 disabled:opacity-60"
+              >
+                {loading ? "Envoi..." : "Envoyer et lancer l’automatisation"}
+              </button>
+
+              {status && (
+                <div
+                  className={[
+                    "rounded-2xl border p-3 text-sm",
+                    status.ok
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                      : "border-red-500/30 bg-red-500/10 text-red-200",
+                  ].join(" ")}
+                >
+                  {status.msg}
+                </div>
+              )}
+            </div>
+          </form>
+        </div>
+
+        {/* RIGHT SIDE */}
+        <div className="lg:col-span-4">
+          <div className="sticky top-6 space-y-4">
+            <Card>
+              <h3 className="text-base font-semibold text-white">Ce que ça déclenche</h3>
+              <ul className="mt-3 space-y-2 text-sm text-white/70">
+                <li>• Envoi des infos vers n8n</li>
+                <li>• Création/paramétrage du workflow de leads</li>
+                <li>• Email récap à l’équipe</li>
+              </ul>
+            </Card>
+
+            <Card>
+              <h3 className="text-base font-semibold text-white">Conseil</h3>
+              <p className="mt-2 text-sm text-white/70">
+                Plus ta promesse est claire, plus on peut filtrer et sortir des prospects qui répondent vraiment à ton offre.
+              </p>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function Field({
+/* ---------- UI atoms (sans dépendance) ---------- */
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+      {children}
+    </div>
+  );
+}
+
+function Divider() {
+  return <div className="my-7 h-px w-full bg-white/10" />;
+}
+
+function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-white">{title}</h2>
+      <p className="mt-1 text-sm text-white/60">{subtitle}</p>
+    </div>
+  );
+}
+
+function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <div className="text-sm font-medium text-white">
+      {children} {required ? <span className="text-red-400">*</span> : null}
+    </div>
+  );
+}
+
+function Input({
   label,
   required,
-  children,
+  value,
+  onChange,
+  placeholder,
+  readOnly,
+  helper,
 }: {
   label: string;
   required?: boolean;
-  children: React.ReactNode;
+  value: string;
+  onChange?: (v: string) => void;
+  placeholder?: string;
+  readOnly?: boolean;
+  helper?: string;
 }) {
   return (
-    <label className="block">
-      <div className="mb-1 text-sm font-medium">
-        {label} {required ? <span className="text-red-500">*</span> : null}
-      </div>
-      {children}
-    </label>
+    <div>
+      <Label required={required}>{label}</Label>
+      <input
+        className={[
+          "mt-2 w-full rounded-2xl border px-4 py-3 text-sm text-white outline-none transition",
+          readOnly
+            ? "border-white/10 bg-white/5 text-white/60"
+            : "border-white/10 bg-white/5 focus:border-white/30 focus:bg-white/7",
+        ].join(" ")}
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        placeholder={placeholder}
+        readOnly={readOnly}
+      />
+      {helper ? <p className="mt-1 text-xs text-white/50">{helper}</p> : null}
+    </div>
+  );
+}
+
+function Textarea({
+  label,
+  required,
+  value,
+  onChange,
+  placeholder,
+  rows = 4,
+}: {
+  label: string;
+  required?: boolean;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  rows?: number;
+}) {
+  return (
+    <div>
+      <Label required={required}>{label}</Label>
+      <textarea
+        className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-white/30 focus:bg-white/7"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+      />
+    </div>
   );
 }
