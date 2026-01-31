@@ -5,53 +5,88 @@ import Stripe from "stripe";
 
 export const runtime = "nodejs";
 
-// Mapping des plans → Price IDs Stripe
-const PRICE_BY_PLAN: Record<string, string | undefined> = {
-  premium: process.env.STRIPE_PRICE_PREMIUM,
-  essential: process.env.STRIPE_PRICE_ESSENTIAL,
+function normalizePlan(p?: unknown) {
+  return typeof p === "string" ? p.toLowerCase().trim() : null;
+}
+
+function normalizeQuota(q?: unknown): number | null {
+  if (q === null || q === undefined) return null;
+  const n = Number(String(q).trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+// ✅ Price IDs Stripe (Essential 10/20/30 fournis)
+// + Automated à renseigner
+const PRICE_ESSENTIAL_BY_QUOTA: Record<number, string> = {
+  10: "price_1SvQu71rJNZjWmG5D9MtzZn4",
+  20: "price_1SvQuX1rJNZjWmG54cjd0AFb",
+  30: "price_1SvQut1rJNZjWmG5NJEMlvyZ",
 };
+
+// ⚠️ À compléter dès que tu me le donnes
+const STRIPE_PRICE_AUTOMATED = process.env.STRIPE_PRICE_AUTOMATED;
+
+// Legacy (si tu veux le garder temporairement)
+const STRIPE_PRICE_PREMIUM = process.env.STRIPE_PRICE_PREMIUM;
 
 export async function POST(req: Request) {
   // 1️⃣ Stripe
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) {
-    return NextResponse.json(
-      { error: "Missing STRIPE_SECRET_KEY" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Missing STRIPE_SECRET_KEY" }, { status: 500 });
   }
   const stripe = new Stripe(stripeKey);
 
   // 2️⃣ Auth Clerk
   const { userId } = await auth();
   if (!userId) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 3️⃣ Plan demandé (normalisation)
-  const body = await req.json();
+  // 3️⃣ Body
+  const body = await req.json().catch(() => ({}));
   const rawPlan = body?.plan;
-  const plan = typeof rawPlan === "string" ? rawPlan.toLowerCase() : null;
+  const plan = normalizePlan(rawPlan);
+  const requestedQuota = normalizeQuota(body?.quota);
 
   if (!plan) {
-    return NextResponse.json(
-      { error: "Missing plan" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Missing plan" }, { status: 400 });
   }
 
-  const priceId = PRICE_BY_PLAN[plan];
-  if (!priceId) {
-    return NextResponse.json(
-      { error: `Invalid plan: ${rawPlan}` },
-      { status: 400 }
-    );
+  // 4️⃣ Déterminer priceId + quota final
+  let priceId: string | undefined;
+  let finalQuota: number | null = null;
+
+  if (plan === "essential") {
+    const q = requestedQuota ?? 10; // défaut 10 pour compat
+    if (![10, 20, 30].includes(q)) {
+      return NextResponse.json({ error: `Invalid quota for essential: ${body?.quota}` }, { status: 400 });
+    }
+    priceId = PRICE_ESSENTIAL_BY_QUOTA[q];
+    finalQuota = q;
+  } else if (plan === "automated") {
+    if (!STRIPE_PRICE_AUTOMATED) {
+      return NextResponse.json(
+        { error: "Missing STRIPE_PRICE_AUTOMATED env" },
+        { status: 500 }
+      );
+    }
+    priceId = STRIPE_PRICE_AUTOMATED;
+    finalQuota = 15;
+  } else if (plan === "premium") {
+    if (!STRIPE_PRICE_PREMIUM) {
+      return NextResponse.json(
+        { error: "Missing STRIPE_PRICE_PREMIUM env" },
+        { status: 500 }
+      );
+    }
+    priceId = STRIPE_PRICE_PREMIUM;
+    finalQuota = null;
+  } else {
+    return NextResponse.json({ error: `Invalid plan: ${rawPlan}` }, { status: 400 });
   }
 
-  // 4️⃣ Supabase
+  // 5️⃣ Supabase
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -64,13 +99,10 @@ export async function POST(req: Request) {
     .single();
 
   if (error || !client) {
-    return NextResponse.json(
-      { error: "Client not found" },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: "Client not found" }, { status: 404 });
   }
 
-  // 5️⃣ Customer Stripe (création si absent)
+  // 6️⃣ Customer Stripe (création si absent)
   let stripeCustomerId: string | null = client.stripe_customer_id;
 
   if (!stripeCustomerId) {
@@ -90,24 +122,28 @@ export async function POST(req: Request) {
       .eq("id", client.id);
   }
 
-  // 6️⃣ Checkout Stripe
-  const origin =
-    req.headers.get("origin") ?? "https://mind-link.fr";
+  // 7️⃣ Checkout Stripe
+  const origin = req.headers.get("origin") ?? "https://mind-link.fr";
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: stripeCustomerId,
-    line_items: [
-      {
-        price: priceId,
-        quantity: 1,
+    line_items: [{ price: priceId, quantity: 1 }],
+
+    // ✅ on stocke plan/quota dans la subscription metadata (utile pour le webhook)
+    subscription_data: {
+      metadata: {
+        client_id: String(client.id),
+        clerk_user_id: userId,
+        plan,
+        quota: finalQuota !== null ? String(finalQuota) : "",
       },
-    ],
+    },
+
     success_url: `${origin}/dashboard/hub/billing?success=1`,
     cancel_url: `${origin}/dashboard/hub/billing?canceled=1`,
     client_reference_id: userId,
   });
 
-  // 7️⃣ Réponse
   return NextResponse.json({ url: session.url });
 }
