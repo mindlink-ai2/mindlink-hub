@@ -74,6 +74,20 @@ function OnboardingForm() {
   const [status, setStatus] = useState<null | { ok: boolean; msg: string }>(null);
 
   const progress = useMemo(() => {
+    const total = 10;
+    let done = 0;
+
+    if (form.phone) done++;
+    if (form.company) done++;
+    if (form.target_company_type) done++;
+    if (form.target_industry) done++;
+    if (form.target_geo_france) done++;
+    if (form.target_company_size.length) done++;
+    if (form.target_personas_titles) done++;
+    if (form.ideal_targets) done++;
+    if (form.value_promise) done++;
+    if (form.full_name) done++;
+
     const requiredFilled =
       !!form.full_name &&
       !!clerkEmail &&
@@ -87,19 +101,6 @@ function OnboardingForm() {
       !!form.ideal_targets &&
       !!form.value_promise;
 
-    // mini progress visuel (pas bloquant)
-    const total = 10;
-    let done = 0;
-    if (form.phone) done++;
-    if (form.company) done++;
-    if (form.target_company_type) done++;
-    if (form.target_industry) done++;
-    if (form.target_geo_france) done++;
-    if (form.target_company_size.length) done++;
-    if (form.target_personas_titles) done++;
-    if (form.ideal_targets) done++;
-    if (form.value_promise) done++;
-    if (form.full_name) done++;
     return { done, total, requiredFilled };
   }, [form, clerkEmail]);
 
@@ -145,7 +146,10 @@ function OnboardingForm() {
         return;
       }
 
-      setStatus({ ok: true, msg: "C’est bon ✅ On lance la mise en place." });
+      setStatus({
+        ok: true,
+        msg: "Parfait ✅ Merci ! On a bien reçu tes infos, on s’occupe du reste.",
+      });
     } catch {
       setStatus({ ok: false, msg: "Erreur réseau. Réessaie dans 30 secondes." });
     } finally {
@@ -173,7 +177,7 @@ function OnboardingForm() {
                 Questionnaire d’onboarding
               </h1>
               <p className="mt-2 max-w-2xl text-sm text-white/70">
-                Réponds une fois, et on automatise le reste : tes infos déclenchent nos scénarios (n8n) et accélèrent la mise en place.
+                Réponds une fois, et on met tout en place derrière. Tes réponses nous permettent d’être ultra précis dès le départ.
               </p>
             </div>
 
@@ -185,7 +189,12 @@ function OnboardingForm() {
               <div className="mt-3 h-2 w-full rounded-full bg-white/10">
                 <div
                   className="h-2 rounded-full bg-white"
-                  style={{ width: `${Math.min(100, Math.round((progress.done / progress.total) * 100))}%` }}
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      Math.round((progress.done / progress.total) * 100)
+                    )}%`,
+                  }}
                 />
               </div>
               <p className="mt-2 text-xs text-white/60">
@@ -199,8 +208,14 @@ function OnboardingForm() {
       {/* FORM */}
       <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 px-4 py-10 lg:grid-cols-12">
         <div className="lg:col-span-8">
-          <form onSubmit={onSubmit} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
-            <SectionTitle title="Identité" subtitle="On verrouille l’email pour éviter les erreurs de paiement." />
+          <form
+            onSubmit={onSubmit}
+            className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
+          >
+            <SectionTitle
+              title="Identité"
+              subtitle="On verrouille l’email pour éviter les erreurs et garder un suivi propre."
+            />
 
             <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
@@ -211,7 +226,7 @@ function OnboardingForm() {
                 placeholder="Ex: Marie Dupont"
               />
               <Input
-                label="E-mail (doit être le même que celui avec lequel vous avez payé)"
+                label="E-mail (doit être le même que celui utilisé lors du paiement)"
                 required
                 value={clerkEmail}
                 readOnly
@@ -235,7 +250,10 @@ function OnboardingForm() {
 
             <Divider />
 
-            <SectionTitle title="Ciblage" subtitle="On s’aligne sur la cible et le terrain de jeu." />
+            <SectionTitle
+              title="Ciblage"
+              subtitle="On s’aligne sur la cible et le terrain de jeu."
+            />
 
             <div className="mt-5 grid grid-cols-1 gap-4">
               <Input
@@ -267,7 +285,7 @@ function OnboardingForm() {
             <div className="mt-5">
               <Label required>Taille d’entreprise recherchée</Label>
               <p className="mt-1 text-xs text-white/55">
-                Coche les tailles EXACTES que tu veux (mêmes valeurs que ton ancienne liste).
+                Coche les tailles qui t’intéressent (tu peux en sélectionner plusieurs).
               </p>
 
               <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -303,7 +321,10 @@ function OnboardingForm() {
 
             <Divider />
 
-            <SectionTitle title="Cibles & promesse" subtitle="Ce qui va driver la qualité des prospects." />
+            <SectionTitle
+              title="Cibles & promesse"
+              subtitle="C’est ce qui va faire la différence sur la qualité."
+            />
 
             <div className="mt-5 grid grid-cols-1 gap-4">
               <Input
@@ -319,12 +340,12 @@ function OnboardingForm() {
                 required
                 value={form.ideal_targets}
                 onChange={(v) => update("ideal_targets", v)}
-                placeholder="Décris l’entreprise idéale, signaux, douleurs, contexte..."
+                placeholder="Décris l’entreprise idéale : signaux, douleurs, contexte, etc."
                 rows={4}
               />
 
               <Textarea
-                label="Quel promesse faites-vous à vos clients, pourquoi travailleraient-ils avec vous ?"
+                label="Quelle promesse faites-vous à vos clients, pourquoi travailleraient-ils avec vous ?"
                 required
                 value={form.value_promise}
                 onChange={(v) => update("value_promise", v)}
@@ -338,7 +359,7 @@ function OnboardingForm() {
                 disabled={loading}
                 className="rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:opacity-90 disabled:opacity-60"
               >
-                {loading ? "Envoi..." : "Envoyer et lancer l’automatisation"}
+                {loading ? "Envoi..." : "Envoyer"}
               </button>
 
               {status && (
@@ -361,11 +382,13 @@ function OnboardingForm() {
         <div className="lg:col-span-4">
           <div className="sticky top-6 space-y-4">
             <Card>
-              <h3 className="text-base font-semibold text-white">Ce que ça déclenche</h3>
+              <h3 className="text-base font-semibold text-white">
+                Ce qui se passe après l’envoi
+              </h3>
               <ul className="mt-3 space-y-2 text-sm text-white/70">
-                <li>• Envoi des infos vers n8n</li>
-                <li>• Création/paramétrage du workflow de leads</li>
-                <li>• Email récap à l’équipe</li>
+                <li>• Vérification des informations</li>
+                <li>• Paramétrage de votre ciblage</li>
+                <li>• Mise en place du suivi et de la livraison</li>
               </ul>
             </Card>
 
@@ -405,7 +428,13 @@ function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) 
   );
 }
 
-function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
+function Label({
+  children,
+  required,
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+}) {
   return (
     <div className="text-sm font-medium text-white">
       {children} {required ? <span className="text-red-400">*</span> : null}
