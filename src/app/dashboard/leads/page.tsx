@@ -28,14 +28,15 @@ export default function LeadsPage() {
   const [clientLoaded, setClientLoaded] = useState(false);
 
   // ✅ client options (email / phone enrichment)
-  const [emailOption, setEmailOption] = useState<boolean>(false);
-  const [phoneOption, setPhoneOption] = useState<boolean>(false);
+  // ➜ Tous les clients ont accès email + téléphone désormais
+  const [emailOption, setEmailOption] = useState<boolean>(true);
+  const [phoneOption, setPhoneOption] = useState<boolean>(true);
 
-  // ✅ plan
+  // ✅ plan (on garde la logique existante côté API, mais plus de premium gating)
   const [plan, setPlan] = useState<string>("essential");
-  const isPremium = plan === "premium";
+  const isPremium = false;
 
-  // ✅ premium modal
+  // ✅ premium modal (désactivé — conservé nulle part)
   const [premiumModalOpen, setPremiumModalOpen] = useState(false);
 
   // ✅ Selection mode
@@ -75,16 +76,15 @@ export default function LeadsPage() {
       const leads = data.leads ?? [];
       setSafeLeads(leads);
 
-      // ✅ client from API
+      // ✅ client from API (on garde le parsing, mais email/phone sont forcés ON)
       const client = data.client ?? data.options ?? null;
-      const eo = client?.email_option;
-      const po = client?.phone_option;
-
-      setEmailOption(Boolean(eo));
-      setPhoneOption(Boolean(po));
 
       // ✅ plan (fallback essential)
       setPlan(String(client?.plan ?? "essential").toLowerCase());
+
+      // ✅ Tout le monde a email + phone
+      setEmailOption(true);
+      setPhoneOption(true);
 
       setClientLoaded(true);
     })();
@@ -166,9 +166,7 @@ export default function LeadsPage() {
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
 
-    const ok = confirm(
-      `Voulez-vous vraiment supprimer ${selectedIds.size} lead(s) ?`
-    );
+    const ok = confirm(`Voulez-vous vraiment supprimer ${selectedIds.size} lead(s) ?`);
     if (!ok) return;
 
     const ids = Array.from(selectedIds)
@@ -189,9 +187,7 @@ export default function LeadsPage() {
       }
 
       // ✅ instant UI update
-      setSafeLeads((prev: Lead[]) =>
-        prev.filter((l) => !selectedIds.has(String(l.id)))
-      );
+      setSafeLeads((prev: Lead[]) => prev.filter((l) => !selectedIds.has(String(l.id))));
       setSelectedIds(new Set());
       setOpenLead((prev: Lead | null) =>
         prev && selectedIds.has(String(prev.id)) ? null : prev
@@ -205,16 +201,11 @@ export default function LeadsPage() {
   // ✅ LIVE UI UPDATE via events from child components
   useEffect(() => {
     const onTreated = (e: Event) => {
-      const detail = (e as CustomEvent).detail as {
-        leadId: number;
-        traite: boolean;
-      };
+      const detail = (e as CustomEvent).detail as { leadId: number; traite: boolean };
       if (!detail?.leadId) return;
 
       setSafeLeads((prev: Lead[]) =>
-        prev.map((l) =>
-          l.id === detail.leadId ? { ...l, traite: detail.traite } : l
-        )
+        prev.map((l) => (l.id === detail.leadId ? { ...l, traite: detail.traite } : l))
       );
 
       setOpenLead((prev: Lead | null) =>
@@ -226,9 +217,7 @@ export default function LeadsPage() {
       const detail = (e as CustomEvent).detail as { leadId: string };
       if (!detail?.leadId) return;
 
-      setSafeLeads((prev: Lead[]) =>
-        prev.filter((l) => String(l.id) !== detail.leadId)
-      );
+      setSafeLeads((prev: Lead[]) => prev.filter((l) => String(l.id) !== detail.leadId));
       setOpenLead((prev: Lead | null) =>
         prev && String(prev.id) === detail.leadId ? null : prev
       );
@@ -246,14 +235,8 @@ export default function LeadsPage() {
     window.addEventListener("mindlink:lead-deleted", onDeleted as EventListener);
 
     return () => {
-      window.removeEventListener(
-        "mindlink:lead-treated",
-        onTreated as EventListener
-      );
-      window.removeEventListener(
-        "mindlink:lead-deleted",
-        onDeleted as EventListener
-      );
+      window.removeEventListener("mindlink:lead-treated", onTreated as EventListener);
+      window.removeEventListener("mindlink:lead-deleted", onDeleted as EventListener);
     };
   }, []);
 
@@ -273,9 +256,7 @@ export default function LeadsPage() {
 
       setSafeLeads((prev: Lead[]) =>
         prev.map((l) =>
-          l.id === openLead.id
-            ? { ...l, internal_message: openLead.internal_message }
-            : l
+          l.id === openLead.id ? { ...l, internal_message: openLead.internal_message } : l
         )
       );
     }, 300);
@@ -283,10 +264,9 @@ export default function LeadsPage() {
     return () => clearTimeout(delay);
   }, [openLead?.internal_message]);
 
-  // ✅ Auto-save mail message (Email) — only when PREMIUM (plan)
+  // ✅ Auto-save mail message (Email) — now for everyone (no premium gating)
   useEffect(() => {
     if (!openLead) return;
-    if (!isPremium) return;
 
     const delay = setTimeout(async () => {
       await fetch("/api/update-mail-message", {
@@ -300,15 +280,13 @@ export default function LeadsPage() {
 
       setSafeLeads((prev: Lead[]) =>
         prev.map((l) =>
-          l.id === openLead.id
-            ? { ...l, message_mail: openLead.message_mail }
-            : l
+          l.id === openLead.id ? { ...l, message_mail: openLead.message_mail } : l
         )
       );
     }, 300);
 
     return () => clearTimeout(delay);
-  }, [openLead?.message_mail, isPremium]);
+  }, [openLead?.message_mail]);
 
   // 🔵 Fonction pour marquer "Message envoyé"
   const handleMessageSent = async () => {
@@ -348,14 +326,9 @@ export default function LeadsPage() {
     );
   };
 
-  // ✅ Email actions (plan-gated) — uses message_mail
+  // ✅ Email actions — now for everyone (no premium gating)
   const openPrefilledEmail = () => {
     if (!openLead) return;
-
-    if (!isPremium) {
-      setPremiumModalOpen(true);
-      return;
-    }
 
     const to = (openLead.email ?? "").trim();
     if (!to) {
@@ -363,14 +336,10 @@ export default function LeadsPage() {
       return;
     }
 
-    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${
-      openLead.LastName ?? ""
-    }`.trim();
+    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
     const body = (openLead.message_mail ?? "").trim();
 
-    const mailto = `mailto:${to}?subject=${encodeURIComponent(
-      subject
-    )}&body=${encodeURIComponent(body)}`;
+    const mailto = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
     window.location.href = mailto;
   };
@@ -378,20 +347,13 @@ export default function LeadsPage() {
   const openGmailWeb = () => {
     if (!openLead) return;
 
-    if (!isPremium) {
-      setPremiumModalOpen(true);
-      return;
-    }
-
     const to = (openLead.email ?? "").trim();
     if (!to) {
       alert("Aucun email disponible pour ce prospect.");
       return;
     }
 
-    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${
-      openLead.LastName ?? ""
-    }`.trim();
+    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
     const body = (openLead.message_mail ?? "").trim();
 
     const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
@@ -404,20 +366,13 @@ export default function LeadsPage() {
   const openOutlookWeb = () => {
     if (!openLead) return;
 
-    if (!isPremium) {
-      setPremiumModalOpen(true);
-      return;
-    }
-
     const to = (openLead.email ?? "").trim();
     if (!to) {
       alert("Aucun email disponible pour ce prospect.");
       return;
     }
 
-    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${
-      openLead.LastName ?? ""
-    }`.trim();
+    const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
     const body = (openLead.message_mail ?? "").trim();
 
     const url = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(
@@ -458,9 +413,7 @@ export default function LeadsPage() {
 
             <div className="mt-6 h-12 rounded-2xl bg-slate-900/50 border border-slate-800/70 animate-pulse" />
             <div className="mt-4 h-72 rounded-2xl bg-slate-900/40 border border-slate-800/60 animate-pulse" />
-            <div className="mt-3 text-slate-500 text-xs">
-              Chargement des leads…
-            </div>
+            <div className="mt-3 text-slate-500 text-xs">Chargement des leads…</div>
           </div>
         </div>
       </div>
@@ -472,34 +425,26 @@ export default function LeadsPage() {
   const remainingToTreat = total - treatedCount;
 
   // Next import (Paris)
-  const now = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
-  );
-  const nextImport = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" })
-  );
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+  const nextImport = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
   nextImport.setHours(8, 0, 0, 0);
   if (now > nextImport) nextImport.setDate(nextImport.getDate() + 1);
   const diffMs = nextImport.getTime() - now.getTime();
   const diffMinutes = Math.floor(diffMs / 1000 / 60);
   const hours = Math.floor(diffMinutes / 60);
   const minutes = diffMinutes % 60;
-  const nextImportText =
-    hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
+  const nextImportText = hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
 
   const allFilteredSelected =
-    filteredLeads.length > 0 &&
-    filteredLeads.every((l) => selectedIds.has(String(l.id)));
+    filteredLeads.length > 0 && filteredLeads.every((l) => selectedIds.has(String(l.id)));
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
-        {/* ✅ CHANGEMENT 1: remonter légèrement le header (pt-20 -> pt-14) */}
         <div className="min-h-screen w-full px-5 sm:px-6 pt-14 pb-32">
           <div className="mx-auto w-full max-w-[1680px] space-y-6">
             {/* TOP / HEADER */}
             <div className="relative overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950/70">
-              {/* Ambient glow (purely visual) */}
               <div className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(60%_55%_at_50%_0%,black,transparent)]">
                 <div className="absolute -top-28 left-1/2 h-72 w-[740px] -translate-x-1/2 rounded-full bg-indigo-500/14 blur-3xl" />
                 <div className="absolute -top-16 left-1/2 h-44 w-[560px] -translate-x-1/2 rounded-full bg-sky-400/8 blur-3xl" />
@@ -507,7 +452,6 @@ export default function LeadsPage() {
 
               <div className="relative p-6 sm:p-7">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                  {/* Title + context */}
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/40 px-3 py-1 text-[11px] text-slate-300">
@@ -528,15 +472,8 @@ export default function LeadsPage() {
                         </span>
                       )}
 
-                      <span
-                        className={[
-                          "inline-flex items-center rounded-full border px-3 py-1 text-[11px] whitespace-nowrap",
-                          isPremium
-                            ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-200"
-                            : "border-slate-800 bg-slate-950/35 text-slate-300",
-                        ].join(" ")}
-                      >
-                        {isPremium ? "Premium" : "Essential"}
+                      <span className="inline-flex items-center rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] text-slate-300 whitespace-nowrap">
+                        Essential
                       </span>
                     </div>
 
@@ -545,12 +482,10 @@ export default function LeadsPage() {
                     </h1>
 
                     <p className="mt-2 text-sm text-slate-400 max-w-2xl">
-                      Tous vos prospects qualifiés, importés automatiquement par
-                      Lidmeo. Recherchez, traitez, et ouvrez un lead pour préparer
-                      votre message.
+                      Tous vos prospects qualifiés, importés automatiquement par Lidmeo. Recherchez,
+                      traitez, et ouvrez un lead pour préparer votre message.
                     </p>
 
-                    {/* ✅ CHANGEMENT 2: rendre Total + Traités + À traiter plus visibles et mieux positionnés */}
                     <div className="mt-4 flex flex-wrap items-center gap-3">
                       <div className="rounded-2xl border border-slate-800 bg-slate-950/45 px-4 py-3">
                         <div className="text-[10px] uppercase tracking-wide text-slate-500">
@@ -580,7 +515,6 @@ export default function LeadsPage() {
                       </div>
                     </div>
 
-                    {/* Search */}
                     <div className="mt-5">
                       <div className="group flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-3 shadow-inner backdrop-blur-md transition focus-within:ring-2 focus-within:ring-indigo-500/40">
                         <svg
@@ -615,211 +549,188 @@ export default function LeadsPage() {
                   </div>
 
                   {/* Command center */}
-<div className="w-full lg:w-[520px] shrink-0">
-  <div className="relative overflow-hidden rounded-[26px] border border-slate-800 bg-slate-950/40 p-4 sm:p-5 shadow-[0_16px_40px_-26px_rgba(0,0,0,0.75)]">
-    {/* subtle glow */}
-    <div className="pointer-events-none absolute inset-0">
-      <div className="absolute -top-24 right-[-120px] h-56 w-56 rounded-full bg-indigo-500/10 blur-3xl" />
-      <div className="absolute -bottom-24 left-[-120px] h-56 w-56 rounded-full bg-sky-400/8 blur-3xl" />
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/0 via-slate-950/10 to-slate-950/35" />
-    </div>
+                  <div className="w-full lg:w-[520px] shrink-0">
+                    <div className="relative overflow-hidden rounded-[26px] border border-slate-800 bg-slate-950/40 p-4 sm:p-5 shadow-[0_16px_40px_-26px_rgba(0,0,0,0.75)]">
+                      <div className="pointer-events-none absolute inset-0">
+                        <div className="absolute -top-24 right-[-120px] h-56 w-56 rounded-full bg-indigo-500/10 blur-3xl" />
+                        <div className="absolute -bottom-24 left-[-120px] h-56 w-56 rounded-full bg-sky-400/8 blur-3xl" />
+                        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/0 via-slate-950/10 to-slate-950/35" />
+                      </div>
 
-    <div className="relative">
-      {/* Header (dense) */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/45 text-slate-200">
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M10 6H5a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M14 4h6m0 0v6m0-6L10 14"
-                />
-              </svg>
-            </div>
+                      <div className="relative">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/45 text-slate-200">
+                                <svg
+                                  className="h-4 w-4"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  aria-hidden="true"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M10 6H5a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M14 4h6m0 0v6m0-6L10 14"
+                                  />
+                                </svg>
+                              </div>
 
-            <div className="min-w-0">
-              <div className="text-[12px] font-semibold text-slate-100 leading-none">
-                Commandes
-              </div>
-              <div className="mt-1 text-[11px] text-slate-500">
-                Export, sélection, suppression.
-              </div>
-            </div>
-          </div>
-        </div>
+                              <div className="min-w-0">
+                                <div className="text-[12px] font-semibold text-slate-100 leading-none">
+                                  Commandes
+                                </div>
+                                <div className="mt-1 text-[11px] text-slate-500">
+                                  Export, sélection, suppression.
+                                </div>
+                              </div>
+                            </div>
+                          </div>
 
-        {/* Right stack (compact chips) */}
-        <div className="shrink-0 flex flex-col items-end gap-2">
-          <span
-            className={[
-              "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] tabular-nums whitespace-nowrap",
-              isPremium
-                ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-200"
-                : "border-slate-800 bg-slate-950/35 text-slate-300",
-            ].join(" ")}
-          >
-            <span
-              className={[
-                "h-1.5 w-1.5 rounded-full",
-                isPremium ? "bg-indigo-400" : "bg-slate-600",
-              ].join(" ")}
-            />
-            {isPremium ? "Premium" : "Essential"}
-          </span>
+                          <div className="shrink-0 flex flex-col items-end gap-2">
+                            <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] tabular-nums whitespace-nowrap text-slate-300">
+                              <span className="h-1.5 w-1.5 rounded-full bg-slate-600" />
+                              Essential
+                            </span>
 
-          <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-950/35 px-3 py-2 text-[12px] text-slate-200 whitespace-nowrap tabular-nums">
-            <span className="text-[10px] uppercase tracking-wide text-slate-500">
-              Prochain import
-            </span>
-            <span className="h-4 w-px bg-slate-800" />
-            <span className="font-semibold text-slate-100">{nextImportText}</span>
-            <span className="text-slate-500">•</span>
-            <span className="text-slate-400">08:00</span>
-          </span>
-        </div>
-      </div>
+                            <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-950/35 px-3 py-2 text-[12px] text-slate-200 whitespace-nowrap tabular-nums">
+                              <span className="text-[10px] uppercase tracking-wide text-slate-500">
+                                Prochain import
+                              </span>
+                              <span className="h-4 w-px bg-slate-800" />
+                              <span className="font-semibold text-slate-100">{nextImportText}</span>
+                              <span className="text-slate-500">•</span>
+                              <span className="text-slate-400">08:00</span>
+                            </span>
+                          </div>
+                        </div>
 
-      {/* Primary actions (fills space, no dead zones) */}
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <a
-          href="/dashboard/leads/export"
-          className="group inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-        >
-          <span className="inline-flex items-center gap-2">
-            <svg
-              className="h-4 w-4 text-slate-300 group-hover:text-slate-100 transition"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 3v12m0 0l4-4m-4 4l-4-4"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 17v3h16v-3"
-              />
-            </svg>
-            Exporter CSV
-          </span>
-        </a>
+                        <div className="mt-4 grid grid-cols-2 gap-2">
+                          <a
+                            href="/dashboard/leads/export"
+                            className="group inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <svg
+                                className="h-4 w-4 text-slate-300 group-hover:text-slate-100 transition"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M12 3v12m0 0l4-4m-4 4l-4-4"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M4 17v3h16v-3"
+                                />
+                              </svg>
+                              Exporter CSV
+                            </span>
+                          </a>
 
-        <button
-          type="button"
-          onClick={toggleSelectionMode}
-          className={[
-            "group inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl border transition shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30",
-            selectionMode
-              ? "bg-indigo-600/15 border-indigo-500/25 text-indigo-100 hover:bg-indigo-600/20"
-              : "bg-slate-900/70 border-slate-800 text-slate-200 hover:bg-slate-800/70",
-          ].join(" ")}
-        >
-          <span className="inline-flex items-center gap-2">
-            <svg
-              className="h-4 w-4 text-slate-300 group-hover:text-slate-100 transition"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 11l3 3L22 4"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"
-              />
-            </svg>
-            {selectionMode ? "Annuler" : "Mode sélection"}
-          </span>
-        </button>
-      </div>
+                          <button
+                            type="button"
+                            onClick={toggleSelectionMode}
+                            className={[
+                              "group inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl border transition shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30",
+                              selectionMode
+                                ? "bg-indigo-600/15 border-indigo-500/25 text-indigo-100 hover:bg-indigo-600/20"
+                                : "bg-slate-900/70 border-slate-800 text-slate-200 hover:bg-slate-800/70",
+                            ].join(" ")}
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <svg
+                                className="h-4 w-4 text-slate-300 group-hover:text-slate-100 transition"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M9 11l3 3L22 4"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"
+                                />
+                              </svg>
+                              {selectionMode ? "Annuler" : "Mode sélection"}
+                            </span>
+                          </button>
+                        </div>
 
-      {/* Selection mode actions (tight, no extra padding) */}
-      {selectionMode && (
-        <div className="mt-2 rounded-2xl border border-indigo-500/15 bg-indigo-500/8 p-2">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={toggleSelectAllFiltered}
-              className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/45 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
-            >
-              {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
-            </button>
+                        {selectionMode && (
+                          <div className="mt-2 rounded-2xl border border-indigo-500/15 bg-indigo-500/8 p-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={toggleSelectAllFiltered}
+                                className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/45 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
+                              >
+                                {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
+                              </button>
 
-            <button
-              type="button"
-              onClick={handleBulkDelete}
-              disabled={selectedCount === 0}
-              className={[
-                "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-amber-500/20",
-                selectedCount === 0
-                  ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
-                  : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
-              ].join(" ")}
-            >
-              Supprimer ({selectedCount})
-            </button>
-          </div>
+                              <button
+                                type="button"
+                                onClick={handleBulkDelete}
+                                disabled={selectedCount === 0}
+                                className={[
+                                  "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-amber-500/20",
+                                  selectedCount === 0
+                                    ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
+                                    : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
+                                ].join(" ")}
+                              >
+                                Supprimer ({selectedCount})
+                              </button>
+                            </div>
 
-          <div className="mt-2 flex items-center justify-between gap-3 px-1">
-            <div className="text-[11px] text-indigo-200/70">Sélection active</div>
-            <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
-              {selectedCount} sélectionné(s)
-            </span>
-          </div>
-        </div>
-      )}
+                            <div className="mt-2 flex items-center justify-between gap-3 px-1">
+                              <div className="text-[11px] text-indigo-200/70">Sélection active</div>
+                              <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
+                                {selectedCount} sélectionné(s)
+                              </span>
+                            </div>
+                          </div>
+                        )}
 
-      {/* Footer (aligned + no blank space) */}
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div className="text-[11px] text-slate-500">
-          Astuce : filtrez avec la recherche, puis exportez ou sélectionnez.
-        </div>
+                        <div className="mt-4 flex items-center justify-between gap-3">
+                          <div className="text-[11px] text-slate-500">
+                            Astuce : filtrez avec la recherche, puis exportez ou sélectionnez.
+                          </div>
 
-        {!selectionMode && (
-          <span className="text-[11px] px-3 py-1 rounded-full border border-slate-800 bg-slate-950/35 text-slate-300 whitespace-nowrap tabular-nums">
-            {filteredLeads.length} affiché(s)
-          </span>
-        )}
-      </div>
-    </div>
-  </div>
-</div>
+                          {!selectionMode && (
+                            <span className="text-[11px] px-3 py-1 rounded-full border border-slate-800 bg-slate-950/35 text-slate-300 whitespace-nowrap tabular-nums">
+                              {filteredLeads.length} affiché(s)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Selection hint bar (UX only) */}
                 {selectionMode && (
                   <div className="mt-5 rounded-2xl border border-indigo-500/20 bg-indigo-500/8 px-4 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-[12px] text-indigo-100">
                         Sélection active •{" "}
-                        <span className="font-semibold tabular-nums">
-                          {selectedCount}
-                        </span>{" "}
-                        lead(s)
+                        <span className="font-semibold tabular-nums">{selectedCount}</span> lead(s)
                       </div>
                       <div className="text-[11px] text-indigo-200/70">
-                        Astuce : utilisez “Tout sélectionner” pour supprimer en
-                        lot.
+                        Astuce : utilisez “Tout sélectionner” pour supprimer en lot.
                       </div>
                     </div>
                   </div>
@@ -833,9 +744,7 @@ export default function LeadsPage() {
             <div className="rounded-[28px] border border-slate-800 bg-slate-950/70 shadow-xl overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <h2 className="text-slate-100 text-sm font-semibold">
-                    Liste des leads
-                  </h2>
+                  <h2 className="text-slate-100 text-sm font-semibold">Liste des leads</h2>
                   <p className="text-[11px] text-slate-500">
                     Cliquez sur “Voir →” pour ouvrir la fiche lead.
                   </p>
@@ -852,7 +761,6 @@ export default function LeadsPage() {
                 )}
               </div>
 
-              {/* Scroll container to avoid layout break on small screens / email+phone */}
               <div className="w-full overflow-x-auto">
                 <table className="w-full text-[13px] table-fixed min-w-[980px]">
                   <thead className="sticky top-0 z-10">
@@ -908,9 +816,7 @@ export default function LeadsPage() {
                             <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/40 text-slate-300">
                               ⌕
                             </div>
-                            <div className="text-slate-200 font-medium">
-                              Aucun résultat
-                            </div>
+                            <div className="text-slate-200 font-medium">Aucun résultat</div>
                             <div className="mt-1 text-slate-500 text-sm">
                               Essayez un autre nom, une entreprise ou une ville.
                             </div>
@@ -932,9 +838,7 @@ export default function LeadsPage() {
                             key={lead.id}
                             className={[
                               "border-b border-slate-900/80 transition group",
-                              idx % 2 === 0
-                                ? "bg-transparent"
-                                : "bg-slate-950/25",
+                              idx % 2 === 0 ? "bg-transparent" : "bg-slate-950/25",
                               "hover:bg-slate-900/45",
                             ].join(" ")}
                           >
@@ -951,10 +855,7 @@ export default function LeadsPage() {
                             )}
 
                             <td className="py-3 px-3 text-center">
-                              <TraiteCheckbox
-                                leadId={lead.id}
-                                defaultChecked={Boolean(lead.traite)}
-                              />
+                              <TraiteCheckbox leadId={lead.id} defaultChecked={Boolean(lead.traite)} />
                             </td>
 
                             <td className="py-3 px-3 text-slate-50 relative pr-16">
@@ -971,9 +872,7 @@ export default function LeadsPage() {
                                   </span>
                                 )}
 
-                                <span className="font-medium truncate">
-                                  {fullName}
-                                </span>
+                                <span className="font-medium truncate">{fullName}</span>
                               </div>
 
                               <button
@@ -985,13 +884,9 @@ export default function LeadsPage() {
                               </button>
                             </td>
 
-                            <td className="py-3 px-3 text-slate-300 truncate">
-                              {lead.Company || "—"}
-                            </td>
+                            <td className="py-3 px-3 text-slate-300 truncate">{lead.Company || "—"}</td>
 
-                            <td className="py-3 px-3 text-slate-300 truncate">
-                              {lead.location || "—"}
-                            </td>
+                            <td className="py-3 px-3 text-slate-300 truncate">{lead.location || "—"}</td>
 
                             <td className="py-3 px-3">
                               {lead.LinkedInURL ? (
@@ -1001,8 +896,7 @@ export default function LeadsPage() {
                                   rel="noreferrer"
                                   className="inline-flex items-center justify-center gap-2 h-9 px-3 rounded-xl border border-slate-800 bg-slate-950/35 text-[12px] text-sky-200 hover:bg-slate-900/55 transition whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                                 >
-                                  Profil{" "}
-                                  <span className="text-slate-500">↗</span>
+                                  Profil <span className="text-slate-500">↗</span>
                                 </a>
                               ) : (
                                 <span className="text-slate-500">—</span>
@@ -1010,23 +904,15 @@ export default function LeadsPage() {
                             </td>
 
                             {emailOption && (
-                              <td className="py-3 px-3 text-slate-200 truncate">
-                                {lead.email || "—"}
-                              </td>
+                              <td className="py-3 px-3 text-slate-200 truncate">{lead.email || "—"}</td>
                             )}
 
                             {phoneOption && (
-                              <td className="py-3 px-3 text-slate-200 truncate">
-                                {lead.phone || "—"}
-                              </td>
+                              <td className="py-3 px-3 text-slate-200 truncate">{lead.phone || "—"}</td>
                             )}
 
                             <td className="py-3 px-3 text-center text-slate-400 whitespace-nowrap tabular-nums">
-                              {lead.created_at
-                                ? new Date(lead.created_at).toLocaleDateString(
-                                    "fr-FR"
-                                  )
-                                : "—"}
+                              {lead.created_at ? new Date(lead.created_at).toLocaleDateString("fr-FR") : "—"}
                             </td>
 
                             <td className="py-3 px-3 text-center">
@@ -1040,11 +926,8 @@ export default function LeadsPage() {
                 </table>
               </div>
 
-              {/* Footer hint */}
               <div className="px-6 py-3 border-t border-slate-800 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  Astuce : passez la souris sur une ligne pour afficher “Voir →”.
-                </div>
+                <div>Astuce : passez la souris sur une ligne pour afficher “Voir →”.</div>
                 <div className="tabular-nums">
                   {treatedCount} traité(s) • {remainingToTreat} à traiter
                 </div>
@@ -1055,13 +938,9 @@ export default function LeadsPage() {
           {/* --- SIDEBAR --- */}
           {openLead && (
             <>
-              <div
-                className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]"
-                aria-hidden="true"
-              />
+              <div className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]" aria-hidden="true" />
 
               <div className="fixed right-0 top-0 z-50 h-full w-full sm:w-[480px] animate-slideLeft bg-gradient-to-b from-slate-950/95 to-slate-950/85 backdrop-blur-2xl border-l border-slate-800 shadow-[0_0_55px_-16px_rgba(99,102,241,0.55)] flex flex-col">
-                {/* Header */}
                 <div className="sticky top-0 z-10 p-6 pb-4 bg-slate-950/55 backdrop-blur-xl border-b border-slate-800">
                   <div className="flex items-start justify-between gap-3">
                     <button
@@ -1075,15 +954,8 @@ export default function LeadsPage() {
                       Fermer
                     </button>
 
-                    <span
-                      className={[
-                        "text-[11px] px-3 py-1 rounded-full border bg-slate-950/35 whitespace-nowrap",
-                        isPremium
-                          ? "border-indigo-500/30 text-indigo-200"
-                          : "border-slate-700 text-slate-200",
-                      ].join(" ")}
-                    >
-                      {isPremium ? "Premium" : "Essential"}
+                    <span className="text-[11px] px-3 py-1 rounded-full border bg-slate-950/35 whitespace-nowrap border-slate-700 text-slate-200">
+                      Essential
                     </span>
                   </div>
 
@@ -1115,13 +987,9 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                  {/* Identity / quick info */}
                   <div className="rounded-3xl border border-slate-800 bg-slate-950/25 p-4">
-                    <div className="text-[11px] uppercase tracking-wide text-slate-500">
-                      Informations
-                    </div>
+                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Informations</div>
 
                     <div className="mt-3 grid grid-cols-1 gap-3">
                       <InfoBlock title="LinkedIn">
@@ -1141,41 +1009,30 @@ export default function LeadsPage() {
 
                       {emailOption && (
                         <InfoBlock title="Email">
-                          <span className="text-slate-200">
-                            {openLead.email || "—"}
-                          </span>
+                          <span className="text-slate-200">{openLead.email || "—"}</span>
                         </InfoBlock>
                       )}
 
                       {phoneOption && (
                         <InfoBlock title="Téléphone">
-                          <span className="text-slate-200">
-                            {openLead.phone || "—"}
-                          </span>
+                          <span className="text-slate-200">{openLead.phone || "—"}</span>
                         </InfoBlock>
                       )}
 
                       <InfoBlock title="Créé le">
                         <span className="text-slate-200">
                           {openLead.created_at
-                            ? new Date(openLead.created_at).toLocaleDateString(
-                                "fr-FR"
-                              )
+                            ? new Date(openLead.created_at).toLocaleDateString("fr-FR")
                             : "—"}
                         </span>
                       </InfoBlock>
                     </div>
                   </div>
 
-                  {/* LinkedIn message */}
                   <div className="rounded-3xl border border-slate-800 bg-slate-950/25 p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs text-slate-300 font-medium">
-                        Message LinkedIn
-                      </label>
-                      <span className="text-[11px] text-slate-500 whitespace-nowrap">
-                        Autosave
-                      </span>
+                      <label className="text-xs text-slate-300 font-medium">Message LinkedIn</label>
+                      <span className="text-[11px] text-slate-500 whitespace-nowrap">Autosave</span>
                     </div>
 
                     <textarea
@@ -1185,9 +1042,7 @@ export default function LeadsPage() {
                         setOpenLead({ ...openLead, internal_message: newMsg });
                         setSafeLeads((prev: Lead[]) =>
                           prev.map((l) =>
-                            l.id === openLead.id
-                              ? { ...l, internal_message: newMsg }
-                              : l
+                            l.id === openLead.id ? { ...l, internal_message: newMsg } : l
                           )
                         );
                       }}
@@ -1207,9 +1062,7 @@ export default function LeadsPage() {
                             : "bg-indigo-600 hover:bg-indigo-500 text-white",
                         ].join(" ")}
                       >
-                        {openLead.message_sent
-                          ? "Message envoyé ✓"
-                          : "Marquer comme envoyé"}
+                        {openLead.message_sent ? "Message envoyé ✓" : "Marquer comme envoyé"}
                       </button>
                     </div>
 
@@ -1217,59 +1070,30 @@ export default function LeadsPage() {
                       <p className="text-xs text-slate-400 mt-2">
                         Prochaine relance :{" "}
                         <span className="text-slate-200 font-medium">
-                          {new Date(openLead.next_followup_at).toLocaleDateString(
-                            "fr-FR"
-                          )}
+                          {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
                         </span>
                       </p>
                     )}
                   </div>
 
-                  {/* Email (Premium only) */}
+                  {/* Email (now for everyone) */}
                   <div className="rounded-3xl border border-slate-800 bg-slate-950/25 p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs text-slate-300 font-medium">
-                        Message email
-                      </label>
-
-                      {!isPremium && (
-                        <button
-                          type="button"
-                          onClick={() => setPremiumModalOpen(true)}
-                          className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/15 transition whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/35"
-                        >
-                          Débloquer Premium
-                        </button>
-                      )}
+                      <label className="text-xs text-slate-300 font-medium">Message email</label>
+                      <span className="text-[11px] text-slate-500 whitespace-nowrap">Autosave</span>
                     </div>
 
                     <textarea
-                      value={
-                        isPremium
-                          ? openLead.message_mail ?? ""
-                          : "Fonctionnalité Premium : débloquez l’email personnalisé + les boutons d’envoi avec l’abonnement Premium."
-                      }
+                      value={openLead.message_mail ?? ""}
                       onChange={(e) => {
-                        if (!isPremium) return;
-
                         const newMsg = e.target.value;
                         setOpenLead({ ...openLead, message_mail: newMsg });
                         setSafeLeads((prev: Lead[]) =>
-                          prev.map((l) =>
-                            l.id === openLead.id
-                              ? { ...l, message_mail: newMsg }
-                              : l
-                          )
+                          prev.map((l) => (l.id === openLead.id ? { ...l, message_mail: newMsg } : l))
                         );
                       }}
                       placeholder="Écrivez votre message email…"
-                      className={[
-                        "mt-3 w-full h-44 p-4 rounded-2xl border text-sm transition focus:outline-none focus:ring-2",
-                        isPremium
-                          ? "bg-slate-900/55 border-slate-800 text-slate-200 placeholder-slate-500 focus:ring-indigo-500/50"
-                          : "bg-slate-900/35 border-slate-800 text-slate-500 focus:ring-transparent",
-                      ].join(" ")}
-                      readOnly={!isPremium}
+                      className="mt-3 w-full h-44 p-4 rounded-2xl bg-slate-900/55 border border-slate-800 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition"
                     />
 
                     {(() => {
@@ -1319,9 +1143,7 @@ export default function LeadsPage() {
                           </div>
 
                           {!hasEmail && (
-                            <p className="text-[11px] text-slate-500 mt-2">
-                              Aucun email détecté pour ce lead.
-                            </p>
+                            <p className="text-[11px] text-slate-500 mt-2">Aucun email détecté pour ce lead.</p>
                           )}
                         </>
                       );
@@ -1332,38 +1154,7 @@ export default function LeadsPage() {
             </>
           )}
 
-          {/* ✅ premium modal */}
-          {premiumModalOpen && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center">
-              <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                onClick={() => setPremiumModalOpen(false)}
-              />
-              <div className="relative w-[92%] max-w-md rounded-3xl border border-indigo-500/25 bg-slate-950 p-6 shadow-2xl">
-                <div className="text-sm font-semibold text-slate-50">
-                  Fonctionnalité Premium
-                </div>
-                <p className="mt-2 text-sm text-slate-300">
-                  Cette fonctionnalité est disponible avec l’abonnement Premium.
-                </p>
-                <div className="mt-5 flex gap-2">
-                  <a
-                    href="/dashboard/hub/billing"
-                    className="flex-1 text-center px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition"
-                  >
-                    Passer en Premium
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setPremiumModalOpen(false)}
-                    className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-200 text-sm font-semibold transition"
-                  >
-                    Fermer
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* ✅ premium modal supprimé (plus de gating) */}
         </div>
 
         <style jsx global>{`
