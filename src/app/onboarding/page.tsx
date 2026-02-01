@@ -148,7 +148,7 @@ function OnboardingForm() {
 
       setStatus({
         ok: true,
-        msg: "Parfait ✅ Merci ! On a bien reçu tes infos, on s’occupe du reste.",
+        msg: "Merci, c’est bien reçu ✅ Notre équipe va pouvoir lancer la configuration sur des bases claires.",
       });
     } catch {
       setStatus({ ok: false, msg: "Erreur réseau. Réessaie dans 30 secondes." });
@@ -170,14 +170,14 @@ function OnboardingForm() {
             <div>
               <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                Onboarding Lidmeo — connecté
+                Espace client — onboarding
               </p>
 
               <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white">
-                Questionnaire d’onboarding
+                Paramétrage de votre prospection
               </h1>
               <p className="mt-2 max-w-2xl text-sm text-white/70">
-                Réponds une fois, et on met tout en place derrière. Tes réponses nous permettent d’être ultra précis dès le départ.
+                Ces informations nous permettent de configurer votre ciblage et d’assurer une mise en place propre dès le départ.
               </p>
             </div>
 
@@ -190,15 +190,12 @@ function OnboardingForm() {
                 <div
                   className="h-2 rounded-full bg-white"
                   style={{
-                    width: `${Math.min(
-                      100,
-                      Math.round((progress.done / progress.total) * 100)
-                    )}%`,
+                    width: `${Math.min(100, Math.round((progress.done / progress.total) * 100))}%`,
                   }}
                 />
               </div>
               <p className="mt-2 text-xs text-white/60">
-                Plus c’est précis, plus tes leads sont bons.
+                Plus le ciblage est précis, plus les leads sont qualifiés.
               </p>
             </div>
           </div>
@@ -213,24 +210,24 @@ function OnboardingForm() {
             className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
           >
             <SectionTitle
-              title="Identité"
-              subtitle="On verrouille l’email pour éviter les erreurs et garder un suivi propre."
+              title="Informations du compte"
+              subtitle="Ces éléments nous permettent d’identifier votre abonnement et d’assurer un suivi fiable."
             />
 
             <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
-                label="Nom prénom"
+                label="Nom et prénom"
                 required
                 value={form.full_name}
                 onChange={(v) => update("full_name", v)}
                 placeholder="Ex: Marie Dupont"
               />
               <Input
-                label="E-mail (doit être le même que celui utilisé lors du paiement)"
+                label="E-mail (utilisé lors du paiement)"
                 required
                 value={clerkEmail}
                 readOnly
-                helper="Cet email est verrouillé car lié à ton compte."
+                helper="Cet e-mail est verrouillé car il correspond à votre compte."
               />
               <Input
                 label="Téléphone"
@@ -244,7 +241,7 @@ function OnboardingForm() {
                 required
                 value={form.company}
                 onChange={(v) => update("company", v)}
-                placeholder="Nom de ton entreprise"
+                placeholder="Nom de votre entreprise"
               />
             </div>
 
@@ -252,20 +249,20 @@ function OnboardingForm() {
 
             <SectionTitle
               title="Ciblage"
-              subtitle="On s’aligne sur la cible et le terrain de jeu."
+              subtitle="Définissez précisément qui vous souhaitez contacter. C’est la base de la qualité des prospects."
             />
 
             <div className="mt-5 grid grid-cols-1 gap-4">
               <Input
-                label="Quel type d’entreprise souhaitez-vous cibler ?"
+                label="Type d’entreprise ciblée"
                 required
                 value={form.target_company_type}
                 onChange={(v) => update("target_company_type", v)}
-                placeholder="PME, grands groupes, indépendants..."
+                placeholder="Ex: PME, grands groupes, indépendants..."
               />
 
               <Input
-                label="Secteur d’activité visé"
+                label="Secteur d’activité"
                 required
                 value={form.target_industry}
                 onChange={(v) => update("target_industry", v)}
@@ -273,11 +270,12 @@ function OnboardingForm() {
               />
 
               <Input
-                label="Dans quelle zone géographique souhaitez-vous cibler vos prospects en France ?"
+                label="Zones géographiques ciblées (France)"
                 required
                 value={form.target_geo_france}
                 onChange={(v) => update("target_geo_france", v)}
-                placeholder="Ex: Île-de-France / Lyon + 50km / PACA..."
+                placeholder="Ex : 75, 92-95, 13, 69"
+                helper="Indique des départements ou des plages. Exemple : 75, 92-95. Plus c’est précis, plus c’est qualifié."
               />
             </div>
 
@@ -285,7 +283,7 @@ function OnboardingForm() {
             <div className="mt-5">
               <Label required>Taille d’entreprise recherchée</Label>
               <p className="mt-1 text-xs text-white/55">
-                Coche les tailles qui t’intéressent (tu peux en sélectionner plusieurs).
+                Sélectionnez une ou plusieurs tailles. Cela nous aide à éviter les sociétés hors périmètre.
               </p>
 
               <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -322,13 +320,13 @@ function OnboardingForm() {
             <Divider />
 
             <SectionTitle
-              title="Cibles & promesse"
-              subtitle="C’est ce qui va faire la différence sur la qualité."
+              title="Personas & message"
+              subtitle="Ces réponses servent à calibrer le bon profil de contact et le bon angle de prise de contact."
             />
 
             <div className="mt-5 grid grid-cols-1 gap-4">
               <Input
-                label="Quelles personnes souhaitez-vous contacter ? (poste)"
+                label="Fonctions / postes à contacter"
                 required
                 value={form.target_personas_titles}
                 onChange={(v) => update("target_personas_titles", v)}
@@ -340,16 +338,16 @@ function OnboardingForm() {
                 required
                 value={form.ideal_targets}
                 onChange={(v) => update("ideal_targets", v)}
-                placeholder="Décris l’entreprise idéale : signaux, douleurs, contexte, etc."
+                placeholder="Décrivez votre cible idéale : typologie, signaux, contexte, objections fréquentes…"
                 rows={4}
               />
 
               <Textarea
-                label="Quelle promesse faites-vous à vos clients, pourquoi travailleraient-ils avec vous ?"
+                label="Votre promesse (pourquoi vous choisir)"
                 required
                 value={form.value_promise}
                 onChange={(v) => update("value_promise", v)}
-                placeholder="Promesse, bénéfices, différenciation, preuves..."
+                placeholder="Bénéfice concret, différenciation, preuves (résultats, méthode, références)…"
                 rows={4}
               />
             </div>
@@ -382,20 +380,21 @@ function OnboardingForm() {
         <div className="lg:col-span-4">
           <div className="sticky top-6 space-y-4">
             <Card>
-              <h3 className="text-base font-semibold text-white">
-                Ce qui se passe après l’envoi
-              </h3>
+              <h3 className="text-base font-semibold text-white">Ce que Lidmeo fait ensuite</h3>
               <ul className="mt-3 space-y-2 text-sm text-white/70">
-                <li>• Vérification des informations</li>
-                <li>• Paramétrage de votre ciblage</li>
-                <li>• Mise en place du suivi et de la livraison</li>
+                <li>• Vérification de la cohérence du ciblage</li>
+                <li>• Paramétrage de votre configuration dans l’outil</li>
+                <li>• Lancement de la prospection selon votre rythme</li>
               </ul>
+              <p className="mt-3 text-xs text-white/50">
+                Vos informations restent confidentielles et ne sont utilisées que pour configurer votre compte.
+              </p>
             </Card>
 
             <Card>
               <h3 className="text-base font-semibold text-white">Conseil</h3>
               <p className="mt-2 text-sm text-white/70">
-                Plus ta promesse est claire, plus on peut filtrer et sortir des prospects qui répondent vraiment à ton offre.
+                La qualité des leads dépend d’abord de la précision du ciblage : secteur, taille, zone et postes. Prenez 2 minutes pour être spécifique.
               </p>
             </Card>
           </div>
