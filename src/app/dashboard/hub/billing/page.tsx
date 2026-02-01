@@ -167,6 +167,13 @@ export default function BillingPage() {
     { value: 30, label: "30 / jour", sub: "Rythme intensif" },
   ];
 
+  // ✅ FIX PRIX ESSENTIAL selon quota
+  const essentialPrice = useMemo(() => {
+    if (selectedEssentialQuota === 10) return 49;
+    if (selectedEssentialQuota === 20) return 69;
+    return 89; // 30
+  }, [selectedEssentialQuota]);
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-14">
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#0b1220] via-[#070b14] to-[#060813] p-10 shadow-2xl">
@@ -244,7 +251,7 @@ export default function BillingPage() {
               </div>
 
               <div className="mt-6 flex items-end gap-2">
-                <div className="text-4xl font-semibold text-white">49€</div>
+                <div className="text-4xl font-semibold text-white">{essentialPrice}€</div>
                 <div className="pb-1 text-gray-400">/ mois</div>
               </div>
 
@@ -351,13 +358,30 @@ export default function BillingPage() {
               </div>
             </div>
 
-            {/* FULL AUTOMATISÉ (placeholder) */}
+            {/* FULL AUTOMATISÉ */}
             <div className="relative rounded-2xl border border-white/10 bg-white/5 p-7">
               <div className="flex items-start justify-between gap-4">
-                <div>
+                <div className="w-full">
                   <div className="text-white text-lg font-semibold">Full automatisé</div>
-                  <div className="mt-1 text-gray-400 text-sm">
-                    Nous gérons tout pour vous : extraction, ciblage, livraison, suivi.
+
+                  {/* ✅ Texte visible sur la page Offres */}
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                        <span className="text-white/80">⏱️</span>
+                      </div>
+                      <div>
+                        <div className="text-white font-semibold">Gagnez 10h par semaine</div>
+                        <div className="text-sm text-gray-400">
+                          On fait la prospection, vous récoltez les réponses
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4">
+                      <div className="text-sm text-gray-300">Prospects contactés</div>
+                      <div className="text-xl font-semibold text-white">450/mois</div>
+                    </div>
                   </div>
                 </div>
 
@@ -373,12 +397,17 @@ export default function BillingPage() {
                 <div className="pb-1 text-gray-400">/ mois</div>
               </div>
 
+              {/* ✅ EXACTEMENT les points visibles sur la page Offres */}
               <ul className="mt-6 space-y-3 text-sm text-gray-300">
                 {[
-                  "15 leads / jour (fixe)",
-                  "Configuration et optimisation par nos équipes",
-                  "Livraison continue + monitoring",
-                  "Priorité support",
+                  "100% automatisé, vous ne faites rien",
+                  "Jusqu'à 15 prospects contactés par jour",
+                  "Demandes de connexion envoyées pour vous",
+                  "Premier message personnalisé automatique",
+                  "Relances automatiques si pas de réponse",
+                  "Envois aux heures de bureau (comme vous)",
+                  "Dashboard de suivi complet",
+                  "Sécurisé et conforme LinkedIn",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2">
                     <Check className="mt-0.5 h-4 w-4 text-indigo-300" />
@@ -386,10 +415,6 @@ export default function BillingPage() {
                   </li>
                 ))}
               </ul>
-
-              <div className="mt-7 text-xs text-gray-500">
-                Pour l’instant, l’activation se fait via votre contact commercial. (Le checkout arrivera ensuite.)
-              </div>
 
               <div className="mt-6">
                 <button
