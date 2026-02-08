@@ -20,7 +20,7 @@ export async function POST() {
       requireEnv("SUPABASE_SERVICE_ROLE_KEY")
     );
 
-    // 1) retrouver TON client (source de vérité)
+    // ✅ Source de vérité : retrouver le client lié à ce user Clerk
     const { data: client, error: clientErr } = await supabase
       .from("clients")
       .select("id")
@@ -37,12 +37,10 @@ export async function POST() {
     const failure_redirect_url = requireEnv("UNIPILE_FAILURE_REDIRECT_URL");
     const notify_url = requireEnv("UNIPILE_NOTIFY_URL");
 
-    // 2) un lien doit expirer vite
+    // ✅ Lien de connexion = courte durée
     const expiresOn = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 min
 
-    // Unipile Hosted Auth Wizard
-    // POST {UNIPILE_DSN}/api/v1/hosted/accounts/link
-    // Doc: https://developer.unipile.com/docs/hosted-auth
+    // ✅ Unipile Hosted Auth Wizard
     const res = await fetch(`${UNIPILE_DSN}/api/v1/hosted/accounts/link`, {
       method: "POST",
       headers: {
@@ -51,16 +49,14 @@ export async function POST() {
         accept: "application/json",
       },
       body: JSON.stringify({
-        type: "create", // ou "reconnect" si tu gères la reconnexion plus tard
+        type: "create",
         providers: ["LINKEDIN"],
         api_url: UNIPILE_DSN,
         expiresOn,
         success_redirect_url,
         failure_redirect_url,
         notify_url,
-
-        // clé: Unipile renverra ce "name" dans le notify webhook
-        // on met ton client.id (uuid) => mapping clean
+        // ✅ Unipile renverra ce "name" dans le notify webhook -> mapping client_id
         name: client.id,
       }),
     });
@@ -75,6 +71,7 @@ export async function POST() {
 
     const json = await res.json();
     const url = json?.url;
+
     if (!url) {
       return NextResponse.json(
         { error: "unipile_missing_url", raw: json },
