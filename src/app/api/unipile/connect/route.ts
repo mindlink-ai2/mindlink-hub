@@ -65,7 +65,10 @@ export async function POST(req: Request) {
       });
     }
 
-    // ✅ Unipile Hosted Auth Wizard (body minimal + X-API-KEY)
+    // ✅ lien de connexion à durée courte (souvent requis)
+    const expiresOn = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 min
+
+    // ✅ Unipile Hosted Auth Wizard (providers enum)
     const res = await fetch(`${BASE}/api/v1/hosted/accounts/link`, {
       method: "POST",
       headers: {
@@ -74,11 +77,14 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        provider: "linkedin", // ✅ important : minuscule
+        type: "create",
+        providers: ["LINKEDIN"], // ✅ enum attendu
+        api_url: BASE,           // ✅ base propre
+        expiresOn,
         success_redirect_url,
         failure_redirect_url,
         notify_url,
-        name: String(client.id), // ✅ string
+        name: String(client.id),
       }),
     });
 
