@@ -8,17 +8,17 @@ function requireEnv(name: string) {
   return v;
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const supabase = createClient(
-      requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-      requireEnv("SUPABASE_SERVICE_ROLE_KEY")
-    );
+    const supabaseUrl = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
+    const supabaseKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // ✅ Source de vérité : retrouver le client lié à ce user Clerk
     const { data: client, error: clientErr } = await supabase
@@ -36,6 +36,25 @@ export async function POST() {
     const success_redirect_url = requireEnv("UNIPILE_SUCCESS_REDIRECT_URL");
     const failure_redirect_url = requireEnv("UNIPILE_FAILURE_REDIRECT_URL");
     const notify_url = requireEnv("UNIPILE_NOTIFY_URL");
+
+    // ✅ DEBUG (à appeler avec ?debug=1)
+    const debug = new URL(req.url).searchParams.get("debug") === "1";
+    if (debug) {
+      return NextResponse.json({
+        ok: true,
+        clerkUserId: userId,
+        clientId: client.id,
+        env: {
+          NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+          SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+          UNIPILE_DSN: process.env.UNIPILE_DSN,
+          UNIPILE_API_KEY: !!process.env.UNIPILE_API_KEY,
+          UNIPILE_SUCCESS_REDIRECT_URL: process.env.UNIPILE_SUCCESS_REDIRECT_URL,
+          UNIPILE_FAILURE_REDIRECT_URL: process.env.UNIPILE_FAILURE_REDIRECT_URL,
+          UNIPILE_NOTIFY_URL: process.env.UNIPILE_NOTIFY_URL,
+        },
+      });
+    }
 
     // ✅ Lien de connexion = courte durée
     const expiresOn = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 min
