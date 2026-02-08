@@ -63,8 +63,9 @@ export async function POST() {
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
+      console.error("UNIPILE_CONNECT_UNIPILE_ERROR:", res.status, text);
       return NextResponse.json(
-        { error: "unipile_error", details: text },
+        { error: "unipile_error", status: res.status, details: text },
         { status: 500 }
       );
     }
@@ -73,6 +74,7 @@ export async function POST() {
     const url = json?.url;
 
     if (!url) {
+      console.error("UNIPILE_CONNECT_MISSING_URL:", json);
       return NextResponse.json(
         { error: "unipile_missing_url", raw: json },
         { status: 500 }
@@ -81,6 +83,7 @@ export async function POST() {
 
     return NextResponse.json({ url });
   } catch (e: any) {
+    console.error("UNIPILE_CONNECT_ERROR:", e);
     return NextResponse.json(
       { error: "server_error", details: e?.message ?? String(e) },
       { status: 500 }
