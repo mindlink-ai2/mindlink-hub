@@ -8,6 +8,12 @@ function requireEnv(name: string) {
   return v;
 }
 
+function normalizeUnipileBase(dsn: string) {
+  // 1) retire les / finaux
+  // 2) si quelqu’un met /api/v1/... par erreur, on coupe à la base
+  return dsn.replace(/\/+$/, "").replace(/\/api\/v1\/.*$/, "");
+}
+
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();
@@ -15,10 +21,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const supabaseUrl = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
-    const supabaseKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(
+      requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+      requireEnv("SUPABASE_SERVICE_ROLE_KEY")
+    );
 
     // ✅ Source de vérité : retrouver le client lié à ce user Clerk
     const { data: client, error: clientErr } = await supabase
@@ -37,6 +43,8 @@ export async function POST(req: Request) {
     const failure_redirect_url = requireEnv("UNIPILE_FAILURE_REDIRECT_URL");
     const notify_url = requireEnv("UNIPILE_NOTIFY_URL");
 
+    const BASE = normalizeUnipileBase(UNIPILE_DSN);
+
     // ✅ DEBUG (à appeler avec ?debug=1)
     const debug = new URL(req.url).searchParams.get("debug") === "1";
     if (debug) {
@@ -48,6 +56,7 @@ export async function POST(req: Request) {
           NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
           SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
           UNIPILE_DSN: process.env.UNIPILE_DSN,
+          UNIPILE_BASE_USED: BASE,
           UNIPILE_API_KEY: !!process.env.UNIPILE_API_KEY,
           UNIPILE_SUCCESS_REDIRECT_URL: process.env.UNIPILE_SUCCESS_REDIRECT_URL,
           UNIPILE_FAILURE_REDIRECT_URL: process.env.UNIPILE_FAILURE_REDIRECT_URL,
@@ -60,7 +69,7 @@ export async function POST(req: Request) {
     const expiresOn = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 min
 
     // ✅ Unipile Hosted Auth Wizard
-    const res = await fetch(`${UNIPILE_DSN}/api/v1/hosted/accounts/link`, {
+    const res = await fetch(`${BASE}/api/v1/hosted/accounts/link`, {
       method: "POST",
       headers: {
         "X-API-KEY": UNIPILE_API_KEY,
@@ -70,12 +79,11 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         type: "create",
         providers: ["LINKEDIN"],
-        api_url: UNIPILE_DSN,
+        api_url: BASE, // ✅ important : base propre
         expiresOn,
         success_redirect_url,
         failure_redirect_url,
         notify_url,
-        // ✅ Unipile renverra ce "name" dans le notify webhook -> mapping client_id
         name: client.id,
       }),
     });
@@ -84,7 +92,7 @@ export async function POST(req: Request) {
       const text = await res.text().catch(() => "");
       console.error("UNIPILE_CONNECT_UNIPILE_ERROR:", res.status, text);
       return NextResponse.json(
-        { error: "unipile_error", status: res.status, details: text },
+        { error: "unipile_error", status: res.status, details: text, base: BASE },
         { status: 500 }
       );
     }
