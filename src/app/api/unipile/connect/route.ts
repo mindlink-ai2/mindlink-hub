@@ -65,7 +65,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // ✅ Unipile Hosted Auth Wizard (body simplifié + auth Bearer)
+    // ✅ Unipile Hosted Auth Wizard (body minimal + X-API-KEY)
     const res = await fetch(`${BASE}/api/v1/hosted/accounts/link`, {
       method: "POST",
       headers: {
@@ -74,11 +74,11 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        provider: "LINKEDIN",
+        provider: "linkedin", // ✅ important : minuscule
         success_redirect_url,
         failure_redirect_url,
         notify_url,
-        name: client.id,
+        name: String(client.id), // ✅ string
       }),
     });
 
