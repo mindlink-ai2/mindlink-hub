@@ -69,16 +69,15 @@ export async function POST(req: Request) {
     const res = await fetch(`${BASE}/api/v1/hosted/accounts/link`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${UNIPILE_API_KEY}`,
-        "Content-Type": "application/json",
+        "X-API-KEY": UNIPILE_API_KEY,
         accept: "application/json",
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         provider: "LINKEDIN",
         success_redirect_url,
         failure_redirect_url,
         notify_url,
-        // ✅ Unipile renverra ce "name" dans le notify webhook -> mapping client_id
         name: client.id,
       }),
     });
