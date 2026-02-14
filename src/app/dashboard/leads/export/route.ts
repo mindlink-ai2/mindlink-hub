@@ -46,22 +46,22 @@ export async function GET() {
 
   // 3️⃣ Construire le CSV
   const columns: Array<{ header: string; key: string }> = [
-    { header: "Id", key: "id" },
-    { header: "Name", key: "Name" },
-    { header: "FirstName", key: "FirstName" },
-    { header: "LastName", key: "LastName" },
-    { header: "Company", key: "Company" },
-    { header: "Location", key: "location" },
-    { header: "LinkedInURL", key: "LinkedInURL" },
+    { header: "ID", key: "id" },
+    { header: "Nom complet", key: "Name" },
+    { header: "Prénom", key: "FirstName" },
+    { header: "Nom", key: "LastName" },
+    { header: "Entreprise", key: "Company" },
+    { header: "Localisation", key: "location" },
+    { header: "URL LinkedIn", key: "LinkedInURL" },
     { header: "Email", key: "email" },
-    { header: "Phone", key: "phone" },
-    { header: "CreatedAt", key: "created_at" },
+    { header: "Téléphone", key: "phone" },
+    { header: "Créé le", key: "created_at" },
     { header: "Traite", key: "traite" },
-    { header: "MessageSent", key: "message_sent" },
-    { header: "MessageSentAt", key: "message_sent_at" },
-    { header: "NextFollowupAt", key: "next_followup_at" },
-    { header: "LinkedInMessage", key: "internal_message" },
-    { header: "EmailMessage", key: "message_mail" },
+    { header: "Message envoyé", key: "message_sent" },
+    { header: "Message envoyé le", key: "message_sent_at" },
+    { header: "Prochaine relance", key: "next_followup_at" },
+    { header: "Message LinkedIn", key: "internal_message" },
+    { header: "Message email", key: "message_mail" },
   ];
 
   const header = columns.map((c) => c.header);
