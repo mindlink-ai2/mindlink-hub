@@ -45,14 +45,34 @@ export async function GET() {
   }
 
   // 3️⃣ Construire le CSV
-  const header = ["FirstName", "LastName", "Company", "LinkedInURL", "CreatedAt"];
-  const rows = leads.map((l: any) => [
-    l.FirstName ?? "",
-    l.LastName ?? "",
-    l.Company ?? "",
-    l.LinkedInURL ?? "",
-    l.created_at ?? "",
-  ]);
+  const columns: Array<{ header: string; key: string }> = [
+    { header: "Id", key: "id" },
+    { header: "Name", key: "Name" },
+    { header: "FirstName", key: "FirstName" },
+    { header: "LastName", key: "LastName" },
+    { header: "Company", key: "Company" },
+    { header: "Location", key: "location" },
+    { header: "LinkedInURL", key: "LinkedInURL" },
+    { header: "Email", key: "email" },
+    { header: "Phone", key: "phone" },
+    { header: "CreatedAt", key: "created_at" },
+    { header: "Traite", key: "traite" },
+    { header: "MessageSent", key: "message_sent" },
+    { header: "MessageSentAt", key: "message_sent_at" },
+    { header: "NextFollowupAt", key: "next_followup_at" },
+    { header: "LinkedInMessage", key: "internal_message" },
+    { header: "EmailMessage", key: "message_mail" },
+  ];
+
+  const header = columns.map((c) => c.header);
+
+  const rows = leads.map((l: any) =>
+    columns.map((c) => {
+      const value = l?.[c.key];
+      if (typeof value === "boolean") return value ? "Oui" : "Non";
+      return value ?? "";
+    })
+  );
 
   const csvLines = [
     header.join(";"),
