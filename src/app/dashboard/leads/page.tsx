@@ -38,8 +38,6 @@ export default function LeadsPage() {
   // ✅ premium modal (désactivé — conservé nulle part)
   const [premiumModalOpen, setPremiumModalOpen] = useState(false);
 
-  // ✅ Selection mode
-  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exportingSelected, setExportingSelected] = useState(false);
   const [updatingStatusIds, setUpdatingStatusIds] = useState<Set<string>>(new Set());
@@ -55,7 +53,7 @@ export default function LeadsPage() {
 
   // ✅ Column count for empty state colSpan
   const baseCols = 7 + (emailOption ? 1 : 0) + (phoneOption ? 1 : 0);
-  const colCount = (selectionMode ? 1 : 0) + baseCols;
+  const colCount = baseCols + 1;
 
   // ✅ Read query param once on mount
   useEffect(() => {
@@ -115,8 +113,6 @@ export default function LeadsPage() {
 
   // ✅ cleanup selection when list changes (ex: deleted)
   useEffect(() => {
-    if (!selectionMode) return;
-
     const existing = new Set(safeLeads.map((l) => String(l.id)));
     setSelectedIds((prev: Set<string>) => {
       const next = new Set<string>();
@@ -125,20 +121,11 @@ export default function LeadsPage() {
       });
       return next;
     });
-  }, [safeLeads, selectionMode]);
+  }, [safeLeads]);
 
   // SEARCH FUNCTION
   const handleSearch = (value: string) => {
     setSearchTerm(value);
-  };
-
-  // ✅ selection helpers
-  const toggleSelectionMode = () => {
-    setSelectionMode((prev) => {
-      const next = !prev;
-      if (!next) setSelectedIds(new Set());
-      return next;
-    });
   };
 
   const toggleSelected = (leadId: string) => {
@@ -591,14 +578,12 @@ export default function LeadsPage() {
                         {filteredLeads.length} affiché(s)
                       </span>
 
-                      {selectionMode && (
-                        <span className="inline-flex items-center gap-2 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-[11px] text-indigo-200">
-                          Mode sélection
-                          <span className="rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-0.5 text-[11px] leading-none tabular-nums">
-                            {selectedCount}
-                          </span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-[11px] text-indigo-200">
+                        Sélection active
+                        <span className="rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-0.5 text-[11px] leading-none tabular-nums">
+                          {selectedCount}
                         </span>
-                      )}
+                      </span>
 
                       <span className="inline-flex items-center rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] text-slate-300 whitespace-nowrap">
                         Essential
@@ -671,7 +656,7 @@ export default function LeadsPage() {
 
                       <div className="mt-2 text-[11px] text-slate-500">
                         {filteredLeads.length} résultat(s) • {total} total
-                        {selectionMode ? ` • ${selectedCount} sélectionné(s)` : ""}
+                        {` • ${selectedCount} sélectionné(s)`}
                       </div>
                     </div>
                   </div>
@@ -764,119 +749,83 @@ export default function LeadsPage() {
                             </span>
                           </a>
 
-                          <button
-                            type="button"
-                            onClick={toggleSelectionMode}
-                            className={[
-                              "group inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl border transition shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30",
-                              selectionMode
-                                ? "bg-indigo-600/15 border-indigo-500/25 text-indigo-100 hover:bg-indigo-600/20"
-                                : "bg-slate-900/70 border-slate-800 text-slate-200 hover:bg-slate-800/70",
-                            ].join(" ")}
-                          >
-                            <span className="inline-flex items-center gap-2">
-                              <svg
-                                className="h-4 w-4 text-slate-300 group-hover:text-slate-100 transition"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M9 11l3 3L22 4"
-                                />
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"
-                                />
-                              </svg>
-                              {selectionMode ? "Annuler" : "Mode sélection"}
-                            </span>
-                          </button>
+                          <span className="inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl border border-indigo-500/25 bg-indigo-600/15 text-indigo-100 shadow-sm whitespace-nowrap">
+                            Sélection active
+                          </span>
                         </div>
 
-                        {selectionMode && (
-                          <div className="mt-2 rounded-2xl border border-indigo-500/15 bg-indigo-500/8 p-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                              <button
-                                type="button"
-                                onClick={toggleSelectAllFiltered}
-                                className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/45 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
-                              >
-                                {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
-                              </button>
+                        <div className="mt-2 rounded-2xl border border-indigo-500/15 bg-indigo-500/8 p-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <button
+                              type="button"
+                              onClick={toggleSelectAllFiltered}
+                              className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/45 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
+                            >
+                              {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
+                            </button>
 
-                              <button
-                                type="button"
-                                onClick={handleExportSelected}
-                                disabled={selectedCount === 0 || exportingSelected}
-                                className={[
-                                  "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
-                                  selectedCount === 0 || exportingSelected
-                                    ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
-                                    : "bg-indigo-600/15 border-indigo-500/30 text-indigo-200 hover:bg-indigo-600/25",
-                                ].join(" ")}
-                              >
-                                {exportingSelected ? "Export..." : `Exporter (${selectedCount})`}
-                              </button>
+                            <button
+                              type="button"
+                              onClick={handleExportSelected}
+                              disabled={selectedCount === 0 || exportingSelected}
+                              className={[
+                                "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
+                                selectedCount === 0 || exportingSelected
+                                  ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
+                                  : "bg-indigo-600/15 border-indigo-500/30 text-indigo-200 hover:bg-indigo-600/25",
+                              ].join(" ")}
+                            >
+                              {exportingSelected ? "Export..." : `Exporter (${selectedCount})`}
+                            </button>
 
-                              <button
-                                type="button"
-                                onClick={handleBulkDelete}
-                                disabled={selectedCount === 0}
-                                className={[
-                                  "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-amber-500/20",
-                                  selectedCount === 0
-                                    ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
-                                    : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
-                                ].join(" ")}
-                              >
-                                Supprimer ({selectedCount})
-                              </button>
-                            </div>
-
-                            <div className="mt-2 flex items-center justify-between gap-3 px-1">
-                              <div className="text-[11px] text-indigo-200/70">Sélection active</div>
-                              <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
-                                {selectedCount} sélectionné(s)
-                              </span>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={handleBulkDelete}
+                              disabled={selectedCount === 0}
+                              className={[
+                                "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-amber-500/20",
+                                selectedCount === 0
+                                  ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
+                                  : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
+                              ].join(" ")}
+                            >
+                              Supprimer ({selectedCount})
+                            </button>
                           </div>
-                        )}
+
+                          <div className="mt-2 flex items-center justify-between gap-3 px-1">
+                            <div className="text-[11px] text-indigo-200/70">Sélection active</div>
+                            <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
+                              {selectedCount} sélectionné(s)
+                            </span>
+                          </div>
+                        </div>
 
                         <div className="mt-4 flex items-center justify-between gap-3">
                           <div className="text-[11px] text-slate-500">
                             Astuce : filtrez avec la recherche, puis exportez ou sélectionnez.
                           </div>
 
-                          {!selectionMode && (
-                            <span className="text-[11px] px-3 py-1 rounded-full border border-slate-800 bg-slate-950/35 text-slate-300 whitespace-nowrap tabular-nums">
-                              {filteredLeads.length} affiché(s)
-                            </span>
-                          )}
+                          <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
+                            {selectedCount} sélectionné(s)
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {selectionMode && (
-                  <div className="mt-5 rounded-2xl border border-indigo-500/20 bg-indigo-500/8 px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="text-[12px] text-indigo-100">
-                        Sélection active •{" "}
-                        <span className="font-semibold tabular-nums">{selectedCount}</span> lead(s)
-                      </div>
-                      <div className="text-[11px] text-indigo-200/70">
-                        Astuce : utilisez “Tout sélectionner” pour supprimer en lot.
-                      </div>
+                <div className="mt-5 rounded-2xl border border-indigo-500/20 bg-indigo-500/8 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-[12px] text-indigo-100">
+                      Sélection active •{" "}
+                      <span className="font-semibold tabular-nums">{selectedCount}</span> lead(s)
+                    </div>
+                    <div className="text-[11px] text-indigo-200/70">
+                      Astuce : utilisez “Tout sélectionner” pour supprimer en lot.
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             </div>
 
@@ -892,26 +841,18 @@ export default function LeadsPage() {
                   </p>
                 </div>
 
-                {selectionMode ? (
-                  <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
-                    {selectedCount} sélectionné(s)
-                  </span>
-                ) : (
-                  <span className="text-[11px] px-3 py-1 rounded-full border border-slate-800 bg-slate-950/35 text-slate-300 whitespace-nowrap tabular-nums">
-                    {filteredLeads.length} affiché(s)
-                  </span>
-                )}
+                <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
+                  {selectedCount} sélectionné(s)
+                </span>
               </div>
 
               <div className="w-full overflow-x-auto">
                 <table className="w-full text-[13px] table-fixed min-w-[1080px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-900/95 backdrop-blur text-slate-300 text-[11px] uppercase tracking-wide">
-                      {selectionMode && (
-                        <th className="w-[54px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
-                          Sel.
-                        </th>
-                      )}
+                      <th className="w-[54px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
+                        Sel.
+                      </th>
 
                       <th className="w-[190px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
                         Statut
@@ -992,17 +933,15 @@ export default function LeadsPage() {
                               "hover:bg-slate-900/45",
                             ].join(" ")}
                           >
-                            {selectionMode && (
-                              <td className="py-3 px-3 text-center">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => toggleSelected(idStr)}
-                                  className="h-4 w-4 cursor-pointer accent-indigo-500"
-                                  aria-label={`Sélectionner le lead ${fullName}`}
-                                />
-                              </td>
-                            )}
+                            <td className="py-3 px-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelected(idStr)}
+                                className="h-4 w-4 cursor-pointer accent-indigo-500"
+                                aria-label={`Sélectionner le lead ${fullName}`}
+                              />
+                            </td>
 
                             <td className="py-3 px-3 text-center">
                               <button
