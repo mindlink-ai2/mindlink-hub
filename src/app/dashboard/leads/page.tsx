@@ -578,13 +578,6 @@ export default function LeadsPage() {
                         {filteredLeads.length} affiché(s)
                       </span>
 
-                      <span className="inline-flex items-center gap-2 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-[11px] text-indigo-200">
-                        Sélection active
-                        <span className="rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-0.5 text-[11px] leading-none tabular-nums">
-                          {selectedCount}
-                        </span>
-                      </span>
-
                       <span className="inline-flex items-center rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] text-slate-300 whitespace-nowrap">
                         Essential
                       </span>
@@ -749,8 +742,8 @@ export default function LeadsPage() {
                             </span>
                           </a>
 
-                          <span className="inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl border border-indigo-500/25 bg-indigo-600/15 text-indigo-100 shadow-sm whitespace-nowrap">
-                            Sélection active
+                          <span className="inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl border border-indigo-500/25 bg-indigo-600/15 text-indigo-100 shadow-sm whitespace-nowrap tabular-nums">
+                            {selectedCount} coché(s)
                           </span>
                         </div>
 
@@ -793,8 +786,7 @@ export default function LeadsPage() {
                             </button>
                           </div>
 
-                          <div className="mt-2 flex items-center justify-between gap-3 px-1">
-                            <div className="text-[11px] text-indigo-200/70">Sélection active</div>
+                          <div className="mt-2 flex items-center justify-end gap-3 px-1">
                             <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
                               {selectedCount} sélectionné(s)
                             </span>
@@ -815,16 +807,8 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-indigo-500/20 bg-indigo-500/8 px-4 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-[12px] text-indigo-100">
-                      Sélection active •{" "}
-                      <span className="font-semibold tabular-nums">{selectedCount}</span> lead(s)
-                    </div>
-                    <div className="text-[11px] text-indigo-200/70">
-                      Astuce : utilisez “Tout sélectionner” pour supprimer en lot.
-                    </div>
-                  </div>
+                <div className="mt-5 rounded-2xl border border-indigo-500/20 bg-indigo-500/8 px-4 py-3 text-[11px] text-indigo-200/80">
+                  Astuce : utilisez “Tout sélectionner” pour supprimer ou exporter en lot.
                 </div>
               </div>
             </div>
@@ -847,45 +831,45 @@ export default function LeadsPage() {
               </div>
 
               <div className="w-full overflow-x-auto">
-                <table className="w-full text-[13px] table-fixed min-w-[1080px]">
+                <table className="w-full text-[13px] table-fixed min-w-[980px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-900/95 backdrop-blur text-slate-300 text-[11px] uppercase tracking-wide">
-                      <th className="w-[54px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
+                      <th className="w-[44px] py-3 px-2 border-b border-slate-800 text-center whitespace-nowrap">
                         Sel.
                       </th>
 
-                      <th className="w-[190px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
+                      <th className="w-[126px] py-3 px-2 border-b border-slate-800 text-center whitespace-nowrap">
                         Statut
                       </th>
 
-                      <th className="w-[220px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
+                      <th className="w-[150px] py-3 px-2 border-b border-slate-800 text-left whitespace-nowrap">
                         Nom
                       </th>
-                      <th className="w-[200px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
+                      <th className="w-[150px] py-3 px-2 border-b border-slate-800 text-left whitespace-nowrap">
                         Entreprise
                       </th>
-                      <th className="w-[160px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
+                      <th className="w-[140px] py-3 px-2 border-b border-slate-800 text-left whitespace-nowrap">
                         Localisation
                       </th>
-                      <th className="w-[130px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
+                      <th className="w-[96px] py-3 px-2 border-b border-slate-800 text-left whitespace-nowrap">
                         LinkedIn
                       </th>
 
                       {emailOption && (
-                        <th className="w-[240px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
+                        <th className="w-[190px] py-3 px-2 border-b border-slate-800 text-left whitespace-nowrap">
                           Email
                         </th>
                       )}
                       {phoneOption && (
-                        <th className="w-[150px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
+                        <th className="w-[120px] py-3 px-2 border-b border-slate-800 text-left whitespace-nowrap">
                           Téléphone
                         </th>
                       )}
 
-                      <th className="w-[120px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
+                      <th className="w-[92px] py-3 px-2 border-b border-slate-800 text-center whitespace-nowrap">
                         Date
                       </th>
-                      <th className="w-[110px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
+                      <th className="w-[96px] py-3 px-2 border-b border-slate-800 text-center whitespace-nowrap">
                         Supprimer
                       </th>
                     </tr>
@@ -933,7 +917,7 @@ export default function LeadsPage() {
                               "hover:bg-slate-900/45",
                             ].join(" ")}
                           >
-                            <td className="py-3 px-3 text-center">
+                            <td className="py-3 px-2 text-center">
                               <input
                                 type="checkbox"
                                 checked={isSelected}
@@ -943,7 +927,7 @@ export default function LeadsPage() {
                               />
                             </td>
 
-                            <td className="py-3 px-3 text-center">
+                            <td className="py-3 px-2 text-center">
                               <button
                                 type="button"
                                 onClick={() => handleStatusBadgeClick(lead)}
@@ -970,7 +954,7 @@ export default function LeadsPage() {
                               </button>
                             </td>
 
-                            <td className="py-3 px-3 text-slate-50 relative pr-16">
+                            <td className="py-3 px-2 text-slate-50 relative pr-14">
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="font-medium truncate">{fullName}</span>
                               </div>
@@ -984,11 +968,11 @@ export default function LeadsPage() {
                               </button>
                             </td>
 
-                            <td className="py-3 px-3 text-slate-300 truncate">{lead.Company || "—"}</td>
+                            <td className="py-3 px-2 text-slate-300 truncate">{lead.Company || "—"}</td>
 
-                            <td className="py-3 px-3 text-slate-300 truncate">{lead.location || "—"}</td>
+                            <td className="py-3 px-2 text-slate-300 truncate">{lead.location || "—"}</td>
 
-                            <td className="py-3 px-3">
+                            <td className="py-3 px-2">
                               {lead.LinkedInURL ? (
                                 <a
                                   href={lead.LinkedInURL}
@@ -1004,18 +988,18 @@ export default function LeadsPage() {
                             </td>
 
                             {emailOption && (
-                              <td className="py-3 px-3 text-slate-200 truncate">{lead.email || "—"}</td>
+                              <td className="py-3 px-2 text-slate-200 truncate">{lead.email || "—"}</td>
                             )}
 
                             {phoneOption && (
-                              <td className="py-3 px-3 text-slate-200 truncate">{lead.phone || "—"}</td>
+                              <td className="py-3 px-2 text-slate-200 truncate">{lead.phone || "—"}</td>
                             )}
 
-                            <td className="py-3 px-3 text-center text-slate-400 whitespace-nowrap tabular-nums">
+                            <td className="py-3 px-2 text-center text-slate-400 whitespace-nowrap tabular-nums">
                               {lead.created_at ? new Date(lead.created_at).toLocaleDateString("fr-FR") : "—"}
                             </td>
 
-                            <td className="py-3 px-3 text-center">
+                            <td className="py-3 px-2 text-center">
                               <DeleteLeadButton leadId={lead.id} />
                             </td>
                           </tr>
