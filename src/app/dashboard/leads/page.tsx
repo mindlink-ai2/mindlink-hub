@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, ReactNode } from "react";
-import TraiteCheckbox from "./TraiteCheckbox";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 
@@ -43,6 +42,7 @@ export default function LeadsPage() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exportingSelected, setExportingSelected] = useState(false);
+  const [updatingStatusIds, setUpdatingStatusIds] = useState<Set<string>>(new Set());
   const selectedCount = selectedIds.size;
 
   // ✅ open lead from query param (?open=ID)
@@ -244,6 +244,85 @@ export default function LeadsPage() {
       alert("Erreur réseau pendant l'export.");
     } finally {
       setExportingSelected(false);
+    }
+  };
+
+  const handleStatusBadgeClick = async (lead: Lead) => {
+    const idStr = String(lead.id);
+    if (lead.message_sent || updatingStatusIds.has(idStr)) return;
+
+    const previousTraite = Boolean(lead.traite);
+    const nextTraite = !previousTraite;
+
+    setUpdatingStatusIds((prev: Set<string>) => {
+      const next = new Set(prev);
+      next.add(idStr);
+      return next;
+    });
+
+    // ✅ optimistic UI update
+    setSafeLeads((prev: Lead[]) =>
+      prev.map((l) =>
+        String(l.id) === idStr
+          ? {
+              ...l,
+              traite: nextTraite,
+            }
+          : l
+      )
+    );
+
+    setOpenLead((prev: Lead | null) =>
+      prev && String(prev.id) === idStr
+        ? {
+            ...prev,
+            traite: nextTraite,
+          }
+        : prev
+    );
+
+    try {
+      const res = await fetch("/api/leads/update-traite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: lead.id,
+          traite: nextTraite,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Erreur mise à jour traite");
+    } catch (e) {
+      console.error(e);
+      alert("Impossible de mettre à jour le statut.");
+
+      // rollback si erreur
+      setSafeLeads((prev: Lead[]) =>
+        prev.map((l) =>
+          String(l.id) === idStr
+            ? {
+                ...l,
+                traite: previousTraite,
+              }
+            : l
+        )
+      );
+
+      setOpenLead((prev: Lead | null) =>
+        prev && String(prev.id) === idStr
+          ? {
+              ...prev,
+              traite: previousTraite,
+            }
+          : prev
+      );
+    } finally {
+      setUpdatingStatusIds((prev: Set<string>) => {
+        if (!prev.has(idStr)) return prev;
+        const next = new Set(prev);
+        next.delete(idStr);
+        return next;
+      });
     }
   };
 
@@ -825,7 +904,7 @@ export default function LeadsPage() {
               </div>
 
               <div className="w-full overflow-x-auto">
-                <table className="w-full text-[13px] table-fixed min-w-[980px]">
+                <table className="w-full text-[13px] table-fixed min-w-[1080px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-900/95 backdrop-blur text-slate-300 text-[11px] uppercase tracking-wide">
                       {selectionMode && (
@@ -834,8 +913,8 @@ export default function LeadsPage() {
                         </th>
                       )}
 
-                      <th className="w-[64px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
-                        Traité
+                      <th className="w-[190px] py-3 px-3 border-b border-slate-800 text-center whitespace-nowrap">
+                        Statut
                       </th>
 
                       <th className="w-[220px] py-3 px-3 border-b border-slate-800 text-left whitespace-nowrap">
@@ -895,6 +974,14 @@ export default function LeadsPage() {
 
                         const idStr = String(lead.id);
                         const isSelected = selectedIds.has(idStr);
+                        const isStatusUpdating = updatingStatusIds.has(idStr);
+                        const isSent = Boolean(lead.message_sent);
+                        const isPending = !isSent && Boolean(lead.traite);
+                        const statusLabel = isSent
+                          ? "Envoyé"
+                          : isPending
+                            ? "En attente d'envoi"
+                            : "À faire";
 
                         return (
                           <tr
@@ -918,23 +1005,34 @@ export default function LeadsPage() {
                             )}
 
                             <td className="py-3 px-3 text-center">
-                              <TraiteCheckbox leadId={lead.id} defaultChecked={Boolean(lead.traite)} />
+                              <button
+                                type="button"
+                                onClick={() => handleStatusBadgeClick(lead)}
+                                disabled={isSent || isStatusUpdating}
+                                className={[
+                                  "inline-flex items-center justify-center h-8 px-3 rounded-full text-[11px] font-medium border whitespace-nowrap transition focus:outline-none focus:ring-2",
+                                  isSent
+                                    ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-200 cursor-default focus:ring-emerald-500/20"
+                                    : isPending
+                                      ? "border-amber-500/35 bg-amber-500/15 text-amber-200 hover:bg-amber-500/20 focus:ring-amber-500/20"
+                                      : "border-slate-700 bg-slate-950/45 text-slate-200 hover:bg-slate-900/65 focus:ring-indigo-500/25",
+                                  isStatusUpdating ? "opacity-70 cursor-wait" : "",
+                                ].join(" ")}
+                                title={
+                                  isSent
+                                    ? "Message déjà envoyé"
+                                    : isPending
+                                      ? "Cliquer pour repasser À faire"
+                                      : "Cliquer pour marquer en attente d'envoi"
+                                }
+                                aria-label={`Statut du lead ${fullName} : ${statusLabel}`}
+                              >
+                                {isStatusUpdating ? "Mise à jour..." : statusLabel}
+                              </button>
                             </td>
 
                             <td className="py-3 px-3 text-slate-50 relative pr-16">
                               <div className="flex items-center gap-2 min-w-0">
-                                {lead.message_sent ? (
-                                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-200 whitespace-nowrap leading-none">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                                    Envoyé
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/35 px-2.5 py-1 text-[11px] text-slate-300 whitespace-nowrap leading-none">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-slate-600" />
-                                    À faire
-                                  </span>
-                                )}
-
                                 <span className="font-medium truncate">{fullName}</span>
                               </div>
 
