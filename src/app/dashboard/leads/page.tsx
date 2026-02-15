@@ -742,9 +742,7 @@ export default function LeadsPage() {
                                     : "bg-indigo-600/15 border-indigo-500/30 text-indigo-200 hover:bg-indigo-600/25",
                                 ].join(" ")}
                               >
-                                {exportingSelected
-                                  ? "Export..."
-                                  : `Exporter les sélectionnés (${selectedCount})`}
+                                {exportingSelected ? "Export..." : `Exporter (${selectedCount})`}
                               </button>
 
                               <button
