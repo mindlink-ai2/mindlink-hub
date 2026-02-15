@@ -1,13 +1,36 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
-import { buildLeadsCsv } from "./csv";
+import { buildLeadsCsv } from "../csv";
 
-export async function GET() {
+function parseSelectedIds(ids: unknown): number[] {
+  if (!Array.isArray(ids)) return [];
+
+  const unique = new Set<number>();
+
+  ids.forEach((value) => {
+    const n = Number(value);
+    if (Number.isFinite(n)) unique.add(n);
+  });
+
+  return Array.from(unique);
+}
+
+export async function POST(req: Request) {
   const { userId } = await auth();
 
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const ids = parseSelectedIds(body?.ids);
+
+  if (ids.length === 0) {
+    return NextResponse.json(
+      { error: "Aucun identifiant sélectionné." },
+      { status: 400 }
+    );
   }
 
   const supabase = createClient(
@@ -29,30 +52,29 @@ export async function GET() {
     );
   }
 
-  // 2️⃣ Récupérer les leads du client
+  // 2️⃣ Récupérer uniquement les leads sélectionnés du client
   const { data: leadsData, error: leadsError } = await supabase
     .from("leads")
     .select("*")
     .eq("client_id", client.id)
+    .in("id", ids)
     .order("created_at", { ascending: false });
-
-  const leads = leadsData ?? []; // ✅ plus jamais null
 
   if (leadsError) {
     return NextResponse.json(
-      { error: "Failed to fetch leads" },
+      { error: "Failed to fetch selected leads" },
       { status: 500 }
     );
   }
 
-  // 3️⃣ Construire le CSV
+  const leads = leadsData ?? [];
   const csv = buildLeadsCsv(leads);
 
   return new NextResponse(csv, {
     status: 200,
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="leads-mindlink.csv"',
+      "Content-Disposition": 'attachment; filename="leads-selection-mindlink.csv"',
     },
   });
 }

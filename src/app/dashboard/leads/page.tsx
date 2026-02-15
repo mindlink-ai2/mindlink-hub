@@ -42,6 +42,7 @@ export default function LeadsPage() {
   // ✅ Selection mode
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [exportingSelected, setExportingSelected] = useState(false);
   const selectedCount = selectedIds.size;
 
   // ✅ open lead from query param (?open=ID)
@@ -195,6 +196,54 @@ export default function LeadsPage() {
     } catch (e) {
       console.error(e);
       alert("Erreur réseau pendant la suppression.");
+    }
+  };
+
+  const handleExportSelected = async () => {
+    if (selectedIds.size === 0 || exportingSelected) return;
+
+    const ids = Array.from(selectedIds)
+      .map((v) => Number(v))
+      .filter((n) => Number.isFinite(n));
+
+    if (ids.length === 0) {
+      alert("Aucun lead valide à exporter.");
+      return;
+    }
+
+    try {
+      setExportingSelected(true);
+
+      const res = await fetch("/dashboard/leads/export/selected", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data?.error || "Impossible d'exporter ces leads. Réessayez.");
+        return;
+      }
+
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get("content-disposition") ?? "";
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+      const filename = filenameMatch?.[1] ?? "leads-selection-mindlink.csv";
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert("Erreur réseau pendant l'export.");
+    } finally {
+      setExportingSelected(false);
     }
   };
 
@@ -673,13 +722,29 @@ export default function LeadsPage() {
 
                         {selectionMode && (
                           <div className="mt-2 rounded-2xl border border-indigo-500/15 bg-indigo-500/8 p-2">
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                               <button
                                 type="button"
                                 onClick={toggleSelectAllFiltered}
                                 className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/45 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
                               >
                                 {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={handleExportSelected}
+                                disabled={selectedCount === 0 || exportingSelected}
+                                className={[
+                                  "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
+                                  selectedCount === 0 || exportingSelected
+                                    ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
+                                    : "bg-indigo-600/15 border-indigo-500/30 text-indigo-200 hover:bg-indigo-600/25",
+                                ].join(" ")}
+                              >
+                                {exportingSelected
+                                  ? "Export..."
+                                  : `Exporter les sélectionnés (${selectedCount})`}
                               </button>
 
                               <button
