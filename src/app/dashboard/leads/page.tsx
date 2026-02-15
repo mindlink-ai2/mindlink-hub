@@ -713,7 +713,7 @@ export default function LeadsPage() {
                           </div>
                         </div>
 
-                        <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div className="mt-4 grid grid-cols-1 gap-2">
                           <a
                             href="/dashboard/leads/export"
                             className="group inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
@@ -742,9 +742,6 @@ export default function LeadsPage() {
                             </span>
                           </a>
 
-                          <span className="inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl border border-indigo-500/25 bg-indigo-600/15 text-indigo-100 shadow-sm whitespace-nowrap tabular-nums">
-                            {selectedCount} coché(s)
-                          </span>
                         </div>
 
                         <div className="mt-2 rounded-2xl border border-indigo-500/15 bg-indigo-500/8 p-2">
