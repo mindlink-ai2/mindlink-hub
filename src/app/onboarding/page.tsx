@@ -2,6 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useUser, SignedIn, SignedOut, RedirectToSignIn } from "@clerk/nextjs";
+import OnboardingIntroModal from "@/components/onboarding/OnboardingIntroModal";
+import { useOnboardingIntroModal } from "@/hooks/use-onboarding-intro-modal";
+import {
+  getOnboardingCompletedStorageKey,
+  getOnboardingState,
+} from "@/lib/onboarding";
 
 const COMPANY_SIZE_OPTIONS = [
   "1-10",
@@ -49,6 +55,14 @@ export default function OnboardingPage() {
 
 function OnboardingForm() {
   const { user } = useUser();
+  const onboardingState = getOnboardingState(
+    user?.publicMetadata,
+    user?.unsafeMetadata
+  );
+  const { open: isIntroOpen, dismiss: dismissIntro } = useOnboardingIntroModal({
+    userId: user?.id,
+    enabled: onboardingState.required,
+  });
 
   const clerkEmail = user?.primaryEmailAddress?.emailAddress || "";
   const clerkName =
@@ -150,6 +164,11 @@ function OnboardingForm() {
         ok: true,
         msg: "Merci, c’est bien reçu ✅ Notre équipe va pouvoir lancer la configuration sur des bases claires.",
       });
+      if (user?.id && typeof window !== "undefined") {
+        window.localStorage.setItem(getOnboardingCompletedStorageKey(user.id), "1");
+      }
+      dismissIntro();
+      await user?.reload().catch(() => {});
     } catch {
       setStatus({ ok: false, msg: "Erreur réseau. Réessaie dans 30 secondes." });
     } finally {
@@ -159,6 +178,12 @@ function OnboardingForm() {
 
   return (
     <div className="min-h-screen bg-[#070A12]">
+      <OnboardingIntroModal
+        open={isIntroOpen}
+        onPrimaryAction={dismissIntro}
+        onClose={dismissIntro}
+      />
+
       {/* HERO */}
       <div className="relative overflow-hidden border-b border-white/10">
         <div className="absolute inset-0 opacity-60">

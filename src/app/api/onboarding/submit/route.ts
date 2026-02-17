@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
+import { getOnboardingMetadataForCompletion } from "@/lib/onboarding";
 
 export const runtime = "nodejs"; // important (fetch externes + email)
 
@@ -175,33 +176,45 @@ export async function POST(req: Request) {
     // 7) Email récap interne (Resend)
     await sendNotifyEmail(n8nBody);
 
-    return NextResponse.json({ ok: true });
-  } catch (e: any) {
+    // 8) Marque l'onboarding comme complété pour stopper les redirections
+    let onboardingMarked = false;
+    try {
+      const client = await clerkClient();
+      await client.users.updateUserMetadata(userId, getOnboardingMetadataForCompletion());
+      onboardingMarked = true;
+    } catch (metaErr) {
+      console.error("Unable to mark onboarding metadata:", metaErr);
+    }
+
+    return NextResponse.json({ ok: true, onboardingMarked });
+  } catch (e: unknown) {
+    const details = e instanceof Error ? e.message : String(e);
     return NextResponse.json(
-      { error: "Erreur serveur.", details: String(e?.message || e) },
+      { error: "Erreur serveur.", details },
       { status: 500 }
     );
   }
 }
 
-async function sendNotifyEmail(data: any) {
+async function sendNotifyEmail(data: Record<string, unknown>) {
   const to = process.env.ONBOARDING_NOTIFY_EMAIL || "contact@lidmeo.com";
 
   // Si Resend n’est pas configuré, on ne bloque pas
   if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM) return;
 
-  const sizes = Array.isArray(data.target_company_size)
-    ? data.target_company_size.join(", ")
-    : String(data.target_company_size || "");
+  const targetCompanySize = data.target_company_size;
+  const sizes = Array.isArray(targetCompanySize)
+    ? targetCompanySize.join(", ")
+    : String(targetCompanySize || "");
 
   const html = `
     <div style="font-family: ui-sans-serif, system-ui, -apple-system; line-height:1.5">
       <h2>Nouvel onboarding Lidmeo</h2>
 
-      <p><b>Entreprise :</b> ${escapeHtml(data.company || "")}</p>
-      <p><b>Nom :</b> ${escapeHtml(data.full_name || "")}</p>
-      <p><b>Email (compte) :</b> ${escapeHtml(data.email || "")}</p>
-      <p><b>Téléphone :</b> ${escapeHtml(data.phone || "")}</p>
+      <p><b>Entreprise :</b> ${escapeHtml(String(data.company || ""))}</p>
+      <p><b>Nom :</b> ${escapeHtml(String(data.full_name || ""))}</p>
+      <p><b>Email (compte) :</b> ${escapeHtml(String(data.email || ""))}</p>
+      <p><b>Téléphone :</b> ${escapeHtml(String(data.phone || ""))}</p>
 
       <p><b>Taille entreprise recherchée :</b> ${escapeHtml(sizes)}</p>
 
@@ -221,7 +234,7 @@ ${escapeHtml(JSON.stringify(data, null, 2))}
     body: JSON.stringify({
       from: process.env.RESEND_FROM,
       to: [to],
-      subject: `Onboarding — ${data.company || "Nouveau client"}`,
+      subject: `Onboarding — ${String(data.company || "Nouveau client")}`,
       html,
       reply_to: "contact@lidmeo.com",
     }),

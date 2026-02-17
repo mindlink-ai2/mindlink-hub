@@ -1,4 +1,5 @@
 import { SignUp } from "@clerk/nextjs";
+import { getOnboardingUnsafeMetadataForSignup } from "@/lib/onboarding";
 
 export default function SignUpPage() {
   return (
@@ -12,6 +13,9 @@ export default function SignUpPage() {
         </p>
 
         <SignUp
+          forceRedirectUrl="/onboarding"
+          fallbackRedirectUrl="/onboarding"
+          unsafeMetadata={getOnboardingUnsafeMetadataForSignup()}
           appearance={{
             elements: {
               formButtonPrimary:
