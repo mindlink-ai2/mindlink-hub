@@ -203,38 +203,45 @@ export default function DashboardPage() {
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <div className="min-h-screen w-full px-6 pt-20 pb-32">
-        <div className="mx-auto w-full max-w-6xl">
+      <div className="min-h-screen w-full px-4 sm:px-6 pt-10 pb-24">
+        <div className="mx-auto w-full max-w-7xl">
           {/* HEADER */}
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-10">
-            <div>
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-400 bg-clip-text text-transparent">
-                Tableau de bord
-              </h1>
-              <p className="text-slate-400 text-base md:text-lg mt-2">
-                Vue d’ensemble de votre activité Lidmeo : leads, emails et relances.
-              </p>
-            </div>
+          <div className="mb-10 rounded-[28px] border border-[#dbe6ff] bg-white/85 p-6 shadow-[0_24px_55px_-36px_rgba(55,102,210,0.55)] backdrop-blur-sm md:p-8">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#d6e3ff] bg-[#f4f8ff] px-3 py-1 text-[11px] font-medium text-[#3a5788]">
+                  <span className="h-2 w-2 rounded-full bg-[#3b73ec]" />
+                  Hub de pilotage
+                </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/dashboard/prospection"
-                className="rounded-xl bg-sky-500 px-4 py-2 text-xs md:text-sm font-medium text-slate-950 hover:bg-sky-400 transition shadow-lg shadow-sky-500/25"
-              >
-                Ouvrir Prospection
-              </Link>
-              <Link
-                href="/dashboard/followups"
-                className="rounded-xl border border-slate-700 bg-slate-900/40 px-4 py-2 text-xs md:text-sm font-medium text-slate-200 hover:bg-slate-900 transition"
-              >
-                Ouvrir Relances
-              </Link>
+                <h1 className="mt-3 text-4xl md:text-5xl font-extrabold tracking-tight text-[#0f2446]">
+                  Tableau de bord
+                </h1>
+                <p className="mt-2 max-w-2xl text-base md:text-lg text-[#5a7096]">
+                  Vue d’ensemble de votre activité Lidmeo : leads, emails et relances.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/dashboard/prospection"
+                  className="rounded-full bg-[#2f6df0] px-5 py-2.5 text-xs md:text-sm font-semibold text-white hover:bg-[#245fdc] transition shadow-lg shadow-[#3a73e7]/25"
+                >
+                  Ouvrir Prospection
+                </Link>
+                <Link
+                  href="/dashboard/followups"
+                  className="rounded-full border border-[#d3e0f8] bg-white px-5 py-2.5 text-xs md:text-sm font-semibold text-[#1f3c67] hover:bg-[#f4f8ff] transition"
+                >
+                  Ouvrir Relances
+                </Link>
+              </div>
             </div>
           </div>
 
           {/* STATS ERROR / LOADING */}
           {statsError ? (
-            <div className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {statsError}
             </div>
           ) : null}
@@ -321,20 +328,20 @@ export default function DashboardPage() {
           {active && (
             <div
               ref={drilldownRef}
-              className="mt-10 rounded-2xl border border-slate-800 bg-slate-950/90 shadow-xl overflow-hidden"
+              className="mt-10 overflow-hidden rounded-[24px] border border-[#d9e5fd] bg-white/90 shadow-[0_28px_60px_-42px_rgba(44,95,195,0.55)]"
             >
               {/* sticky header */}
-              <div className="px-6 py-4 border-b border-slate-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-slate-950/80">
+              <div className="border-b border-[#e0e9fb] bg-[#f6f9ff] px-6 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-slate-100 text-sm font-semibold">
+                    <h2 className="text-[#132b51] text-sm font-semibold">
                       {activeLabel}
                     </h2>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full border border-slate-700 bg-slate-900/60 text-slate-200">
+                    <span className="rounded-full border border-[#d2ddf8] bg-white px-2 py-0.5 text-[11px] text-[#36558a]">
                       {loadingItems ? "…" : `${filteredItems.length}`}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
+                  <p className="text-[11px] text-[#6c83aa] mt-1">
                     Astuce : re-cliquez sur le KPI pour fermer. Cliquez sur une
                     ligne pour ouvrir le détail.
                   </p>
@@ -346,7 +353,7 @@ export default function DashboardPage() {
                       value={q}
                       onChange={(e) => setQ(e.target.value)}
                       placeholder="Rechercher (nom, société, email…)"
-                      className="w-[260px] max-w-full rounded-xl bg-slate-900/60 border border-slate-700 px-3 py-2 text-[12px] text-slate-200 placeholder:text-slate-500 outline-none focus:border-sky-500/60"
+                      className="w-[260px] max-w-full rounded-xl border border-[#d5e1f8] bg-white px-3 py-2 text-[12px] text-[#193762] placeholder:text-[#7c91b5] outline-none focus:border-[#7ba1f3]"
                     />
                   </div>
 
@@ -357,7 +364,7 @@ export default function DashboardPage() {
                       setItemsError(null);
                       setQ("");
                     }}
-                    className="text-[12px] px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 transition text-slate-200"
+                    className="rounded-xl border border-[#d2def7] bg-white px-3 py-2 text-[12px] font-medium text-[#21426f] transition hover:bg-[#f4f8ff]"
                   >
                     Fermer
                   </button>
@@ -365,15 +372,15 @@ export default function DashboardPage() {
               </div>
 
               {loadingItems ? (
-                <div className="px-6 py-10 text-sm text-slate-400">
+                <div className="px-6 py-10 text-sm text-[#60759a]">
                   Chargement…
                 </div>
               ) : itemsError ? (
-                <div className="px-6 py-10 text-sm text-red-300">
+                <div className="px-6 py-10 text-sm text-red-700">
                   {itemsError}
                 </div>
               ) : filteredItems.length === 0 ? (
-                <div className="px-6 py-10 text-sm text-slate-500">
+                <div className="px-6 py-10 text-sm text-[#6e83a9]">
                   Aucun élément.
                 </div>
               ) : (
@@ -381,20 +388,20 @@ export default function DashboardPage() {
                   {!isFollowupsView ? (
                     <table className="w-full text-sm border-separate border-spacing-0">
                       <thead>
-                        <tr className="bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide">
-                          <th className="py-3 px-4 border-b border-slate-800 text-left">
+                        <tr className="bg-[#f6f9ff] text-[#5a7096] text-[11px] uppercase tracking-wide">
+                          <th className="py-3 px-4 border-b border-[#dce6fa] text-left">
                             Source
                           </th>
-                          <th className="py-3 px-4 border-b border-slate-800 text-left">
+                          <th className="py-3 px-4 border-b border-[#dce6fa] text-left">
                             Nom
                           </th>
-                          <th className="py-3 px-4 border-b border-slate-800 text-left">
+                          <th className="py-3 px-4 border-b border-[#dce6fa] text-left">
                             Contact
                           </th>
-                          <th className="py-3 px-4 border-b border-slate-800 text-center">
+                          <th className="py-3 px-4 border-b border-[#dce6fa] text-center">
                             Traité
                           </th>
-                          <th className="py-3 px-4 border-b border-slate-800 text-center">
+                          <th className="py-3 px-4 border-b border-[#dce6fa] text-center">
                             Date
                           </th>
                         </tr>
@@ -429,27 +436,27 @@ export default function DashboardPage() {
                             <tr
                               key={`${it?.source ?? "x"}-${it?.id}`}
                               onClick={() => openFromRow(it)}
-                              className="border-b border-slate-900 hover:bg-slate-900/60 transition cursor-pointer"
+                              className="cursor-pointer border-b border-[#edf2fb] transition hover:bg-[#f5f8ff]"
                             >
-                              <td className="py-3 px-4 text-slate-300">
+                              <td className="py-3 px-4 text-[#3f5885]">
                                 <SourceBadge
                                   value={sourceLabel}
                                   variant={src}
                                 />
                               </td>
-                              <td className="py-3 px-4 text-slate-50">
+                              <td className="py-3 px-4 text-[#0f2446]">
                                 {name}
-                                <div className="text-[11px] text-slate-500 mt-0.5">
+                                <div className="mt-0.5 text-[11px] text-[#7086aa]">
                                   Ouvrir →
                                 </div>
                               </td>
-                              <td className="py-3 px-4 text-slate-300">
+                              <td className="py-3 px-4 text-[#4d638c]">
                                 {contact}
                               </td>
-                              <td className="py-3 px-4 text-center text-slate-300">
+                              <td className="py-3 px-4 text-center text-[#3f5885]">
                                 {it?.traite ? "Oui" : "Non"}
                               </td>
-                              <td className="py-3 px-4 text-center text-slate-400">
+                              <td className="py-3 px-4 text-center text-[#6f84a8]">
                                 {it?.created_at
                                   ? new Date(
                                       it.created_at
@@ -464,17 +471,17 @@ export default function DashboardPage() {
                   ) : (
                     <table className="w-full text-sm border-separate border-spacing-0">
                       <thead>
-                        <tr className="bg-slate-900 text-slate-300 text-[11px] uppercase tracking-wide">
-                          <th className="py-3 px-4 border-b border-slate-800 text-left">
+                        <tr className="bg-[#f6f9ff] text-[#5a7096] text-[11px] uppercase tracking-wide">
+                          <th className="py-3 px-4 border-b border-[#dce6fa] text-left">
                             Source
                           </th>
-                          <th className="py-3 px-4 border-b border-slate-800 text-left">
+                          <th className="py-3 px-4 border-b border-[#dce6fa] text-left">
                             Nom
                           </th>
-                          <th className="py-3 px-4 border-b border-slate-800 text-left">
+                          <th className="py-3 px-4 border-b border-[#dce6fa] text-left">
                             Contact
                           </th>
-                          <th className="py-3 px-4 border-b border-slate-800 text-center">
+                          <th className="py-3 px-4 border-b border-[#dce6fa] text-center">
                             Prochaine relance
                           </th>
                         </tr>
@@ -509,24 +516,24 @@ export default function DashboardPage() {
                             <tr
                               key={`${it?.source ?? "x"}-${it?.id}`}
                               onClick={() => openFromRow(it)}
-                              className="border-b border-slate-900 hover:bg-slate-900/60 transition cursor-pointer"
+                              className="cursor-pointer border-b border-[#edf2fb] transition hover:bg-[#f5f8ff]"
                             >
-                              <td className="py-3 px-4 text-slate-300">
+                              <td className="py-3 px-4 text-[#3f5885]">
                                 <SourceBadge
                                   value={sourceLabel}
                                   variant={src}
                                 />
                               </td>
-                              <td className="py-3 px-4 text-slate-50">
+                              <td className="py-3 px-4 text-[#0f2446]">
                                 {name}
-                                <div className="text-[11px] text-slate-500 mt-0.5">
+                                <div className="mt-0.5 text-[11px] text-[#7086aa]">
                                   Ouvrir →
                                 </div>
                               </td>
-                              <td className="py-3 px-4 text-slate-300">
+                              <td className="py-3 px-4 text-[#4d638c]">
                                 {contact}
                               </td>
-                              <td className="py-3 px-4 text-center text-slate-400">
+                              <td className="py-3 px-4 text-center text-[#6f84a8]">
                                 {it?.next_followup_at
                                   ? new Date(
                                       it.next_followup_at
@@ -563,10 +570,10 @@ function SectionHeader({
   return (
     <div className="flex items-end justify-between gap-4">
       <div>
-        <p className="text-slate-100 font-semibold">{title}</p>
-        <p className="text-[12px] text-slate-500 mt-0.5">{subtitle}</p>
+        <p className="font-semibold text-[#122c55]">{title}</p>
+        <p className="mt-0.5 text-[12px] text-[#6d84ab]">{subtitle}</p>
       </div>
-      <div className="h-px flex-1 bg-slate-800/70" />
+      <div className="h-px flex-1 bg-[#dce7fd]" />
     </div>
   );
 }
@@ -602,39 +609,39 @@ function KPI({
         if (e.key === "Enter" || e.key === " ") onClick?.();
       }}
       className={[
-        "rounded-2xl border p-6 shadow-xl shadow-black/40 relative overflow-hidden transition-all duration-200",
-        "bg-[#0B0E13] border-slate-800",
+        "relative overflow-hidden rounded-2xl border p-6 transition-all duration-200",
+        "border-[#dbe5fb] bg-white shadow-[0_24px_45px_-34px_rgba(55,98,196,0.5)]",
         clickable
-          ? "cursor-pointer hover:border-slate-700 hover:bg-slate-950/40"
+          ? "cursor-pointer hover:-translate-y-0.5 hover:border-[#bed0f4]"
           : "opacity-80 cursor-default",
-        active ? "ring-2 ring-indigo-500/35 border-indigo-500/30" : "",
+        active ? "ring-2 ring-[#8fb0f7] border-[#9ab7f3]" : "",
       ].join(" ")}
     >
-      <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${color}`} />
+      <div className={`absolute inset-0 opacity-10 bg-gradient-to-br ${color}`} />
       <div className="relative z-10">
         <div className="flex items-start justify-between gap-3">
-          <div className="text-slate-300 text-sm">{label}</div>
+          <div className="text-sm text-[#4d638c]">{label}</div>
           {clickable ? (
-            <span className="text-[11px] px-2 py-0.5 rounded-full border border-slate-700 bg-slate-900/60 text-slate-200">
+            <span className="rounded-full border border-[#d7e2f8] bg-[#f6f9ff] px-2 py-0.5 text-[11px] text-[#3e5988]">
               {active ? "Ouvert" : "Détails"}
             </span>
           ) : (
-            <span className="text-[11px] px-2 py-0.5 rounded-full border border-slate-800 bg-slate-900/40 text-slate-400">
+            <span className="rounded-full border border-[#dfe8fb] bg-[#f7faff] px-2 py-0.5 text-[11px] text-[#7085ac]">
               Info
             </span>
           )}
         </div>
 
-        <div className="mt-3 text-4xl font-extrabold text-white">
+        <div className="mt-3 text-4xl font-extrabold text-[#10284d]">
           {loading ? <span className="opacity-50">—</span> : value}
         </div>
 
         {clickable ? (
-          <div className="mt-3 text-[12px] text-slate-400">
+          <div className="mt-3 text-[12px] text-[#60779f]">
             Cliquez pour afficher la liste.
           </div>
         ) : (
-          <div className="mt-3 text-[12px] text-slate-500">
+          <div className="mt-3 text-[12px] text-[#7489ad]">
             Statistique informative.
           </div>
         )}
@@ -652,8 +659,8 @@ function SourceBadge({
 }) {
   const cls =
     variant === "maps"
-      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-      : "border-sky-500/30 bg-sky-500/10 text-sky-200";
+      ? "border-emerald-300/60 bg-emerald-50 text-emerald-700"
+      : "border-sky-300/60 bg-sky-50 text-sky-700";
 
   return (
     <span

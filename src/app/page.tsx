@@ -18,28 +18,27 @@ export default function HomePage() {
   }, [user]);
 
   return (
-    <div className="grid gap-8 md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] items-start md:items-center min-h-[70vh]">
+    <div className="grid min-h-[78vh] items-start gap-8 md:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] md:items-center">
       {/* ======================= */}
       {/* COLONNE GAUCHE */}
       {/* ======================= */}
-      <section className="space-y-6">
+      <section className="space-y-7">
         {/* 🔓 VERSION NON CONNECTÉE */}
         <SignedOut>
-          <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs text-sky-200">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#d4e1ff] bg-white px-4 py-1.5 text-xs font-medium text-[#3a5686] shadow-sm">
+            <span className="h-2 w-2 rounded-full bg-[#3f79ff]" />
             Espace client sécurisé • Accès réservé
           </div>
 
-          <div className="space-y-3">
-            <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
-              Bienvenue sur{" "}
-              <span className="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
-                Lidmeo Hub
+          <div className="space-y-4">
+            <h1 className="max-w-3xl text-4xl font-extrabold leading-[1.06] tracking-tight text-[#0a1d3d] md:text-6xl">
+              Pilotez votre
+              <span className="block bg-gradient-to-r from-[#2f6df0] via-[#356ee5] to-[#5f89ef] bg-clip-text text-transparent">
+                prospection Lidmeo
               </span>
-              .
             </h1>
 
-            <p className="text-sm md:text-base text-slate-300 max-w-xl">
+            <p className="max-w-2xl text-base leading-relaxed text-[#4f648d]">
               Votre espace client pour retrouver au même endroit votre prospection,
               vos relances et l’accès à vos écrans de suivi. Un Hub simple, clair,
               pensé pour piloter ce que Lidmeo automatise pour vous.
@@ -49,14 +48,14 @@ export default function HomePage() {
           <div className="flex flex-wrap gap-3 pt-1">
             <Link
               href="/sign-in"
-              className="rounded-xl bg-sky-500 px-4 py-2 text-xs md:text-sm font-medium text-slate-950 hover:bg-sky-400 transition shadow-lg shadow-sky-500/30"
+              className="rounded-full bg-[#2f6df0] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#235fdc] shadow-lg shadow-[#2f6df0]/25"
             >
               Se connecter
             </Link>
 
             <Link
               href="/sign-up"
-              className="rounded-xl border border-sky-500/60 px-4 py-2 text-xs md:text-sm text-sky-200 hover:bg-slate-900 transition"
+              className="rounded-full border border-[#cfdcf8] bg-white px-6 py-3 text-sm font-semibold text-[#1d3a67] transition hover:border-[#adc4f4] hover:bg-[#f4f8ff]"
             >
               Créer un compte
             </Link>
@@ -65,13 +64,13 @@ export default function HomePage() {
               href="https://lidmeo.com"
               target="_blank"
               rel="noreferrer"
-              className="rounded-xl border border-slate-700 px-4 py-2 text-xs md:text-sm text-slate-200 hover:bg-slate-800 transition"
+              className="rounded-full border border-[#d4def2] bg-white/70 px-6 py-3 text-sm font-semibold text-[#415b85] transition hover:bg-white"
             >
               Découvrir Lidmeo
             </a>
           </div>
 
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[12px] text-[#6a7fa3]">
             Déjà client Lidmeo ? Créez votre compte avec votre email pro ou contactez
             votre référent si vous n’avez pas reçu vos accès.
           </p>
@@ -79,26 +78,26 @@ export default function HomePage() {
 
         {/* 🔒 VERSION CONNECTÉE */}
         <SignedIn>
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/60 bg-emerald-500/10 px-4 py-1.5 text-xs font-medium text-emerald-800">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
             Connecté • Lidmeo Hub actif
           </div>
 
           {firstName && (
-            <p className="text-xs text-slate-400">
-              Bonjour <span className="font-medium text-slate-100">{firstName}</span> 👋
+            <p className="text-sm text-[#4f648d]">
+              Bonjour <span className="font-semibold text-[#112e57]">{firstName}</span> 👋
             </p>
           )}
 
-          <div className="space-y-3">
-            <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
-              Votre espace{" "}
-              <span className="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
+          <div className="space-y-4">
+            <h1 className="max-w-3xl text-4xl font-extrabold leading-[1.06] tracking-tight text-[#0a1d3d] md:text-6xl">
+              Votre espace
+              <span className="block bg-gradient-to-r from-[#2f6df0] via-[#356ee5] to-[#5f89ef] bg-clip-text text-transparent">
                 Lidmeo Hub
               </span>
             </h1>
 
-            <p className="text-sm md:text-base text-slate-300 max-w-xl">
+            <p className="max-w-2xl text-base leading-relaxed text-[#4f648d]">
               Ici, vous retrouvez tout ce qui compte pour piloter votre activité avec Lidmeo :
               prospection, relances, et accès rapide à vos écrans de suivi. Simple, sans bruit.
             </p>
@@ -107,30 +106,30 @@ export default function HomePage() {
           <div className="flex flex-wrap gap-3 pt-1">
             <Link
               href="/dashboard"
-              className="rounded-xl bg-sky-500 px-4 py-2 text-xs md:text-sm font-medium text-slate-950 hover:bg-sky-400 transition shadow-lg shadow-sky-500/30"
+              className="rounded-full bg-[#2f6df0] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#235fdc] shadow-lg shadow-[#2f6df0]/25"
             >
               Accéder au dashboard
             </Link>
 
             <Link
               href="/dashboard/prospection"
-              className="rounded-xl border border-slate-700 bg-slate-900/40 px-4 py-2 text-xs md:text-sm font-medium text-slate-200 hover:bg-slate-900 transition"
+              className="rounded-full border border-[#cfdcf8] bg-white px-6 py-3 text-sm font-semibold text-[#1d3a67] transition hover:border-[#adc4f4] hover:bg-[#f4f8ff]"
             >
               Prospection
             </Link>
 
             <Link
               href="/dashboard/followups"
-              className="rounded-xl border border-slate-700 bg-slate-900/40 px-4 py-2 text-xs md:text-sm font-medium text-slate-200 hover:bg-slate-900 transition"
+              className="rounded-full border border-[#cfdcf8] bg-white px-6 py-3 text-sm font-semibold text-[#1d3a67] transition hover:border-[#adc4f4] hover:bg-[#f4f8ff]"
             >
               Relances
             </Link>
           </div>
 
-          <p className="text-[12px] text-slate-500">
-            Astuce : commencez par <span className="text-slate-200 font-medium">Prospection</span> si vous
+          <p className="text-[13px] text-[#667da4]">
+            Astuce : commencez par <span className="text-[#14325f] font-semibold">Prospection</span> si vous
             souhaitez lancer votre acquisition, ou par{" "}
-            <span className="text-slate-200 font-medium">Relances</span> si vous souhaitez gérer votre suivi.
+            <span className="text-[#14325f] font-semibold">Relances</span> si vous souhaitez gérer votre suivi.
           </p>
         </SignedIn>
       </section>
@@ -138,9 +137,9 @@ export default function HomePage() {
       {/* =============================== */}
       {/* COLONNE DROITE : CARTE EXPLICATIVE */}
       {/* =============================== */}
-      <aside className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 md:p-5 shadow-[0_0_40px_rgba(15,23,42,0.9)]">
-        <p className="text-xs text-slate-400">À quoi sert le Hub ?</p>
-        <p className="mt-1 text-sm font-medium text-slate-100">
+      <aside className="rounded-[28px] border border-[#d7e4ff] bg-white/85 p-5 md:p-6 shadow-[0_24px_50px_-34px_rgba(60,105,210,0.55)] backdrop-blur-sm">
+        <p className="text-xs uppercase tracking-[0.12em] text-[#6f86ad]">À quoi sert le Hub ?</p>
+        <p className="mt-2 text-sm font-semibold text-[#0f2750]">
           Un seul endroit pour piloter Lidmeo
         </p>
 
@@ -159,26 +158,26 @@ export default function HomePage() {
           />
         </div>
 
-        <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/20 p-3">
-          <p className="text-[11px] text-slate-400">Comment ça marche</p>
-          <ol className="mt-2 space-y-2 text-[12px] text-slate-300">
+        <div className="mt-5 rounded-2xl border border-[#dfe8fb] bg-[#f7faff] p-3.5">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-[#7188ae]">Comment ça marche</p>
+          <ol className="mt-2 space-y-2 text-[13px] text-[#4f648d]">
             <li className="flex gap-2">
-              <span className="text-slate-500">1.</span>
+              <span className="text-[#7a8fb2]">1.</span>
               <span>Vous configurez votre prospection et vos préférences.</span>
             </li>
             <li className="flex gap-2">
-              <span className="text-slate-500">2.</span>
+              <span className="text-[#7a8fb2]">2.</span>
               <span>Vous accédez à vos leads et à vos relances depuis le Hub.</span>
             </li>
             <li className="flex gap-2">
-              <span className="text-slate-500">3.</span>
+              <span className="text-[#7a8fb2]">3.</span>
               <span>Vous gardez une vision claire, sans multiplier les outils.</span>
             </li>
           </ol>
         </div>
 
-        <div className="mt-4 border-t border-slate-800 pt-3">
-          <p className="text-[11px] text-slate-500">
+        <div className="mt-4 border-t border-[#e3ebfc] pt-3">
+          <p className="text-[11px] text-[#738ab0]">
             Les fonctionnalités visibles dans votre Hub dépendent des modules activés sur votre compte.
           </p>
         </div>
@@ -189,9 +188,9 @@ export default function HomePage() {
 
 function FeatureRow({ title, desc }: { title: string; desc: string }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950/20 p-3">
-      <p className="text-xs font-medium text-slate-100">{title}</p>
-      <p className="mt-1 text-[12px] text-slate-400">{desc}</p>
+    <div className="rounded-2xl border border-[#dfe8fb] bg-white p-3.5 shadow-sm">
+      <p className="text-sm font-semibold text-[#102749]">{title}</p>
+      <p className="mt-1 text-[13px] text-[#5c7198]">{desc}</p>
     </div>
   );
 }

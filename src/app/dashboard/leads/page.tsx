@@ -515,20 +515,20 @@ export default function LeadsPage() {
 
   if (!clientLoaded) {
     return (
-      <div className="min-h-screen w-full px-5 sm:px-6 pt-20 pb-32">
+      <div className="min-h-screen w-full px-4 sm:px-6 pt-10 pb-24">
         <div className="mx-auto w-full max-w-[1680px]">
-          <div className="rounded-[28px] border border-slate-800 bg-slate-950/70 p-6 sm:p-7">
+          <div className="rounded-[28px] border border-[#dbe6ff] bg-white/90 p-6 shadow-[0_24px_55px_-38px_rgba(56,103,209,0.55)] sm:p-7">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="h-6 w-44 rounded-xl bg-slate-800/60 animate-pulse" />
-                <div className="mt-3 h-4 w-80 rounded-lg bg-slate-800/50 animate-pulse" />
+                <div className="h-6 w-44 rounded-xl bg-[#dce6fb] animate-pulse" />
+                <div className="mt-3 h-4 w-80 rounded-lg bg-[#e7eefc] animate-pulse" />
               </div>
-              <div className="h-10 w-28 rounded-2xl bg-slate-800/40 animate-pulse" />
+              <div className="h-10 w-28 rounded-2xl bg-[#e0e9fd] animate-pulse" />
             </div>
 
-            <div className="mt-6 h-12 rounded-2xl bg-slate-900/50 border border-slate-800/70 animate-pulse" />
-            <div className="mt-4 h-72 rounded-2xl bg-slate-900/40 border border-slate-800/60 animate-pulse" />
-            <div className="mt-3 text-slate-500 text-xs">Chargement des leads…</div>
+            <div className="mt-6 h-12 rounded-2xl border border-[#dbe5fb] bg-[#f6f9ff] animate-pulse" />
+            <div className="mt-4 h-72 rounded-2xl border border-[#dbe5fb] bg-[#f9fbff] animate-pulse" />
+            <div className="mt-3 text-xs text-[#6f84aa]">Chargement des leads…</div>
           </div>
         </div>
       </div>
@@ -556,75 +556,75 @@ export default function LeadsPage() {
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
-        <div className="min-h-screen w-full px-5 sm:px-6 pt-14 pb-32">
+        <div className="min-h-screen w-full px-4 sm:px-6 pt-8 pb-24">
           <div className="mx-auto w-full max-w-[1680px] space-y-6">
             {/* TOP / HEADER */}
-            <div className="relative overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950/70">
+            <div className="relative overflow-hidden rounded-[30px] border border-[#dbe6ff] bg-white/90 shadow-[0_28px_58px_-40px_rgba(53,102,205,0.55)]">
               <div className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(60%_55%_at_50%_0%,black,transparent)]">
-                <div className="absolute -top-28 left-1/2 h-72 w-[740px] -translate-x-1/2 rounded-full bg-indigo-500/14 blur-3xl" />
-                <div className="absolute -top-16 left-1/2 h-44 w-[560px] -translate-x-1/2 rounded-full bg-sky-400/8 blur-3xl" />
+                <div className="absolute -top-28 left-1/2 h-72 w-[740px] -translate-x-1/2 rounded-full bg-[#4d82ff]/18 blur-3xl" />
+                <div className="absolute -top-16 left-1/2 h-44 w-[560px] -translate-x-1/2 rounded-full bg-[#7ba3ff]/15 blur-3xl" />
               </div>
 
               <div className="relative p-6 sm:p-7">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/40 px-3 py-1 text-[11px] text-slate-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                      <span className="inline-flex items-center gap-2 rounded-full border border-[#d4e2ff] bg-[#f4f8ff] px-3 py-1 text-[11px] font-medium text-[#3e5a88]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#3a72eb]" />
                         Hub • Prospection
                       </span>
 
-                      <span className="inline-flex items-center rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] text-slate-300 tabular-nums">
+                      <span className="inline-flex items-center rounded-full border border-[#d9e5fb] bg-white px-3 py-1 text-[11px] text-[#47618e] tabular-nums">
                         {filteredLeads.length} affiché(s)
                       </span>
 
-                      <span className="inline-flex items-center rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] text-slate-300 whitespace-nowrap">
+                      <span className="inline-flex items-center rounded-full border border-[#d9e5fb] bg-white px-3 py-1 text-[11px] text-[#47618e] whitespace-nowrap">
                         Essential
                       </span>
                     </div>
 
-                    <h1 className="mt-2 text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-50">
+                    <h1 className="mt-3 text-4xl sm:text-5xl font-extrabold tracking-tight text-[#0f2448]">
                       Prospection
                     </h1>
 
-                    <p className="mt-2 text-sm text-slate-400 max-w-2xl">
+                    <p className="mt-3 max-w-2xl text-sm text-[#5b7198]">
                       Tous vos prospects qualifiés, importés automatiquement par Lidmeo. Recherchez,
                       traitez, et ouvrez un lead pour préparer votre message.
                     </p>
 
                     <div className="mt-4 flex flex-wrap items-center gap-3">
-                      <div className="rounded-2xl border border-slate-800 bg-slate-950/45 px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                      <div className="rounded-2xl border border-[#d9e5fb] bg-white px-4 py-3">
+                        <div className="text-[10px] uppercase tracking-wide text-[#7690b8]">
                           Total leads
                         </div>
-                        <div className="mt-1 text-3xl font-extrabold text-slate-50 leading-none tabular-nums">
+                        <div className="mt-1 text-3xl font-extrabold text-[#102a51] leading-none tabular-nums">
                           {total}
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-800 bg-slate-950/45 px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                      <div className="rounded-2xl border border-[#d9e5fb] bg-white px-4 py-3">
+                        <div className="text-[10px] uppercase tracking-wide text-[#7690b8]">
                           Traités
                         </div>
-                        <div className="mt-1 text-3xl font-extrabold text-emerald-200 leading-none tabular-nums">
+                        <div className="mt-1 text-3xl font-extrabold text-emerald-700 leading-none tabular-nums">
                           {treatedCount}
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-800 bg-slate-950/45 px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                      <div className="rounded-2xl border border-[#d9e5fb] bg-white px-4 py-3">
+                        <div className="text-[10px] uppercase tracking-wide text-[#7690b8]">
                           À traiter
                         </div>
-                        <div className="mt-1 text-3xl font-extrabold text-amber-200 leading-none tabular-nums">
+                        <div className="mt-1 text-3xl font-extrabold text-amber-700 leading-none tabular-nums">
                           {remainingToTreat}
                         </div>
                       </div>
                     </div>
 
                     <div className="mt-5">
-                      <div className="group flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-3 shadow-inner backdrop-blur-md transition focus-within:ring-2 focus-within:ring-indigo-500/40">
+                      <div className="group flex items-center gap-3 rounded-2xl border border-[#d5e1f8] bg-white px-4 py-3 shadow-sm transition focus-within:ring-2 focus-within:ring-[#8fb0f7]">
                         <svg
-                          className="h-4 w-4 text-slate-500 group-focus-within:text-slate-300 transition"
+                          className="h-4 w-4 text-[#7e93b7] group-focus-within:text-[#436299] transition"
                           fill="none"
                           stroke="currentColor"
                           strokeWidth="2"
@@ -642,12 +642,12 @@ export default function LeadsPage() {
                           value={searchTerm}
                           onChange={(e) => handleSearch(e.target.value)}
                           placeholder="Rechercher (nom, entreprise, ville)…"
-                          className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
+                          className="w-full bg-transparent text-sm text-[#17345e] placeholder-[#7f95b9] focus:outline-none"
                           aria-label="Rechercher un lead"
                         />
                       </div>
 
-                      <div className="mt-2 text-[11px] text-slate-500">
+                      <div className="mt-2 text-[11px] text-[#6f86ab]">
                         {filteredLeads.length} résultat(s) • {total} total
                         {` • ${selectedCount} sélectionné(s)`}
                       </div>
@@ -656,18 +656,18 @@ export default function LeadsPage() {
 
                   {/* Command center */}
                   <div className="w-full lg:w-[520px] shrink-0">
-                    <div className="relative overflow-hidden rounded-[26px] border border-slate-800 bg-slate-950/40 p-4 sm:p-5 shadow-[0_16px_40px_-26px_rgba(0,0,0,0.75)]">
+                    <div className="relative overflow-hidden rounded-[26px] border border-[#dce7fd] bg-[#f8faff] p-4 sm:p-5 shadow-[0_18px_38px_-28px_rgba(53,97,193,0.4)]">
                       <div className="pointer-events-none absolute inset-0">
-                        <div className="absolute -top-24 right-[-120px] h-56 w-56 rounded-full bg-indigo-500/10 blur-3xl" />
-                        <div className="absolute -bottom-24 left-[-120px] h-56 w-56 rounded-full bg-sky-400/8 blur-3xl" />
-                        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/0 via-slate-950/10 to-slate-950/35" />
+                        <div className="absolute -top-24 right-[-120px] h-56 w-56 rounded-full bg-[#4a80ff]/16 blur-3xl" />
+                        <div className="absolute -bottom-24 left-[-120px] h-56 w-56 rounded-full bg-[#8bb0ff]/15 blur-3xl" />
+                        <div className="absolute inset-0 bg-gradient-to-b from-white/0 via-white/10 to-white/45" />
                       </div>
 
                       <div className="relative">
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/45 text-slate-200">
+                              <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#d4e1fa] bg-white text-[#355b94]">
                                 <svg
                                   className="h-4 w-4"
                                   viewBox="0 0 24 24"
@@ -685,10 +685,10 @@ export default function LeadsPage() {
                               </div>
 
                               <div className="min-w-0">
-                                <div className="text-[12px] font-semibold text-slate-100 leading-none">
+                                <div className="text-[12px] font-semibold text-[#12305b] leading-none">
                                   Commandes
                                 </div>
-                                <div className="mt-1 text-[11px] text-slate-500">
+                                <div className="mt-1 text-[11px] text-[#6d83aa]">
                                   Export, sélection, suppression.
                                 </div>
                               </div>
@@ -696,19 +696,19 @@ export default function LeadsPage() {
                           </div>
 
                           <div className="shrink-0 flex flex-col items-end gap-2">
-                            <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] tabular-nums whitespace-nowrap text-slate-300">
-                              <span className="h-1.5 w-1.5 rounded-full bg-slate-600" />
+                            <span className="inline-flex items-center gap-2 rounded-full border border-[#d5e1fa] bg-white px-3 py-1 text-[11px] tabular-nums whitespace-nowrap text-[#47618e]">
+                              <span className="h-1.5 w-1.5 rounded-full bg-[#7f95b8]" />
                               Essential
                             </span>
 
-                            <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-950/35 px-3 py-2 text-[12px] text-slate-200 whitespace-nowrap tabular-nums">
-                              <span className="text-[10px] uppercase tracking-wide text-slate-500">
+                            <span className="inline-flex items-center gap-2 rounded-2xl border border-[#d5e1fa] bg-white px-3 py-2 text-[12px] text-[#375583] whitespace-nowrap tabular-nums">
+                              <span className="text-[10px] uppercase tracking-wide text-[#7a8fb3]">
                                 Prochain import
                               </span>
-                              <span className="h-4 w-px bg-slate-800" />
-                              <span className="font-semibold text-slate-100">{nextImportText}</span>
-                              <span className="text-slate-500">•</span>
-                              <span className="text-slate-400">08:00</span>
+                              <span className="h-4 w-px bg-[#dbe5fb]" />
+                              <span className="font-semibold text-[#12305b]">{nextImportText}</span>
+                              <span className="text-[#8ea4c7]">•</span>
+                              <span className="text-[#6780a7]">08:00</span>
                             </span>
                           </div>
                         </div>
@@ -716,11 +716,11 @@ export default function LeadsPage() {
                         <div className="mt-4 grid grid-cols-1 gap-2">
                           <a
                             href="/dashboard/leads/export"
-                            className="group inline-flex items-center justify-center h-11 px-4 text-xs sm:text-sm rounded-2xl bg-slate-900/70 border border-slate-800 hover:bg-slate-800/70 transition text-slate-200 shadow-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            className="group inline-flex h-11 items-center justify-center whitespace-nowrap rounded-2xl border border-[#c9daf9] bg-white px-4 text-xs font-semibold text-[#21406c] shadow-sm transition hover:bg-[#f3f7ff] focus:outline-none focus:ring-2 focus:ring-[#8eaef4] sm:text-sm"
                           >
                             <span className="inline-flex items-center gap-2">
                               <svg
-                                className="h-4 w-4 text-slate-300 group-hover:text-slate-100 transition"
+                                className="h-4 w-4 text-[#5f78a1] transition group-hover:text-[#2b4d80]"
                                 viewBox="0 0 24 24"
                                 fill="none"
                                 stroke="currentColor"
@@ -744,12 +744,12 @@ export default function LeadsPage() {
 
                         </div>
 
-                        <div className="mt-2 rounded-2xl border border-indigo-500/15 bg-indigo-500/8 p-2">
+                        <div className="mt-2 rounded-2xl border border-[#d8e5ff] bg-white p-2">
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                             <button
                               type="button"
                               onClick={toggleSelectAllFiltered}
-                              className="inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl bg-slate-950/45 border border-slate-800 hover:bg-slate-900/60 transition text-slate-200 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
+                              className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-[#cfdcf8] bg-[#f4f8ff] px-3 text-[12px] font-medium text-[#284a79] transition hover:bg-[#ecf3ff] focus:outline-none focus:ring-2 focus:ring-[#8daef4]"
                             >
                               {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
                             </button>
@@ -761,8 +761,8 @@ export default function LeadsPage() {
                               className={[
                                 "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
                                 selectedCount === 0 || exportingSelected
-                                  ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
-                                  : "bg-indigo-600/15 border-indigo-500/30 text-indigo-200 hover:bg-indigo-600/25",
+                                  ? "cursor-not-allowed border-[#d7e3fa] bg-white/60 text-[#9aaecf]"
+                                  : "border-[#c9daf9] bg-[#edf3ff] text-[#2d4e80] hover:bg-[#e4edff]",
                               ].join(" ")}
                             >
                               {exportingSelected ? "Export..." : `Exporter (${selectedCount})`}
@@ -775,8 +775,8 @@ export default function LeadsPage() {
                               className={[
                                 "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-amber-500/20",
                                 selectedCount === 0
-                                  ? "bg-slate-900/35 border-slate-800 text-slate-500 cursor-not-allowed"
-                                  : "bg-amber-600/15 border-amber-500/30 text-amber-300 hover:bg-amber-600/25",
+                                  ? "cursor-not-allowed border-[#d7e3fa] bg-white/60 text-[#9aaecf]"
+                                  : "border-amber-300/70 bg-amber-50 text-amber-700 hover:bg-amber-100",
                               ].join(" ")}
                             >
                               Supprimer ({selectedCount})
@@ -784,18 +784,18 @@ export default function LeadsPage() {
                           </div>
 
                           <div className="mt-2 flex items-center justify-end gap-3 px-1">
-                            <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
+                            <span className="rounded-full border border-[#c9daf9] bg-[#f4f8ff] px-3 py-1 text-[11px] text-[#3f5b89] whitespace-nowrap tabular-nums">
                               {selectedCount} sélectionné(s)
                             </span>
                           </div>
                         </div>
 
                         <div className="mt-4 flex items-center justify-between gap-3">
-                          <div className="text-[11px] text-slate-500">
+                          <div className="text-[11px] text-[#6f86ab]">
                             Astuce : filtrez avec la recherche, puis exportez ou sélectionnez.
                           </div>
 
-                          <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
+                          <span className="rounded-full border border-[#c9daf9] bg-[#f4f8ff] px-3 py-1 text-[11px] text-[#3f5b89] whitespace-nowrap tabular-nums">
                             {selectedCount} sélectionné(s)
                           </span>
                         </div>
@@ -804,25 +804,25 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-indigo-500/20 bg-indigo-500/8 px-4 py-3 text-[11px] text-indigo-200/80">
+                <div className="mt-5 rounded-2xl border border-[#d8e5ff] bg-[#f5f9ff] px-4 py-3 text-[11px] text-[#54709b]">
                   Astuce : utilisez “Tout sélectionner” pour supprimer ou exporter en lot.
                 </div>
               </div>
             </div>
 
-            <div className="h-8 sm:h-10 border-t border-slate-800/40" />
+            <div className="h-8 border-t border-[#dce7fd]/80 sm:h-10" />
 
             {/* TABLE CARD */}
-            <div className="rounded-[28px] border border-slate-800 bg-slate-950/70 shadow-xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-3">
+            <div className="overflow-hidden rounded-[28px] border border-[#dbe6ff] bg-white/90 shadow-[0_28px_58px_-40px_rgba(53,102,205,0.55)]">
+              <div className="flex items-center justify-between gap-3 border-b border-[#e1eafc] bg-[#f8faff] px-6 py-4">
                 <div className="min-w-0">
-                  <h2 className="text-slate-100 text-sm font-semibold">Liste des leads</h2>
-                  <p className="text-[11px] text-slate-500">
+                  <h2 className="text-sm font-semibold text-[#132d55]">Liste des leads</h2>
+                  <p className="text-[11px] text-[#7086aa]">
                     Cliquez sur “Voir →” pour ouvrir la fiche lead.
                   </p>
                 </div>
 
-                <span className="text-[11px] px-3 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 whitespace-nowrap tabular-nums">
+                <span className="rounded-full border border-[#c9daf9] bg-white px-3 py-1 text-[11px] text-[#3f5b89] whitespace-nowrap tabular-nums">
                   {selectedCount} sélectionné(s)
                 </span>
               </div>
@@ -830,43 +830,43 @@ export default function LeadsPage() {
               <div className="w-full overflow-x-auto">
                 <table className="w-full text-[13px] table-fixed min-w-[980px]">
                   <thead className="sticky top-0 z-10">
-                    <tr className="bg-slate-900/95 backdrop-blur text-slate-300 text-[11px] uppercase tracking-wide">
-                      <th className="w-[44px] py-3 px-2 border-b border-slate-800 text-center whitespace-nowrap">
+                    <tr className="bg-[#f6f9ff] text-[#5d749a] text-[11px] uppercase tracking-wide">
+                      <th className="w-[44px] border-b border-[#dce7fc] py-3 px-2 text-center whitespace-nowrap">
                         Sel.
                       </th>
 
-                      <th className="w-[126px] py-3 px-2 border-b border-slate-800 text-center whitespace-nowrap">
+                      <th className="w-[126px] border-b border-[#dce7fc] py-3 px-2 text-center whitespace-nowrap">
                         Statut
                       </th>
 
-                      <th className="w-[150px] py-3 px-2 border-b border-slate-800 text-left whitespace-nowrap">
+                      <th className="w-[150px] border-b border-[#dce7fc] py-3 px-2 text-left whitespace-nowrap">
                         Nom
                       </th>
-                      <th className="w-[150px] py-3 px-2 border-b border-slate-800 text-left whitespace-nowrap">
+                      <th className="w-[150px] border-b border-[#dce7fc] py-3 px-2 text-left whitespace-nowrap">
                         Entreprise
                       </th>
-                      <th className="w-[140px] py-3 px-2 border-b border-slate-800 text-left whitespace-nowrap">
+                      <th className="w-[140px] border-b border-[#dce7fc] py-3 px-2 text-left whitespace-nowrap">
                         Localisation
                       </th>
-                      <th className="w-[96px] py-3 px-2 border-b border-slate-800 text-left whitespace-nowrap">
+                      <th className="w-[96px] border-b border-[#dce7fc] py-3 px-2 text-left whitespace-nowrap">
                         LinkedIn
                       </th>
 
                       {emailOption && (
-                        <th className="w-[190px] py-3 px-2 border-b border-slate-800 text-left whitespace-nowrap">
+                        <th className="w-[190px] border-b border-[#dce7fc] py-3 px-2 text-left whitespace-nowrap">
                           Email
                         </th>
                       )}
                       {phoneOption && (
-                        <th className="w-[120px] py-3 px-2 border-b border-slate-800 text-left whitespace-nowrap">
+                        <th className="w-[120px] border-b border-[#dce7fc] py-3 px-2 text-left whitespace-nowrap">
                           Téléphone
                         </th>
                       )}
 
-                      <th className="w-[92px] py-3 px-2 border-b border-slate-800 text-center whitespace-nowrap">
+                      <th className="w-[92px] border-b border-[#dce7fc] py-3 px-2 text-center whitespace-nowrap">
                         Date
                       </th>
-                      <th className="w-[96px] py-3 px-2 border-b border-slate-800 text-center whitespace-nowrap">
+                      <th className="w-[96px] border-b border-[#dce7fc] py-3 px-2 text-center whitespace-nowrap">
                         Supprimer
                       </th>
                     </tr>
@@ -877,11 +877,11 @@ export default function LeadsPage() {
                       <tr>
                         <td colSpan={colCount} className="py-14 text-center">
                           <div className="mx-auto max-w-md px-6">
-                            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/40 text-slate-300">
+                            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-[#d6e3fb] bg-white text-[#5f79a5]">
                               ⌕
                             </div>
-                            <div className="text-slate-200 font-medium">Aucun résultat</div>
-                            <div className="mt-1 text-slate-500 text-sm">
+                            <div className="font-medium text-[#1d3a67]">Aucun résultat</div>
+                            <div className="mt-1 text-sm text-[#6f86ab]">
                               Essayez un autre nom, une entreprise ou une ville.
                             </div>
                           </div>
@@ -909,9 +909,9 @@ export default function LeadsPage() {
                           <tr
                             key={lead.id}
                             className={[
-                              "border-b border-slate-900/80 transition group",
-                              idx % 2 === 0 ? "bg-transparent" : "bg-slate-950/25",
-                              "hover:bg-slate-900/45",
+                              "group border-b border-[#eef3fd] transition",
+                              idx % 2 === 0 ? "bg-transparent" : "bg-[#f9fbff]",
+                              "hover:bg-[#f2f7ff]",
                             ].join(" ")}
                           >
                             <td className="py-3 px-2 text-center">
@@ -932,10 +932,10 @@ export default function LeadsPage() {
                                 className={[
                                   "inline-flex items-center justify-center h-8 px-3 rounded-full text-[11px] font-medium border whitespace-nowrap transition focus:outline-none focus:ring-2",
                                   isSent
-                                    ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-200 cursor-default focus:ring-emerald-500/20"
+                                    ? "cursor-default border-emerald-300/70 bg-emerald-50 text-emerald-700 focus:ring-emerald-300/60"
                                     : isPending
-                                      ? "border-amber-500/35 bg-amber-500/15 text-amber-200 hover:bg-amber-500/20 focus:ring-amber-500/20"
-                                      : "border-slate-700 bg-slate-950/45 text-slate-200 hover:bg-slate-900/65 focus:ring-indigo-500/25",
+                                      ? "border-amber-300/70 bg-amber-50 text-amber-700 hover:bg-amber-100 focus:ring-amber-300/60"
+                                      : "border-[#cedbf8] bg-white text-[#31507f] hover:bg-[#f2f7ff] focus:ring-[#90aff3]",
                                   isStatusUpdating ? "opacity-70 cursor-wait" : "",
                                 ].join(" ")}
                                 title={
@@ -951,7 +951,7 @@ export default function LeadsPage() {
                               </button>
                             </td>
 
-                            <td className="py-3 px-2 text-slate-50 relative pr-14">
+                            <td className="relative py-3 px-2 pr-14 text-[#102c54]">
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="font-medium truncate">{fullName}</span>
                               </div>
@@ -959,15 +959,15 @@ export default function LeadsPage() {
                               <button
                                 type="button"
                                 onClick={() => setOpenLead(lead)}
-                                className="opacity-0 group-hover:opacity-100 absolute right-3 top-1/2 -translate-y-1/2 text-[11px] px-3 py-1.5 rounded-xl bg-indigo-600/70 hover:bg-indigo-500 text-white transition shadow-sm hover:shadow-md whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-xl bg-[#2f6df0] px-3 py-1.5 text-[11px] text-white opacity-0 shadow-sm transition hover:bg-[#245fdc] group-hover:opacity-100 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#90aff4]"
                               >
                                 Voir →
                               </button>
                             </td>
 
-                            <td className="py-3 px-2 text-slate-300 truncate">{lead.Company || "—"}</td>
+                            <td className="py-3 px-2 truncate text-[#486287]">{lead.Company || "—"}</td>
 
-                            <td className="py-3 px-2 text-slate-300 truncate">{lead.location || "—"}</td>
+                            <td className="py-3 px-2 truncate text-[#486287]">{lead.location || "—"}</td>
 
                             <td className="py-3 px-2">
                               {lead.LinkedInURL ? (
@@ -975,24 +975,24 @@ export default function LeadsPage() {
                                   href={lead.LinkedInURL}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex items-center justify-center gap-2 h-9 px-3 rounded-xl border border-slate-800 bg-slate-950/35 text-[12px] text-sky-200 hover:bg-slate-900/55 transition whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                                  className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#cfe0f9] bg-white px-3 text-[12px] text-[#2a4f83] transition hover:bg-[#f3f7ff] focus:outline-none focus:ring-2 focus:ring-[#9eb8ef]"
                                 >
-                                  Profil <span className="text-slate-500">↗</span>
+                                  Profil <span className="text-[#7a8fb2]">↗</span>
                                 </a>
                               ) : (
-                                <span className="text-slate-500">—</span>
+                                <span className="text-[#7a8fb2]">—</span>
                               )}
                             </td>
 
                             {emailOption && (
-                              <td className="py-3 px-2 text-slate-200 truncate">{lead.email || "—"}</td>
+                              <td className="py-3 px-2 truncate text-[#2f4f7f]">{lead.email || "—"}</td>
                             )}
 
                             {phoneOption && (
-                              <td className="py-3 px-2 text-slate-200 truncate">{lead.phone || "—"}</td>
+                              <td className="py-3 px-2 truncate text-[#2f4f7f]">{lead.phone || "—"}</td>
                             )}
 
-                            <td className="py-3 px-2 text-center text-slate-400 whitespace-nowrap tabular-nums">
+                            <td className="py-3 px-2 text-center text-[#6f84a8] whitespace-nowrap tabular-nums">
                               {lead.created_at ? new Date(lead.created_at).toLocaleDateString("fr-FR") : "—"}
                             </td>
 
@@ -1007,7 +1007,7 @@ export default function LeadsPage() {
                 </table>
               </div>
 
-              <div className="px-6 py-3 border-t border-slate-800 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e1eafc] px-6 py-3 text-[11px] text-[#6d84aa]">
                 <div>Astuce : passez la souris sur une ligne pour afficher “Voir →”.</div>
                 <div className="tabular-nums">
                   {treatedCount} traité(s) • {remainingToTreat} à traiter
@@ -1019,23 +1019,23 @@ export default function LeadsPage() {
           {/* --- SIDEBAR --- */}
           {openLead && (
             <>
-              <div className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px]" aria-hidden="true" />
+              <div className="fixed inset-0 z-40 bg-[#0c1932]/35 backdrop-blur-[3px]" aria-hidden="true" />
 
-              <div className="fixed right-0 top-0 z-50 h-full w-full sm:w-[480px] animate-slideLeft bg-gradient-to-b from-slate-950/95 to-slate-950/85 backdrop-blur-2xl border-l border-slate-800 shadow-[0_0_55px_-16px_rgba(99,102,241,0.55)] flex flex-col">
-                <div className="sticky top-0 z-10 p-6 pb-4 bg-slate-950/55 backdrop-blur-xl border-b border-slate-800">
+              <div className="fixed right-0 top-0 z-50 flex h-full w-full flex-col border-l border-[#dce7fd] bg-white/95 shadow-[0_0_55px_-16px_rgba(57,104,199,0.35)] backdrop-blur-2xl animate-slideLeft sm:w-[500px]">
+                <div className="sticky top-0 z-10 border-b border-[#e2eafd] bg-white/90 p-6 pb-4 backdrop-blur-xl">
                   <div className="flex items-start justify-between gap-3">
                     <button
                       type="button"
-                      className="text-slate-300 text-xs hover:text-slate-100 transition inline-flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/35 rounded-2xl"
+                      className="inline-flex items-center gap-2 rounded-2xl text-xs text-[#4a668f] transition hover:text-[#143864] focus:outline-none focus:ring-2 focus:ring-[#8eaef4]"
                       onClick={() => setOpenLead(null)}
                     >
-                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/40">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#d5e2fb] bg-white">
                         ✕
                       </span>
                       Fermer
                     </button>
 
-                    <span className="text-[11px] px-3 py-1 rounded-full border bg-slate-950/35 whitespace-nowrap border-slate-700 text-slate-200">
+                    <span className="rounded-full border border-[#d5e2fb] bg-white px-3 py-1 text-[11px] text-[#3e5a88] whitespace-nowrap">
                       Essential
                     </span>
                   </div>
@@ -1043,23 +1043,23 @@ export default function LeadsPage() {
                   <div className="mt-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h2 className="text-2xl font-semibold text-slate-50 leading-tight truncate">
+                        <h2 className="truncate text-2xl font-semibold leading-tight text-[#102b53]">
                           {(openLead.FirstName ?? "")} {(openLead.LastName ?? "")}
                         </h2>
-                        <p className="text-[12px] text-slate-400 mt-1 truncate">
+                        <p className="mt-1 truncate text-[12px] text-[#6780a7]">
                           {openLead.Company || "—"} • {openLead.location || "—"}
                         </p>
                       </div>
 
                       <div className="shrink-0">
                         {openLead.message_sent ? (
-                          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] text-emerald-200 whitespace-nowrap">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/60 bg-emerald-50 px-3 py-1 text-[11px] text-emerald-700 whitespace-nowrap">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                             Envoyé
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/35 px-3 py-1 text-[11px] text-slate-300 whitespace-nowrap">
-                            <span className="h-1.5 w-1.5 rounded-full bg-slate-600" />
+                          <span className="inline-flex items-center gap-2 rounded-full border border-[#d4e1fa] bg-white px-3 py-1 text-[11px] text-[#49658f] whitespace-nowrap">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#86a0c5]" />
                             À faire
                           </span>
                         )}
@@ -1068,9 +1068,9 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                  <div className="rounded-3xl border border-slate-800 bg-slate-950/25 p-4">
-                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Informations</div>
+                <div className="flex-1 space-y-6 overflow-y-auto p-6">
+                  <div className="rounded-3xl border border-[#dce7fd] bg-[#f9fbff] p-4">
+                    <div className="text-[11px] uppercase tracking-wide text-[#7087ac]">Informations</div>
 
                     <div className="mt-3 grid grid-cols-1 gap-3">
                       <InfoBlock title="LinkedIn">
@@ -1079,29 +1079,29 @@ export default function LeadsPage() {
                             href={openLead.LinkedInURL}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-2 rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-3 py-2 text-indigo-200 hover:bg-indigo-500/15 transition whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/35"
+                            className="inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border border-[#cddcf8] bg-white px-3 py-2 text-[#2f5080] transition hover:bg-[#f3f7ff] focus:outline-none focus:ring-2 focus:ring-[#8eaef4]"
                           >
                             Ouvrir le profil <span className="opacity-80">↗</span>
                           </a>
                         ) : (
-                          <span className="text-slate-500">—</span>
+                          <span className="text-[#7d93b7]">—</span>
                         )}
                       </InfoBlock>
 
                       {emailOption && (
                         <InfoBlock title="Email">
-                          <span className="text-slate-200">{openLead.email || "—"}</span>
+                          <span className="text-[#16345f]">{openLead.email || "—"}</span>
                         </InfoBlock>
                       )}
 
                       {phoneOption && (
                         <InfoBlock title="Téléphone">
-                          <span className="text-slate-200">{openLead.phone || "—"}</span>
+                          <span className="text-[#16345f]">{openLead.phone || "—"}</span>
                         </InfoBlock>
                       )}
 
                       <InfoBlock title="Créé le">
-                        <span className="text-slate-200">
+                        <span className="text-[#16345f]">
                           {openLead.created_at
                             ? new Date(openLead.created_at).toLocaleDateString("fr-FR")
                             : "—"}
@@ -1110,10 +1110,10 @@ export default function LeadsPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-3xl border border-slate-800 bg-slate-950/25 p-4">
+                  <div className="rounded-3xl border border-[#dce7fd] bg-[#f9fbff] p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs text-slate-300 font-medium">Message LinkedIn</label>
-                      <span className="text-[11px] text-slate-500 whitespace-nowrap">Autosave</span>
+                      <label className="text-xs font-medium text-[#264873]">Message LinkedIn</label>
+                      <span className="text-[11px] text-[#7187ac] whitespace-nowrap">Autosave</span>
                     </div>
 
                     <textarea
@@ -1128,7 +1128,7 @@ export default function LeadsPage() {
                         );
                       }}
                       placeholder="Écrivez votre message LinkedIn…"
-                      className="mt-3 w-full h-44 p-4 rounded-2xl bg-slate-900/55 border border-slate-800 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition"
+                      className="mt-3 h-44 w-full rounded-2xl border border-[#d1def8] bg-white p-4 text-sm text-[#183a67] placeholder-[#8096ba] transition focus:outline-none focus:ring-2 focus:ring-[#8eaef4]"
                     />
 
                     <div className="mt-3">
@@ -1140,7 +1140,7 @@ export default function LeadsPage() {
                           "w-full px-4 py-3 rounded-2xl text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/35",
                           openLead.message_sent
                             ? "bg-emerald-600 text-white cursor-default"
-                            : "bg-indigo-600 hover:bg-indigo-500 text-white",
+                            : "bg-[#2f6df0] text-white hover:bg-[#245fdc]",
                         ].join(" ")}
                       >
                         {openLead.message_sent ? "Message envoyé ✓" : "Marquer comme envoyé"}
@@ -1148,9 +1148,9 @@ export default function LeadsPage() {
                     </div>
 
                     {openLead.next_followup_at && (
-                      <p className="text-xs text-slate-400 mt-2">
+                      <p className="mt-2 text-xs text-[#6d83aa]">
                         Prochaine relance :{" "}
-                        <span className="text-slate-200 font-medium">
+                        <span className="font-medium text-[#16345f]">
                           {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
                         </span>
                       </p>
@@ -1158,10 +1158,10 @@ export default function LeadsPage() {
                   </div>
 
                   {/* Email (now for everyone) */}
-                  <div className="rounded-3xl border border-slate-800 bg-slate-950/25 p-4">
+                  <div className="rounded-3xl border border-[#dce7fd] bg-[#f9fbff] p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs text-slate-300 font-medium">Message email</label>
-                      <span className="text-[11px] text-slate-500 whitespace-nowrap">Autosave</span>
+                      <label className="text-xs font-medium text-[#264873]">Message email</label>
+                      <span className="text-[11px] text-[#7187ac] whitespace-nowrap">Autosave</span>
                     </div>
 
                     <textarea
@@ -1174,7 +1174,7 @@ export default function LeadsPage() {
                         );
                       }}
                       placeholder="Écrivez votre message email…"
-                      className="mt-3 w-full h-44 p-4 rounded-2xl bg-slate-900/55 border border-slate-800 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition"
+                      className="mt-3 h-44 w-full rounded-2xl border border-[#d1def8] bg-white p-4 text-sm text-[#183a67] placeholder-[#8096ba] transition focus:outline-none focus:ring-2 focus:ring-[#8eaef4]"
                     />
 
                     {(() => {
@@ -1189,7 +1189,7 @@ export default function LeadsPage() {
                               onClick={openPrefilledEmail}
                               className={[
                                 "w-full px-4 py-3 rounded-2xl text-sm font-semibold transition border cursor-pointer whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25",
-                                "bg-slate-900/65 border-slate-800 text-slate-100 hover:bg-slate-800/70",
+                                "border-[#ccdaf7] bg-white text-[#234772] hover:bg-[#f3f7ff]",
                                 dimIfNoEmail,
                               ].join(" ")}
                             >
@@ -1203,7 +1203,7 @@ export default function LeadsPage() {
                               onClick={openGmailWeb}
                               className={[
                                 "flex-1 px-3 py-2.5 rounded-2xl text-[12px] font-semibold transition border cursor-pointer whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25",
-                                "bg-slate-950/55 border-slate-800 text-slate-200 hover:bg-slate-900/70",
+                                "border-[#ccdaf7] bg-white text-[#234772] hover:bg-[#f3f7ff]",
                                 dimIfNoEmail,
                               ].join(" ")}
                             >
@@ -1215,7 +1215,7 @@ export default function LeadsPage() {
                               onClick={openOutlookWeb}
                               className={[
                                 "flex-1 px-3 py-2.5 rounded-2xl text-[12px] font-semibold transition border cursor-pointer whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25",
-                                "bg-slate-950/55 border-slate-800 text-slate-200 hover:bg-slate-900/70",
+                                "border-[#ccdaf7] bg-white text-[#234772] hover:bg-[#f3f7ff]",
                                 dimIfNoEmail,
                               ].join(" ")}
                             >
@@ -1224,7 +1224,7 @@ export default function LeadsPage() {
                           </div>
 
                           {!hasEmail && (
-                            <p className="text-[11px] text-slate-500 mt-2">Aucun email détecté pour ce lead.</p>
+                            <p className="mt-2 text-[11px] text-[#7188ae]">Aucun email détecté pour ce lead.</p>
                           )}
                         </>
                       );
@@ -1260,11 +1260,11 @@ export default function LeadsPage() {
 
 function Metric({ title, value }: { title: string; value: any }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950/55 px-3 py-3 shadow-inner overflow-hidden">
-      <div className="text-[10px] uppercase tracking-wide text-slate-500 whitespace-nowrap">
+    <div className="overflow-hidden rounded-2xl border border-[#dce7fd] bg-white px-3 py-3 shadow-sm">
+      <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-[#7288ad]">
         {title}
       </div>
-      <div className="mt-1 text-[15px] font-semibold text-slate-100 leading-none whitespace-nowrap tabular-nums truncate">
+      <div className="mt-1 truncate whitespace-nowrap text-[15px] font-semibold leading-none tabular-nums text-[#15335f]">
         {value}
       </div>
     </div>
@@ -1273,11 +1273,11 @@ function Metric({ title, value }: { title: string; value: any }) {
 
 function InfoBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-4">
-      <div className="text-[10px] uppercase tracking-wide text-slate-500 whitespace-nowrap">
+    <div className="rounded-2xl border border-[#dce7fd] bg-white p-4">
+      <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-[#7087ac]">
         {title}
       </div>
-      <div className="mt-2 text-sm text-slate-200">{children}</div>
+      <div className="mt-2 text-sm text-[#15335f]">{children}</div>
     </div>
   );
 }

@@ -14,7 +14,7 @@ export default function SearchBar({ onSearch }: { onSearch: (value: string) => v
         setValue(e.target.value);
         onSearch(e.target.value);
       }}
-      className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      className="w-full rounded-2xl border border-[#d5e2fb] bg-white px-4 py-2.5 text-sm text-[#17345e] placeholder-[#7f95b9] shadow-sm transition focus:outline-none focus:ring-2 focus:ring-[#8eaef4]"
     />
   );
 }

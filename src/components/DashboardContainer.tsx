@@ -47,7 +47,7 @@ export default function DashboardContainer({ children }: { children: React.React
   }, [isLoaded, isSignedIn, pathname, router, user]);
 
   return (
-    <div className="mx-auto w-full max-w-[1480px] px-4 sm:px-6 py-8">
+    <div className="relative z-[1] mx-auto w-full max-w-[1560px] px-4 sm:px-6 py-6 sm:py-8">
       {children}
     </div>
   );

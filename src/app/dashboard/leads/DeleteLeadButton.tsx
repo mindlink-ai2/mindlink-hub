@@ -42,7 +42,7 @@ export default function DeleteLeadButton({ leadId, onDeleted }: DeleteLeadButton
   return (
     <button
       onClick={handleDelete}
-      className="text-red-400 hover:text-red-500 text-sm underline-offset-2 hover:underline"
+      className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-300"
     >
       Supprimer
     </button>

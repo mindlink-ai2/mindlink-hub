@@ -17,7 +17,7 @@ export default function SubscriptionGate({ children, supportEmail }: Props) {
         const res = await fetch("/api/subscription-status", { cache: "no-store" });
         const data = await res.json();
         setStatus(data?.subscription_status ?? null);
-      } catch (e) {
+      } catch {
         setStatus(null);
       } finally {
         setLoading(false);
@@ -41,19 +41,19 @@ export default function SubscriptionGate({ children, supportEmail }: Props) {
       </div>
 
       <div className="fixed inset-0 flex items-center justify-center p-6">
-        <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-black/70 p-6 shadow-xl backdrop-blur">
-          <div className="text-lg font-semibold">Paiement en attente</div>
+        <div className="w-full max-w-xl rounded-3xl border border-[#d9e6ff] bg-white/95 p-6 shadow-2xl shadow-[#3f73df]/20 backdrop-blur">
+          <div className="text-lg font-semibold text-[#10284d]">Paiement en attente</div>
 
-          <p className="mt-2 text-sm text-white/80">
+          <p className="mt-2 text-sm text-[#52698f]">
             Ton paiement est actuellement en <b>attente</b>. L’accès au Hub est temporairement
             désactivé. Pour récupérer l’accès (dashboard, prospection, relances…), merci de
             régulariser le paiement.
           </p>
 
-          <div className="mt-4 rounded-xl bg-white/5 p-4 text-sm text-white/80">
+          <div className="mt-4 rounded-2xl border border-[#dce7ff] bg-[#f6f9ff] p-4 text-sm text-[#52698f]">
             Contacte-nous :{" "}
             <a
-              className="underline underline-offset-4 hover:text-white"
+              className="font-semibold text-[#265fcf] underline underline-offset-4 hover:text-[#1c4eae]"
               href={`mailto:${supportEmail}?subject=Lidmeo%20-%20Paiement%20en%20attente`}
             >
               {supportEmail}
