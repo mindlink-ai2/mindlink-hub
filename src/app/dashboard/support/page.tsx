@@ -167,25 +167,27 @@ export default function SupportPage() {
   };
 
   return (
-    <div className="w-full min-h-[calc(100vh-120px)]">
+    <div className="min-h-[calc(100vh-120px)] w-full">
       <div className="mx-auto w-full max-w-5xl">
-        <div className="relative overflow-hidden rounded-[24px] border border-slate-800/80 bg-slate-950/60">
-          <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-600/15 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-sky-500/10 blur-3xl" />
+        <section className="relative overflow-hidden rounded-[30px] border border-[#dbe7ff] bg-white/90 px-6 py-7 shadow-[0_28px_62px_-42px_rgba(54,102,203,0.5)] sm:px-8 sm:py-8">
+          <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[#e5eeff] blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-[#edf4ff] blur-3xl" />
 
-          <div className="px-6 py-7 sm:px-9 sm:py-9">
-            {/* Header */}
+          <div className="relative">
             <div className="space-y-2">
-              <h1 className="text-3xl sm:text-[34px] font-semibold tracking-tight text-slate-50">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#d6e3fc] bg-[#f6f9ff] px-3 py-1 text-[11px] font-medium text-[#3f5f8e]">
+                <span className="h-2 w-2 rounded-full bg-[#3771ed]" />
+                Centre support
+              </div>
+              <h1 className="text-3xl font-semibold tracking-tight text-[#122b52] sm:text-[34px]">
                 Support
               </h1>
-              <p className="text-sm text-slate-300/80 max-w-2xl">
-                Envoie-nous un ticket : question, bug, changement de cibles ou
+              <p className="max-w-2xl text-sm text-[#5d759c]">
+                Envoie-nous un ticket: question, bug, changement de cibles ou
                 règle mail.
               </p>
             </div>
 
-            {/* Tabs */}
             <div className="mt-6 flex flex-wrap gap-2">
               {CATEGORIES.map((c) => {
                 const isActive = c.id === form.category;
@@ -195,10 +197,10 @@ export default function SupportPage() {
                     type="button"
                     onClick={() => setField("category", c.id)}
                     className={[
-                      "px-4 py-2 rounded-full text-[12px] transition border",
+                      "rounded-full border px-4 py-2 text-[12px] transition",
                       isActive
-                        ? "bg-indigo-600/20 border-indigo-500/40 text-slate-50"
-                        : "bg-slate-900/35 border-slate-800 text-slate-200/80 hover:text-slate-50 hover:bg-slate-900/55 hover:border-slate-700",
+                        ? "border-[#b8cdf6] bg-[#edf4ff] text-[#224676]"
+                        : "border-[#d8e4fb] bg-white text-[#60789f] hover:border-[#c1d4f7] hover:bg-[#f7faff] hover:text-[#264a79]",
                     ].join(" ")}
                   >
                     {c.label}
@@ -207,68 +209,51 @@ export default function SupportPage() {
               })}
             </div>
 
-            {/* Compact hint */}
-            <div className="mt-3 text-[12px] text-slate-400">{active.hint}</div>
+            <div className="mt-3 text-[12px] text-[#6f87ad]">{active.hint}</div>
 
-            {/* Form */}
-            <div className="mt-6 rounded-[20px] border border-slate-800/70 bg-slate-950/50 p-5 sm:p-6">
-              {/* Top row: status + prefill */}
+            <div className="mt-6 rounded-[24px] border border-[#d8e4fb] bg-white p-5 sm:p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-[12.5px]">
                   {sent === "ok" && (
-                    <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-emerald-200">
-                      ✅ {serverMsg ?? "Message envoyé."}
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
+                      {serverMsg ?? "Message envoyé."}
                     </div>
                   )}
                   {sent === "error" && (
-                    <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-red-200">
-                      ❌ {serverMsg ?? "Une erreur est survenue. Réessaie."}
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+                      {serverMsg ?? "Une erreur est survenue. Réessaie."}
                     </div>
                   )}
                 </div>
 
-                {/* ✅ single prefill button */}
                 <button
                   type="button"
                   onClick={handlePrefill}
-                  className="
-                    shrink-0 inline-flex items-center gap-2
-                    rounded-full border border-slate-700/70
-                    bg-slate-900/40 px-4 py-2 text-[12px] text-slate-200
-                    hover:bg-slate-900/70 hover:border-slate-600
-                    transition
-                  "
+                  className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#d4e1fb] bg-[#f7faff] px-4 py-2 text-[12px] text-[#365786] transition hover:border-[#c0d3f8] hover:bg-[#edf4ff]"
                 >
                   <span className="text-[13px]">✨</span>
                   Pré-remplir
                 </button>
               </div>
 
-              {/* Subject */}
               <div className="mt-5 space-y-2">
-                <label className="text-[11px] text-slate-400 uppercase tracking-wider">
+                <label className="text-[11px] uppercase tracking-wider text-[#6f88ae]">
                   Sujet
                 </label>
                 <input
                   value={form.subject}
                   onChange={(e) => setField("subject", e.target.value)}
                   placeholder={active.subjectPH}
-                  className="
-                    w-full rounded-2xl bg-slate-900/35 border border-slate-800/80
-                    px-4 py-3.5 text-sm text-slate-100 placeholder-slate-500
-                    focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40
-                    transition
-                  "
+                  className="w-full rounded-2xl border border-[#d5e2fb] bg-[#f9fbff] px-4 py-3.5 text-sm text-[#15345f] placeholder-[#8097bc] transition focus:border-[#b3caf4] focus:outline-none focus:ring-2 focus:ring-[#8eaef4]/35"
                 />
               </div>
 
-              {/* Message */}
               <div className="mt-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] text-slate-400 uppercase tracking-wider">
+                  <label className="text-[11px] uppercase tracking-wider text-[#6f88ae]">
                     Message
                   </label>
-                  <div className="text-[11px] text-slate-500">
+                  <div className="text-[11px] text-[#7d95ba]">
                     {messageCount} caractère{messageCount > 1 ? "s" : ""}
                   </div>
                 </div>
@@ -277,18 +262,12 @@ export default function SupportPage() {
                   value={form.message}
                   onChange={(e) => setField("message", e.target.value)}
                   placeholder={active.messagePH}
-                  className="
-                    w-full min-h-[220px] rounded-2xl bg-slate-900/35 border border-slate-800/80
-                    px-4 py-4 text-sm text-slate-100 placeholder-slate-500
-                    focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40
-                    transition resize-none
-                  "
+                  className="min-h-[220px] w-full resize-none rounded-2xl border border-[#d5e2fb] bg-[#f9fbff] px-4 py-4 text-sm text-[#15345f] placeholder-[#8097bc] transition focus:border-[#b3caf4] focus:outline-none focus:ring-2 focus:ring-[#8eaef4]/35"
                 />
               </div>
 
-              {/* Footer */}
-              <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="text-[11.5px] text-slate-500">
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-[11.5px] text-[#728ab0]">
                   Si c’est un bug, ajoute les étapes + (si possible) une capture.
                 </div>
 
@@ -297,11 +276,10 @@ export default function SupportPage() {
                   onClick={handleSend}
                   disabled={sending}
                   className={[
-                    "inline-flex items-center justify-center",
-                    "px-6 py-3 rounded-2xl text-sm font-medium transition",
+                    "inline-flex items-center justify-center rounded-2xl px-6 py-3 text-sm font-medium transition",
                     sending
-                      ? "bg-slate-800/70 text-slate-400 cursor-not-allowed"
-                      : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20",
+                      ? "cursor-not-allowed bg-[#dbe5fa] text-[#7e95b9]"
+                      : "bg-[#316ded] text-white shadow-lg shadow-[#3b73eb]/25 hover:bg-[#255dd8]",
                   ].join(" ")}
                 >
                   {sending ? "Envoi en cours…" : "Envoyer"}
@@ -309,12 +287,11 @@ export default function SupportPage() {
               </div>
             </div>
 
-            {/* Tiny helper */}
-            <div className="mt-5 text-[11.5px] text-slate-500">
-              Tip cibles : zone + secteurs + taille + exclusions + 2 exemples.
+            <div className="mt-5 text-[11.5px] text-[#728ab0]">
+              Tip cibles: zone + secteurs + taille + exclusions + 2 exemples.
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
