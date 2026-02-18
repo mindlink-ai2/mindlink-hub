@@ -1037,7 +1037,7 @@ export default function LeadsPage() {
                       <button
                         type="button"
                         onClick={handleMessageSent}
-                        disabled={openLead.message_sent}
+                        disabled={Boolean(openLead.message_sent)}
                         className={[
                           "w-full rounded-xl px-4 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2",
                           openLead.message_sent

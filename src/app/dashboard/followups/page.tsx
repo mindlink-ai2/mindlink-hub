@@ -128,11 +128,13 @@ export default function FollowupsPage() {
   }, [openLead]);
 
   const formatDateFR = (d: unknown) => {
-    try {
-      return new Date(d).toLocaleDateString("fr-FR");
-    } catch {
+    if (!(typeof d === "string" || typeof d === "number" || d instanceof Date)) {
       return "—";
     }
+
+    const parsed = new Date(d);
+    if (Number.isNaN(parsed.getTime())) return "—";
+    return parsed.toLocaleDateString("fr-FR");
   };
 
   const leadDisplayName = (lead: FollowupLead) =>
