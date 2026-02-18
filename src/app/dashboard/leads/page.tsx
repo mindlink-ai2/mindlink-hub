@@ -5,7 +5,25 @@ import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
 
-type Lead = any;
+type Lead = {
+  id: number | string;
+  Name?: string | null;
+  FirstName?: string | null;
+  LastName?: string | null;
+  Company?: string | null;
+  location?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  created_at?: string | null;
+  traite?: boolean | null;
+  message_sent?: boolean | null;
+  message_sent_at?: string | null;
+  next_followup_at?: string | null;
+  internal_message?: string | null;
+  message_mail?: string | null;
+  LinkedInURL?: string | null;
+  [key: string]: unknown;
+};
 
 function filterLeads(leads: Lead[], term: string) {
   const v = term.trim().toLowerCase();
@@ -417,12 +435,16 @@ export default function LeadsPage() {
       return;
     }
 
-    setOpenLead((prev: any) => ({
-      ...prev,
-      message_sent: true,
-      message_sent_at: data.lead?.message_sent_at,
-      next_followup_at: data.lead?.next_followup_at,
-    }));
+    setOpenLead((prev: Lead | null) =>
+      prev
+        ? {
+            ...prev,
+            message_sent: true,
+            message_sent_at: data.lead?.message_sent_at,
+            next_followup_at: data.lead?.next_followup_at,
+          }
+        : prev
+    );
 
     setSafeLeads((prev: Lead[]) =>
       prev.map((l) =>
@@ -1133,7 +1155,7 @@ function Metric({
   tone,
 }: {
   title: string;
-  value: any;
+  value: ReactNode;
   tone: "default" | "success" | "warning";
 }) {
   const valueColor =

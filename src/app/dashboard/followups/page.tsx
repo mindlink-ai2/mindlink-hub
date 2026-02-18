@@ -4,13 +4,29 @@ import { useEffect, useState } from "react";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
 
+type TabKey = "overdue" | "today" | "upcoming";
+
+type FollowupLead = {
+  id: string | number;
+  next_followup_at?: string | null;
+  placeUrl?: string | null;
+  FirstName?: string | null;
+  LastName?: string | null;
+  title?: string | null;
+  Company?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+  LinkedInURL?: string | null;
+  [key: string]: unknown;
+};
+
 export default function FollowupsPage() {
-  const [leads, setLeads] = useState<any[]>([]);
+  const [leads, setLeads] = useState<FollowupLead[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [openLead, setOpenLead] = useState<any>(null);
+  const [openLead, setOpenLead] = useState<FollowupLead | null>(null);
 
   // UI state (UX only)
-  const [tab, setTab] = useState<"overdue" | "today" | "upcoming">("overdue");
+  const [tab, setTab] = useState<TabKey>("overdue");
 
   // Fetch all leads with followups
   useEffect(() => {
@@ -21,7 +37,7 @@ export default function FollowupsPage() {
       const data1 = await res1.json();
       const data2 = await res2.json();
 
-      const merged = [...(data1.leads ?? []), ...(data2.leads ?? [])];
+      const merged = [...(data1.leads ?? []), ...(data2.leads ?? [])] as FollowupLead[];
 
       // Only leads with next_followup_at
       const filtered = merged.filter((l) => l.next_followup_at != null);
@@ -37,7 +53,7 @@ export default function FollowupsPage() {
   );
 
   // 🔧 FIX 1 : éviter crash si la date n’est pas une string
-  const cleanDate = (d: any) => {
+  const cleanDate = (d: unknown) => {
     if (!d || typeof d !== "string") return new Date("2100-01-01");
     return new Date(d.split("T")[0] + "T00:00:00");
   };
@@ -72,7 +88,7 @@ export default function FollowupsPage() {
       : "Relances planifiées pour les prochains jours.";
 
   // 🔵 Fonction : marquer comme répondu (LinkedIn OU Maps)
-  const markAsResponded = async (leadId: string) => {
+  const markAsResponded = async (leadId: string | number) => {
     // 🔧 FIX 2 : éviter crash si openLead est null
     const isMapLead = !!openLead?.placeUrl;
 
@@ -111,7 +127,7 @@ export default function FollowupsPage() {
     };
   }, [openLead]);
 
-  const formatDateFR = (d: any) => {
+  const formatDateFR = (d: unknown) => {
     try {
       return new Date(d).toLocaleDateString("fr-FR");
     } catch {
@@ -119,10 +135,10 @@ export default function FollowupsPage() {
     }
   };
 
-  const leadDisplayName = (lead: any) =>
+  const leadDisplayName = (lead: FollowupLead) =>
     `${lead.FirstName || lead.title || "—"} ${lead.LastName || ""}`.trim();
 
-  const LeadCard = ({ lead, tone }: any) => {
+  const renderLeadCard = (lead: FollowupLead, tone: TabKey) => {
     // ✅ no red (overdue uses amber)
     const toneRing =
       tone === "overdue"
@@ -195,7 +211,17 @@ export default function FollowupsPage() {
     );
   };
 
-  const Section = ({ title, subtitle, data, tone }: any) => (
+  const renderSection = ({
+    title,
+    subtitle,
+    data,
+    tone,
+  }: {
+    title: string;
+    subtitle: string;
+    data: FollowupLead[];
+    tone: TabKey;
+  }) => (
     <section className="hub-card overflow-hidden">
       <div className="border-b border-[#e2e8f0] bg-[#f8fbff] px-5 py-4">
         <div className="flex items-start justify-between gap-4">
@@ -224,8 +250,8 @@ export default function FollowupsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-            {data.map((lead: any) => (
-              <LeadCard key={lead.id} lead={lead} tone={tone} />
+            {data.map((lead) => (
+              <div key={lead.id}>{renderLeadCard(lead, tone)}</div>
             ))}
           </div>
         )}
@@ -233,7 +259,15 @@ export default function FollowupsPage() {
     </section>
   );
 
-  const HeaderStat = ({ label, value, variant }: any) => {
+  const renderHeaderStat = ({
+    label,
+    value,
+    variant,
+  }: {
+    label: string;
+    value: number;
+    variant: TabKey;
+  }) => {
     // ✅ no red (overdue uses amber)
     const styles =
       variant === "overdue"
@@ -288,7 +322,7 @@ export default function FollowupsPage() {
     );
   };
 
-  const Skeleton = () => (
+  const renderSkeleton = () => (
     <div className="space-y-4">
       <div className="h-8 w-56 rounded-xl bg-[#e5edf8] animate-pulse" />
       <div className="h-4 w-80 rounded-lg bg-[#edf3fb] animate-pulse" />
@@ -315,7 +349,7 @@ export default function FollowupsPage() {
 
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             {!loaded ? (
-              <Skeleton />
+              renderSkeleton()
             ) : (
               <div className="space-y-6">
                 {/* Header */}
@@ -344,32 +378,32 @@ export default function FollowupsPage() {
 
                   {/* Clickable tabs */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <HeaderStat
-                      label="En retard"
-                      value={overdue.length}
-                      variant="overdue"
-                    />
-                    <HeaderStat
-                      label="Aujourd’hui"
-                      value={todayList.length}
-                      variant="today"
-                    />
-                    <HeaderStat
-                      label="À venir"
-                      value={upcoming.length}
-                      variant="upcoming"
-                    />
+                    {renderHeaderStat({
+                      label: "En retard",
+                      value: overdue.length,
+                      variant: "overdue",
+                    })}
+                    {renderHeaderStat({
+                      label: "Aujourd’hui",
+                      value: todayList.length,
+                      variant: "today",
+                    })}
+                    {renderHeaderStat({
+                      label: "À venir",
+                      value: upcoming.length,
+                      variant: "upcoming",
+                    })}
                   </div>
                 </div>
 
                 {/* Active content only */}
                 <div className="grid grid-cols-1 gap-4">
-                  <Section
-                    title={activeTitle}
-                    subtitle={activeSubtitle}
-                    data={activeData}
-                    tone={tab}
-                  />
+                  {renderSection({
+                    title: activeTitle,
+                    subtitle: activeSubtitle,
+                    data: activeData,
+                    tone: tab,
+                  })}
                 </div>
               </div>
             )}
