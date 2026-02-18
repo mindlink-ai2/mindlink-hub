@@ -558,6 +558,9 @@ export default function LeadsPage() {
 
   const total = safeLeads.length;
   const treatedCount = safeLeads.filter((l) => l.traite === true).length;
+  const pendingCount = safeLeads.filter(
+    (l) => Boolean(l.traite) && !Boolean(l.message_sent)
+  ).length;
   const remainingToTreat = total - treatedCount;
 
   // Next import (Paris)
@@ -592,11 +595,11 @@ export default function LeadsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
                       <span className="h-1.5 w-1.5 rounded-full bg-[#1f5eff]" />
-                      Hub Lidmeo
+                      Espace client Lidmeo
                     </span>
 
                     <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] tabular-nums">
-                      {filteredLeads.length} affiché(s)
+                      {filteredLeads.length} affichés
                     </span>
 
                     <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] whitespace-nowrap">
@@ -605,16 +608,17 @@ export default function LeadsPage() {
                   </div>
 
                   <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#0b1c33] sm:text-5xl">
-                    Votre espace prospection
+                    Prospection claire et agréable
                   </h1>
                   <p className="mt-3 max-w-2xl text-sm text-[#51627b] sm:text-base">
-                    Retrouvez tous vos leads dans un espace clair et apaisé. Filtrez, contactez,
-                    traitez et avancez simplement, sans friction.
+                    Une vue simple pour avancer sereinement: visualisez vos priorités,
+                    contactez vos prospects et gardez le cap en quelques clics.
                   </p>
 
-                  <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <Metric title="Total leads" value={total} tone="default" />
                     <Metric title="Traités" value={treatedCount} tone="success" />
+                    <Metric title="En attente" value={pendingCount} tone="info" />
                     <Metric title="À traiter" value={remainingToTreat} tone="warning" />
                   </div>
 
@@ -644,7 +648,7 @@ export default function LeadsPage() {
                     </div>
 
                     <div className="mt-2 text-[11px] text-[#51627b]">
-                      {filteredLeads.length} résultat(s) • {total} total • {selectedCount} sélectionné(s)
+                      {filteredLeads.length} résultat(s) • {pendingCount} en attente • {selectedCount} sélectionné(s)
                     </div>
                   </div>
                 </div>
@@ -671,12 +675,27 @@ export default function LeadsPage() {
                             />
                           </svg>
                         </div>
-                        <h2 className="mt-3 text-base font-semibold text-[#0b1c33]">Commandes rapides</h2>
-                        <p className="mt-1 text-xs text-[#51627b]">Actions lot: sélection, export, suppression.</p>
+                        <h2 className="mt-3 text-base font-semibold text-[#0b1c33]">Centre d’actions</h2>
+                        <p className="mt-1 text-xs text-[#51627b]">Gérez vos lots en un coup d’œil.</p>
                       </div>
 
                       <div className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 text-[11px] text-[#51627b] tabular-nums">
                         Import {nextImportText}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <div className="rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wide text-[#68809d]">En attente</p>
+                        <p className="mt-1 text-lg font-semibold leading-none text-[#0b1c33] tabular-nums">
+                          {pendingCount}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-3 py-2">
+                        <p className="text-[10px] uppercase tracking-wide text-[#68809d]">À traiter</p>
+                        <p className="mt-1 text-lg font-semibold leading-none text-[#0b1c33] tabular-nums">
+                          {remainingToTreat}
+                        </p>
                       </div>
                     </div>
 
@@ -686,7 +705,7 @@ export default function LeadsPage() {
                       </HubButton>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <HubButton type="button" variant="ghost" onClick={toggleSelectAllFiltered}>
                         {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
                       </HubButton>
@@ -699,7 +718,9 @@ export default function LeadsPage() {
                       >
                         {exportingSelected ? "Export..." : `Exporter (${selectedCount})`}
                       </HubButton>
+                    </div>
 
+                    <div className="mt-2">
                       <HubButton
                         type="button"
                         variant="danger"
@@ -733,6 +754,9 @@ export default function LeadsPage() {
                 <div className="flex items-center gap-2 text-[11px] text-[#51627b]">
                   <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 tabular-nums">
                     {selectedCount} sélectionné(s)
+                  </span>
+                  <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 tabular-nums">
+                    {pendingCount} en attente
                   </span>
                   <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 tabular-nums">
                     {treatedCount} traités
@@ -1202,14 +1226,30 @@ function Metric({
 }: {
   title: string;
   value: ReactNode;
-  tone: "default" | "success" | "warning";
+  tone: "default" | "success" | "warning" | "info";
 }) {
   const valueColor =
-    tone === "success" ? "text-emerald-700" : tone === "warning" ? "text-amber-700" : "text-[#0b1c33]";
+    tone === "success"
+      ? "text-emerald-700"
+      : tone === "warning"
+        ? "text-amber-700"
+        : tone === "info"
+          ? "text-[#1f5eff]"
+          : "text-[#0b1c33]";
+
+  const chipColor =
+    tone === "success"
+      ? "bg-emerald-500"
+      : tone === "warning"
+        ? "bg-amber-500"
+        : tone === "info"
+          ? "bg-[#1f5eff]"
+          : "bg-[#8aa2c2]";
 
   return (
     <div className="overflow-hidden rounded-xl border border-[#d7e3f4] bg-white px-4 py-3 shadow-[0_16px_26px_-24px_rgba(18,43,86,0.75)]">
-      <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-[#51627b]">
+      <div className="flex items-center gap-2 whitespace-nowrap text-[10px] uppercase tracking-wide text-[#51627b]">
+        <span className={["h-1.5 w-1.5 rounded-full", chipColor].join(" ")} />
         {title}
       </div>
       <div className={["mt-1 truncate whitespace-nowrap text-[28px] font-semibold leading-none tabular-nums", valueColor].join(" ")}>
