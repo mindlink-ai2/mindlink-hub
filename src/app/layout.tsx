@@ -15,33 +15,33 @@ export const metadata: Metadata = {
 
 function PaywallOverlay() {
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#111827]/35 backdrop-blur-sm p-6">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#081123]/45 p-6 backdrop-blur-sm">
       {/* Glow */}
       <div className="absolute inset-0 opacity-40">
         <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl bg-gradient-to-tr from-[#3b6ff6]/22 via-[#97b4fb]/12 to-[#e3e7ef]/20" />
       </div>
 
-      <div className="relative w-full max-w-xl rounded-3xl border border-[#e3e7ef] bg-white/95 p-8 shadow-2xl shadow-black/10">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[#e3e7ef] bg-[#f7f8fb] px-3 py-1 text-[11px] text-[#4b5565]">
+      <div className="relative w-full max-w-xl rounded-3xl border border-[#d7e3f4] bg-white/95 p-8 shadow-[0_26px_68px_-38px_rgba(21,55,120,0.65)]">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#d7e3f4] bg-[#f7faff] px-3 py-1 text-[11px] text-[#51627b]">
           <span className="h-2 w-2 rounded-full bg-amber-400" />
           Accès en attente d’activation
         </div>
 
-        <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#1f2a44]">
+        <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#0b1c33]">
           Active ton accès à Lidmeo
         </h2>
 
-        <p className="mt-3 text-sm leading-relaxed text-[#667085]">
+        <p className="mt-3 text-sm leading-relaxed text-[#51627b]">
           Ton compte est bien créé, mais l’accès au Hub n’est pas encore activé.
           <br />
           Pour commencer à recevoir tes leads, il te suffit de choisir une offre.
         </p>
 
-        <div className="mt-5 rounded-2xl border border-[#e3e7ef] bg-[#fbfcfe] p-4">
-          <div className="text-sm font-medium text-[#1f2a44]">
+        <div className="mt-5 rounded-2xl border border-[#d7e3f4] bg-[#f8fbff] p-4">
+          <div className="text-sm font-medium text-[#0b1c33]">
             Déjà souscrit ?
           </div>
-          <div className="mt-1 text-sm text-[#667085] leading-relaxed">
+          <div className="mt-1 text-sm leading-relaxed text-[#51627b]">
             Si tu viens de payer, l’activation se fait automatiquement en quelques
             minutes. Ensuite, recharge cette page.
           </div>
@@ -50,10 +50,10 @@ function PaywallOverlay() {
         <div className="mt-7 flex flex-col gap-3">
           <Link
             href="https://lidmeo.com/offres-prospection-automatique"
-            className="group inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-base font-semibold text-white shadow-lg shadow-[#3b6ff6]/25 transition hover:opacity-95"
+            className="group inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-[#1f5eff] bg-gradient-to-r from-[#1f5eff] via-[#2f70ff] to-[#1254ec] px-5 py-3.5 text-base font-semibold text-white shadow-[0_18px_28px_-18px_rgba(31,94,255,0.9)] transition hover:-translate-y-[1px]"
             style={{
               background:
-                "linear-gradient(135deg, #3B6FF6 0%, #3263E7 55%, #2B58D5 100%)",
+                "linear-gradient(135deg, #1f5eff 0%, #2f70ff 55%, #1254ec 100%)",
             }}
           >
             Voir les offres
@@ -62,9 +62,9 @@ function PaywallOverlay() {
             </span>
           </Link>
 
-          <div className="text-center text-xs text-[#667085]">
+          <div className="text-center text-xs text-[#51627b]">
             Accès généralement activé en{" "}
-            <span className="text-[#1f2a44]">2 à 5 minutes</span> après paiement.
+            <span className="text-[#0b1c33]">2 à 5 minutes</span> après paiement.
           </div>
         </div>
       </div>
@@ -98,29 +98,29 @@ export default async function RootLayout({
   return (
     <ClerkProvider>
       <html lang="fr">
-        <body className="bg-[#f4f6fb] text-[#1f2a44]">
+        <body className="bg-[#f3f7ff] text-[#0b1c33]">
           <div className="min-h-screen flex flex-col relative">
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
-              <div className="absolute -top-36 left-1/2 h-[420px] w-[980px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(59,111,246,0.1),rgba(59,111,246,0.01)_58%,transparent_75%)]" />
-              <div className="absolute -left-24 top-32 h-72 w-72 rounded-full bg-[#eef1f8]/90 blur-3xl" />
-              <div className="absolute -right-24 top-24 h-80 w-80 rounded-full bg-[#e9edf6]/90 blur-3xl" />
+              <div className="absolute -top-40 left-1/2 h-[500px] w-[1120px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(31,94,255,0.14),rgba(31,94,255,0.01)_62%,transparent_78%)]" />
+              <div className="absolute -left-24 top-20 h-80 w-80 rounded-full bg-[#dfeaff]/80 blur-3xl" />
+              <div className="absolute -right-24 top-12 h-96 w-96 rounded-full bg-[#d8f0ff]/70 blur-3xl" />
             </div>
 
             {/* 🔵 HEADER */}
-            <header className="sticky top-0 z-20 border-b border-[#e3e7ef] bg-white/88 backdrop-blur-xl">
+            <header className="sticky top-0 z-20 border-b border-[#d7e3f4] bg-white/88 backdrop-blur-xl">
               {/* ✅ élargi pour laisser respirer les pages data-heavy */}
-              <div className="max-w-[1480px] mx-auto flex items-center justify-between px-4 py-3">
+              <div className="mx-auto flex max-w-[1480px] items-center justify-between px-4 py-3">
                 {/* 🔹 Logo + titre */}
                 <div className="flex items-center gap-2">
                   <Link href="/" className="flex items-center gap-2">
-                    <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-[#3b6ff6] to-[#2f5de0] flex items-center justify-center text-xs font-bold tracking-tight text-white shadow-lg shadow-[#3b6ff6]/25">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#1f5eff] bg-gradient-to-tr from-[#1f5eff] to-[#1254ec] text-xs font-bold tracking-tight text-white shadow-[0_14px_24px_-16px_rgba(31,94,255,0.92)]">
                       LM
                     </div>
                     <div className="flex flex-col">
-                      <span className="font-semibold text-sm leading-tight text-[#1f2a44]">
+                      <span className="text-sm font-semibold leading-tight text-[#0b1c33]">
                         Lidmeo Hub
                       </span>
-                      <span className="text-xs text-[#667085] leading-tight">
+                      <span className="text-xs leading-tight text-[#51627b]">
                         Espace client
                       </span>
                     </div>
@@ -130,41 +130,41 @@ export default async function RootLayout({
                 {/* 🔹 Navigation + User */}
                 <div className="flex items-center gap-4 text-xs">
                   <SignedIn>
-                    <nav className="hidden sm:flex items-center gap-2 text-[11px] text-[#667085]">
+                    <nav className="hidden items-center gap-2 text-[11px] text-[#51627b] sm:flex">
                       <Link
                         href="/dashboard"
-                        className="rounded-full border border-transparent px-3 py-1.5 hover:border-[#e3e7ef] hover:bg-[#f7f8fb] hover:text-[#1f2a44] transition"
+                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                       >
                         Dashboard
                       </Link>
                       <Link
                         href="/dashboard/leads"
-                        className="rounded-full border border-transparent px-3 py-1.5 hover:border-[#e3e7ef] hover:bg-[#f7f8fb] hover:text-[#1f2a44] transition"
+                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                       >
                         Prospection
                       </Link>
                       <Link
                         href="/dashboard/followups"
-                        className="rounded-full border border-transparent px-3 py-1.5 hover:border-[#e3e7ef] hover:bg-[#f7f8fb] hover:text-[#1f2a44] transition"
+                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                       >
                         Relances
                       </Link>
                       <Link
                         href="/dashboard/hub/billing"
-                        className="rounded-full border border-transparent px-3 py-1.5 hover:border-[#e3e7ef] hover:bg-[#f7f8fb] hover:text-[#1f2a44] transition"
+                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                       >
                         Abonnement
                       </Link>
                       <Link
                         href="/dashboard/support"
-                        className="rounded-full border border-transparent px-3 py-1.5 hover:border-[#e3e7ef] hover:bg-[#f7f8fb] hover:text-[#1f2a44] transition"
+                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                       >
                         Support
                       </Link>
                     </nav>
 
                     <div className="flex items-center gap-3">
-                      <span className="hidden sm:inline text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                      <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] text-emerald-700 sm:inline">
                         Connecté
                       </span>
 
@@ -173,7 +173,7 @@ export default async function RootLayout({
                         appearance={{
                           elements: {
                             avatarBox:
-                              "h-8 w-8 ring-2 ring-[#e3e7ef] shadow-sm",
+                              "h-8 w-8 ring-2 ring-[#d7e3f4] shadow-sm",
                           },
                         }}
                       />
@@ -184,13 +184,13 @@ export default async function RootLayout({
                     <div className="flex items-center gap-3">
                       <Link
                         href="/sign-in"
-                        className="rounded-full border border-[#e3e7ef] bg-white/80 px-3 py-1 text-xs text-[#33415f] hover:bg-[#f7f8fb] transition"
+                        className="rounded-full border border-[#d7e3f4] bg-white px-3 py-1 text-xs text-[#2c466d] transition hover:bg-[#f3f8ff]"
                       >
                         Se connecter
                       </Link>
                       <Link
                         href="/sign-up"
-                        className="hidden sm:inline rounded-full bg-[#3b6ff6] px-3 py-1 text-xs font-medium text-white hover:bg-[#2f5de0] transition shadow-lg shadow-[#3b6ff6]/25"
+                        className="hidden rounded-full border border-[#1f5eff] bg-gradient-to-r from-[#1f5eff] to-[#1254ec] px-3 py-1 text-xs font-medium text-white shadow-[0_12px_20px_-14px_rgba(31,94,255,0.9)] transition hover:-translate-y-[1px] sm:inline"
                       >
                         Créer un compte
                       </Link>
@@ -206,15 +206,15 @@ export default async function RootLayout({
             </main>
 
             {/* 🔵 FOOTER */}
-            <footer className="border-t border-[#e3e7ef] text-xs text-[#667085] bg-white/65">
+            <footer className="border-t border-[#d7e3f4] bg-white/65 text-xs text-[#51627b]">
               {/* ✅ aligné avec le header */}
-              <div className="max-w-[1480px] mx-auto px-4 py-4 flex items-center justify-between">
+              <div className="mx-auto flex max-w-[1480px] items-center justify-between px-4 py-4">
                 <span>© Lidmeo</span>
                 <div className="flex gap-4">
-                  <button className="hover:text-[#1f2a44] transition">
+                  <button className="transition hover:text-[#0b1c33]">
                     Statut
                   </button>
-                  <button className="hover:text-[#1f2a44] transition">
+                  <button className="transition hover:text-[#0b1c33]">
                     Mentions légales
                   </button>
                 </div>

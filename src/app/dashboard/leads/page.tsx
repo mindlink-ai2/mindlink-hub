@@ -576,36 +576,36 @@ export default function LeadsPage() {
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
         <div className="relative min-h-screen w-full px-4 pb-24 pt-8 sm:px-6">
-          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[360px] bg-[radial-gradient(circle_at_20%_-10%,rgba(37,99,235,0.16),transparent_56%),radial-gradient(circle_at_80%_0%,rgba(14,165,233,0.12),transparent_48%)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[360px] bg-[radial-gradient(circle_at_20%_-10%,rgba(31,94,255,0.18),transparent_56%),radial-gradient(circle_at_80%_0%,rgba(35,196,245,0.14),transparent_48%)]" />
 
           <div className="mx-auto w-full max-w-[1680px] space-y-8">
             <section className="hub-card-hero relative overflow-hidden p-6 sm:p-7">
               <div className="pointer-events-none absolute inset-0">
-                <div className="absolute -left-16 top-[-120px] h-64 w-64 rounded-full bg-[#dbeafe]/70 blur-3xl" />
-                <div className="absolute -right-20 top-[-140px] h-72 w-72 rounded-full bg-[#dbeafe]/60 blur-3xl" />
+                <div className="absolute -left-16 top-[-120px] h-64 w-64 rounded-full bg-[#dce8ff]/70 blur-3xl" />
+                <div className="absolute -right-20 top-[-140px] h-72 w-72 rounded-full bg-[#d8f4ff]/65 blur-3xl" />
               </div>
 
               <div className="relative grid gap-6 xl:grid-cols-[1.28fr_0.92fr]">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] font-medium text-[#4B5563]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#2563EB]" />
+                    <span className="hub-chip border-[#d7e3f4] bg-white font-medium">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#1f5eff]" />
                       Hub Lidmeo
                     </span>
 
-                    <span className="inline-flex items-center rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] tabular-nums">
+                    <span className="hub-chip border-[#d7e3f4] bg-white tabular-nums">
                       {filteredLeads.length} affiché(s)
                     </span>
 
-                    <span className="inline-flex items-center rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
+                    <span className="hub-chip border-[#d7e3f4] bg-white whitespace-nowrap">
                       {plan || "essential"}
                     </span>
                   </div>
 
-                  <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#0F172A] sm:text-5xl">
+                  <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#0b1c33] sm:text-5xl">
                     Pipeline de prospection
                   </h1>
-                  <p className="mt-3 max-w-2xl text-sm text-[#4B5563] sm:text-base">
+                  <p className="mt-3 max-w-2xl text-sm text-[#51627b] sm:text-base">
                     Gérez vos leads dans une vue unique: recherche rapide, statuts opérationnels,
                     exports ciblés et actions batch.
                   </p>
@@ -617,9 +617,9 @@ export default function LeadsPage() {
                   </div>
 
                   <div className="mt-6">
-                    <div className="group flex items-center gap-3 rounded-xl border border-[#dbe5f3] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition focus-within:border-[#93c5fd] focus-within:ring-2 focus-within:ring-[#bfdbfe]">
+                    <div className="group flex items-center gap-3 rounded-xl border border-[#d7e3f4] bg-white px-4 py-3 shadow-[0_16px_28px_-26px_rgba(18,43,86,0.8)] transition focus-within:border-[#90b5ff] focus-within:ring-2 focus-within:ring-[#dce8ff]">
                       <svg
-                        className="h-4 w-4 text-[#64748b] transition group-focus-within:text-[#2563EB]"
+                        className="h-4 w-4 text-[#6a7f9f] transition group-focus-within:text-[#1f5eff]"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
@@ -636,24 +636,24 @@ export default function LeadsPage() {
                         value={searchTerm}
                         onChange={(e) => handleSearch(e.target.value)}
                         placeholder="Rechercher (nom, entreprise, ville)…"
-                        className="w-full bg-transparent text-sm text-[#0F172A] placeholder-[#94a3b8] focus:outline-none"
+                        className="w-full bg-transparent text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:outline-none"
                         aria-label="Rechercher un lead"
                       />
                     </div>
 
-                    <div className="mt-2 text-[11px] text-[#4B5563]">
+                    <div className="mt-2 text-[11px] text-[#51627b]">
                       {filteredLeads.length} résultat(s) • {total} total • {selectedCount} sélectionné(s)
                     </div>
                   </div>
                 </div>
 
                 <div className="hub-card-soft relative overflow-hidden p-4 sm:p-5">
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(37,99,235,0.08),transparent_48%)]" />
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(31,94,255,0.12),transparent_48%)]" />
 
                   <div className="relative">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#dbe5f3] bg-white text-[#475569]">
+                        <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#d7e3f4] bg-white text-[#51627b]">
                           <svg
                             className="h-4 w-4"
                             viewBox="0 0 24 24"
@@ -669,11 +669,11 @@ export default function LeadsPage() {
                             />
                           </svg>
                         </div>
-                        <h2 className="mt-3 text-base font-semibold text-[#0F172A]">Commandes rapides</h2>
-                        <p className="mt-1 text-xs text-[#4B5563]">Actions lot: sélection, export, suppression.</p>
+                        <h2 className="mt-3 text-base font-semibold text-[#0b1c33]">Commandes rapides</h2>
+                        <p className="mt-1 text-xs text-[#51627b]">Actions lot: sélection, export, suppression.</p>
                       </div>
 
-                      <div className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] tabular-nums">
+                      <div className="rounded-full border border-[#d7e3f4] bg-white px-3 py-1 text-[11px] text-[#51627b] tabular-nums">
                         Import {nextImportText}
                       </div>
                     </div>
@@ -708,9 +708,9 @@ export default function LeadsPage() {
                       </HubButton>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[#dbe5f3] bg-white px-3 py-2 text-[11px] text-[#4B5563]">
+                    <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[#d7e3f4] bg-white px-3 py-2 text-[11px] text-[#51627b]">
                       <span>Astuce: filtrez puis déclenchez vos actions en lot.</span>
-                      <span className="rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-1 tabular-nums">
+                      <span className="rounded-full border border-[#d7e3f4] bg-[#f8fbff] px-2.5 py-1 tabular-nums">
                         {selectedCount} sélectionné(s)
                       </span>
                     </div>
@@ -720,60 +720,60 @@ export default function LeadsPage() {
             </section>
 
             <section className="hub-card overflow-hidden">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e2e8f0] bg-[#f8fbff] px-6 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d7e3f4] bg-[#f8fbff] px-6 py-4">
                 <div className="min-w-0">
-                  <h2 className="text-sm font-semibold text-[#0F172A]">Table des leads</h2>
-                  <p className="text-[11px] text-[#4B5563]">
+                  <h2 className="text-sm font-semibold text-[#0b1c33]">Table des leads</h2>
+                  <p className="text-[11px] text-[#51627b]">
                     Cliquez sur “Voir” pour ouvrir le panneau de traitement.
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 text-[11px] text-[#4B5563]">
-                  <span className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 tabular-nums">
+                <div className="flex items-center gap-2 text-[11px] text-[#51627b]">
+                  <span className="rounded-full border border-[#d7e3f4] bg-white px-3 py-1 tabular-nums">
                     {selectedCount} sélectionné(s)
                   </span>
-                  <span className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 tabular-nums">
+                  <span className="rounded-full border border-[#d7e3f4] bg-white px-3 py-1 tabular-nums">
                     {treatedCount} traités
                   </span>
                 </div>
               </div>
 
-              <div className="w-full overflow-x-auto">
-                <table className="min-w-[1040px] w-full table-fixed text-[13px]">
+              <div className="w-full overflow-x-auto px-2 pb-2 pt-1">
+                <table className="min-w-[1040px] w-full table-fixed border-separate [border-spacing:0_10px] text-[13px]">
                   <thead className="sticky top-0 z-10">
-                    <tr className="bg-white text-[11px] uppercase tracking-[0.06em] text-[#64748b]">
-                      <th className="w-[54px] border-b border-[#e2e8f0] px-3 py-3 text-center whitespace-nowrap">
+                    <tr className="text-[11px] uppercase tracking-[0.06em] text-[#51627b]">
+                      <th className="w-[54px] px-3 py-2 text-center whitespace-nowrap">
                         Sel.
                       </th>
-                      <th className="w-[150px] border-b border-[#e2e8f0] px-3 py-3 text-center whitespace-nowrap">
+                      <th className="w-[150px] px-3 py-2 text-center whitespace-nowrap">
                         Statut
                       </th>
-                      <th className="w-[180px] border-b border-[#e2e8f0] px-3 py-3 text-left whitespace-nowrap">
+                      <th className="w-[180px] px-3 py-2 text-left whitespace-nowrap">
                         Nom
                       </th>
-                      <th className="w-[170px] border-b border-[#e2e8f0] px-3 py-3 text-left whitespace-nowrap">
+                      <th className="w-[170px] px-3 py-2 text-left whitespace-nowrap">
                         Entreprise
                       </th>
-                      <th className="w-[160px] border-b border-[#e2e8f0] px-3 py-3 text-left whitespace-nowrap">
+                      <th className="w-[160px] px-3 py-2 text-left whitespace-nowrap">
                         Localisation
                       </th>
-                      <th className="w-[110px] border-b border-[#e2e8f0] px-3 py-3 text-left whitespace-nowrap">
+                      <th className="w-[110px] px-3 py-2 text-left whitespace-nowrap">
                         LinkedIn
                       </th>
                       {emailOption && (
-                        <th className="w-[210px] border-b border-[#e2e8f0] px-3 py-3 text-left whitespace-nowrap">
+                        <th className="w-[210px] px-3 py-2 text-left whitespace-nowrap">
                           Email
                         </th>
                       )}
                       {phoneOption && (
-                        <th className="w-[140px] border-b border-[#e2e8f0] px-3 py-3 text-left whitespace-nowrap">
+                        <th className="w-[140px] px-3 py-2 text-left whitespace-nowrap">
                           Téléphone
                         </th>
                       )}
-                      <th className="w-[110px] border-b border-[#e2e8f0] px-3 py-3 text-center whitespace-nowrap">
+                      <th className="w-[110px] px-3 py-2 text-center whitespace-nowrap">
                         Date
                       </th>
-                      <th className="w-[110px] border-b border-[#e2e8f0] px-3 py-3 text-center whitespace-nowrap">
+                      <th className="w-[110px] px-3 py-2 text-center whitespace-nowrap">
                         Supprimer
                       </th>
                     </tr>
@@ -811,26 +811,41 @@ export default function LeadsPage() {
                           : isPending
                             ? "En attente"
                             : "À faire";
+                        const tone = idx % 4;
+                        const rowTone = tone === 0 ? "blue" : tone === 1 ? "violet" : tone === 2 ? "mint" : "sand";
+                        const toneDotClass =
+                          tone === 0
+                            ? "bg-[#4f8bff]"
+                            : tone === 1
+                              ? "bg-[#8d79ff]"
+                              : tone === 2
+                                ? "bg-[#15b88f]"
+                                : "bg-[#de8a30]";
+                        const baseCellClass = "border-y border-[#d7e3f4] px-3 py-4 align-middle";
 
                         return (
                           <tr
                             key={lead.id}
+                            data-tone={rowTone}
                             className={[
                               "hub-table-row group",
-                              idx % 2 === 0 ? "bg-white" : "bg-[#fbfdff]",
+                              isSelected ? "ring-2 ring-[#dce8ff]" : "",
                             ].join(" ")}
                           >
-                            <td className="px-3 py-4 text-center align-middle">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleSelected(idStr)}
-                                className="h-4 w-4 cursor-pointer rounded border-[#c7d5e7] text-[#2563EB] focus:ring-[#bfdbfe]"
-                                aria-label={`Sélectionner le lead ${fullName}`}
-                              />
+                            <td className={`${baseCellClass} rounded-l-2xl border-l border-[#d7e3f4] text-center`}>
+                              <div className="flex items-center justify-center gap-2">
+                                <span className={`h-2 w-2 rounded-full ${toneDotClass}`} />
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleSelected(idStr)}
+                                  className="h-4 w-4 cursor-pointer rounded border-[#c7d5e7] text-[#1f5eff] focus:ring-[#dce8ff]"
+                                  aria-label={`Sélectionner le lead ${fullName}`}
+                                />
+                              </div>
                             </td>
 
-                            <td className="px-3 py-4 text-center align-middle">
+                            <td className={`${baseCellClass} text-center`}>
                               <button
                                 type="button"
                                 onClick={() => handleStatusBadgeClick(lead)}
@@ -841,7 +856,7 @@ export default function LeadsPage() {
                                     ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
                                     : isPending
                                       ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 focus:ring-amber-200"
-                                      : "border-[#d6e2f2] bg-white text-[#334155] hover:border-[#bfdbfe] hover:bg-[#f8fbff] focus:ring-[#bfdbfe]",
+                                      : "border-[#d6e2f2] bg-white text-[#334155] hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:ring-[#dce8ff]",
                                   isStatusUpdating ? "cursor-wait opacity-70" : "",
                                 ].join(" ")}
                                 title={
@@ -857,7 +872,7 @@ export default function LeadsPage() {
                               </button>
                             </td>
 
-                            <td className="relative px-3 py-4 pr-16 align-middle text-[#0F172A]">
+                            <td className={`${baseCellClass} relative pr-16 text-[#0b1c33]`}>
                               <div className="flex min-w-0 items-center gap-2">
                                 <span className="truncate font-medium">{fullName}</span>
                               </div>
@@ -873,19 +888,19 @@ export default function LeadsPage() {
                               </HubButton>
                             </td>
 
-                            <td className="truncate px-3 py-4 align-middle text-[#475569]">
+                            <td className={`${baseCellClass} truncate text-[#51627b]`}>
                               {lead.Company || "—"}
                             </td>
-                            <td className="truncate px-3 py-4 align-middle text-[#475569]">
+                            <td className={`${baseCellClass} truncate text-[#51627b]`}>
                               {lead.location || "—"}
                             </td>
-                            <td className="px-3 py-4 align-middle">
+                            <td className={baseCellClass}>
                               {lead.LinkedInURL ? (
                                 <a
                                   href={lead.LinkedInURL}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[#dbe5f3] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#bfdbfe] hover:bg-[#f8fbff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
                                 >
                                   Profil <span className="text-[#64748b]">↗</span>
                                 </a>
@@ -894,19 +909,19 @@ export default function LeadsPage() {
                               )}
                             </td>
                             {emailOption && (
-                              <td className="truncate px-3 py-4 align-middle text-[#334155]">
+                              <td className={`${baseCellClass} truncate text-[#334155]`}>
                                 {lead.email || "—"}
                               </td>
                             )}
                             {phoneOption && (
-                              <td className="truncate px-3 py-4 align-middle text-[#334155]">
+                              <td className={`${baseCellClass} truncate text-[#334155]`}>
                                 {lead.phone || "—"}
                               </td>
                             )}
-                            <td className="whitespace-nowrap px-3 py-4 text-center align-middle tabular-nums text-[#64748b]">
+                            <td className={`${baseCellClass} whitespace-nowrap text-center tabular-nums text-[#64748b]`}>
                               {lead.created_at ? new Date(lead.created_at).toLocaleDateString("fr-FR") : "—"}
                             </td>
-                            <td className="px-3 py-4 text-center align-middle">
+                            <td className={`${baseCellClass} rounded-r-2xl border-r border-[#d7e3f4] text-center`}>
                               <DeleteLeadButton leadId={lead.id} />
                             </td>
                           </tr>
@@ -917,7 +932,7 @@ export default function LeadsPage() {
                 </table>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e2e8f0] bg-[#f8fbff] px-6 py-3 text-[11px] text-[#4B5563]">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#d7e3f4] bg-[#f8fbff] px-6 py-3 text-[11px] text-[#51627b]">
                 <div>Survolez une ligne pour afficher l’action “Voir”.</div>
                 <div className="tabular-nums">
                   {treatedCount} traité(s) • {remainingToTreat} à traiter
@@ -1144,11 +1159,11 @@ function Metric({
   tone: "default" | "success" | "warning";
 }) {
   const valueColor =
-    tone === "success" ? "text-emerald-700" : tone === "warning" ? "text-amber-700" : "text-[#0F172A]";
+    tone === "success" ? "text-emerald-700" : tone === "warning" ? "text-amber-700" : "text-[#0b1c33]";
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#dbe5f3] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-[#4B5563]">
+    <div className="overflow-hidden rounded-xl border border-[#d7e3f4] bg-white px-4 py-3 shadow-[0_16px_26px_-24px_rgba(18,43,86,0.75)]">
+      <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-[#51627b]">
         {title}
       </div>
       <div className={["mt-1 truncate whitespace-nowrap text-[28px] font-semibold leading-none tabular-nums", valueColor].join(" ")}>
@@ -1160,11 +1175,11 @@ function Metric({
 
 function InfoBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-[#dbe5f3] bg-white p-4">
-      <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-[#4B5563]">
+    <div className="rounded-xl border border-[#d7e3f4] bg-white p-4">
+      <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-[#51627b]">
         {title}
       </div>
-      <div className="mt-2 text-sm text-[#0F172A]">{children}</div>
+      <div className="mt-2 text-sm text-[#0b1c33]">{children}</div>
     </div>
   );
 }

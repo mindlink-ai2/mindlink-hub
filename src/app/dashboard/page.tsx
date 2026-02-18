@@ -203,21 +203,25 @@ export default function DashboardPage() {
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <div className="min-h-screen w-full px-4 sm:px-6 pt-10 pb-24">
+      <div className="min-h-screen w-full px-4 pb-24 pt-10 sm:px-6">
         <div className="mx-auto w-full max-w-7xl">
           {/* HEADER */}
-          <div className="mb-10 rounded-[28px] border border-[#e3e7ef] bg-white/95 p-6 shadow-sm backdrop-blur-sm md:p-8">
+          <div className="hub-card-hero relative mb-10 overflow-hidden p-6 md:p-8">
+            <div className="pointer-events-none absolute inset-0">
+              <div className="absolute -left-24 top-[-130px] h-72 w-72 rounded-full bg-[#dce8ff]/80 blur-3xl" />
+              <div className="absolute -right-24 top-[-130px] h-72 w-72 rounded-full bg-[#d8f4ff]/80 blur-3xl" />
+            </div>
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#e3e7ef] bg-[#fbfcfe] px-3 py-1 text-[11px] font-medium text-[#667085]">
-                  <span className="h-2 w-2 rounded-full bg-[#3b6ff6]" />
+              <div className="relative">
+                <div className="hub-chip border-[#d7e3f4] bg-white">
+                  <span className="h-2 w-2 rounded-full bg-[#1f5eff]" />
                   Hub de pilotage
                 </div>
 
-                <h1 className="mt-3 text-4xl md:text-5xl font-extrabold tracking-tight text-[#1f2a44]">
+                <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-[#0b1c33] md:text-5xl">
                   Tableau de bord
                 </h1>
-                <p className="mt-2 max-w-2xl text-base md:text-lg text-[#667085]">
+                <p className="mt-2 max-w-2xl text-base text-[#51627b] md:text-lg">
                   Vue d’ensemble de votre activité Lidmeo : leads, emails et relances.
                 </p>
               </div>
@@ -225,13 +229,13 @@ export default function DashboardPage() {
               <div className="flex flex-wrap gap-3">
                 <Link
                   href="/dashboard/prospection"
-                  className="rounded-full bg-[#3b6ff6] px-5 py-2.5 text-xs md:text-sm font-semibold text-white hover:bg-[#2f5de0] transition shadow-lg shadow-[#3a73e7]/25"
+                  className="inline-flex items-center justify-center rounded-full border border-[#1f5eff] bg-gradient-to-r from-[#1f5eff] to-[#1254ec] px-5 py-2.5 text-xs font-semibold text-white shadow-[0_14px_26px_-16px_rgba(31,94,255,0.85)] transition hover:-translate-y-[1px] md:text-sm"
                 >
                   Ouvrir Prospection
                 </Link>
                 <Link
                   href="/dashboard/followups"
-                  className="rounded-full border border-[#e3e7ef] bg-white px-5 py-2.5 text-xs md:text-sm font-semibold text-[#1f2a44] hover:bg-[#fbfcfe] transition"
+                  className="rounded-full border border-[#d7e3f4] bg-white px-5 py-2.5 text-xs font-semibold text-[#0b1c33] transition hover:-translate-y-[1px] hover:border-[#bdd2f2] hover:bg-[#f7fbff] md:text-sm"
                 >
                   Ouvrir Relances
                 </Link>
@@ -241,7 +245,7 @@ export default function DashboardPage() {
 
           {/* STATS ERROR / LOADING */}
           {statsError ? (
-            <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-[0_12px_20px_-18px_rgba(185,28,28,0.75)]">
               {statsError}
             </div>
           ) : null}
@@ -258,7 +262,7 @@ export default function DashboardPage() {
               <KPI
                 label="Leads aujourd’hui"
                 value={stats.leadsToday}
-                color="from-[#4f72f3] to-[#8aa0f8]"
+                color="from-[#1f5eff] to-[#74a1ff]"
                 onClick={() => loadDrilldown("leads_today")}
                 active={active === "leads_today"}
                 loading={loadingStats}
@@ -266,7 +270,7 @@ export default function DashboardPage() {
               <KPI
                 label="Leads cette semaine"
                 value={stats.leadsWeek}
-                color="from-[#7f8ca4] to-[#a9b4c7]"
+                color="from-[#4f6e9a] to-[#94abcf]"
                 onClick={() => loadDrilldown("leads_week")}
                 active={active === "leads_week"}
                 loading={loadingStats}
@@ -274,7 +278,7 @@ export default function DashboardPage() {
               <KPI
                 label="Taux de traitement"
                 value={`${stats.traitementRate}%`}
-                color="from-[#5974ad] to-[#8ba0cb]"
+                color="from-[#355fbe] to-[#7f9de0]"
                 onClick={() => loadDrilldown("treated")}
                 active={active === "treated"}
                 loading={loadingStats}
@@ -288,7 +292,7 @@ export default function DashboardPage() {
               <KPI
                 label="Relances à venir"
                 value={stats.relancesCount}
-                color="from-[#9d7f49] to-[#c5a468]"
+                color="from-[#089682] to-[#46c0ab]"
                 onClick={() => loadDrilldown("followups_upcoming")}
                 active={active === "followups_upcoming"}
                 loading={loadingStats}
@@ -296,7 +300,7 @@ export default function DashboardPage() {
               <KPI
                 label="Relances en retard"
                 value={stats.relancesLate}
-                color="from-[#a87359] to-[#c6947d]"
+                color="from-[#b9742e] to-[#ddaa73]"
                 onClick={() => loadDrilldown("followups_late")}
                 active={active === "followups_late"}
                 loading={loadingStats}
@@ -310,14 +314,14 @@ export default function DashboardPage() {
               <KPI
                 label="Emails triés aujourd’hui"
                 value={stats.emailsSortedToday}
-                color="from-[#5f7ec3] to-[#8eabde]"
+                color="from-[#3572d4] to-[#7ca9e8]"
                 clickable={false}
                 loading={loadingStats}
               />
               <KPI
                 label="Emails triés au total"
                 value={stats.emailsSortedTotal}
-                color="from-[#7a96ce] to-[#a7bbdf]"
+                color="from-[#5f84c8] to-[#97b3e1]"
                 clickable={false}
                 loading={loadingStats}
               />
@@ -328,20 +332,20 @@ export default function DashboardPage() {
           {active && (
             <div
               ref={drilldownRef}
-              className="mt-10 overflow-hidden rounded-[24px] border border-[#e3e7ef] bg-white/95 shadow-sm"
+              className="hub-card mt-10 overflow-hidden"
             >
               {/* sticky header */}
-              <div className="border-b border-[#e3e7ef] bg-[#fbfcfe] px-6 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-col gap-3 border-b border-[#d7e3f4] bg-[#f8fbff] px-6 py-4 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-[#1f2a44] text-sm font-semibold">
+                    <h2 className="text-sm font-semibold text-[#0b1c33]">
                       {activeLabel}
                     </h2>
-                    <span className="rounded-full border border-[#e3e7ef] bg-white px-2 py-0.5 text-[11px] text-[#667085]">
+                    <span className="rounded-full border border-[#d7e3f4] bg-white px-2 py-0.5 text-[11px] text-[#51627b]">
                       {loadingItems ? "…" : `${filteredItems.length}`}
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] text-[#667085]">
+                  <p className="mt-1 text-[11px] text-[#51627b]">
                     Astuce : re-cliquez sur le KPI pour fermer. Cliquez sur une
                     ligne pour ouvrir le détail.
                   </p>
@@ -353,7 +357,7 @@ export default function DashboardPage() {
                       value={q}
                       onChange={(e) => setQ(e.target.value)}
                       placeholder="Rechercher (nom, société, email…)"
-                      className="w-[260px] max-w-full rounded-xl border border-[#e3e7ef] bg-white px-3 py-2 text-[12px] text-[#1f2a44] placeholder:text-[#667085] outline-none focus:border-[#9bb5f8]"
+                      className="w-[260px] max-w-full rounded-xl border border-[#d7e3f4] bg-white px-3 py-2 text-[12px] text-[#0b1c33] placeholder:text-[#51627b] outline-none transition focus:border-[#90b5ff] focus:ring-2 focus:ring-[#dce8ff]"
                     />
                   </div>
 
@@ -364,7 +368,7 @@ export default function DashboardPage() {
                       setItemsError(null);
                       setQ("");
                     }}
-                    className="rounded-xl border border-[#e3e7ef] bg-white px-3 py-2 text-[12px] font-medium text-[#1f2a44] transition hover:bg-[#fbfcfe]"
+                    className="rounded-xl border border-[#d7e3f4] bg-white px-3 py-2 text-[12px] font-medium text-[#0b1c33] transition hover:bg-[#f7fbff]"
                   >
                     Fermer
                   </button>
@@ -372,7 +376,7 @@ export default function DashboardPage() {
               </div>
 
               {loadingItems ? (
-                <div className="px-6 py-10 text-sm text-[#60759a]">
+                <div className="px-6 py-10 text-sm text-[#51627b]">
                   Chargement…
                 </div>
               ) : itemsError ? (
@@ -380,7 +384,7 @@ export default function DashboardPage() {
                   {itemsError}
                 </div>
               ) : filteredItems.length === 0 ? (
-                <div className="px-6 py-10 text-sm text-[#6e83a9]">
+                <div className="px-6 py-10 text-sm text-[#51627b]">
                   Aucun élément.
                 </div>
               ) : (
@@ -388,20 +392,20 @@ export default function DashboardPage() {
                   {!isFollowupsView ? (
                     <table className="w-full text-sm border-separate border-spacing-0">
                       <thead>
-                        <tr className="bg-[#fbfcfe] text-[#5a7096] text-[11px] uppercase tracking-wide">
-                          <th className="py-3 px-4 border-b border-[#e3e7ef] text-left">
+                        <tr className="bg-[#f8fbff] text-[11px] uppercase tracking-wide text-[#51627b]">
+                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">
                             Source
                           </th>
-                          <th className="py-3 px-4 border-b border-[#e3e7ef] text-left">
+                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">
                             Nom
                           </th>
-                          <th className="py-3 px-4 border-b border-[#e3e7ef] text-left">
+                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">
                             Contact
                           </th>
-                          <th className="py-3 px-4 border-b border-[#e3e7ef] text-center">
+                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-center">
                             Traité
                           </th>
-                          <th className="py-3 px-4 border-b border-[#e3e7ef] text-center">
+                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-center">
                             Date
                           </th>
                         </tr>
@@ -436,27 +440,27 @@ export default function DashboardPage() {
                             <tr
                               key={`${it?.source ?? "x"}-${it?.id}`}
                               onClick={() => openFromRow(it)}
-                              className="cursor-pointer border-b border-[#eef1f5] transition hover:bg-[#fbfcfe]"
+                              className="cursor-pointer border-b border-[#e4edf8] transition hover:bg-[#f8fbff]"
                             >
-                              <td className="py-3 px-4 text-[#667085]">
+                              <td className="px-4 py-3 text-[#51627b]">
                                 <SourceBadge
                                   value={sourceLabel}
                                   variant={src}
                                 />
                               </td>
-                              <td className="py-3 px-4 text-[#1f2a44]">
+                              <td className="px-4 py-3 text-[#0b1c33]">
                                 {name}
-                                <div className="mt-0.5 text-[11px] text-[#667085]">
+                                <div className="mt-0.5 text-[11px] text-[#51627b]">
                                   Ouvrir →
                                 </div>
                               </td>
-                              <td className="py-3 px-4 text-[#667085]">
+                              <td className="px-4 py-3 text-[#51627b]">
                                 {contact}
                               </td>
-                              <td className="py-3 px-4 text-center text-[#667085]">
+                              <td className="px-4 py-3 text-center text-[#51627b]">
                                 {it?.traite ? "Oui" : "Non"}
                               </td>
-                              <td className="py-3 px-4 text-center text-[#667085]">
+                              <td className="px-4 py-3 text-center text-[#51627b]">
                                 {it?.created_at
                                   ? new Date(
                                       it.created_at
@@ -471,17 +475,17 @@ export default function DashboardPage() {
                   ) : (
                     <table className="w-full text-sm border-separate border-spacing-0">
                       <thead>
-                        <tr className="bg-[#fbfcfe] text-[#5a7096] text-[11px] uppercase tracking-wide">
-                          <th className="py-3 px-4 border-b border-[#e3e7ef] text-left">
+                        <tr className="bg-[#f8fbff] text-[11px] uppercase tracking-wide text-[#51627b]">
+                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">
                             Source
                           </th>
-                          <th className="py-3 px-4 border-b border-[#e3e7ef] text-left">
+                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">
                             Nom
                           </th>
-                          <th className="py-3 px-4 border-b border-[#e3e7ef] text-left">
+                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">
                             Contact
                           </th>
-                          <th className="py-3 px-4 border-b border-[#e3e7ef] text-center">
+                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-center">
                             Prochaine relance
                           </th>
                         </tr>
@@ -516,24 +520,24 @@ export default function DashboardPage() {
                             <tr
                               key={`${it?.source ?? "x"}-${it?.id}`}
                               onClick={() => openFromRow(it)}
-                              className="cursor-pointer border-b border-[#eef1f5] transition hover:bg-[#fbfcfe]"
+                              className="cursor-pointer border-b border-[#e4edf8] transition hover:bg-[#f8fbff]"
                             >
-                              <td className="py-3 px-4 text-[#667085]">
+                              <td className="px-4 py-3 text-[#51627b]">
                                 <SourceBadge
                                   value={sourceLabel}
                                   variant={src}
                                 />
                               </td>
-                              <td className="py-3 px-4 text-[#1f2a44]">
+                              <td className="px-4 py-3 text-[#0b1c33]">
                                 {name}
-                                <div className="mt-0.5 text-[11px] text-[#667085]">
+                                <div className="mt-0.5 text-[11px] text-[#51627b]">
                                   Ouvrir →
                                 </div>
                               </td>
-                              <td className="py-3 px-4 text-[#667085]">
+                              <td className="px-4 py-3 text-[#51627b]">
                                 {contact}
                               </td>
-                              <td className="py-3 px-4 text-center text-[#667085]">
+                              <td className="px-4 py-3 text-center text-[#51627b]">
                                 {it?.next_followup_at
                                   ? new Date(
                                       it.next_followup_at
@@ -570,10 +574,10 @@ function SectionHeader({
   return (
     <div className="flex items-end justify-between gap-4">
       <div>
-        <p className="font-semibold text-[#1f2a44]">{title}</p>
-        <p className="mt-0.5 text-[12px] text-[#667085]">{subtitle}</p>
+        <p className="font-semibold text-[#0b1c33]">{title}</p>
+        <p className="mt-0.5 text-[12px] text-[#51627b]">{subtitle}</p>
       </div>
-      <div className="h-px flex-1 bg-[#e3e7ef]" />
+      <div className="h-px flex-1 bg-[#d7e3f4]" />
     </div>
   );
 }
@@ -610,38 +614,38 @@ function KPI({
       }}
       className={[
         "relative overflow-hidden rounded-2xl border p-6 transition-all duration-200",
-        "border-[#e3e7ef] bg-white shadow-sm",
+        "border-[#d7e3f4] bg-white shadow-[0_16px_32px_-28px_rgba(14,45,96,0.68)]",
         clickable
-          ? "cursor-pointer hover:-translate-y-0.5 hover:border-[#d2d8e2]"
+          ? "cursor-pointer hover:-translate-y-0.5 hover:border-[#bcd1f1]"
           : "opacity-80 cursor-default",
-        active ? "ring-2 ring-[#dbe1ec] border-[#c8cfdb]" : "",
+        active ? "border-[#90b5ff] ring-2 ring-[#dce8ff]" : "",
       ].join(" ")}
     >
-      <div className={`absolute inset-0 opacity-10 bg-gradient-to-br ${color}`} />
+      <div className={`absolute inset-0 opacity-[0.16] bg-gradient-to-br ${color}`} />
       <div className="relative z-10">
         <div className="flex items-start justify-between gap-3">
-          <div className="text-sm text-[#667085]">{label}</div>
+          <div className="text-sm text-[#51627b]">{label}</div>
           {clickable ? (
-            <span className="rounded-full border border-[#e3e7ef] bg-[#fbfcfe] px-2 py-0.5 text-[11px] text-[#667085]">
+            <span className="rounded-full border border-[#d7e3f4] bg-[#f8fbff] px-2 py-0.5 text-[11px] text-[#51627b]">
               {active ? "Ouvert" : "Détails"}
             </span>
           ) : (
-            <span className="rounded-full border border-[#e3e7ef] bg-[#fbfcfe] px-2 py-0.5 text-[11px] text-[#667085]">
+            <span className="rounded-full border border-[#d7e3f4] bg-[#f8fbff] px-2 py-0.5 text-[11px] text-[#51627b]">
               Info
             </span>
           )}
         </div>
 
-        <div className="mt-3 text-4xl font-extrabold text-[#1f2a44]">
+        <div className="mt-3 text-4xl font-extrabold text-[#0b1c33]">
           {loading ? <span className="opacity-50">—</span> : value}
         </div>
 
         {clickable ? (
-          <div className="mt-3 text-[12px] text-[#667085]">
+          <div className="mt-3 text-[12px] text-[#51627b]">
             Cliquez pour afficher la liste.
           </div>
         ) : (
-          <div className="mt-3 text-[12px] text-[#667085]">
+          <div className="mt-3 text-[12px] text-[#51627b]">
             Statistique informative.
           </div>
         )}
@@ -659,8 +663,8 @@ function SourceBadge({
 }) {
   const cls =
     variant === "maps"
-      ? "border-emerald-300/60 bg-emerald-50 text-emerald-700"
-      : "border-[#d5def0] bg-[#f5f8ff] text-[#4f6286]";
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : "border-[#d7e3f4] bg-[#ecf3ff] text-[#36598a]";
 
   return (
     <span
