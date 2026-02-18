@@ -165,7 +165,7 @@ export default function FollowupsPage() {
         onClick={() => setOpenLead(lead)}
         className={[
           "group w-full text-left",
-          "rounded-xl border border-[#d7e3f4] bg-white",
+          "rounded-xl border border-[#c8d6ea] bg-[#f7fbff]",
           "px-4 py-4",
           "transition duration-200",
           "shadow-[0_16px_28px_-26px_rgba(18,43,86,0.8)]",
@@ -275,7 +275,7 @@ export default function FollowupsPage() {
       variant === "overdue"
         ? "border-amber-200 bg-amber-50 text-amber-800"
         : variant === "today"
-        ? "border-[#d7e3f4] bg-white text-[#51627b]"
+        ? "border-[#c8d6ea] bg-[#f7fbff] text-[#51627b]"
         : "border-emerald-200 bg-emerald-50 text-emerald-700";
 
     const isActive =
@@ -297,7 +297,7 @@ export default function FollowupsPage() {
         }
         className={[
           "w-full rounded-xl border px-4 py-3 text-left transition",
-          "border-[#d7e3f4] bg-white hover:border-[#9cc0ff]",
+          "border-[#c8d6ea] bg-[#f7fbff] hover:border-[#9cc0ff]",
           "focus:outline-none focus:ring-2 focus:ring-[#dce8ff]",
           isActive ? "border-[#90b5ff] ring-1 ring-[#dce8ff]" : "",
         ].join(" ")}
@@ -372,7 +372,7 @@ export default function FollowupsPage() {
 
                     {/* Small contextual hint (visual only) */}
                     <div className="hidden items-center gap-2 text-xs text-[#51627b] md:flex">
-                      <span className="inline-flex items-center gap-2 rounded-xl border border-[#d7e3f4] bg-white px-3 py-2">
+                      <span className="inline-flex items-center gap-2 rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-3 py-2">
                         <span className="h-2 w-2 rounded-full bg-emerald-500" />
                         Cliquez sur une relance pour ouvrir le détail
                       </span>
@@ -513,8 +513,8 @@ export default function FollowupsPage() {
                       <a
                         href={openLead.LinkedInURL}
                         className="
-                          group rounded-xl border border-[#d7e3f4]
-                          bg-white px-4 py-3
+                          group rounded-xl border border-[#c8d6ea]
+                          bg-[#f7fbff] px-4 py-3
                           hover:border-[#9cc0ff] hover:bg-[#f3f8ff]
                           transition
                         "
@@ -539,8 +539,8 @@ export default function FollowupsPage() {
                       <a
                         href={openLead.placeUrl}
                         className="
-                          group rounded-xl border border-[#d7e3f4]
-                          bg-white px-4 py-3
+                          group rounded-xl border border-[#c8d6ea]
+                          bg-[#f7fbff] px-4 py-3
                           hover:border-[#9cc0ff] hover:bg-[#f3f8ff]
                           transition
                         "

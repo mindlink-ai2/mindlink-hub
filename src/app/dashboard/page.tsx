@@ -213,7 +213,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div className="relative">
-                <div className="hub-chip border-[#d7e3f4] bg-white">
+                <div className="hub-chip border-[#c8d6ea] bg-[#f7fbff]">
                   <span className="h-2 w-2 rounded-full bg-[#1f5eff]" />
                   Hub de pilotage
                 </div>
@@ -235,7 +235,7 @@ export default function DashboardPage() {
                 </Link>
                 <Link
                   href="/dashboard/followups"
-                  className="rounded-full border border-[#d7e3f4] bg-white px-5 py-2.5 text-xs font-semibold text-[#0b1c33] transition hover:-translate-y-[1px] hover:border-[#bdd2f2] hover:bg-[#f7fbff] md:text-sm"
+                  className="rounded-full border border-[#c8d6ea] bg-[#f5f9ff] px-5 py-2.5 text-xs font-semibold text-[#0b1c33] transition hover:-translate-y-[1px] hover:border-[#afc7eb] hover:bg-[#edf4fd] md:text-sm"
                 >
                   Ouvrir Relances
                 </Link>
@@ -341,7 +341,7 @@ export default function DashboardPage() {
                     <h2 className="text-sm font-semibold text-[#0b1c33]">
                       {activeLabel}
                     </h2>
-                    <span className="rounded-full border border-[#d7e3f4] bg-white px-2 py-0.5 text-[11px] text-[#51627b]">
+                    <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-2 py-0.5 text-[11px] text-[#51627b]">
                       {loadingItems ? "…" : `${filteredItems.length}`}
                     </span>
                   </div>
@@ -357,7 +357,7 @@ export default function DashboardPage() {
                       value={q}
                       onChange={(e) => setQ(e.target.value)}
                       placeholder="Rechercher (nom, société, email…)"
-                      className="w-[260px] max-w-full rounded-xl border border-[#d7e3f4] bg-white px-3 py-2 text-[12px] text-[#0b1c33] placeholder:text-[#51627b] outline-none transition focus:border-[#90b5ff] focus:ring-2 focus:ring-[#dce8ff]"
+                      className="w-[260px] max-w-full rounded-xl border border-[#c8d6ea] bg-[#f5f9ff] px-3 py-2 text-[12px] text-[#0b1c33] placeholder:text-[#51627b] outline-none transition focus:border-[#90b5ff] focus:ring-2 focus:ring-[#dce8ff]"
                     />
                   </div>
 
@@ -368,7 +368,7 @@ export default function DashboardPage() {
                       setItemsError(null);
                       setQ("");
                     }}
-                    className="rounded-xl border border-[#d7e3f4] bg-white px-3 py-2 text-[12px] font-medium text-[#0b1c33] transition hover:bg-[#f7fbff]"
+                    className="rounded-xl border border-[#c8d6ea] bg-[#f5f9ff] px-3 py-2 text-[12px] font-medium text-[#0b1c33] transition hover:bg-[#edf4fd]"
                   >
                     Fermer
                   </button>

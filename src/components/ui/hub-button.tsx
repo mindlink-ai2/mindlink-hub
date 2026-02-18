@@ -17,9 +17,9 @@ const hubButtonVariants = cva(
         primary:
           "border-[#1f5eff] bg-gradient-to-r from-[#1f5eff] via-[#2f70ff] to-[#1254ec] text-white shadow-[0_14px_28px_-18px_rgba(31,94,255,0.9)] hover:-translate-y-[1px] hover:border-[#134ae0]",
         secondary:
-          "border-[#d2e1f4] bg-white text-[#0b1c33] shadow-[0_8px_18px_-18px_rgba(18,43,86,0.8)] hover:-translate-y-[1px] hover:border-[#b8cdee] hover:bg-[#f7fbff]",
+          "border-[#c8d7eb] bg-[#f4f8ff] text-[#0f213c] shadow-[0_8px_18px_-18px_rgba(18,43,86,0.8)] hover:-translate-y-[1px] hover:border-[#afc5e4] hover:bg-[#eef4fd]",
         ghost:
-          "border-transparent bg-transparent text-[#51627b] hover:bg-[#eaf1ff] hover:text-[#0b1c33]",
+          "border-transparent bg-transparent text-[#3f5470] hover:bg-[#dde8f9] hover:text-[#0f213c]",
         danger:
           "border-[#fecdc7] bg-[#fff7f5] text-[#b93828] hover:border-[#fdb6ad] hover:bg-[#ffe9e6]",
       },

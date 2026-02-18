@@ -588,16 +588,16 @@ export default function LeadsPage() {
               <div className="relative grid gap-6 xl:grid-cols-[1.28fr_0.92fr]">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="hub-chip border-[#d7e3f4] bg-white font-medium">
+                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
                       <span className="h-1.5 w-1.5 rounded-full bg-[#1f5eff]" />
                       Hub Lidmeo
                     </span>
 
-                    <span className="hub-chip border-[#d7e3f4] bg-white tabular-nums">
+                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] tabular-nums">
                       {filteredLeads.length} affiché(s)
                     </span>
 
-                    <span className="hub-chip border-[#d7e3f4] bg-white whitespace-nowrap">
+                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] whitespace-nowrap">
                       {plan || "essential"}
                     </span>
                   </div>
@@ -617,7 +617,7 @@ export default function LeadsPage() {
                   </div>
 
                   <div className="mt-6">
-                    <div className="group flex items-center gap-3 rounded-xl border border-[#d7e3f4] bg-white px-4 py-3 shadow-[0_16px_28px_-26px_rgba(18,43,86,0.8)] transition focus-within:border-[#90b5ff] focus-within:ring-2 focus-within:ring-[#dce8ff]">
+                    <div className="group flex items-center gap-3 rounded-xl border border-[#c8d6ea] bg-[#f5f9ff] px-4 py-3 shadow-[0_16px_28px_-26px_rgba(18,43,86,0.8)] transition focus-within:border-[#90b5ff] focus-within:ring-2 focus-within:ring-[#dce8ff]">
                       <svg
                         className="h-4 w-4 text-[#6a7f9f] transition group-focus-within:text-[#1f5eff]"
                         fill="none"
@@ -653,7 +653,7 @@ export default function LeadsPage() {
                   <div className="relative">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#d7e3f4] bg-white text-[#51627b]">
+                        <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#c8d6ea] bg-[#f7fbff] text-[#51627b]">
                           <svg
                             className="h-4 w-4"
                             viewBox="0 0 24 24"
@@ -673,7 +673,7 @@ export default function LeadsPage() {
                         <p className="mt-1 text-xs text-[#51627b]">Actions lot: sélection, export, suppression.</p>
                       </div>
 
-                      <div className="rounded-full border border-[#d7e3f4] bg-white px-3 py-1 text-[11px] text-[#51627b] tabular-nums">
+                      <div className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 text-[11px] text-[#51627b] tabular-nums">
                         Import {nextImportText}
                       </div>
                     </div>
@@ -708,7 +708,7 @@ export default function LeadsPage() {
                       </HubButton>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[#d7e3f4] bg-white px-3 py-2 text-[11px] text-[#51627b]">
+                    <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-3 py-2 text-[11px] text-[#51627b]">
                       <span>Astuce: filtrez puis déclenchez vos actions en lot.</span>
                       <span className="rounded-full border border-[#d7e3f4] bg-[#f8fbff] px-2.5 py-1 tabular-nums">
                         {selectedCount} sélectionné(s)
@@ -729,10 +729,10 @@ export default function LeadsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 text-[11px] text-[#51627b]">
-                  <span className="rounded-full border border-[#d7e3f4] bg-white px-3 py-1 tabular-nums">
+                  <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 tabular-nums">
                     {selectedCount} sélectionné(s)
                   </span>
-                  <span className="rounded-full border border-[#d7e3f4] bg-white px-3 py-1 tabular-nums">
+                  <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 tabular-nums">
                     {treatedCount} traités
                   </span>
                 </div>
@@ -741,7 +741,7 @@ export default function LeadsPage() {
               <div className="w-full overflow-x-auto px-2 pb-2 pt-1">
                 <table className="min-w-[1040px] w-full table-fixed border-separate [border-spacing:0_10px] text-[13px]">
                   <thead className="sticky top-0 z-10">
-                    <tr className="text-[11px] uppercase tracking-[0.06em] text-[#51627b]">
+                    <tr className="text-[11px] uppercase tracking-[0.06em] text-[#405770]">
                       <th className="w-[54px] px-3 py-2 text-center whitespace-nowrap">
                         Sel.
                       </th>
@@ -811,30 +811,25 @@ export default function LeadsPage() {
                           : isPending
                             ? "En attente"
                             : "À faire";
-                        const tone = idx % 4;
-                        const rowTone = tone === 0 ? "blue" : tone === 1 ? "violet" : tone === 2 ? "mint" : "sand";
-                        const toneDotClass =
-                          tone === 0
-                            ? "bg-[#4f8bff]"
-                            : tone === 1
-                              ? "bg-[#8d79ff]"
-                              : tone === 2
-                                ? "bg-[#15b88f]"
-                                : "bg-[#de8a30]";
+                        const statusDotClass = isSent
+                          ? "bg-emerald-500"
+                          : isPending
+                            ? "bg-amber-500"
+                            : "bg-[#6f85a6]";
                         const baseCellClass = "border-y border-[#d7e3f4] px-3 py-4 align-middle";
 
                         return (
                           <tr
                             key={lead.id}
-                            data-tone={rowTone}
                             className={[
                               "hub-table-row group",
+                              idx % 2 === 0 ? "bg-[#f4f8ff]" : "bg-[#f0f5fd]",
                               isSelected ? "ring-2 ring-[#dce8ff]" : "",
                             ].join(" ")}
                           >
                             <td className={`${baseCellClass} rounded-l-2xl border-l border-[#d7e3f4] text-center`}>
                               <div className="flex items-center justify-center gap-2">
-                                <span className={`h-2 w-2 rounded-full ${toneDotClass}`} />
+                                <span className={`h-2 w-2 rounded-full ${statusDotClass}`} />
                                 <input
                                   type="checkbox"
                                   checked={isSelected}

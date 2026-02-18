@@ -98,7 +98,7 @@ export default async function RootLayout({
   return (
     <ClerkProvider>
       <html lang="fr">
-        <body className="bg-[#f3f7ff] text-[#0b1c33]">
+        <body className="bg-[#ecf2fa] text-[#0f213c]">
           <div className="min-h-screen flex flex-col relative">
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
               <div className="absolute -top-40 left-1/2 h-[500px] w-[1120px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(31,94,255,0.14),rgba(31,94,255,0.01)_62%,transparent_78%)]" />
@@ -107,7 +107,7 @@ export default async function RootLayout({
             </div>
 
             {/* 🔵 HEADER */}
-            <header className="sticky top-0 z-20 border-b border-[#d7e3f4] bg-white/88 backdrop-blur-xl">
+            <header className="sticky top-0 z-20 border-b border-[#c8d6ea] bg-[#f4f8ff]/92 backdrop-blur-xl">
               {/* ✅ élargi pour laisser respirer les pages data-heavy */}
               <div className="mx-auto flex max-w-[1480px] items-center justify-between px-4 py-3">
                 {/* 🔹 Logo + titre */}
@@ -206,7 +206,7 @@ export default async function RootLayout({
             </main>
 
             {/* 🔵 FOOTER */}
-            <footer className="border-t border-[#d7e3f4] bg-white/65 text-xs text-[#51627b]">
+            <footer className="border-t border-[#c8d6ea] bg-[#f4f8ff]/75 text-xs text-[#3f5470]">
               {/* ✅ aligné avec le header */}
               <div className="mx-auto flex max-w-[1480px] items-center justify-between px-4 py-4">
                 <span>© Lidmeo</span>
