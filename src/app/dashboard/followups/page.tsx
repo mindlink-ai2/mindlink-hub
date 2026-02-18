@@ -564,21 +564,6 @@ export default function FollowupsPage() {
           )}
         </div>
 
-        <style jsx global>{`
-          @keyframes slideLeft {
-            from {
-              transform: translateX(24px);
-              opacity: 0;
-            }
-            to {
-              transform: translateX(0);
-              opacity: 1;
-            }
-          }
-          .animate-slideLeft {
-            animation: slideLeft 180ms ease-out;
-          }
-        `}</style>
       </>
     </SubscriptionGate>
   );
