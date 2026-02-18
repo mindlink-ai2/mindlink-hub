@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import SubscriptionGate from "@/components/SubscriptionGate";
+import { HubButton } from "@/components/ui/hub-button";
 
 export default function FollowupsPage() {
   const [leads, setLeads] = useState<any[]>([]);
@@ -125,20 +126,20 @@ export default function FollowupsPage() {
     // ✅ no red (overdue uses amber)
     const toneRing =
       tone === "overdue"
-        ? "hover:border-amber-300/70 hover:shadow-amber-200/60"
+        ? "hover:border-amber-200 hover:bg-amber-50/60"
         : tone === "today"
-        ? "hover:border-[#9dbaf2] hover:shadow-[#d9e5ff]"
-        : "hover:border-emerald-300/70 hover:shadow-emerald-200/70";
+        ? "hover:border-[#bfdbfe] hover:bg-[#f8fbff]"
+        : "hover:border-emerald-200 hover:bg-emerald-50/60";
 
     const badge =
       tone === "overdue" ? "Retard" : tone === "today" ? "Aujourd’hui" : "À venir";
 
     const badgeStyle =
       tone === "overdue"
-        ? "border-amber-300/70 bg-amber-50 text-amber-700"
+        ? "border-amber-200 bg-amber-50 text-amber-700"
         : tone === "today"
-        ? "border-[#e3e7ef] bg-[#fbfcfe] text-[#4e5f80]"
-        : "border-emerald-300/70 bg-emerald-50 text-emerald-700";
+        ? "border-[#dbe5f3] bg-white text-[#475569]"
+        : "border-emerald-200 bg-emerald-50 text-emerald-700";
 
     return (
       <button
@@ -146,23 +147,23 @@ export default function FollowupsPage() {
         onClick={() => setOpenLead(lead)}
         className={[
           "group w-full text-left",
-          "rounded-2xl border border-[#e3e7ef] bg-white",
-          "px-4 py-3.5",
+          "rounded-xl border border-[#dbe5f3] bg-white",
+          "px-4 py-4",
           "transition",
-          "shadow-sm hover:shadow-md",
-          "focus:outline-none focus:ring-2 focus:ring-[#9bb5f8] focus:ring-offset-0",
+          "shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
+          "focus:outline-none focus:ring-2 focus:ring-[#bfdbfe] focus:ring-offset-0",
           toneRing,
         ].join(" ")}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="truncate font-semibold text-[#1f2a44]">
+              <h3 className="truncate font-semibold text-[#0F172A]">
                 {leadDisplayName(lead)}
               </h3>
               <span
                 className={[
-                  "shrink-0 text-[11px] px-2 py-0.5 rounded-full border",
+                  "shrink-0 rounded-full border px-2 py-0.5 text-[11px]",
                   badgeStyle,
                 ].join(" ")}
               >
@@ -171,22 +172,22 @@ export default function FollowupsPage() {
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-              <p className="text-[#667085]">
+              <p className="text-[#4B5563]">
                 Prochaine relance :{" "}
-                <span className="font-semibold text-[#1f2a44]">
+                <span className="font-semibold text-[#0F172A]">
                   {formatDateFR(lead.next_followup_at)}
                 </span>
               </p>
 
               {lead.Company && (
-                <p className="max-w-[28ch] truncate text-[#667085]">
+                <p className="max-w-[28ch] truncate text-[#4B5563]">
                   {lead.Company}
                 </p>
               )}
             </div>
           </div>
 
-          <div className="shrink-0 text-[#94a0b5] transition group-hover:text-[#667085]">
+          <div className="shrink-0 text-[#94a3b8] transition group-hover:text-[#4B5563]">
             <span className="text-xs">Ouvrir</span> <span aria-hidden>→</span>
           </div>
         </div>
@@ -195,17 +196,17 @@ export default function FollowupsPage() {
   };
 
   const Section = ({ title, subtitle, data, tone }: any) => (
-    <section className="rounded-3xl border border-[#e3e7ef] bg-white/95 shadow-sm">
-      <div className="border-b border-[#e3e7ef] px-5 py-4 bg-[#fbfcfe]">
+    <section className="hub-card overflow-hidden">
+      <div className="border-b border-[#e2e8f0] bg-[#f8fbff] px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-base font-semibold text-[#1f2a44]">{title}</h2>
-            <p className="mt-1 text-xs text-[#667085]">{subtitle}</p>
+            <h2 className="text-base font-semibold text-[#0F172A]">{title}</h2>
+            <p className="mt-1 text-xs text-[#4B5563]">{subtitle}</p>
           </div>
 
           <div className="shrink-0 flex items-center gap-2">
-            <span className="text-xs text-[#667085]">Total</span>
-            <span className="rounded-lg border border-[#e3e7ef] bg-white px-2 py-1 text-xs font-semibold text-[#1f2a44]">
+            <span className="text-xs text-[#4B5563]">Total</span>
+            <span className="rounded-lg border border-[#dbe5f3] bg-white px-2 py-1 text-xs font-semibold text-[#0F172A]">
               {data.length}
             </span>
           </div>
@@ -214,15 +215,15 @@ export default function FollowupsPage() {
 
       <div className="p-5">
         {data.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#e3e7ef] bg-[#fbfcfe] px-4 py-6">
+          <div className="rounded-xl border border-dashed border-[#dbe5f3] bg-[#f8fbff] px-4 py-6">
             <p className="text-sm text-[#334155]">Aucune relance ici.</p>
-            <p className="mt-1 text-xs text-[#667085]">
+            <p className="mt-1 text-xs text-[#4B5563]">
               Quand une prochaine relance est planifiée, elle apparaîtra dans
               cette section.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
             {data.map((lead: any) => (
               <LeadCard key={lead.id} lead={lead} tone={tone} />
             ))}
@@ -236,10 +237,10 @@ export default function FollowupsPage() {
     // ✅ no red (overdue uses amber)
     const styles =
       variant === "overdue"
-        ? "border-amber-300/70 bg-amber-50 text-amber-700"
+        ? "border-amber-200 bg-amber-50 text-amber-700"
         : variant === "today"
-        ? "border-[#e3e7ef] bg-[#fbfcfe] text-[#475467]"
-        : "border-emerald-300/70 bg-emerald-50 text-emerald-700";
+        ? "border-[#dbe5f3] bg-white text-[#475569]"
+        : "border-emerald-200 bg-emerald-50 text-emerald-700";
 
     const isActive =
       (variant === "overdue" && tab === "overdue") ||
@@ -259,24 +260,24 @@ export default function FollowupsPage() {
           )
         }
         className={[
-          "rounded-2xl border px-4 py-3 transition text-left w-full",
-          "bg-white border-[#e3e7ef] hover:border-[#cdd3de]",
-          "focus:outline-none focus:ring-2 focus:ring-[#9bb5f8]",
-          isActive ? "ring-1 ring-[#dbe1ec] border-[#c7cedb]" : "",
+          "w-full rounded-xl border px-4 py-3 text-left transition",
+          "bg-white border-[#dbe5f3] hover:border-[#bfdbfe]",
+          "focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]",
+          isActive ? "ring-1 ring-[#dbeafe] border-[#93c5fd]" : "",
         ].join(" ")}
       >
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-[#667085]">{label}</p>
+          <p className="text-xs text-[#4B5563]">{label}</p>
           <span
             className={[
-              "text-xs px-2 py-0.5 rounded-full border",
+              "rounded-full border px-2 py-0.5 text-xs",
               styles,
             ].join(" ")}
           >
             {value}
           </span>
         </div>
-        <p className="mt-2 text-[11px] text-[#667085]">
+        <p className="mt-2 text-[11px] text-[#4B5563]">
           {variant === "overdue"
             ? "Prioritaire"
             : variant === "today"
@@ -289,19 +290,19 @@ export default function FollowupsPage() {
 
   const Skeleton = () => (
     <div className="space-y-4">
-      <div className="h-8 w-56 rounded-xl bg-[#e6eaf1] animate-pulse" />
-      <div className="h-4 w-80 rounded-lg bg-[#eef2f7] animate-pulse" />
+      <div className="h-8 w-56 rounded-xl bg-[#e5edf8] animate-pulse" />
+      <div className="h-4 w-80 rounded-lg bg-[#edf3fb] animate-pulse" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-6">
-        <div className="h-20 rounded-2xl bg-[#fbfcfe] border border-[#e3e7ef] animate-pulse" />
-        <div className="h-20 rounded-2xl bg-[#fbfcfe] border border-[#e3e7ef] animate-pulse" />
-        <div className="h-20 rounded-2xl bg-[#fbfcfe] border border-[#e3e7ef] animate-pulse" />
+      <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="h-20 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] animate-pulse" />
+        <div className="h-20 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] animate-pulse" />
+        <div className="h-20 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] animate-pulse" />
       </div>
 
-      <div className="space-y-3 mt-8">
-        <div className="h-28 rounded-3xl bg-[#fbfcfe] border border-[#e3e7ef] animate-pulse" />
-        <div className="h-28 rounded-3xl bg-[#fbfcfe] border border-[#e3e7ef] animate-pulse" />
-        <div className="h-28 rounded-3xl bg-[#fbfcfe] border border-[#e3e7ef] animate-pulse" />
+      <div className="mt-8 space-y-3">
+        <div className="h-28 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] animate-pulse" />
+        <div className="h-28 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] animate-pulse" />
+        <div className="h-28 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] animate-pulse" />
       </div>
     </div>
   );
@@ -309,30 +310,32 @@ export default function FollowupsPage() {
   return (
     <SubscriptionGate supportEmail="contact@mindlink.fr">
       <>
-        <div className="relative">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <div className="relative min-h-screen">
+          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px] bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.12),transparent_56%),radial-gradient(circle_at_80%_0%,rgba(14,165,233,0.12),transparent_48%)]" />
+
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             {!loaded ? (
               <Skeleton />
             ) : (
               <div className="space-y-6">
                 {/* Header */}
-                <div className="flex flex-col gap-4 rounded-[28px] border border-[#e3e7ef] bg-white/95 p-5 shadow-sm sm:p-6">
+                <div className="hub-card-hero flex flex-col gap-4 p-5 sm:p-6">
                   <div className="flex items-start justify-between gap-6">
                     <div>
-                      <h1 className="text-2xl sm:text-3xl font-semibold text-[#1f2a44] tracking-tight">
+                      <h1 className="text-2xl font-semibold tracking-tight text-[#0F172A] sm:text-3xl">
                         Relances clients
                       </h1>
-                      <p className="mt-1 text-sm text-[#667085]">
+                      <p className="mt-1 text-sm text-[#4B5563]">
                         Clique sur un bloc pour afficher la liste{" "}
-                        <span className="text-[#1f2a44]">En retard</span>,{" "}
-                        <span className="text-[#1f2a44]">Aujourd’hui</span> ou{" "}
-                        <span className="text-[#1f2a44]">À venir</span>.
+                        <span className="text-[#0F172A]">En retard</span>,{" "}
+                        <span className="text-[#0F172A]">Aujourd’hui</span> ou{" "}
+                        <span className="text-[#0F172A]">À venir</span>.
                       </p>
                     </div>
 
                     {/* Small contextual hint (visual only) */}
-                    <div className="hidden text-xs text-[#667085] md:flex items-center gap-2">
-                      <span className="inline-flex items-center gap-2 rounded-xl border border-[#e3e7ef] bg-white px-3 py-2">
+                    <div className="hidden items-center gap-2 text-xs text-[#4B5563] md:flex">
+                      <span className="inline-flex items-center gap-2 rounded-xl border border-[#dbe5f3] bg-white px-3 py-2">
                         <span className="h-2 w-2 rounded-full bg-emerald-500" />
                         Cliquez sur une relance pour ouvrir le détail
                       </span>
@@ -376,7 +379,7 @@ export default function FollowupsPage() {
           {openLead && (
             <div
               onClick={() => setOpenLead(null)}
-              className="fixed inset-0 z-40 bg-[#111827]/30 backdrop-blur-[2px]"
+              className="fixed inset-0 z-40 bg-[#0F172A]/38 backdrop-blur-[2px]"
             />
           )}
 
@@ -385,9 +388,9 @@ export default function FollowupsPage() {
             <div
               className="
                 fixed right-0 top-0 h-full w-full sm:w-[420px]
-                bg-white/95 backdrop-blur-xl
-                border-l border-[#e3e7ef] z-50
-                shadow-[0_0_40px_-10px_rgba(17,24,39,0.2)]
+                bg-white z-50
+                border-l border-[#dbe5f3]
+                shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)]
                 animate-slideLeft
               "
               role="dialog"
@@ -395,67 +398,54 @@ export default function FollowupsPage() {
             >
               <div className="h-full flex flex-col">
                 {/* Top bar */}
-                <div className="border-b border-[#e3e7ef] p-5 bg-[#fbfcfe]">
+                <div className="border-b border-[#e2e8f0] bg-[#f8fbff] p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xs text-[#667085]">
+                      <p className="text-xs text-[#4B5563]">
                         Détail de la relance
                       </p>
-                      <h2 className="mt-1 truncate text-xl font-semibold text-[#1f2a44]">
+                      <h2 className="mt-1 truncate text-xl font-semibold text-[#0F172A]">
                         {openLead.FirstName || openLead.title}{" "}
                         {openLead.LastName || ""}
                       </h2>
-                      <p className="mt-1 text-sm text-[#667085]">
+                      <p className="mt-1 text-sm text-[#4B5563]">
                         Prochaine relance :{" "}
-                        <span className="font-medium text-[#1f2a44]">
+                        <span className="font-medium text-[#0F172A]">
                           {formatDateFR(openLead.next_followup_at)}
                         </span>
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => setOpenLead(null)}
-                      className="
-                        shrink-0 rounded-xl px-3 py-2 text-xs
-                        border border-[#e3e7ef] bg-white
-                        text-[#667085] hover:text-[#1f2a44]
-                        hover:border-[#cfd5df] transition
-                      "
-                    >
-                      ✕ Fermer
-                    </button>
+                    <HubButton variant="ghost" size="sm" onClick={() => setOpenLead(null)}>
+                      Fermer
+                    </HubButton>
                   </div>
 
                   {/* Primary CTA */}
-                  <button
+                  <HubButton
                     onClick={() => markAsResponded(openLead.id)}
-                    className="
-                      w-full mt-4 rounded-2xl
-                      bg-emerald-600 hover:bg-emerald-500
-                      text-sm font-semibold text-white
-                      py-2.5 transition
-                      shadow-sm hover:shadow-emerald-500/10
-                      focus:outline-none focus:ring-2 focus:ring-emerald-400/40
-                    "
+                    variant="primary"
+                    size="lg"
+                    className="mt-4 w-full border-emerald-600 bg-emerald-600 hover:border-emerald-500 hover:bg-emerald-500"
                   >
                     Marquer comme répondu ✓
-                  </button>
+                  </HubButton>
 
-                  <p className="mt-2 text-[11px] text-[#667085]">
+                  <p className="mt-2 text-[11px] text-[#4B5563]">
                     Astuce : appuyez sur{" "}
-                    <span className="text-[#2d4f80]">Échap</span> pour fermer.
+                    <span className="text-[#2563EB]">Échap</span> pour fermer.
                   </p>
                 </div>
 
                 {/* Content */}
                 <div className="p-5 overflow-y-auto">
-                  <div className="rounded-2xl border border-[#e3e7ef] bg-[#fbfcfe] p-4">
-                    <div className="space-y-3 text-sm text-[#1f2a44]">
+                  <div className="hub-card-soft p-4">
+                    <div className="space-y-3 text-sm text-[#0F172A]">
                       {openLead.Company && (
-                        <p className="text-[#1f2a44]">
-                          <span className="text-[#667085]">Entreprise</span>
+                        <p className="text-[#0F172A]">
+                          <span className="text-[#4B5563]">Entreprise</span>
                           <br />
-                          <strong className="font-semibold text-[#1f2a44]">
+                          <strong className="font-semibold text-[#0F172A]">
                             {openLead.Company}
                           </strong>
                         </p>
@@ -463,17 +453,17 @@ export default function FollowupsPage() {
 
                       {openLead.email && (
                         <p>
-                          <span className="text-[#667085]">Email</span>
+                          <span className="text-[#4B5563]">Email</span>
                           <br />
-                          <span className="text-[#1f2a44]">{openLead.email}</span>
+                          <span className="text-[#0F172A]">{openLead.email}</span>
                         </p>
                       )}
 
                       {openLead.phoneNumber && (
                         <p>
-                          <span className="text-[#667085]">Téléphone</span>
+                          <span className="text-[#4B5563]">Téléphone</span>
                           <br />
-                          <span className="text-[#1f2a44]">
+                          <span className="text-[#0F172A]">
                             {openLead.phoneNumber}
                           </span>
                         </p>
@@ -486,21 +476,22 @@ export default function FollowupsPage() {
                       <a
                         href={openLead.LinkedInURL}
                         className="
-                          group rounded-2xl border border-[#e3e7ef]
+                          group rounded-xl border border-[#dbe5f3]
                           bg-white px-4 py-3
-                          hover:border-[#d1d6e0] hover:bg-[#fbfcfe]
+                          hover:border-[#bfdbfe] hover:bg-[#f8fbff]
                           transition
                         "
                         target="_blank"
+                        rel="noreferrer"
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-xs text-[#667085]">Lien</p>
-                            <p className="text-sm font-semibold text-[#1f2a44]">
+                            <p className="text-xs text-[#4B5563]">Lien</p>
+                            <p className="text-sm font-semibold text-[#0F172A]">
                               LinkedIn
                             </p>
                           </div>
-                          <span className="text-[#667085] transition group-hover:text-[#334155]">
+                          <span className="text-[#64748b] transition group-hover:text-[#334155]">
                             Voir →
                           </span>
                         </div>
@@ -511,21 +502,22 @@ export default function FollowupsPage() {
                       <a
                         href={openLead.placeUrl}
                         className="
-                          group rounded-2xl border border-[#e3e7ef]
+                          group rounded-xl border border-[#dbe5f3]
                           bg-white px-4 py-3
-                          hover:border-[#d1d6e0] hover:bg-[#fbfcfe]
+                          hover:border-[#bfdbfe] hover:bg-[#f8fbff]
                           transition
                         "
                         target="_blank"
+                        rel="noreferrer"
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-xs text-[#667085]">Lien</p>
-                            <p className="text-sm font-semibold text-[#1f2a44]">
+                            <p className="text-xs text-[#4B5563]">Lien</p>
+                            <p className="text-sm font-semibold text-[#0F172A]">
                               Google Maps
                             </p>
                           </div>
-                          <span className="text-[#667085] transition group-hover:text-[#334155]">
+                          <span className="text-[#64748b] transition group-hover:text-[#334155]">
                             Ouvrir →
                           </span>
                         </div>
@@ -537,6 +529,22 @@ export default function FollowupsPage() {
             </div>
           )}
         </div>
+
+        <style jsx global>{`
+          @keyframes slideLeft {
+            from {
+              transform: translateX(24px);
+              opacity: 0;
+            }
+            to {
+              transform: translateX(0);
+              opacity: 1;
+            }
+          }
+          .animate-slideLeft {
+            animation: slideLeft 180ms ease-out;
+          }
+        `}</style>
       </>
     </SubscriptionGate>
   );

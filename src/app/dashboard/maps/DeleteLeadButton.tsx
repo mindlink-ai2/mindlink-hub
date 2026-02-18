@@ -31,7 +31,7 @@ export default function DeleteLeadButton({
   return (
     <button
       onClick={handleDelete}
-      className="text-red-500 hover:text-red-300 transition text-xs"
+      className="inline-flex h-9 items-center justify-center rounded-xl border border-[#f5c2c7] bg-[#fff5f5] px-3 text-xs font-semibold text-[#b42318] transition hover:border-[#f1aeb5] hover:bg-[#ffe9ea] focus:outline-none focus:ring-2 focus:ring-[#f8c9cf]"
     >
       Supprimer
     </button>

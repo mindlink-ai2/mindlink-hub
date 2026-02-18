@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
+import { HubButton } from "@/components/ui/hub-button";
 
 type Lead = any;
 
@@ -33,10 +34,6 @@ export default function LeadsPage() {
 
   // ✅ plan (on garde la logique existante côté API, mais plus de premium gating)
   const [plan, setPlan] = useState<string>("essential");
-  const isPremium = false;
-
-  // ✅ premium modal (désactivé — conservé nulle part)
-  const [premiumModalOpen, setPremiumModalOpen] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exportingSelected, setExportingSelected] = useState(false);
@@ -515,20 +512,20 @@ export default function LeadsPage() {
 
   if (!clientLoaded) {
     return (
-      <div className="min-h-screen w-full px-4 sm:px-6 pt-10 pb-24">
+      <div className="min-h-screen w-full px-4 pb-24 pt-10 sm:px-6">
         <div className="mx-auto w-full max-w-[1680px]">
-          <div className="rounded-[28px] border border-[#e3e7ef] bg-white/95 p-6 shadow-sm sm:p-7">
+          <div className="hub-card-hero p-6 sm:p-7">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="h-6 w-44 rounded-xl bg-[#e6eaf1] animate-pulse" />
-                <div className="mt-3 h-4 w-80 rounded-lg bg-[#eef2f7] animate-pulse" />
+                <div className="h-6 w-44 animate-pulse rounded-xl bg-[#e5edf8]" />
+                <div className="mt-3 h-4 w-80 animate-pulse rounded-lg bg-[#edf3fb]" />
               </div>
-              <div className="h-10 w-28 rounded-2xl bg-[#eceff5] animate-pulse" />
+              <div className="h-10 w-28 animate-pulse rounded-xl bg-[#edf3fb]" />
             </div>
 
-            <div className="mt-6 h-12 rounded-2xl border border-[#e3e7ef] bg-[#fbfcfe] animate-pulse" />
-            <div className="mt-4 h-72 rounded-2xl border border-[#e3e7ef] bg-[#fbfcfe] animate-pulse" />
-            <div className="mt-3 text-xs text-[#667085]">Chargement des leads…</div>
+            <div className="mt-6 h-12 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
+            <div className="mt-4 h-72 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
+            <div className="mt-3 text-xs text-[#4B5563]">Chargement des leads…</div>
           </div>
         </div>
       </div>
@@ -556,317 +553,205 @@ export default function LeadsPage() {
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
-        <div className="min-h-screen w-full px-4 sm:px-6 pt-8 pb-24">
-          <div className="mx-auto w-full max-w-[1680px] space-y-6">
-            {/* TOP / HEADER */}
-            <div className="relative overflow-hidden rounded-[30px] border border-[#e3e7ef] bg-white/95 shadow-sm">
-              <div className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(60%_55%_at_50%_0%,black,transparent)]">
-                <div className="absolute -top-28 left-1/2 h-72 w-[740px] -translate-x-1/2 rounded-full bg-[#e9eef8] blur-3xl" />
-                <div className="absolute -top-16 left-1/2 h-44 w-[560px] -translate-x-1/2 rounded-full bg-[#f1f4fa] blur-3xl" />
+        <div className="relative min-h-screen w-full px-4 pb-24 pt-8 sm:px-6">
+          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[360px] bg-[radial-gradient(circle_at_20%_-10%,rgba(37,99,235,0.16),transparent_56%),radial-gradient(circle_at_80%_0%,rgba(14,165,233,0.12),transparent_48%)]" />
+
+          <div className="mx-auto w-full max-w-[1680px] space-y-8">
+            <section className="hub-card-hero relative overflow-hidden p-6 sm:p-7">
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute -left-16 top-[-120px] h-64 w-64 rounded-full bg-[#dbeafe]/70 blur-3xl" />
+                <div className="absolute -right-20 top-[-140px] h-72 w-72 rounded-full bg-[#dbeafe]/60 blur-3xl" />
               </div>
 
-              <div className="relative p-6 sm:p-7">
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-2 rounded-full border border-[#e3e7ef] bg-[#fbfcfe] px-3 py-1 text-[11px] font-medium text-[#667085]">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#3b6ff6]" />
-                        Hub • Prospection
-                      </span>
-
-                      <span className="inline-flex items-center rounded-full border border-[#e3e7ef] bg-white px-3 py-1 text-[11px] text-[#667085] tabular-nums">
-                        {filteredLeads.length} affiché(s)
-                      </span>
-
-                      <span className="inline-flex items-center rounded-full border border-[#e3e7ef] bg-white px-3 py-1 text-[11px] text-[#667085] whitespace-nowrap">
-                        Essential
-                      </span>
-                    </div>
-
-                    <h1 className="mt-3 text-4xl sm:text-5xl font-extrabold tracking-tight text-[#1f2a44]">
-                      Prospection
-                    </h1>
-
-                    <p className="mt-3 max-w-2xl text-sm text-[#667085]">
-                      Tous vos prospects qualifiés, importés automatiquement par Lidmeo. Recherchez,
-                      traitez, et ouvrez un lead pour préparer votre message.
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap items-center gap-3">
-                      <div className="rounded-2xl border border-[#e3e7ef] bg-white px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wide text-[#667085]">
-                          Total leads
-                        </div>
-                        <div className="mt-1 text-3xl font-extrabold text-[#1f2a44] leading-none tabular-nums">
-                          {total}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-[#e3e7ef] bg-white px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wide text-[#667085]">
-                          Traités
-                        </div>
-                        <div className="mt-1 text-3xl font-extrabold text-emerald-700 leading-none tabular-nums">
-                          {treatedCount}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-[#e3e7ef] bg-white px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wide text-[#667085]">
-                          À traiter
-                        </div>
-                        <div className="mt-1 text-3xl font-extrabold text-amber-700 leading-none tabular-nums">
-                          {remainingToTreat}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-5">
-                      <div className="group flex items-center gap-3 rounded-2xl border border-[#e3e7ef] bg-white px-4 py-3 shadow-sm transition focus-within:ring-2 focus-within:ring-[#8fb0f7]">
-                        <svg
-                          className="h-4 w-4 text-[#7e93b7] group-focus-within:text-[#436299] transition"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
-                          />
-                        </svg>
-
-                        <input
-                          value={searchTerm}
-                          onChange={(e) => handleSearch(e.target.value)}
-                          placeholder="Rechercher (nom, entreprise, ville)…"
-                          className="w-full bg-transparent text-sm text-[#17345e] placeholder-[#7f95b9] focus:outline-none"
-                          aria-label="Rechercher un lead"
-                        />
-                      </div>
-
-                      <div className="mt-2 text-[11px] text-[#667085]">
-                        {filteredLeads.length} résultat(s) • {total} total
-                        {` • ${selectedCount} sélectionné(s)`}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Command center */}
-                  <div className="w-full lg:w-[520px] shrink-0">
-                    <div className="relative overflow-hidden rounded-[26px] border border-[#e3e7ef] bg-[#fbfcfe] p-4 sm:p-5 shadow-sm">
-                      <div className="pointer-events-none absolute inset-0">
-                        <div className="absolute -top-24 right-[-120px] h-56 w-56 rounded-full bg-[#edf1f8] blur-3xl" />
-                        <div className="absolute -bottom-24 left-[-120px] h-56 w-56 rounded-full bg-[#f1f4fa] blur-3xl" />
-                        <div className="absolute inset-0 bg-gradient-to-b from-white/0 via-white/10 to-white/45" />
-                      </div>
-
-                      <div className="relative">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#e3e7ef] bg-white text-[#667085]">
-                                <svg
-                                  className="h-4 w-4"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  aria-hidden="true"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M10 6H5a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M14 4h6m0 0v6m0-6L10 14"
-                                  />
-                                </svg>
-                              </div>
-
-                              <div className="min-w-0">
-                                <div className="text-[12px] font-semibold text-[#1f2a44] leading-none">
-                                  Commandes
-                                </div>
-                                <div className="mt-1 text-[11px] text-[#667085]">
-                                  Export, sélection, suppression.
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="shrink-0 flex flex-col items-end gap-2">
-                            <span className="inline-flex items-center gap-2 rounded-full border border-[#e3e7ef] bg-white px-3 py-1 text-[11px] tabular-nums whitespace-nowrap text-[#667085]">
-                              <span className="h-1.5 w-1.5 rounded-full bg-[#9ca3af]" />
-                              Essential
-                            </span>
-
-                            <span className="inline-flex items-center gap-2 rounded-2xl border border-[#e3e7ef] bg-white px-3 py-2 text-[12px] text-[#667085] whitespace-nowrap tabular-nums">
-                              <span className="text-[10px] uppercase tracking-wide text-[#667085]">
-                                Prochain import
-                              </span>
-                              <span className="h-4 w-px bg-[#e3e7ef]" />
-                              <span className="font-semibold text-[#1f2a44]">{nextImportText}</span>
-                              <span className="text-[#9aa4b2]">•</span>
-                              <span className="text-[#667085]">08:00</span>
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-1 gap-2">
-                          <a
-                            href="/dashboard/leads/export"
-                            className="group inline-flex h-11 items-center justify-center whitespace-nowrap rounded-2xl border border-[#e3e7ef] bg-white px-4 text-xs font-semibold text-[#1f2a44] shadow-sm transition hover:bg-[#fbfcfe] focus:outline-none focus:ring-2 focus:ring-[#9bb5f8] sm:text-sm"
-                          >
-                            <span className="inline-flex items-center gap-2">
-                              <svg
-                                className="h-4 w-4 text-[#667085] transition group-hover:text-[#334155]"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M12 3v12m0 0l4-4m-4 4l-4-4"
-                                />
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M4 17v3h16v-3"
-                                />
-                              </svg>
-                              Exporter CSV
-                            </span>
-                          </a>
-
-                        </div>
-
-                        <div className="mt-2 rounded-2xl border border-[#e3e7ef] bg-white p-2">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <button
-                              type="button"
-                              onClick={toggleSelectAllFiltered}
-                              className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-[#e3e7ef] bg-[#fbfcfe] px-3 text-[12px] font-medium text-[#1f2a44] transition hover:bg-[#f7f8fb] focus:outline-none focus:ring-2 focus:ring-[#9bb5f8]"
-                            >
-                              {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={handleExportSelected}
-                              disabled={selectedCount === 0 || exportingSelected}
-                              className={[
-                                "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
-                                selectedCount === 0 || exportingSelected
-                                  ? "cursor-not-allowed border-[#d7e3fa] bg-white/60 text-[#9aaecf]"
-                                  : "border-[#e3e7ef] bg-[#fbfcfe] text-[#1f2a44] hover:bg-[#f7f8fb]",
-                              ].join(" ")}
-                            >
-                              {exportingSelected ? "Export..." : `Exporter (${selectedCount})`}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={handleBulkDelete}
-                              disabled={selectedCount === 0}
-                              className={[
-                                "inline-flex items-center justify-center h-10 px-3 text-[12px] rounded-2xl transition border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-amber-500/20",
-                                selectedCount === 0
-                                  ? "cursor-not-allowed border-[#d7e3fa] bg-white/60 text-[#9aaecf]"
-                                  : "border-amber-300/70 bg-amber-50 text-amber-700 hover:bg-amber-100",
-                              ].join(" ")}
-                            >
-                              Supprimer ({selectedCount})
-                            </button>
-                          </div>
-
-                          <div className="mt-2 flex items-center justify-end gap-3 px-1">
-                            <span className="rounded-full border border-[#e3e7ef] bg-[#fbfcfe] px-3 py-1 text-[11px] text-[#667085] whitespace-nowrap tabular-nums">
-                              {selectedCount} sélectionné(s)
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          <div className="text-[11px] text-[#667085]">
-                            Astuce : filtrez avec la recherche, puis exportez ou sélectionnez.
-                          </div>
-
-                          <span className="rounded-full border border-[#e3e7ef] bg-[#fbfcfe] px-3 py-1 text-[11px] text-[#667085] whitespace-nowrap tabular-nums">
-                            {selectedCount} sélectionné(s)
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-[#e3e7ef] bg-[#fbfcfe] px-4 py-3 text-[11px] text-[#667085]">
-                  Astuce : utilisez “Tout sélectionner” pour supprimer ou exporter en lot.
-                </div>
-              </div>
-            </div>
-
-            <div className="h-8 border-t border-[#e3e7ef]/80 sm:h-10" />
-
-            {/* TABLE CARD */}
-            <div className="overflow-hidden rounded-[28px] border border-[#e3e7ef] bg-white/95 shadow-sm">
-              <div className="flex items-center justify-between gap-3 border-b border-[#e3e7ef] bg-[#fbfcfe] px-6 py-4">
+              <div className="relative grid gap-6 xl:grid-cols-[1.28fr_0.92fr]">
                 <div className="min-w-0">
-                  <h2 className="text-sm font-semibold text-[#1f2a44]">Liste des leads</h2>
-                  <p className="text-[11px] text-[#667085]">
-                    Cliquez sur “Voir →” pour ouvrir la fiche lead.
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] font-medium text-[#4B5563]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#2563EB]" />
+                      Hub Lidmeo
+                    </span>
+
+                    <span className="inline-flex items-center rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] tabular-nums">
+                      {filteredLeads.length} affiché(s)
+                    </span>
+
+                    <span className="inline-flex items-center rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
+                      {plan || "essential"}
+                    </span>
+                  </div>
+
+                  <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#0F172A] sm:text-5xl">
+                    Pipeline de prospection
+                  </h1>
+                  <p className="mt-3 max-w-2xl text-sm text-[#4B5563] sm:text-base">
+                    Gérez vos leads dans une vue unique: recherche rapide, statuts opérationnels,
+                    exports ciblés et actions batch.
+                  </p>
+
+                  <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <Metric title="Total leads" value={total} tone="default" />
+                    <Metric title="Traités" value={treatedCount} tone="success" />
+                    <Metric title="À traiter" value={remainingToTreat} tone="warning" />
+                  </div>
+
+                  <div className="mt-6">
+                    <div className="group flex items-center gap-3 rounded-xl border border-[#dbe5f3] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition focus-within:border-[#93c5fd] focus-within:ring-2 focus-within:ring-[#bfdbfe]">
+                      <svg
+                        className="h-4 w-4 text-[#64748b] transition group-focus-within:text-[#2563EB]"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+                        />
+                      </svg>
+                      <input
+                        value={searchTerm}
+                        onChange={(e) => handleSearch(e.target.value)}
+                        placeholder="Rechercher (nom, entreprise, ville)…"
+                        className="w-full bg-transparent text-sm text-[#0F172A] placeholder-[#94a3b8] focus:outline-none"
+                        aria-label="Rechercher un lead"
+                      />
+                    </div>
+
+                    <div className="mt-2 text-[11px] text-[#4B5563]">
+                      {filteredLeads.length} résultat(s) • {total} total • {selectedCount} sélectionné(s)
+                    </div>
+                  </div>
+                </div>
+
+                <div className="hub-card-soft relative overflow-hidden p-4 sm:p-5">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(37,99,235,0.08),transparent_48%)]" />
+
+                  <div className="relative">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#dbe5f3] bg-white text-[#475569]">
+                          <svg
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M10 6H5a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M14 4h6m0 0v6m0-6L10 14"
+                            />
+                          </svg>
+                        </div>
+                        <h2 className="mt-3 text-base font-semibold text-[#0F172A]">Commandes rapides</h2>
+                        <p className="mt-1 text-xs text-[#4B5563]">Actions lot: sélection, export, suppression.</p>
+                      </div>
+
+                      <div className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] tabular-nums">
+                        Import {nextImportText}
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <HubButton asChild variant="secondary" size="lg" className="w-full">
+                        <a href="/dashboard/leads/export">Exporter tout en CSV</a>
+                      </HubButton>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <HubButton type="button" variant="ghost" onClick={toggleSelectAllFiltered}>
+                        {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
+                      </HubButton>
+
+                      <HubButton
+                        type="button"
+                        variant="secondary"
+                        onClick={handleExportSelected}
+                        disabled={selectedCount === 0 || exportingSelected}
+                      >
+                        {exportingSelected ? "Export..." : `Exporter (${selectedCount})`}
+                      </HubButton>
+
+                      <HubButton
+                        type="button"
+                        variant="danger"
+                        onClick={handleBulkDelete}
+                        disabled={selectedCount === 0}
+                      >
+                        Supprimer ({selectedCount})
+                      </HubButton>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[#dbe5f3] bg-white px-3 py-2 text-[11px] text-[#4B5563]">
+                      <span>Astuce: filtrez puis déclenchez vos actions en lot.</span>
+                      <span className="rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-1 tabular-nums">
+                        {selectedCount} sélectionné(s)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="hub-card overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e2e8f0] bg-[#f8fbff] px-6 py-4">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-[#0F172A]">Table des leads</h2>
+                  <p className="text-[11px] text-[#4B5563]">
+                    Cliquez sur “Voir” pour ouvrir le panneau de traitement.
                   </p>
                 </div>
 
-                <span className="rounded-full border border-[#e3e7ef] bg-white px-3 py-1 text-[11px] text-[#667085] whitespace-nowrap tabular-nums">
-                  {selectedCount} sélectionné(s)
-                </span>
+                <div className="flex items-center gap-2 text-[11px] text-[#4B5563]">
+                  <span className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 tabular-nums">
+                    {selectedCount} sélectionné(s)
+                  </span>
+                  <span className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 tabular-nums">
+                    {treatedCount} traités
+                  </span>
+                </div>
               </div>
 
               <div className="w-full overflow-x-auto">
-                <table className="w-full text-[13px] table-fixed min-w-[980px]">
+                <table className="min-w-[1040px] w-full table-fixed text-[13px]">
                   <thead className="sticky top-0 z-10">
-                    <tr className="bg-[#fbfcfe] text-[#667085] text-[11px] uppercase tracking-wide">
-                      <th className="w-[44px] border-b border-[#e3e7ef] py-3 px-2 text-center whitespace-nowrap">
+                    <tr className="bg-white text-[11px] uppercase tracking-[0.06em] text-[#64748b]">
+                      <th className="w-[54px] border-b border-[#e2e8f0] px-3 py-3 text-center whitespace-nowrap">
                         Sel.
                       </th>
-
-                      <th className="w-[126px] border-b border-[#e3e7ef] py-3 px-2 text-center whitespace-nowrap">
+                      <th className="w-[150px] border-b border-[#e2e8f0] px-3 py-3 text-center whitespace-nowrap">
                         Statut
                       </th>
-
-                      <th className="w-[150px] border-b border-[#e3e7ef] py-3 px-2 text-left whitespace-nowrap">
+                      <th className="w-[180px] border-b border-[#e2e8f0] px-3 py-3 text-left whitespace-nowrap">
                         Nom
                       </th>
-                      <th className="w-[150px] border-b border-[#e3e7ef] py-3 px-2 text-left whitespace-nowrap">
+                      <th className="w-[170px] border-b border-[#e2e8f0] px-3 py-3 text-left whitespace-nowrap">
                         Entreprise
                       </th>
-                      <th className="w-[140px] border-b border-[#e3e7ef] py-3 px-2 text-left whitespace-nowrap">
+                      <th className="w-[160px] border-b border-[#e2e8f0] px-3 py-3 text-left whitespace-nowrap">
                         Localisation
                       </th>
-                      <th className="w-[96px] border-b border-[#e3e7ef] py-3 px-2 text-left whitespace-nowrap">
+                      <th className="w-[110px] border-b border-[#e2e8f0] px-3 py-3 text-left whitespace-nowrap">
                         LinkedIn
                       </th>
-
                       {emailOption && (
-                        <th className="w-[190px] border-b border-[#e3e7ef] py-3 px-2 text-left whitespace-nowrap">
+                        <th className="w-[210px] border-b border-[#e2e8f0] px-3 py-3 text-left whitespace-nowrap">
                           Email
                         </th>
                       )}
                       {phoneOption && (
-                        <th className="w-[120px] border-b border-[#e3e7ef] py-3 px-2 text-left whitespace-nowrap">
+                        <th className="w-[140px] border-b border-[#e2e8f0] px-3 py-3 text-left whitespace-nowrap">
                           Téléphone
                         </th>
                       )}
-
-                      <th className="w-[92px] border-b border-[#e3e7ef] py-3 px-2 text-center whitespace-nowrap">
+                      <th className="w-[110px] border-b border-[#e2e8f0] px-3 py-3 text-center whitespace-nowrap">
                         Date
                       </th>
-                      <th className="w-[96px] border-b border-[#e3e7ef] py-3 px-2 text-center whitespace-nowrap">
+                      <th className="w-[110px] border-b border-[#e2e8f0] px-3 py-3 text-center whitespace-nowrap">
                         Supprimer
                       </th>
                     </tr>
@@ -875,13 +760,13 @@ export default function LeadsPage() {
                   <tbody>
                     {filteredLeads.length === 0 ? (
                       <tr>
-                        <td colSpan={colCount} className="py-14 text-center">
+                        <td colSpan={colCount} className="py-16 text-center">
                           <div className="mx-auto max-w-md px-6">
-                            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-[#e3e7ef] bg-white text-[#667085]">
+                            <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-[#dbe5f3] bg-white text-[#4B5563]">
                               ⌕
                             </div>
-                            <div className="font-medium text-[#1f2a44]">Aucun résultat</div>
-                            <div className="mt-1 text-sm text-[#667085]">
+                            <div className="font-medium text-[#0F172A]">Aucun résultat</div>
+                            <div className="mt-1 text-sm text-[#4B5563]">
                               Essayez un autre nom, une entreprise ou une ville.
                             </div>
                           </div>
@@ -902,41 +787,40 @@ export default function LeadsPage() {
                         const statusLabel = isSent
                           ? "Envoyé"
                           : isPending
-                            ? "En attente d'envoi"
+                            ? "En attente"
                             : "À faire";
 
                         return (
                           <tr
                             key={lead.id}
                             className={[
-                              "group border-b border-[#eef1f5] transition",
-                              idx % 2 === 0 ? "bg-transparent" : "bg-[#fbfcfe]",
-                              "hover:bg-[#fbfcfe]",
+                              "hub-table-row group",
+                              idx % 2 === 0 ? "bg-white" : "bg-[#fbfdff]",
                             ].join(" ")}
                           >
-                            <td className="py-3 px-2 text-center">
+                            <td className="px-3 py-4 text-center align-middle">
                               <input
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={() => toggleSelected(idStr)}
-                                className="h-4 w-4 cursor-pointer accent-indigo-500"
+                                className="h-4 w-4 cursor-pointer rounded border-[#c7d5e7] text-[#2563EB] focus:ring-[#bfdbfe]"
                                 aria-label={`Sélectionner le lead ${fullName}`}
                               />
                             </td>
 
-                            <td className="py-3 px-2 text-center">
+                            <td className="px-3 py-4 text-center align-middle">
                               <button
                                 type="button"
                                 onClick={() => handleStatusBadgeClick(lead)}
                                 disabled={isSent || isStatusUpdating}
                                 className={[
-                                  "inline-flex items-center justify-center h-8 px-3 rounded-full text-[11px] font-medium border whitespace-nowrap transition focus:outline-none focus:ring-2",
+                                  "inline-flex h-8 items-center justify-center rounded-full border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
                                   isSent
-                                    ? "cursor-default border-emerald-300/70 bg-emerald-50 text-emerald-700 focus:ring-emerald-300/60"
+                                    ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
                                     : isPending
-                                      ? "border-amber-300/70 bg-amber-50 text-amber-700 hover:bg-amber-100 focus:ring-amber-300/60"
-                                      : "border-[#e3e7ef] bg-white text-[#475467] hover:bg-[#fbfcfe] focus:ring-[#9bb5f8]",
-                                  isStatusUpdating ? "opacity-70 cursor-wait" : "",
+                                      ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 focus:ring-amber-200"
+                                      : "border-[#d6e2f2] bg-white text-[#334155] hover:border-[#bfdbfe] hover:bg-[#f8fbff] focus:ring-[#bfdbfe]",
+                                  isStatusUpdating ? "cursor-wait opacity-70" : "",
                                 ].join(" ")}
                                 title={
                                   isSent
@@ -951,52 +835,56 @@ export default function LeadsPage() {
                               </button>
                             </td>
 
-                            <td className="relative py-3 px-2 pr-14 text-[#1f2a44]">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="font-medium truncate">{fullName}</span>
+                            <td className="relative px-3 py-4 pr-16 align-middle text-[#0F172A]">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="truncate font-medium">{fullName}</span>
                               </div>
 
-                              <button
+                              <HubButton
                                 type="button"
+                                variant="primary"
+                                size="sm"
                                 onClick={() => setOpenLead(lead)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-xl bg-[#3b6ff6] px-3 py-1.5 text-[11px] text-white opacity-0 shadow-sm transition hover:bg-[#2f5de0] group-hover:opacity-100 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#9bb5f8]"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                               >
-                                Voir →
-                              </button>
+                                Voir
+                              </HubButton>
                             </td>
 
-                            <td className="py-3 px-2 truncate text-[#667085]">{lead.Company || "—"}</td>
-
-                            <td className="py-3 px-2 truncate text-[#667085]">{lead.location || "—"}</td>
-
-                            <td className="py-3 px-2">
+                            <td className="truncate px-3 py-4 align-middle text-[#475569]">
+                              {lead.Company || "—"}
+                            </td>
+                            <td className="truncate px-3 py-4 align-middle text-[#475569]">
+                              {lead.location || "—"}
+                            </td>
+                            <td className="px-3 py-4 align-middle">
                               {lead.LinkedInURL ? (
                                 <a
                                   href={lead.LinkedInURL}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#e3e7ef] bg-white px-3 text-[12px] text-[#475467] transition hover:bg-[#fbfcfe] focus:outline-none focus:ring-2 focus:ring-[#9bb5f8]"
+                                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[#dbe5f3] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#bfdbfe] hover:bg-[#f8fbff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
                                 >
-                                  Profil <span className="text-[#667085]">↗</span>
+                                  Profil <span className="text-[#64748b]">↗</span>
                                 </a>
                               ) : (
-                                <span className="text-[#667085]">—</span>
+                                <span className="text-[#64748b]">—</span>
                               )}
                             </td>
-
                             {emailOption && (
-                              <td className="py-3 px-2 truncate text-[#475467]">{lead.email || "—"}</td>
+                              <td className="truncate px-3 py-4 align-middle text-[#334155]">
+                                {lead.email || "—"}
+                              </td>
                             )}
-
                             {phoneOption && (
-                              <td className="py-3 px-2 truncate text-[#475467]">{lead.phone || "—"}</td>
+                              <td className="truncate px-3 py-4 align-middle text-[#334155]">
+                                {lead.phone || "—"}
+                              </td>
                             )}
-
-                            <td className="py-3 px-2 text-center text-[#667085] whitespace-nowrap tabular-nums">
+                            <td className="whitespace-nowrap px-3 py-4 text-center align-middle tabular-nums text-[#64748b]">
                               {lead.created_at ? new Date(lead.created_at).toLocaleDateString("fr-FR") : "—"}
                             </td>
-
-                            <td className="py-3 px-2 text-center">
+                            <td className="px-3 py-4 text-center align-middle">
                               <DeleteLeadButton leadId={lead.id} />
                             </td>
                           </tr>
@@ -1007,71 +895,63 @@ export default function LeadsPage() {
                 </table>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e3e7ef] px-6 py-3 text-[11px] text-[#667085]">
-                <div>Astuce : passez la souris sur une ligne pour afficher “Voir →”.</div>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e2e8f0] bg-[#f8fbff] px-6 py-3 text-[11px] text-[#4B5563]">
+                <div>Survolez une ligne pour afficher l’action “Voir”.</div>
                 <div className="tabular-nums">
                   {treatedCount} traité(s) • {remainingToTreat} à traiter
                 </div>
               </div>
-            </div>
+            </section>
           </div>
 
-          {/* --- SIDEBAR --- */}
           {openLead && (
             <>
-              <div className="fixed inset-0 z-40 bg-[#111827]/30 backdrop-blur-[3px]" aria-hidden="true" />
+              <div
+                className="fixed inset-0 z-40 bg-[#0F172A]/38 backdrop-blur-[3px]"
+                aria-hidden="true"
+                onClick={() => setOpenLead(null)}
+              />
 
-              <div className="fixed right-0 top-0 z-50 flex h-full w-full flex-col border-l border-[#e3e7ef] bg-white/95 shadow-[0_0_55px_-16px_rgba(17,24,39,0.18)] backdrop-blur-2xl animate-slideLeft sm:w-[500px]">
-                <div className="sticky top-0 z-10 border-b border-[#e3e7ef] bg-white/90 p-6 pb-4 backdrop-blur-xl">
+              <div className="animate-slideLeft fixed right-0 top-0 z-50 flex h-full w-full flex-col border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
+                <div className="sticky top-0 z-10 border-b border-[#e2e8f0] bg-white/95 p-6 pb-4 backdrop-blur-xl">
                   <div className="flex items-start justify-between gap-3">
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-2 rounded-2xl text-xs text-[#667085] transition hover:text-[#1f2a44] focus:outline-none focus:ring-2 focus:ring-[#9bb5f8]"
-                      onClick={() => setOpenLead(null)}
-                    >
-                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#e3e7ef] bg-white">
-                        ✕
-                      </span>
+                    <HubButton type="button" variant="ghost" size="sm" onClick={() => setOpenLead(null)}>
                       Fermer
-                    </button>
-
-                    <span className="rounded-full border border-[#e3e7ef] bg-white px-3 py-1 text-[11px] text-[#667085] whitespace-nowrap">
-                      Essential
+                    </HubButton>
+                    <span className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
+                      {plan || "essential"}
                     </span>
                   </div>
 
-                  <div className="mt-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h2 className="truncate text-2xl font-semibold leading-tight text-[#1f2a44]">
-                          {(openLead.FirstName ?? "")} {(openLead.LastName ?? "")}
-                        </h2>
-                        <p className="mt-1 truncate text-[12px] text-[#667085]">
-                          {openLead.Company || "—"} • {openLead.location || "—"}
-                        </p>
-                      </div>
+                  <div className="mt-4 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="truncate text-2xl font-semibold leading-tight text-[#0F172A]">
+                        {(openLead.FirstName ?? "")} {(openLead.LastName ?? "")}
+                      </h2>
+                      <p className="mt-1 truncate text-[12px] text-[#4B5563]">
+                        {openLead.Company || "—"} • {openLead.location || "—"}
+                      </p>
+                    </div>
 
-                      <div className="shrink-0">
-                        {openLead.message_sent ? (
-                          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/60 bg-emerald-50 px-3 py-1 text-[11px] text-emerald-700 whitespace-nowrap">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                            Envoyé
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-2 rounded-full border border-[#e3e7ef] bg-white px-3 py-1 text-[11px] text-[#667085] whitespace-nowrap">
-                            <span className="h-1.5 w-1.5 rounded-full bg-[#86a0c5]" />
-                            À faire
-                          </span>
-                        )}
-                      </div>
+                    <div className="shrink-0">
+                      {openLead.message_sent ? (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] text-emerald-700 whitespace-nowrap">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          Envoyé
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" />
+                          À faire
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex-1 space-y-6 overflow-y-auto p-6">
-                  <div className="rounded-3xl border border-[#e3e7ef] bg-[#fbfcfe] p-4">
-                    <div className="text-[11px] uppercase tracking-wide text-[#667085]">Informations</div>
-
+                <div className="flex-1 space-y-5 overflow-y-auto p-6">
+                  <div className="hub-card-soft p-4">
+                    <div className="text-[11px] uppercase tracking-wide text-[#4B5563]">Informations</div>
                     <div className="mt-3 grid grid-cols-1 gap-3">
                       <InfoBlock title="LinkedIn">
                         {openLead.LinkedInURL ? (
@@ -1079,29 +959,29 @@ export default function LeadsPage() {
                             href={openLead.LinkedInURL}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border border-[#e3e7ef] bg-white px-3 py-2 text-[#475467] transition hover:bg-[#fbfcfe] focus:outline-none focus:ring-2 focus:ring-[#9bb5f8]"
+                            className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-[#dbe5f3] bg-white px-3 py-2 text-[#334155] transition hover:border-[#bfdbfe] hover:bg-[#f8fbff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
                           >
                             Ouvrir le profil <span className="opacity-80">↗</span>
                           </a>
                         ) : (
-                          <span className="text-[#667085]">—</span>
+                          <span className="text-[#64748b]">—</span>
                         )}
                       </InfoBlock>
 
                       {emailOption && (
                         <InfoBlock title="Email">
-                          <span className="text-[#1f2a44]">{openLead.email || "—"}</span>
+                          <span className="text-[#0F172A]">{openLead.email || "—"}</span>
                         </InfoBlock>
                       )}
 
                       {phoneOption && (
                         <InfoBlock title="Téléphone">
-                          <span className="text-[#1f2a44]">{openLead.phone || "—"}</span>
+                          <span className="text-[#0F172A]">{openLead.phone || "—"}</span>
                         </InfoBlock>
                       )}
 
                       <InfoBlock title="Créé le">
-                        <span className="text-[#1f2a44]">
+                        <span className="text-[#0F172A]">
                           {openLead.created_at
                             ? new Date(openLead.created_at).toLocaleDateString("fr-FR")
                             : "—"}
@@ -1110,10 +990,10 @@ export default function LeadsPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-3xl border border-[#e3e7ef] bg-[#fbfcfe] p-4">
+                  <div className="hub-card-soft p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs font-medium text-[#1f2a44]">Message LinkedIn</label>
-                      <span className="text-[11px] text-[#667085] whitespace-nowrap">Autosave</span>
+                      <label className="text-xs font-medium text-[#0F172A]">Message LinkedIn</label>
+                      <span className="text-[11px] text-[#4B5563] whitespace-nowrap">Autosave</span>
                     </div>
 
                     <textarea
@@ -1128,7 +1008,7 @@ export default function LeadsPage() {
                         );
                       }}
                       placeholder="Écrivez votre message LinkedIn…"
-                      className="mt-3 h-44 w-full rounded-2xl border border-[#e3e7ef] bg-white p-4 text-sm text-[#1f2a44] placeholder-[#98a2b3] transition focus:outline-none focus:ring-2 focus:ring-[#9bb5f8]"
+                      className="mt-3 h-44 w-full rounded-xl border border-[#dbe5f3] bg-white p-4 text-sm text-[#0F172A] placeholder-[#94a3b8] transition focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
                     />
 
                     <div className="mt-3">
@@ -1137,10 +1017,10 @@ export default function LeadsPage() {
                         onClick={handleMessageSent}
                         disabled={openLead.message_sent}
                         className={[
-                          "w-full px-4 py-3 rounded-2xl text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/35",
+                          "w-full rounded-xl px-4 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2",
                           openLead.message_sent
-                            ? "bg-emerald-600 text-white cursor-default"
-                            : "bg-[#3b6ff6] text-white hover:bg-[#2f5de0]",
+                            ? "cursor-default bg-emerald-600 text-white focus:ring-emerald-200"
+                            : "bg-[#2563EB] text-white hover:bg-[#1d4ed8] focus:ring-[#bfdbfe]",
                         ].join(" ")}
                       >
                         {openLead.message_sent ? "Message envoyé ✓" : "Marquer comme envoyé"}
@@ -1148,20 +1028,19 @@ export default function LeadsPage() {
                     </div>
 
                     {openLead.next_followup_at && (
-                      <p className="mt-2 text-xs text-[#667085]">
+                      <p className="mt-2 text-xs text-[#4B5563]">
                         Prochaine relance :{" "}
-                        <span className="font-medium text-[#1f2a44]">
+                        <span className="font-medium text-[#0F172A]">
                           {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
                         </span>
                       </p>
                     )}
                   </div>
 
-                  {/* Email (now for everyone) */}
-                  <div className="rounded-3xl border border-[#e3e7ef] bg-[#fbfcfe] p-4">
+                  <div className="hub-card-soft p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs font-medium text-[#1f2a44]">Message email</label>
-                      <span className="text-[11px] text-[#667085] whitespace-nowrap">Autosave</span>
+                      <label className="text-xs font-medium text-[#0F172A]">Message email</label>
+                      <span className="text-[11px] text-[#4B5563] whitespace-nowrap">Autosave</span>
                     </div>
 
                     <textarea
@@ -1174,7 +1053,7 @@ export default function LeadsPage() {
                         );
                       }}
                       placeholder="Écrivez votre message email…"
-                      className="mt-3 h-44 w-full rounded-2xl border border-[#e3e7ef] bg-white p-4 text-sm text-[#1f2a44] placeholder-[#98a2b3] transition focus:outline-none focus:ring-2 focus:ring-[#9bb5f8]"
+                      className="mt-3 h-44 w-full rounded-xl border border-[#dbe5f3] bg-white p-4 text-sm text-[#0F172A] placeholder-[#94a3b8] transition focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
                     />
 
                     {(() => {
@@ -1184,47 +1063,39 @@ export default function LeadsPage() {
                       return (
                         <>
                           <div className="mt-4">
-                            <button
+                            <HubButton
                               type="button"
+                              variant="secondary"
+                              className={["w-full", dimIfNoEmail].join(" ")}
                               onClick={openPrefilledEmail}
-                              className={[
-                                "w-full px-4 py-3 rounded-2xl text-sm font-semibold transition border cursor-pointer whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25",
-                                "border-[#e3e7ef] bg-white text-[#475467] hover:bg-[#fbfcfe]",
-                                dimIfNoEmail,
-                              ].join(" ")}
                             >
                               Ouvrir l’email pré-rempli
-                            </button>
+                            </HubButton>
                           </div>
 
                           <div className="mt-2 flex gap-2">
-                            <button
+                            <HubButton
                               type="button"
+                              variant="secondary"
+                              className={["flex-1", dimIfNoEmail].join(" ")}
                               onClick={openGmailWeb}
-                              className={[
-                                "flex-1 px-3 py-2.5 rounded-2xl text-[12px] font-semibold transition border cursor-pointer whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25",
-                                "border-[#e3e7ef] bg-white text-[#475467] hover:bg-[#fbfcfe]",
-                                dimIfNoEmail,
-                              ].join(" ")}
                             >
                               Gmail
-                            </button>
-
-                            <button
+                            </HubButton>
+                            <HubButton
                               type="button"
+                              variant="secondary"
+                              className={["flex-1", dimIfNoEmail].join(" ")}
                               onClick={openOutlookWeb}
-                              className={[
-                                "flex-1 px-3 py-2.5 rounded-2xl text-[12px] font-semibold transition border cursor-pointer whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-500/25",
-                                "border-[#e3e7ef] bg-white text-[#475467] hover:bg-[#fbfcfe]",
-                                dimIfNoEmail,
-                              ].join(" ")}
                             >
                               Outlook
-                            </button>
+                            </HubButton>
                           </div>
 
                           {!hasEmail && (
-                            <p className="mt-2 text-[11px] text-[#667085]">Aucun email détecté pour ce lead.</p>
+                            <p className="mt-2 text-[11px] text-[#4B5563]">
+                              Aucun email détecté pour ce lead.
+                            </p>
                           )}
                         </>
                       );
@@ -1234,8 +1105,6 @@ export default function LeadsPage() {
               </div>
             </>
           )}
-
-          {/* ✅ premium modal supprimé (plus de gating) */}
         </div>
 
         <style jsx global>{`
@@ -1258,13 +1127,24 @@ export default function LeadsPage() {
   );
 }
 
-function Metric({ title, value }: { title: string; value: any }) {
+function Metric({
+  title,
+  value,
+  tone,
+}: {
+  title: string;
+  value: any;
+  tone: "default" | "success" | "warning";
+}) {
+  const valueColor =
+    tone === "success" ? "text-emerald-700" : tone === "warning" ? "text-amber-700" : "text-[#0F172A]";
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#e3e7ef] bg-white px-3 py-3 shadow-sm">
-      <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-[#7288ad]">
+    <div className="overflow-hidden rounded-xl border border-[#dbe5f3] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-[#4B5563]">
         {title}
       </div>
-      <div className="mt-1 truncate whitespace-nowrap text-[15px] font-semibold leading-none tabular-nums text-[#1f2a44]">
+      <div className={["mt-1 truncate whitespace-nowrap text-[28px] font-semibold leading-none tabular-nums", valueColor].join(" ")}>
         {value}
       </div>
     </div>
@@ -1273,11 +1153,11 @@ function Metric({ title, value }: { title: string; value: any }) {
 
 function InfoBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[#e3e7ef] bg-white p-4">
-      <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-[#667085]">
+    <div className="rounded-xl border border-[#dbe5f3] bg-white p-4">
+      <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-[#4B5563]">
         {title}
       </div>
-      <div className="mt-2 text-sm text-[#1f2a44]">{children}</div>
+      <div className="mt-2 text-sm text-[#0F172A]">{children}</div>
     </div>
   );
 }

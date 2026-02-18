@@ -53,15 +53,15 @@ body {
 }
 
 :root {
-  --hub-bg: #f4f6fb;
+  --hub-bg: #f8fafc;
   --hub-surface: #ffffff;
-  --hub-surface-soft: #fbfcfe;
-  --hub-border: #e3e7ef;
-  --hub-text: #1f2a44;
-  --hub-text-muted: #667085;
-  --hub-primary: #3b6ff6;
-  --hub-primary-hover: #2f5de0;
-  --hub-ring: #9bb5f8;
+  --hub-surface-soft: #f8fbff;
+  --hub-border: #e2e8f0;
+  --hub-text: #0f172a;
+  --hub-text-muted: #4b5563;
+  --hub-primary: #2563eb;
+  --hub-primary-hover: #1d4ed8;
+  --hub-ring: #bfdbfe;
 
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -146,12 +146,29 @@ body {
   .hub-card {
     background-color: var(--hub-surface);
     border: 1px solid var(--hub-border);
-    border-radius: 1rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.02), 0 12px 26px -20px rgba(15, 23, 42, 0.22);
   }
 
   .hub-card-soft {
     background-color: var(--hub-surface-soft);
     border: 1px solid var(--hub-border);
-    border-radius: 1rem;
+    border-radius: 0.75rem;
+  }
+
+  .hub-card-hero {
+    border: 1px solid var(--hub-border);
+    border-radius: 0.875rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.88));
+    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03), 0 24px 40px -30px rgba(15, 23, 42, 0.25);
+  }
+
+  .hub-table-row {
+    border-bottom: 1px solid #edf2f7;
+    transition: background-color 150ms ease;
+  }
+
+  .hub-table-row:hover {
+    background: #f8fbff;
   }
 }
