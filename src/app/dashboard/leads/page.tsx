@@ -581,7 +581,7 @@ export default function LeadsPage() {
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
         <div className="relative min-h-screen w-full px-4 pb-24 pt-8 sm:px-6">
-          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[360px] bg-[radial-gradient(circle_at_20%_-10%,rgba(31,94,255,0.18),transparent_56%),radial-gradient(circle_at_80%_0%,rgba(35,196,245,0.14),transparent_48%)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[440px] bg-[radial-gradient(circle_at_22%_-12%,rgba(31,94,255,0.12),transparent_58%),radial-gradient(circle_at_82%_0%,rgba(35,196,245,0.1),transparent_52%),linear-gradient(180deg,rgba(69,121,214,0.09),rgba(69,121,214,0)_78%)]" />
 
           <div className="mx-auto w-full max-w-[1680px] space-y-8">
             <section className="hub-card-hero relative overflow-hidden p-6 sm:p-7">
@@ -608,11 +608,11 @@ export default function LeadsPage() {
                   </div>
 
                   <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#0b1c33] sm:text-5xl">
-                    Prospection claire et agréable
+                    Pilotage de la prospection
                   </h1>
                   <p className="mt-3 max-w-2xl text-sm text-[#51627b] sm:text-base">
-                    Une vue simple pour avancer sereinement: visualisez vos priorités,
-                    contactez vos prospects et gardez le cap en quelques clics.
+                    Centralisez vos leads, priorisez vos actions et suivez votre pipeline
+                    de manière structurée, avec une vue opérationnelle.
                   </p>
 
                   <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
