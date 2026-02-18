@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
+import { Building2, Linkedin, Mail, MapPin, Phone, UserCircle2 } from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -34,7 +35,9 @@ function filterLeads(leads: Lead[], term: string) {
     return (
       name.includes(v) ||
       (l.Company ?? "").toLowerCase().includes(v) ||
-      (l.location ?? "").toLowerCase().includes(v)
+      (l.location ?? "").toLowerCase().includes(v) ||
+      (l.email ?? "").toLowerCase().includes(v) ||
+      (l.phone ?? "").toLowerCase().includes(v)
     );
   });
 }
@@ -67,8 +70,7 @@ export default function LeadsPage() {
   }, [safeLeads, searchTerm]);
 
   // ✅ Column count for empty state colSpan
-  const baseCols = 7 + (emailOption ? 1 : 0) + (phoneOption ? 1 : 0);
-  const colCount = baseCols + 1;
+  const colCount = 7;
 
   // ✅ Read query param once on mount
   useEffect(() => {
@@ -603,11 +605,11 @@ export default function LeadsPage() {
                   </div>
 
                   <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#0b1c33] sm:text-5xl">
-                    Pipeline de prospection
+                    Votre espace prospection
                   </h1>
                   <p className="mt-3 max-w-2xl text-sm text-[#51627b] sm:text-base">
-                    Gérez vos leads dans une vue unique: recherche rapide, statuts opérationnels,
-                    exports ciblés et actions batch.
+                    Retrouvez tous vos leads dans un espace clair et apaisé. Filtrez, contactez,
+                    traitez et avancez simplement, sans friction.
                   </p>
 
                   <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -635,7 +637,7 @@ export default function LeadsPage() {
                       <input
                         value={searchTerm}
                         onChange={(e) => handleSearch(e.target.value)}
-                        placeholder="Rechercher (nom, entreprise, ville)…"
+                        placeholder="Rechercher (nom, entreprise, ville, email, téléphone)…"
                         className="w-full bg-transparent text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:outline-none"
                         aria-label="Rechercher un lead"
                       />
@@ -741,35 +743,22 @@ export default function LeadsPage() {
               <div className="w-full overflow-x-auto px-2 pb-2 pt-1">
                 <table className="min-w-[1040px] w-full table-fixed border-separate [border-spacing:0_10px] text-[13px]">
                   <thead className="sticky top-0 z-10">
-                    <tr className="text-[11px] uppercase tracking-[0.06em] text-[#405770]">
+                    <tr className="text-[11px] font-medium tracking-[0.02em] text-[#405770]">
                       <th className="w-[54px] px-3 py-2 text-center whitespace-nowrap">
                         Sel.
                       </th>
                       <th className="w-[150px] px-3 py-2 text-center whitespace-nowrap">
                         Statut
                       </th>
-                      <th className="w-[180px] px-3 py-2 text-left whitespace-nowrap">
-                        Nom
+                      <th className="w-[340px] px-3 py-2 text-left whitespace-nowrap">
+                        Prospect
                       </th>
-                      <th className="w-[170px] px-3 py-2 text-left whitespace-nowrap">
-                        Entreprise
+                      <th className="w-[250px] px-3 py-2 text-left whitespace-nowrap">
+                        Contact
                       </th>
-                      <th className="w-[160px] px-3 py-2 text-left whitespace-nowrap">
-                        Localisation
-                      </th>
-                      <th className="w-[110px] px-3 py-2 text-left whitespace-nowrap">
+                      <th className="w-[130px] px-3 py-2 text-left whitespace-nowrap">
                         LinkedIn
                       </th>
-                      {emailOption && (
-                        <th className="w-[210px] px-3 py-2 text-left whitespace-nowrap">
-                          Email
-                        </th>
-                      )}
-                      {phoneOption && (
-                        <th className="w-[140px] px-3 py-2 text-left whitespace-nowrap">
-                          Téléphone
-                        </th>
-                      )}
                       <th className="w-[110px] px-3 py-2 text-center whitespace-nowrap">
                         Date
                       </th>
@@ -811,6 +800,11 @@ export default function LeadsPage() {
                           : isPending
                             ? "En attente"
                             : "À faire";
+                        const initials =
+                          (
+                            `${lead.FirstName?.[0] ?? ""}${lead.LastName?.[0] ?? ""}`.toUpperCase() ||
+                            fullName.slice(0, 2).toUpperCase()
+                          ) || "—";
                         const statusDotClass = isSent
                           ? "bg-emerald-500"
                           : isPending
@@ -868,8 +862,33 @@ export default function LeadsPage() {
                             </td>
 
                             <td className={`${baseCellClass} relative pr-16 text-[#0b1c33]`}>
-                              <div className="flex min-w-0 items-center gap-2">
-                                <span className="truncate font-medium">{fullName}</span>
+                              <div className="flex min-w-0 items-start gap-3">
+                                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#c8d6ea] bg-[#e9f1ff] text-[11px] font-semibold text-[#35598b]">
+                                  {initials}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="truncate font-medium text-[#0f213c]">{fullName}</p>
+                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[#58708f]">
+                                    {lead.Company ? (
+                                      <span className="inline-flex min-w-0 items-center gap-1">
+                                        <Building2 className="h-3.5 w-3.5 shrink-0" />
+                                        <span className="truncate">{lead.Company}</span>
+                                      </span>
+                                    ) : null}
+                                    {lead.location ? (
+                                      <span className="inline-flex min-w-0 items-center gap-1">
+                                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                        <span className="truncate">{lead.location}</span>
+                                      </span>
+                                    ) : null}
+                                    {!lead.Company && !lead.location ? (
+                                      <span className="inline-flex items-center gap-1">
+                                        <UserCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                        Aucune info complémentaire
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </div>
                               </div>
 
                               <HubButton
@@ -877,18 +896,46 @@ export default function LeadsPage() {
                                 variant="primary"
                                 size="sm"
                                 onClick={() => setOpenLead(lead)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                className="absolute right-3 top-1/2 -translate-y-1/2"
                               >
                                 Voir
                               </HubButton>
                             </td>
 
-                            <td className={`${baseCellClass} truncate text-[#51627b]`}>
-                              {lead.Company || "—"}
+                            <td className={`${baseCellClass} text-[#405770]`}>
+                              <div className="space-y-1.5">
+                                {lead.email ? (
+                                  <a
+                                    href={`mailto:${lead.email}`}
+                                    className="group inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[#c8d6ea] bg-[#f7fbff] px-2 py-1 text-[11px] text-[#36506e] transition hover:border-[#afc7eb] hover:bg-[#edf4fd]"
+                                  >
+                                    <Mail className="h-3.5 w-3.5 shrink-0 text-[#58708f]" />
+                                    <span className="truncate">{lead.email}</span>
+                                  </a>
+                                ) : (
+                                  <p className="inline-flex items-center gap-1.5 text-[11px] text-[#8093ad]">
+                                    <Mail className="h-3.5 w-3.5" />
+                                    Aucun email
+                                  </p>
+                                )}
+
+                                {lead.phone ? (
+                                  <a
+                                    href={`tel:${lead.phone}`}
+                                    className="group inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[#c8d6ea] bg-[#f7fbff] px-2 py-1 text-[11px] text-[#36506e] transition hover:border-[#afc7eb] hover:bg-[#edf4fd]"
+                                  >
+                                    <Phone className="h-3.5 w-3.5 shrink-0 text-[#58708f]" />
+                                    <span className="truncate">{lead.phone}</span>
+                                  </a>
+                                ) : (
+                                  <p className="inline-flex items-center gap-1.5 text-[11px] text-[#8093ad]">
+                                    <Phone className="h-3.5 w-3.5" />
+                                    Aucun téléphone
+                                  </p>
+                                )}
+                              </div>
                             </td>
-                            <td className={`${baseCellClass} truncate text-[#51627b]`}>
-                              {lead.location || "—"}
-                            </td>
+
                             <td className={baseCellClass}>
                               {lead.LinkedInURL ? (
                                 <a
@@ -897,22 +944,13 @@ export default function LeadsPage() {
                                   rel="noreferrer"
                                   className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
                                 >
-                                  Profil <span className="text-[#64748b]">↗</span>
+                                  <Linkedin className="h-3.5 w-3.5" />
+                                  Profil
                                 </a>
                               ) : (
                                 <span className="text-[#64748b]">—</span>
                               )}
                             </td>
-                            {emailOption && (
-                              <td className={`${baseCellClass} truncate text-[#334155]`}>
-                                {lead.email || "—"}
-                              </td>
-                            )}
-                            {phoneOption && (
-                              <td className={`${baseCellClass} truncate text-[#334155]`}>
-                                {lead.phone || "—"}
-                              </td>
-                            )}
                             <td className={`${baseCellClass} whitespace-nowrap text-center tabular-nums text-[#64748b]`}>
                               {lead.created_at ? new Date(lead.created_at).toLocaleDateString("fr-FR") : "—"}
                             </td>
@@ -928,7 +966,7 @@ export default function LeadsPage() {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#d7e3f4] bg-[#f8fbff] px-6 py-3 text-[11px] text-[#51627b]">
-                <div>Survolez une ligne pour afficher l’action “Voir”.</div>
+                <div>Cliquez sur “Voir” pour ouvrir la fiche complète du lead.</div>
                 <div className="tabular-nums">
                   {treatedCount} traité(s) • {remainingToTreat} à traiter
                 </div>
