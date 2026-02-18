@@ -53,6 +53,16 @@ body {
 }
 
 :root {
+  --hub-bg: #f4f6fb;
+  --hub-surface: #ffffff;
+  --hub-surface-soft: #fbfcfe;
+  --hub-border: #e3e7ef;
+  --hub-text: #1f2a44;
+  --hub-text-muted: #667085;
+  --hub-primary: #3b6ff6;
+  --hub-primary-hover: #2f5de0;
+  --hub-ring: #9bb5f8;
+
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.129 0.042 264.695);
@@ -127,5 +137,21 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    background-color: var(--hub-bg);
+    color: var(--hub-text);
+  }
+}
+
+@layer components {
+  .hub-card {
+    background-color: var(--hub-surface);
+    border: 1px solid var(--hub-border);
+    border-radius: 1rem;
+  }
+
+  .hub-card-soft {
+    background-color: var(--hub-surface-soft);
+    border: 1px solid var(--hub-border);
+    border-radius: 1rem;
   }
 }

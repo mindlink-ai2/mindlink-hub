@@ -58,10 +58,10 @@ export default function FollowupsPage() {
 
   const activeTitle =
     tab === "overdue"
-      ? "🔥 En retard"
+      ? "En retard"
       : tab === "today"
-      ? "📅 Aujourd’hui"
-      : "⏳ À venir";
+      ? "Aujourd’hui"
+      : "À venir";
 
   const activeSubtitle =
     tab === "overdue"
@@ -131,17 +131,13 @@ export default function FollowupsPage() {
         : "hover:border-emerald-300/70 hover:shadow-emerald-200/70";
 
     const badge =
-      tone === "overdue"
-        ? "Retard"
-        : tone === "today"
-        ? "Aujourd’hui"
-        : "À venir";
+      tone === "overdue" ? "Retard" : tone === "today" ? "Aujourd’hui" : "À venir";
 
     const badgeStyle =
       tone === "overdue"
         ? "border-amber-300/70 bg-amber-50 text-amber-700"
         : tone === "today"
-        ? "border-[#c6d8fb] bg-[#edf3ff] text-[#315286]"
+        ? "border-[#e3e7ef] bg-[#fbfcfe] text-[#4e5f80]"
         : "border-emerald-300/70 bg-emerald-50 text-emerald-700";
 
     return (
@@ -150,18 +146,18 @@ export default function FollowupsPage() {
         onClick={() => setOpenLead(lead)}
         className={[
           "group w-full text-left",
-          "rounded-2xl border border-[#dce7fd] bg-white",
+          "rounded-2xl border border-[#e3e7ef] bg-white",
           "px-4 py-3.5",
           "transition",
           "shadow-sm hover:shadow-md",
-          "focus:outline-none focus:ring-2 focus:ring-[#8caef4] focus:ring-offset-0",
+          "focus:outline-none focus:ring-2 focus:ring-[#9bb5f8] focus:ring-offset-0",
           toneRing,
         ].join(" ")}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="truncate font-semibold text-[#15335f]">
+              <h3 className="truncate font-semibold text-[#1f2a44]">
                 {leadDisplayName(lead)}
               </h3>
               <span
@@ -175,22 +171,22 @@ export default function FollowupsPage() {
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-              <p className="text-[#61789f]">
+              <p className="text-[#667085]">
                 Prochaine relance :{" "}
-                <span className="font-semibold text-[#1b3a67]">
+                <span className="font-semibold text-[#1f2a44]">
                   {formatDateFR(lead.next_followup_at)}
                 </span>
               </p>
 
               {lead.Company && (
-                <p className="max-w-[28ch] truncate text-[#748bb1]">
+                <p className="max-w-[28ch] truncate text-[#667085]">
                   {lead.Company}
                 </p>
               )}
             </div>
           </div>
 
-          <div className="shrink-0 text-[#879bc0] transition group-hover:text-[#36588c]">
+          <div className="shrink-0 text-[#94a0b5] transition group-hover:text-[#667085]">
             <span className="text-xs">Ouvrir</span> <span aria-hidden>→</span>
           </div>
         </div>
@@ -199,17 +195,17 @@ export default function FollowupsPage() {
   };
 
   const Section = ({ title, subtitle, data, tone }: any) => (
-    <section className="rounded-3xl border border-[#dce7fd] bg-white/90 shadow-[0_24px_44px_-34px_rgba(54,98,194,0.4)]">
-      <div className="border-b border-[#e2ebfd] px-5 py-4 bg-[#f8faff]">
+    <section className="rounded-3xl border border-[#e3e7ef] bg-white/95 shadow-sm">
+      <div className="border-b border-[#e3e7ef] px-5 py-4 bg-[#fbfcfe]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-base font-semibold text-[#133058]">{title}</h2>
-            <p className="mt-1 text-xs text-[#6b82a8]">{subtitle}</p>
+            <h2 className="text-base font-semibold text-[#1f2a44]">{title}</h2>
+            <p className="mt-1 text-xs text-[#667085]">{subtitle}</p>
           </div>
 
           <div className="shrink-0 flex items-center gap-2">
-            <span className="text-xs text-[#6b82a8]">Total</span>
-            <span className="rounded-lg border border-[#d5e1fa] bg-white px-2 py-1 text-xs font-semibold text-[#1f3d69]">
+            <span className="text-xs text-[#667085]">Total</span>
+            <span className="rounded-lg border border-[#e3e7ef] bg-white px-2 py-1 text-xs font-semibold text-[#1f2a44]">
               {data.length}
             </span>
           </div>
@@ -218,9 +214,9 @@ export default function FollowupsPage() {
 
       <div className="p-5">
         {data.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#d4e1fb] bg-[#f7faff] px-4 py-6">
-            <p className="text-sm text-[#294d7c]">Aucune relance ici.</p>
-            <p className="mt-1 text-xs text-[#738bb0]">
+          <div className="rounded-2xl border border-dashed border-[#e3e7ef] bg-[#fbfcfe] px-4 py-6">
+            <p className="text-sm text-[#334155]">Aucune relance ici.</p>
+            <p className="mt-1 text-xs text-[#667085]">
               Quand une prochaine relance est planifiée, elle apparaîtra dans
               cette section.
             </p>
@@ -242,7 +238,7 @@ export default function FollowupsPage() {
       variant === "overdue"
         ? "border-amber-300/70 bg-amber-50 text-amber-700"
         : variant === "today"
-        ? "border-[#c8dafc] bg-[#edf3ff] text-[#325485]"
+        ? "border-[#e3e7ef] bg-[#fbfcfe] text-[#475467]"
         : "border-emerald-300/70 bg-emerald-50 text-emerald-700";
 
     const isActive =
@@ -264,13 +260,13 @@ export default function FollowupsPage() {
         }
         className={[
           "rounded-2xl border px-4 py-3 transition text-left w-full",
-          "bg-white border-[#d8e4fb] hover:border-[#b8cff7]",
-          "focus:outline-none focus:ring-2 focus:ring-[#8eaef4]",
-          isActive ? "ring-1 ring-[#b6cbf5] border-[#9db8ea]" : "",
+          "bg-white border-[#e3e7ef] hover:border-[#cdd3de]",
+          "focus:outline-none focus:ring-2 focus:ring-[#9bb5f8]",
+          isActive ? "ring-1 ring-[#dbe1ec] border-[#c7cedb]" : "",
         ].join(" ")}
       >
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-[#486286]">{label}</p>
+          <p className="text-xs text-[#667085]">{label}</p>
           <span
             className={[
               "text-xs px-2 py-0.5 rounded-full border",
@@ -280,7 +276,7 @@ export default function FollowupsPage() {
             {value}
           </span>
         </div>
-        <p className="mt-2 text-[11px] text-[#728ab0]">
+        <p className="mt-2 text-[11px] text-[#667085]">
           {variant === "overdue"
             ? "Prioritaire"
             : variant === "today"
@@ -293,19 +289,19 @@ export default function FollowupsPage() {
 
   const Skeleton = () => (
     <div className="space-y-4">
-      <div className="h-8 w-56 rounded-xl bg-[#dce6fb] animate-pulse" />
-      <div className="h-4 w-80 rounded-lg bg-[#e8effd] animate-pulse" />
+      <div className="h-8 w-56 rounded-xl bg-[#e6eaf1] animate-pulse" />
+      <div className="h-4 w-80 rounded-lg bg-[#eef2f7] animate-pulse" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-6">
-        <div className="h-20 rounded-2xl bg-[#f3f7ff] border border-[#dce7fd] animate-pulse" />
-        <div className="h-20 rounded-2xl bg-[#f3f7ff] border border-[#dce7fd] animate-pulse" />
-        <div className="h-20 rounded-2xl bg-[#f3f7ff] border border-[#dce7fd] animate-pulse" />
+        <div className="h-20 rounded-2xl bg-[#fbfcfe] border border-[#e3e7ef] animate-pulse" />
+        <div className="h-20 rounded-2xl bg-[#fbfcfe] border border-[#e3e7ef] animate-pulse" />
+        <div className="h-20 rounded-2xl bg-[#fbfcfe] border border-[#e3e7ef] animate-pulse" />
       </div>
 
       <div className="space-y-3 mt-8">
-        <div className="h-28 rounded-3xl bg-[#f8faff] border border-[#dce7fd] animate-pulse" />
-        <div className="h-28 rounded-3xl bg-[#f8faff] border border-[#dce7fd] animate-pulse" />
-        <div className="h-28 rounded-3xl bg-[#f8faff] border border-[#dce7fd] animate-pulse" />
+        <div className="h-28 rounded-3xl bg-[#fbfcfe] border border-[#e3e7ef] animate-pulse" />
+        <div className="h-28 rounded-3xl bg-[#fbfcfe] border border-[#e3e7ef] animate-pulse" />
+        <div className="h-28 rounded-3xl bg-[#fbfcfe] border border-[#e3e7ef] animate-pulse" />
       </div>
     </div>
   );
@@ -320,23 +316,23 @@ export default function FollowupsPage() {
             ) : (
               <div className="space-y-6">
                 {/* Header */}
-                <div className="flex flex-col gap-4 rounded-[28px] border border-[#dbe6ff] bg-white/85 p-5 shadow-[0_24px_50px_-36px_rgba(55,102,210,0.5)] sm:p-6">
+                <div className="flex flex-col gap-4 rounded-[28px] border border-[#e3e7ef] bg-white/95 p-5 shadow-sm sm:p-6">
                   <div className="flex items-start justify-between gap-6">
                     <div>
-                      <h1 className="text-2xl sm:text-3xl font-semibold text-[#102a50] tracking-tight">
+                      <h1 className="text-2xl sm:text-3xl font-semibold text-[#1f2a44] tracking-tight">
                         Relances clients
                       </h1>
-                      <p className="mt-1 text-sm text-[#5f769d]">
+                      <p className="mt-1 text-sm text-[#667085]">
                         Clique sur un bloc pour afficher la liste{" "}
-                        <span className="text-[#274677]">En retard</span>,{" "}
-                        <span className="text-[#274677]">Aujourd’hui</span> ou{" "}
-                        <span className="text-[#274677]">À venir</span>.
+                        <span className="text-[#1f2a44]">En retard</span>,{" "}
+                        <span className="text-[#1f2a44]">Aujourd’hui</span> ou{" "}
+                        <span className="text-[#1f2a44]">À venir</span>.
                       </p>
                     </div>
 
                     {/* Small contextual hint (visual only) */}
-                    <div className="hidden text-xs text-[#6f86ab] md:flex items-center gap-2">
-                      <span className="inline-flex items-center gap-2 rounded-xl border border-[#d4e1fb] bg-white px-3 py-2">
+                    <div className="hidden text-xs text-[#667085] md:flex items-center gap-2">
+                      <span className="inline-flex items-center gap-2 rounded-xl border border-[#e3e7ef] bg-white px-3 py-2">
                         <span className="h-2 w-2 rounded-full bg-emerald-500" />
                         Cliquez sur une relance pour ouvrir le détail
                       </span>
@@ -346,17 +342,17 @@ export default function FollowupsPage() {
                   {/* Clickable tabs */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <HeaderStat
-                      label="🔥 En retard"
+                      label="En retard"
                       value={overdue.length}
                       variant="overdue"
                     />
                     <HeaderStat
-                      label="📅 Aujourd’hui"
+                      label="Aujourd’hui"
                       value={todayList.length}
                       variant="today"
                     />
                     <HeaderStat
-                      label="⏳ À venir"
+                      label="À venir"
                       value={upcoming.length}
                       variant="upcoming"
                     />
@@ -380,7 +376,7 @@ export default function FollowupsPage() {
           {openLead && (
             <div
               onClick={() => setOpenLead(null)}
-              className="fixed inset-0 z-40 bg-[#0c1932]/35 backdrop-blur-[2px]"
+              className="fixed inset-0 z-40 bg-[#111827]/30 backdrop-blur-[2px]"
             />
           )}
 
@@ -390,8 +386,8 @@ export default function FollowupsPage() {
               className="
                 fixed right-0 top-0 h-full w-full sm:w-[420px]
                 bg-white/95 backdrop-blur-xl
-                border-l border-[#dce7fd] z-50
-                shadow-[0_0_40px_-10px_rgba(57,104,199,0.3)]
+                border-l border-[#e3e7ef] z-50
+                shadow-[0_0_40px_-10px_rgba(17,24,39,0.2)]
                 animate-slideLeft
               "
               role="dialog"
@@ -399,19 +395,19 @@ export default function FollowupsPage() {
             >
               <div className="h-full flex flex-col">
                 {/* Top bar */}
-                <div className="border-b border-[#e2ebfd] p-5 bg-[#f8faff]">
+                <div className="border-b border-[#e3e7ef] p-5 bg-[#fbfcfe]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xs text-[#7188ae]">
+                      <p className="text-xs text-[#667085]">
                         Détail de la relance
                       </p>
-                      <h2 className="mt-1 truncate text-xl font-semibold text-[#15335f]">
+                      <h2 className="mt-1 truncate text-xl font-semibold text-[#1f2a44]">
                         {openLead.FirstName || openLead.title}{" "}
                         {openLead.LastName || ""}
                       </h2>
-                      <p className="mt-1 text-sm text-[#5e759c]">
+                      <p className="mt-1 text-sm text-[#667085]">
                         Prochaine relance :{" "}
-                        <span className="font-medium text-[#2d4f80]">
+                        <span className="font-medium text-[#1f2a44]">
                           {formatDateFR(openLead.next_followup_at)}
                         </span>
                       </p>
@@ -421,9 +417,9 @@ export default function FollowupsPage() {
                       onClick={() => setOpenLead(null)}
                       className="
                         shrink-0 rounded-xl px-3 py-2 text-xs
-                        border border-[#d4e1fb] bg-white
-                        text-[#4f678f] hover:text-[#133865]
-                        hover:border-[#bacef4] transition
+                        border border-[#e3e7ef] bg-white
+                        text-[#667085] hover:text-[#1f2a44]
+                        hover:border-[#cfd5df] transition
                       "
                     >
                       ✕ Fermer
@@ -445,7 +441,7 @@ export default function FollowupsPage() {
                     Marquer comme répondu ✓
                   </button>
 
-                  <p className="mt-2 text-[11px] text-[#728ab0]">
+                  <p className="mt-2 text-[11px] text-[#667085]">
                     Astuce : appuyez sur{" "}
                     <span className="text-[#2d4f80]">Échap</span> pour fermer.
                   </p>
@@ -453,13 +449,13 @@ export default function FollowupsPage() {
 
                 {/* Content */}
                 <div className="p-5 overflow-y-auto">
-                  <div className="rounded-2xl border border-[#dce7fd] bg-[#f8fbff] p-4">
-                    <div className="space-y-3 text-sm text-[#143662]">
+                  <div className="rounded-2xl border border-[#e3e7ef] bg-[#fbfcfe] p-4">
+                    <div className="space-y-3 text-sm text-[#1f2a44]">
                       {openLead.Company && (
-                        <p className="text-[#143662]">
-                          <span className="text-[#6e86ac]">Entreprise</span>
+                        <p className="text-[#1f2a44]">
+                          <span className="text-[#667085]">Entreprise</span>
                           <br />
-                          <strong className="font-semibold text-[#183a68]">
+                          <strong className="font-semibold text-[#1f2a44]">
                             {openLead.Company}
                           </strong>
                         </p>
@@ -467,17 +463,17 @@ export default function FollowupsPage() {
 
                       {openLead.email && (
                         <p>
-                          <span className="text-[#6e86ac]">Email</span>
+                          <span className="text-[#667085]">Email</span>
                           <br />
-                          <span className="text-[#183a68]">{openLead.email}</span>
+                          <span className="text-[#1f2a44]">{openLead.email}</span>
                         </p>
                       )}
 
                       {openLead.phoneNumber && (
                         <p>
-                          <span className="text-[#6e86ac]">Téléphone</span>
+                          <span className="text-[#667085]">Téléphone</span>
                           <br />
-                          <span className="text-[#183a68]">
+                          <span className="text-[#1f2a44]">
                             {openLead.phoneNumber}
                           </span>
                         </p>
@@ -490,21 +486,21 @@ export default function FollowupsPage() {
                       <a
                         href={openLead.LinkedInURL}
                         className="
-                          group rounded-2xl border border-[#dbe7fd]
+                          group rounded-2xl border border-[#e3e7ef]
                           bg-white px-4 py-3
-                          hover:border-[#b8cff6] hover:bg-[#f4f8ff]
+                          hover:border-[#d1d6e0] hover:bg-[#fbfcfe]
                           transition
                         "
                         target="_blank"
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-xs text-[#728ab0]">Lien</p>
-                            <p className="text-sm font-semibold text-[#143662]">
+                            <p className="text-xs text-[#667085]">Lien</p>
+                            <p className="text-sm font-semibold text-[#1f2a44]">
                               LinkedIn
                             </p>
                           </div>
-                          <span className="text-[#356191] transition group-hover:text-[#1f4e81]">
+                          <span className="text-[#667085] transition group-hover:text-[#334155]">
                             Voir →
                           </span>
                         </div>
@@ -515,21 +511,21 @@ export default function FollowupsPage() {
                       <a
                         href={openLead.placeUrl}
                         className="
-                          group rounded-2xl border border-[#dbe7fd]
+                          group rounded-2xl border border-[#e3e7ef]
                           bg-white px-4 py-3
-                          hover:border-emerald-300/70 hover:bg-[#f4f8ff]
+                          hover:border-[#d1d6e0] hover:bg-[#fbfcfe]
                           transition
                         "
                         target="_blank"
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-xs text-[#728ab0]">Lien</p>
-                            <p className="text-sm font-semibold text-[#143662]">
+                            <p className="text-xs text-[#667085]">Lien</p>
+                            <p className="text-sm font-semibold text-[#1f2a44]">
                               Google Maps
                             </p>
                           </div>
-                          <span className="text-emerald-700 transition group-hover:text-emerald-600">
+                          <span className="text-[#667085] transition group-hover:text-[#334155]">
                             Ouvrir →
                           </span>
                         </div>
