@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
-import { Building2, Linkedin, Mail, MapPin, Phone, UserCircle2 } from "lucide-react";
+import { Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2 } from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -795,6 +795,7 @@ export default function LeadsPage() {
                         const isStatusUpdating = updatingStatusIds.has(idStr);
                         const isSent = Boolean(lead.message_sent);
                         const isPending = !isSent && Boolean(lead.traite);
+                        const isTodo = !isSent && !isPending;
                         const statusLabel = isSent
                           ? "Envoyé"
                           : isPending
@@ -840,12 +841,12 @@ export default function LeadsPage() {
                                 onClick={() => handleStatusBadgeClick(lead)}
                                 disabled={isSent || isStatusUpdating}
                                 className={[
-                                  "inline-flex h-8 items-center justify-center rounded-full border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
+                                  "inline-flex h-9 items-center justify-center rounded-full border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
                                   isSent
                                     ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
                                     : isPending
                                       ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 focus:ring-amber-200"
-                                      : "border-[#d6e2f2] bg-white text-[#334155] hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:ring-[#dce8ff]",
+                                      : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
                                   isStatusUpdating ? "cursor-wait opacity-70" : "",
                                 ].join(" ")}
                                 title={
@@ -857,7 +858,19 @@ export default function LeadsPage() {
                                 }
                                 aria-label={`Statut du lead ${fullName} : ${statusLabel}`}
                               >
-                                {isStatusUpdating ? "Mise à jour..." : statusLabel}
+                                {isStatusUpdating ? (
+                                  "Mise à jour..."
+                                ) : isTodo ? (
+                                  <span className="inline-flex items-center gap-1">
+                                    <span>À faire</span>
+                                    <span className="inline-flex items-center gap-0.5 rounded-full border border-[#c6dbff] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#1f5eff]">
+                                      <MoveRight className="h-3 w-3" />
+                                      Cliquer
+                                    </span>
+                                  </span>
+                                ) : (
+                                  statusLabel
+                                )}
                               </button>
                             </td>
 
@@ -966,7 +979,7 @@ export default function LeadsPage() {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#d7e3f4] bg-[#f8fbff] px-6 py-3 text-[11px] text-[#51627b]">
-                <div>Cliquez sur “Voir” pour ouvrir la fiche complète du lead.</div>
+                <div>Cliquez sur “À faire” pour passer en “En attente”, puis “Voir” pour traiter le lead.</div>
                 <div className="tabular-nums">
                   {treatedCount} traité(s) • {remainingToTreat} à traiter
                 </div>
