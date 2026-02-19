@@ -168,6 +168,18 @@ function extractTimestamp(payload: JsonObject): string {
 
 function extractSenderLinkedInUrl(payload: JsonObject): string | null {
   const url = getFirstString(payload, [
+    ["data", "sender", "profile_url"],
+    ["data", "sender", "profileUrl"],
+    ["data", "sender", "linkedin_url"],
+    ["data", "sender", "linkedinUrl"],
+    ["data", "attendee", "profile_url"],
+    ["data", "attendee", "profileUrl"],
+    ["data", "attendee", "linkedin_url"],
+    ["data", "attendee", "linkedinUrl"],
+    ["data", "contact", "profile_url"],
+    ["data", "contact", "profileUrl"],
+    ["data", "contact", "linkedin_url"],
+    ["data", "contact", "linkedinUrl"],
     ["sender_linkedin_url"],
     ["senderLinkedInUrl"],
     ["sender", "linkedin_url"],
@@ -234,6 +246,17 @@ export function parseUnipileMessage(payloadInput: unknown): ParsedUnipileMessage
     direction: extractDirection(payload),
     senderName:
       getFirstString(payload, [
+        ["data", "sender", "name"],
+        ["data", "sender", "full_name"],
+        ["data", "sender", "fullName"],
+        ["data", "sender", "display_name"],
+        ["data", "sender", "displayName"],
+        ["data", "attendee", "name"],
+        ["data", "attendee", "full_name"],
+        ["data", "attendee", "fullName"],
+        ["data", "contact", "name"],
+        ["data", "contact", "full_name"],
+        ["data", "contact", "fullName"],
         ["sender_name"],
         ["senderName"],
         ["sender", "name"],

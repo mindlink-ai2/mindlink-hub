@@ -548,6 +548,16 @@ async function handleNewMessage(params: {
     threadUpdate.last_message_preview = truncatePreview(parsed.text);
   }
 
+  const senderName = (parsed.senderName ?? "").trim();
+  const senderLinkedInUrl = (parsed.senderLinkedInUrl ?? "").trim();
+  const hasContactName = (thread.contact_name ?? "").trim().length > 0;
+  if (parsed.direction === "inbound" && !hasContactName && senderName) {
+    threadUpdate.contact_name = senderName;
+    if (senderLinkedInUrl) {
+      threadUpdate.contact_linkedin_url = senderLinkedInUrl;
+    }
+  }
+
   if (wasInserted && parsed.direction === "inbound") {
     const currentUnread = typeof thread.unread_count === "number" ? thread.unread_count : 0;
     threadUpdate.unread_count = currentUnread + 1;

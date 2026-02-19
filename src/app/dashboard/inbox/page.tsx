@@ -118,6 +118,7 @@ export default function InboxPage() {
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -140,9 +141,10 @@ export default function InboxPage() {
       const nextThreads = Array.isArray(data?.threads)
         ? (data.threads as InboxThread[])
         : [];
-      setThreads(nextThreads);
+      const sortedThreads = sortThreadsByLastMessage(nextThreads);
+      setThreads(sortedThreads);
 
-      if (nextThreads.length === 0) {
+      if (sortedThreads.length === 0) {
         setSelectedThreadId(null);
         setMessages([]);
         return;
@@ -150,12 +152,12 @@ export default function InboxPage() {
 
       if (options?.keepSelected) {
         setSelectedThreadId((prev) => {
-          if (!prev) return nextThreads[0].id;
-          const stillExists = nextThreads.some((thread) => thread.id === prev);
-          return stillExists ? prev : nextThreads[0].id;
+          if (!prev) return sortedThreads[0].id;
+          const stillExists = sortedThreads.some((thread) => thread.id === prev);
+          return stillExists ? prev : sortedThreads[0].id;
         });
       } else {
-        setSelectedThreadId((prev) => prev ?? nextThreads[0].id);
+        setSelectedThreadId((prev) => prev ?? sortedThreads[0].id);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur de chargement des threads.");
@@ -359,6 +361,29 @@ export default function InboxPage() {
     }
   };
 
+  const handleBackfillNames = async () => {
+    if (backfilling) return;
+    setBackfilling(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/inbox/backfill-contact-names", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.error ?? "Le backfill des noms a échoué.");
+      }
+
+      await loadThreads({ keepSelected: true });
+      if (selectedThreadId) {
+        await loadMessages(selectedThreadId);
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erreur pendant le backfill des noms.");
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!selectedThreadId || !draft.trim() || sending) return;
     setSending(true);
@@ -430,14 +455,25 @@ export default function InboxPage() {
                 </p>
               </div>
 
-              <HubButton
-                type="button"
-                variant="primary"
-                onClick={handleSync}
-                disabled={syncing}
-              >
-                {syncing ? "Synchronisation..." : "Sync Inbox"}
-              </HubButton>
+              <div className="flex items-center gap-2">
+                <HubButton
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleBackfillNames}
+                  disabled={backfilling || syncing}
+                >
+                  {backfilling ? "Backfill..." : "Backfill names"}
+                </HubButton>
+                <HubButton
+                  type="button"
+                  variant="primary"
+                  onClick={handleSync}
+                  disabled={syncing || backfilling}
+                >
+                  {syncing ? "Synchronisation..." : "Sync Inbox"}
+                </HubButton>
+              </div>
             </div>
 
             {error ? (

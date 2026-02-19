@@ -35,6 +35,13 @@ type ThreadParticipant = {
   isSelf: boolean | null;
 };
 
+function parseIsoMs(value: string | null): number {
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return Number.NEGATIVE_INFINITY;
+  return date.getTime();
+}
+
 function extractThreadParticipant(value: unknown): ThreadParticipant | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const participant = value as JsonObject;
@@ -401,7 +408,7 @@ export async function POST() {
 
       const { data: dbThread } = await supabase
         .from("inbox_threads")
-        .select("id")
+        .select("id, contact_name")
         .eq("client_id", clientId)
         .eq("unipile_account_id", unipileAccountId)
         .eq("unipile_thread_id", parsedThread.unipileThreadId)
@@ -434,6 +441,15 @@ export async function POST() {
       if (!messagesResult) continue;
 
       const messageItems = extractArrayCandidates(messagesResult.payload);
+      let latestMessageAtIso = parsedThread.lastMessageAt;
+      let latestMessageAtMs = parseIsoMs(parsedThread.lastMessageAt);
+      let latestMessagePreview = parsedThread.lastMessagePreview;
+      const existingContactName =
+        typeof dbThread.contact_name === "string" ? dbThread.contact_name.trim() : "";
+      let backfillContactName: string | null = null;
+      let backfillContactLinkedInUrl: string | null = null;
+      let latestInboundWithNameAtMs = Number.NEGATIVE_INFINITY;
+
       for (const messageItem of messageItems) {
         const parsedMessage = parseUnipileMessage({
           ...messageItem,
@@ -443,6 +459,22 @@ export async function POST() {
         });
 
         if (!parsedMessage.unipileMessageId) continue;
+
+        const messageSentAtMs = parseIsoMs(parsedMessage.sentAtIso);
+        if (messageSentAtMs > latestMessageAtMs) {
+          latestMessageAtMs = messageSentAtMs;
+          latestMessageAtIso = parsedMessage.sentAtIso;
+          latestMessagePreview = truncatePreview(parsedMessage.text);
+        }
+
+        if (!existingContactName && parsedMessage.direction === "inbound") {
+          const senderName = (parsedMessage.senderName ?? "").trim();
+          if (senderName && messageSentAtMs >= latestInboundWithNameAtMs) {
+            latestInboundWithNameAtMs = messageSentAtMs;
+            backfillContactName = senderName;
+            backfillContactLinkedInUrl = parsedMessage.senderLinkedInUrl;
+          }
+        }
 
         const { data: existingMessage, error: existingMessageErr } = await supabase
           .from("inbox_messages")
@@ -481,6 +513,29 @@ export async function POST() {
         }
 
         messagesInserted += 1;
+      }
+
+      const threadUpdatePayload: Record<string, unknown> = {
+        last_message_at: latestMessageAtIso,
+        last_message_preview: latestMessagePreview,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (backfillContactName) {
+        threadUpdatePayload.contact_name = backfillContactName;
+        if (backfillContactLinkedInUrl) {
+          threadUpdatePayload.contact_linkedin_url = backfillContactLinkedInUrl;
+        }
+      }
+
+      const { error: threadPostSyncErr } = await supabase
+        .from("inbox_threads")
+        .update(threadUpdatePayload)
+        .eq("id", String(dbThread.id))
+        .eq("client_id", clientId);
+
+      if (threadPostSyncErr) {
+        console.error("INBOX_SYNC_THREAD_POST_UPDATE_ERROR:", threadPostSyncErr);
       }
     }
 
