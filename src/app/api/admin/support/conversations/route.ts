@@ -6,7 +6,7 @@ import { getSupportAdminContext } from "@/lib/support-admin-auth";
 export const runtime = "nodejs";
 
 const querySchema = z.object({
-  status: z.enum(["open", "closed", "all"]).default("open"),
+  status: z.enum(["open", "closed", "reopened", "all"]).default("open"),
   search: z.string().trim().max(120).optional().default(""),
   unread: z
     .string()
@@ -17,6 +17,7 @@ const querySchema = z.object({
 
 type ConversationRow = {
   id: string;
+  ticket_number: number | null;
   user_name: string | null;
   user_email: string | null;
   status: string;
@@ -30,6 +31,17 @@ type MessageRow = {
   created_at: string;
   read_by_support_at: string | null;
 };
+
+function isMissingTicketNumberColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const errorCode = String(error.code ?? "");
+  const errorMessage = String(error.message ?? "");
+  return (
+    errorCode === "42703" ||
+    errorCode === "PGRST204" ||
+    errorMessage.includes("ticket_number")
+  );
+}
 
 function truncate(value: string, length: number): string {
   if (value.length <= length) return value;
@@ -60,7 +72,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from("support_conversations")
-      .select("id, user_name, user_email, status, last_message_at, unread_count")
+      .select("id, ticket_number, user_name, user_email, status, last_message_at, unread_count")
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(limit);
 
@@ -72,7 +84,28 @@ export async function GET(request: Request) {
       query = query.or(`user_name.ilike.%${search}%,user_email.ilike.%${search}%`);
     }
 
-    const { data: conversationData, error: conversationErr } = await query;
+    let { data: conversationData, error: conversationErr } = await query;
+    if (conversationErr && isMissingTicketNumberColumn(conversationErr)) {
+      let fallbackQuery = supabase
+        .from("support_conversations")
+        .select("id, user_name, user_email, status, last_message_at, unread_count")
+        .order("last_message_at", { ascending: false, nullsFirst: false })
+        .limit(limit);
+
+      if (status !== "all") {
+        fallbackQuery = fallbackQuery.eq("status", status);
+      }
+      if (search.length > 0) {
+        fallbackQuery = fallbackQuery.or(`user_name.ilike.%${search}%,user_email.ilike.%${search}%`);
+      }
+
+      const fallback = await fallbackQuery;
+      conversationData = Array.isArray(fallback.data)
+        ? fallback.data.map((row) => ({ ...row, ticket_number: null }))
+        : [];
+      conversationErr = fallback.error;
+    }
+
     if (conversationErr) {
       console.error("ADMIN_SUPPORT_CONVERSATIONS_FETCH_ERROR:", conversationErr);
       return NextResponse.json({ error: "conversations_fetch_failed" }, { status: 500 });
@@ -154,6 +187,7 @@ export async function GET(request: Request) {
 
         return {
           id: conversation.id,
+          ticket_number: conversation.ticket_number,
           user_name: conversation.user_name,
           user_email: conversation.user_email,
           status: conversation.status,

@@ -17,6 +17,17 @@ const sendSchema = z.object({
     .max(4000),
 });
 
+function isMissingTicketNumberColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const errorCode = String(error.code ?? "");
+  const errorMessage = String(error.message ?? "");
+  return (
+    errorCode === "42703" ||
+    errorCode === "PGRST204" ||
+    errorMessage.includes("ticket_number")
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const supportUser = await getAuthenticatedSupportUser();
@@ -33,7 +44,11 @@ export async function POST(request: Request) {
     const { conversationId, body } = parsedBody.data;
     const supabase = createSupportSupabase();
 
-    await assertConversationOwnership(supabase, conversationId, supportUser.userId);
+    const conversation = await assertConversationOwnership(
+      supabase,
+      conversationId,
+      supportUser.userId
+    );
 
     const nowIso = new Date().toISOString();
     const { data, error } = await supabase
@@ -52,9 +67,49 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "send_failed" }, { status: 500 });
     }
 
+    const nextStatus = conversation.status === "closed" ? "reopened" : conversation.status;
+    let { data: updatedConversation, error: conversationErr } = await supabase
+      .from("support_conversations")
+      .update({
+        status: nextStatus,
+        last_message_at: nowIso,
+        updated_at: nowIso,
+      })
+      .eq("id", conversationId)
+      .eq("user_id", supportUser.userId)
+      .select(
+        "id, ticket_number, user_id, user_email, user_name, status, last_message_at, unread_count, created_at, updated_at"
+      )
+      .single();
+
+    if (conversationErr && isMissingTicketNumberColumn(conversationErr)) {
+      const fallback = await supabase
+        .from("support_conversations")
+        .update({
+          status: nextStatus,
+          last_message_at: nowIso,
+          updated_at: nowIso,
+        })
+        .eq("id", conversationId)
+        .eq("user_id", supportUser.userId)
+        .select("id, user_id, user_email, user_name, status, last_message_at, unread_count, created_at, updated_at")
+        .single();
+
+      updatedConversation = fallback.data
+        ? { ...fallback.data, ticket_number: null }
+        : null;
+      conversationErr = fallback.error;
+    }
+
+    if (conversationErr || !updatedConversation) {
+      console.error("SUPPORT_WIDGET_SEND_CONVERSATION_UPDATE_ERROR:", conversationErr);
+      return NextResponse.json({ error: "conversation_update_failed" }, { status: 500 });
+    }
+
     return NextResponse.json({
       success: true,
       message: data,
+      conversation: updatedConversation,
     });
   } catch (error) {
     console.error("SUPPORT_WIDGET_SEND_POST_ERROR:", error);

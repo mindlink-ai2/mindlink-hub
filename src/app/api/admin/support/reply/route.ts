@@ -135,7 +135,6 @@ export async function POST(request: Request) {
       .from("support_conversations")
       .update({
         last_message_at: createdAt,
-        status: "open",
         updated_at: createdAt,
       })
       .eq("id", conversationId);

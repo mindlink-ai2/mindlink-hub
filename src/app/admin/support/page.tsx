@@ -14,13 +14,14 @@ import { HubButton } from "@/components/ui/hub-button";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
-type ConversationStatus = "open" | "closed" | "all";
+type ConversationStatus = "open" | "closed" | "reopened" | "all";
 
 type AdminSupportConversation = {
   id: string;
+  ticket_number: number | null;
   user_name: string | null;
   user_email: string | null;
-  status: "open" | "closed";
+  status: "open" | "closed" | "reopened";
   last_message_at: string | null;
   unread_count: number;
   unread_for_support: number;
@@ -329,7 +330,7 @@ export default function AdminSupportPage() {
 
   const handleStatusToggle = async () => {
     if (!selectedConversation || updatingStatus) return;
-    const nextStatus = selectedConversation.status === "open" ? "closed" : "open";
+    const nextStatus = selectedConversation.status === "closed" ? "open" : "closed";
     setUpdatingStatus(true);
     setError(null);
 
@@ -431,7 +432,7 @@ export default function AdminSupportPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {(["open", "closed", "all"] as const).map((status) => (
+                {(["open", "reopened", "closed", "all"] as const).map((status) => (
                   <button
                     key={status}
                     type="button"
@@ -443,7 +444,13 @@ export default function AdminSupportPage() {
                         : "border-[#d7e3f4] bg-white text-[#51627b] hover:bg-[#f3f8ff]"
                     )}
                   >
-                    {status === "open" ? "Open" : status === "closed" ? "Closed" : "All"}
+                    {status === "open"
+                      ? "Open"
+                      : status === "reopened"
+                        ? "Reouvert"
+                        : status === "closed"
+                          ? "Closed"
+                          : "All"}
                   </button>
                 ))}
                 <button
@@ -495,6 +502,9 @@ export default function AdminSupportPage() {
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-[#0b1c33]">
                               {formatConversationName(conversation)}
+                            </p>
+                            <p className="truncate text-[11px] text-[#1f4f96]">
+                              Ticket #{conversation.ticket_number ?? "—"}
                             </p>
                             <p className="truncate text-[11px] text-[#64748b]">
                               {conversation.user_email || "Email indisponible"}
@@ -560,6 +570,9 @@ export default function AdminSupportPage() {
                         <p className="truncate text-sm font-semibold text-[#0b1c33]">
                           {formatConversationName(selectedConversation)}
                         </p>
+                        <p className="truncate text-[11px] text-[#1f4f96]">
+                          Ticket #{selectedConversation.ticket_number ?? "—"}
+                        </p>
                         <p className="truncate text-[11px] text-[#64748b]">
                           {selectedConversation.user_email || "Email indisponible"}
                         </p>
@@ -572,7 +585,9 @@ export default function AdminSupportPage() {
                           "rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide",
                           selectedConversation.status === "open"
                             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-slate-300 bg-slate-100 text-slate-700"
+                            : selectedConversation.status === "reopened"
+                              ? "border-blue-200 bg-blue-50 text-blue-700"
+                              : "border-slate-300 bg-slate-100 text-slate-700"
                         )}
                       >
                         {selectedConversation.status}
@@ -586,9 +601,9 @@ export default function AdminSupportPage() {
                       >
                         {updatingStatus
                           ? "Mise à jour..."
-                          : selectedConversation.status === "open"
-                            ? "Close"
-                            : "Reopen"}
+                          : selectedConversation.status === "closed"
+                            ? "Reopen"
+                            : "Close"}
                       </HubButton>
                     </div>
                   </div>

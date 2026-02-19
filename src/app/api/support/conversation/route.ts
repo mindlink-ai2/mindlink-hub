@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import {
+  createSupportConversation,
   createSupportSupabase,
   getAuthenticatedSupportUser,
-  getOrCreateSupportConversation,
+  listSupportConversations,
+  refreshSupportConversationProfile,
 } from "@/lib/support-widget-server";
 
 export const runtime = "nodejs";
@@ -15,10 +17,16 @@ export async function GET() {
     }
 
     const supabase = createSupportSupabase();
-    const conversation = await getOrCreateSupportConversation(supabase, supportUser);
+    await refreshSupportConversationProfile(supabase, supportUser);
+    const conversations = await listSupportConversations(supabase, supportUser.userId);
+    const unreadTotal = conversations.reduce(
+      (accumulator, conversation) => accumulator + Number(conversation.unread_count ?? 0),
+      0
+    );
 
     return NextResponse.json({
-      conversation,
+      conversations,
+      unreadTotal,
       user: {
         firstName: supportUser.firstName,
         email: supportUser.email,
@@ -26,6 +34,26 @@ export async function GET() {
     });
   } catch (error) {
     console.error("SUPPORT_CONVERSATION_GET_ERROR:", error);
+    return NextResponse.json({ error: "server_error" }, { status: 500 });
+  }
+}
+
+export async function POST() {
+  try {
+    const supportUser = await getAuthenticatedSupportUser();
+    if (!supportUser) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    const supabase = createSupportSupabase();
+    const conversation = await createSupportConversation(supabase, supportUser);
+
+    return NextResponse.json({
+      success: true,
+      conversation,
+    });
+  } catch (error) {
+    console.error("SUPPORT_CONVERSATION_POST_ERROR:", error);
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }
 }
