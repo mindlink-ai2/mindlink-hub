@@ -74,6 +74,29 @@ function extractMessageSenderAvatar(payload: JsonObject): string | null {
   );
 }
 
+function extractMessageSentAtIso(payload: JsonObject): string | null {
+  const rawTimestamp = getFirstString(payload, [
+    ["timestamp"],
+    ["sent_at"],
+    ["sentAt"],
+    ["created_at"],
+    ["createdAt"],
+    ["occurred_at"],
+    ["occurredAt"],
+    ["message", "timestamp"],
+    ["message", "sent_at"],
+    ["message", "created_at"],
+    ["data", "timestamp"],
+    ["data", "sent_at"],
+    ["data", "created_at"],
+  ]);
+
+  if (!rawTimestamp) return null;
+  const parsed = new Date(rawTimestamp);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
 function extractThreadParticipant(value: unknown): ThreadParticipant | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const participant = value as JsonObject;
@@ -421,8 +444,6 @@ export async function POST() {
         provider: "linkedin",
         unipile_account_id: unipileAccountId,
         unipile_thread_id: parsedThread.unipileThreadId,
-        last_message_at: parsedThread.lastMessageAt,
-        last_message_preview: parsedThread.lastMessagePreview,
         unread_count: 0,
         updated_at: new Date().toISOString(),
       };
@@ -492,9 +513,9 @@ export async function POST() {
       if (!messagesResult) continue;
 
       const messageItems = extractArrayCandidates(messagesResult.payload);
-      let latestMessageAtIso = parsedThread.lastMessageAt;
-      let latestMessageAtMs = parseIsoMs(parsedThread.lastMessageAt);
-      let latestMessagePreview = parsedThread.lastMessagePreview;
+      let latestMessageAtIso: string | null = null;
+      let latestMessageAtMs = Number.NEGATIVE_INFINITY;
+      let latestMessagePreview: string | null = null;
       const existingContactName =
         typeof dbThread.contact_name === "string" ? dbThread.contact_name.trim() : "";
       const existingContactAvatar =
@@ -535,6 +556,14 @@ export async function POST() {
             getFirstString(messageItem, [["thread_id"], ["threadId"]]) ??
             parsedThread.unipileThreadId,
         });
+
+        const strictSentAtIso = extractMessageSentAtIso(messageItem);
+        const strictSentAtMs = parseIsoMs(strictSentAtIso);
+        if (strictSentAtIso && strictSentAtMs > latestMessageAtMs) {
+          latestMessageAtMs = strictSentAtMs;
+          latestMessageAtIso = strictSentAtIso;
+          latestMessagePreview = truncatePreview(parsedMessage.text);
+        }
 
         if (!parsedMessage.unipileMessageId) continue;
 
@@ -599,12 +628,9 @@ export async function POST() {
           if (storedAvatarUrl) messageSenderAvatar = storedAvatarUrl;
         }
 
-        const messageSentAtMs = parseIsoMs(parsedMessage.sentAtIso);
-        if (messageSentAtMs > latestMessageAtMs) {
-          latestMessageAtMs = messageSentAtMs;
-          latestMessageAtIso = parsedMessage.sentAtIso;
-          latestMessagePreview = truncatePreview(parsedMessage.text);
-        }
+        const messageSentAtMs = strictSentAtIso
+          ? strictSentAtMs
+          : parseIsoMs(parsedMessage.sentAtIso);
 
         if (!existingContactName && parsedMessage.direction === "inbound") {
           const senderName = (messageSenderName ?? "").trim();
@@ -710,11 +736,16 @@ export async function POST() {
         messagesInserted += 1;
       }
 
-      const threadUpdatePayload: Record<string, unknown> = {
-        last_message_at: latestMessageAtIso,
-        last_message_preview: latestMessagePreview,
-        updated_at: new Date().toISOString(),
-      };
+      const threadUpdatePayload: Record<string, unknown> = {};
+      if (latestMessageAtIso && Number.isFinite(latestMessageAtMs)) {
+        threadUpdatePayload.last_message_at = latestMessageAtIso;
+        threadUpdatePayload.last_message_preview = latestMessagePreview;
+      } else if (messageItems.length > 0) {
+        console.warn(
+          "INBOX_SYNC_INVALID_LAST_MESSAGE_AT:",
+          parsedThread.unipileThreadId
+        );
+      }
 
       if (backfillContactName) {
         threadUpdatePayload.contact_name = backfillContactName;
@@ -726,6 +757,11 @@ export async function POST() {
       if (!existingContactAvatar && backfillContactAvatarUrl) {
         threadUpdatePayload.contact_avatar_url = backfillContactAvatarUrl;
       }
+
+      if (Object.keys(threadUpdatePayload).length === 0) {
+        continue;
+      }
+      threadUpdatePayload.updated_at = new Date().toISOString();
 
       const { error: threadPostSyncErr } = await supabase
         .from("inbox_threads")
