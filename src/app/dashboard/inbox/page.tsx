@@ -11,6 +11,7 @@ type InboxThread = {
   last_message_at: string | null;
   last_message_preview: string | null;
   unread_count: number | null;
+  connection_status: "pending" | "connected" | null;
   contact_name: string | null;
   contact_linkedin_url: string | null;
   contact_avatar_url: string | null;
@@ -69,9 +70,23 @@ function getContactInitials(name: string | null): string {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 }
 
-function formatUnreadCount(value: number): string {
-  if (value > 99) return "99+";
-  return String(value);
+function getThreadStatusBadge(
+  thread: InboxThread,
+  unreadCount: number
+): { label: string; tone: "blue" | "gray" } | null {
+  if (thread.connection_status === "pending") {
+    return { label: "Demande de connexion envoyée", tone: "blue" };
+  }
+
+  if (thread.connection_status === "connected") {
+    return { label: "Connecté", tone: "gray" };
+  }
+
+  if (unreadCount > 0) {
+    return { label: "Message en attente", tone: "blue" };
+  }
+
+  return null;
 }
 
 function normalizeSearchValue(value: string | null | undefined): string {
@@ -100,6 +115,10 @@ function threadFromRealtimePayload(payloadNew: Record<string, unknown>): InboxTh
       typeof payloadNew.unread_count === "number"
         ? payloadNew.unread_count
         : Number(payloadNew.unread_count ?? 0),
+    connection_status:
+      payloadNew.connection_status === "pending" || payloadNew.connection_status === "connected"
+        ? payloadNew.connection_status
+        : null,
     contact_name: typeof payloadNew.contact_name === "string" ? payloadNew.contact_name : null,
     contact_linkedin_url:
       typeof payloadNew.contact_linkedin_url === "string"
@@ -139,7 +158,6 @@ export default function InboxPage() {
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [backfilling, setBackfilling] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
@@ -290,8 +308,14 @@ export default function InboxPage() {
           if (!realtimeThread) return;
 
           setThreads((prev) => {
+            const existing = prev.find((thread) => thread.id === realtimeThread.id) ?? null;
+            const mergedThread = {
+              ...realtimeThread,
+              connection_status:
+                realtimeThread.connection_status ?? existing?.connection_status ?? null,
+            };
             const without = prev.filter((thread) => thread.id !== realtimeThread.id);
-            return sortThreadsByLastMessage([...without, realtimeThread]);
+            return sortThreadsByLastMessage([...without, mergedThread]);
           });
         }
       )
@@ -397,29 +421,6 @@ export default function InboxPage() {
     }
   };
 
-  const handleBackfillNames = async () => {
-    if (backfilling) return;
-    setBackfilling(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/inbox/backfill-contact-names", { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) {
-        throw new Error(data?.error ?? "Le backfill des noms a échoué.");
-      }
-
-      await loadThreads({ keepSelected: true });
-      if (selectedThreadId) {
-        await loadMessages(selectedThreadId);
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur pendant le backfill des noms.");
-    } finally {
-      setBackfilling(false);
-    }
-  };
-
   const handleMarkAllRead = async () => {
     if (markingAllRead) return;
     setMarkingAllRead(true);
@@ -507,11 +508,11 @@ export default function InboxPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-semibold tracking-tight text-[#0b1c33] sm:text-4xl">
-                  Inbox LinkedIn
+                  Messagerie LinkedIn
                 </h1>
                 <p className="mt-2 text-sm text-[#51627b]">
-                  Conversations synchronisées via Unipile. Les messages entrants et sortants
-                  sont historisés automatiquement.
+                  Centralise tes échanges LinkedIn, réponds rapidement et suis chaque
+                  conversation sans perdre le fil.
                 </p>
               </div>
 
@@ -521,26 +522,17 @@ export default function InboxPage() {
                   variant="secondary"
                   size="sm"
                   onClick={handleMarkAllRead}
-                  disabled={markingAllRead || syncing || backfilling}
+                  disabled={markingAllRead || syncing}
                 >
                   {markingAllRead ? "Marquage..." : "Marquer tout comme lu"}
                 </HubButton>
                 <HubButton
                   type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleBackfillNames}
-                  disabled={backfilling || syncing || markingAllRead}
-                >
-                  {backfilling ? "Backfill..." : "Backfill names"}
-                </HubButton>
-                <HubButton
-                  type="button"
                   variant="primary"
                   onClick={handleSync}
-                  disabled={syncing || backfilling || markingAllRead}
+                  disabled={syncing || markingAllRead}
                 >
-                  {syncing ? "Synchronisation..." : "Sync Inbox"}
+                  {syncing ? "Synchronisation..." : "Synchroniser"}
                 </HubButton>
               </div>
             </div>
@@ -572,7 +564,7 @@ export default function InboxPage() {
                   <div className="p-3 text-sm text-[#51627b]">Chargement des threads…</div>
                 ) : threads.length === 0 ? (
                   <div className="p-3 text-sm text-[#51627b]">
-                    Aucune conversation synchronisée pour le moment.
+                    Aucun message.
                   </div>
                 ) : filteredThreads.length === 0 ? (
                   <div className="p-3 text-sm text-[#51627b]">
@@ -584,6 +576,7 @@ export default function InboxPage() {
                       const active = thread.id === selectedThreadId;
                       const unreadCount =
                         typeof thread.unread_count === "number" ? thread.unread_count : 0;
+                      const threadStatusBadge = getThreadStatusBadge(thread, unreadCount);
 
                       return (
                         <button
@@ -618,9 +611,16 @@ export default function InboxPage() {
                                 <p className="truncate text-sm font-medium text-[#0b1c33]">
                                   {thread.contact_name || "Contact LinkedIn"}
                                 </p>
-                                {unreadCount > 0 ? (
-                                  <span className="rounded-full border border-[#9cc0ff] bg-white px-2 py-0.5 text-[11px] font-semibold text-[#1f5eff]">
-                                    {formatUnreadCount(unreadCount)}
+                                {threadStatusBadge ? (
+                                  <span
+                                    className={[
+                                      "rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                                      threadStatusBadge.tone === "blue"
+                                        ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                                        : "border-[#d1d5db] bg-[#f3f4f6] text-[#4b5563]",
+                                    ].join(" ")}
+                                  >
+                                    {threadStatusBadge.label}
                                   </span>
                                 ) : null}
                               </div>
@@ -644,7 +644,30 @@ export default function InboxPage() {
 
             <div className="hub-card overflow-hidden">
               <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
-                <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold text-[#0b1c33]">
+                    {selectedThread
+                      ? selectedThread.contact_name || "Contact LinkedIn"
+                      : "Messages"}
+                  </h2>
+
+                  {selectedThread?.contact_linkedin_url ? (
+                    <a
+                      href={selectedThread.contact_linkedin_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[#c8d6ea] bg-white px-3 py-1.5 text-xs font-medium text-[#2c466d] transition hover:border-[#afc5e4] hover:bg-[#f3f8ff]"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1f5eff] text-[10px] font-semibold text-white"
+                      >
+                        in
+                      </span>
+                      Voir profil LinkedIn
+                    </a>
+                  ) : null}
+                </div>
               </div>
 
               {!selectedThread ? (
@@ -658,7 +681,7 @@ export default function InboxPage() {
                       <div className="text-sm text-[#51627b]">Chargement des messages…</div>
                     ) : messages.length === 0 ? (
                       <div className="text-sm text-[#51627b]">
-                        Aucun message dans ce thread.
+                        Aucun message.
                       </div>
                     ) : (
                       <div className="space-y-3">
