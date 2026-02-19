@@ -665,17 +665,14 @@ async function handleNewRelation(params: {
 
 export async function POST(req: Request) {
   try {
-    const configuredSecret = (process.env.UNIPILE_WEBHOOK_SECRET ?? "").trim();
-    const receivedSecret = req.headers.get("x-unipile-secret") ?? "";
-
-    if (configuredSecret) {
-      if (receivedSecret !== configuredSecret) {
-        return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-      }
-    } else {
-      console.warn(
-        "UNIPILE_WEBHOOK_SECRET is empty: webhook accepted without signature check (dev mode)."
-      );
+    const provided =
+      req.headers.get("x-unipile-secret") ??
+      new URL(req.url).searchParams.get("secret");
+    if (
+      !process.env.UNIPILE_WEBHOOK_SECRET ||
+      provided !== process.env.UNIPILE_WEBHOOK_SECRET
+    ) {
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
     const payloadInput = await req.json().catch(() => ({}));
