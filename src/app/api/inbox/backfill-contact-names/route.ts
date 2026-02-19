@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceSupabase, getClientIdFromClerkUser } from "@/lib/inbox-server";
+import { saveAttendeeAvatarToStorage } from "@/lib/unipile-avatar-storage";
 import {
   extractSenderAttendeeId,
   resolveAttendeeForMessage,
 } from "@/lib/unipile-attendees";
-import { toJsonObject } from "@/lib/unipile-inbox";
+import { getFirstString, toJsonObject } from "@/lib/unipile-inbox";
 
 export async function POST() {
   try {
@@ -22,7 +23,7 @@ export async function POST() {
 
     const { data: threads, error: threadsErr } = await supabase
       .from("inbox_threads")
-      .select("id, unipile_account_id, unipile_thread_id")
+      .select("id, unipile_account_id, unipile_thread_id, contact_avatar_url")
       .eq("client_id", clientId);
 
     if (threadsErr) {
@@ -36,6 +37,10 @@ export async function POST() {
       const threadId = String(threadObj.id ?? "").trim();
       const unipileAccountId = String(threadObj.unipile_account_id ?? "").trim();
       const unipileThreadId = String(threadObj.unipile_thread_id ?? "").trim();
+      const existingThreadAvatarUrl =
+        typeof threadObj.contact_avatar_url === "string"
+          ? threadObj.contact_avatar_url.trim()
+          : "";
       if (!threadId || !unipileAccountId || !unipileThreadId) continue;
 
       const { data: latestInbound, error: latestInboundErr } = await supabase
@@ -62,9 +67,19 @@ export async function POST() {
           ? latestInbound.sender_linkedin_url.trim()
           : "";
       const senderAttendeeId = extractSenderAttendeeId(latestInbound?.raw);
+      const rawMessage = toJsonObject(latestInbound?.raw);
+      const rawSenderAvatar =
+        getFirstString(rawMessage, [
+          ["resolved_sender", "avatar_url"],
+          ["sender_avatar_url"],
+          ["senderAvatarUrl"],
+          ["sender", "avatar_url"],
+          ["sender", "avatarUrl"],
+        ]) ?? null;
 
       let resolvedSenderName = senderName;
       let resolvedSenderLinkedInUrl = senderLinkedInUrl;
+      let resolvedSenderAvatar = rawSenderAvatar;
       if ((!resolvedSenderName || !resolvedSenderLinkedInUrl) && senderAttendeeId) {
         const resolved = await resolveAttendeeForMessage({
           supabase,
@@ -79,6 +94,9 @@ export async function POST() {
         }
         if (resolved?.linkedinUrl && !resolvedSenderLinkedInUrl) {
           resolvedSenderLinkedInUrl = resolved.linkedinUrl;
+        }
+        if (resolved?.avatarUrl && !resolvedSenderAvatar) {
+          resolvedSenderAvatar = resolved.avatarUrl;
         }
 
         if (latestInbound?.id && (resolved?.name || resolved?.linkedinUrl)) {
@@ -106,6 +124,18 @@ export async function POST() {
 
       if (!resolvedSenderName) continue;
 
+      if (!resolvedSenderAvatar && !existingThreadAvatarUrl && senderAttendeeId) {
+        const storedAvatar = await saveAttendeeAvatarToStorage({
+          clientId,
+          unipileAccountId,
+          attendeeId: senderAttendeeId,
+        }).catch((error: unknown) => {
+          console.error("INBOX_BACKFILL_AVATAR_STORAGE_ERROR:", error);
+          return null;
+        });
+        if (storedAvatar) resolvedSenderAvatar = storedAvatar;
+      }
+
       const updatePayload: Record<string, unknown> = {
         contact_name: resolvedSenderName,
         updated_at: new Date().toISOString(),
@@ -113,6 +143,9 @@ export async function POST() {
 
       if (resolvedSenderLinkedInUrl) {
         updatePayload.contact_linkedin_url = resolvedSenderLinkedInUrl;
+      }
+      if (!existingThreadAvatarUrl && resolvedSenderAvatar) {
+        updatePayload.contact_avatar_url = resolvedSenderAvatar;
       }
 
       const { error: updateErr } = await supabase

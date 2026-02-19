@@ -363,12 +363,17 @@ export async function resolveAttendeeFromUnipile(params: {
       apiKey: resolvedConfig.apiKey,
       attendeeId: senderAttendeeId,
     });
-    if (direct) return direct;
+    if (direct) {
+      return {
+        ...direct,
+        attendeeId: direct.attendeeId ?? senderAttendeeId,
+      };
+    }
   }
 
   if (!threadId) return null;
 
-  return fetchAttendeeFromEndpoints({
+  const fallback = await fetchAttendeeFromEndpoints({
     endpoints: [
       `${resolvedConfig.base}/api/v1/chats/${threadId}/attendees?account_id=${accountId}`,
       `${resolvedConfig.base}/api/v1/conversations/${threadId}/attendees?account_id=${accountId}`,
@@ -379,6 +384,11 @@ export async function resolveAttendeeFromUnipile(params: {
     attendeeId: senderAttendeeId,
     preferOther: !senderAttendeeId,
   });
+  if (!fallback) return null;
+  return {
+    ...fallback,
+    attendeeId: fallback.attendeeId ?? senderAttendeeId,
+  };
 }
 
 export async function resolveAttendeeForMessage(params: {

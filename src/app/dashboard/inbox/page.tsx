@@ -61,6 +61,14 @@ function sortMessagesBySentAt(messages: InboxMessage[]) {
   });
 }
 
+function getContactInitials(name: string | null): string {
+  const clean = (name ?? "").trim();
+  if (!clean) return "CL";
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+}
+
 function threadFromRealtimePayload(payloadNew: Record<string, unknown>): InboxThread | null {
   const id = String(payloadNew.id ?? "").trim();
   const unipileThreadId = String(payloadNew.unipile_thread_id ?? "").trim();
@@ -515,24 +523,42 @@ export default function InboxPage() {
                               : "border-[#d7e3f4] bg-[#f7fbff] hover:border-[#b9d0f2]",
                           ].join(" ")}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="truncate text-sm font-medium text-[#0b1c33]">
-                              {thread.contact_name || "Contact LinkedIn"}
-                            </p>
-                            {unreadCount > 0 ? (
-                              <span className="rounded-full border border-[#9cc0ff] bg-white px-2 py-0.5 text-[11px] font-semibold text-[#1f5eff]">
-                                {unreadCount}
-                              </span>
-                            ) : null}
+                          <div className="flex items-start gap-3">
+                            {thread.contact_avatar_url ? (
+                              <img
+                                src={thread.contact_avatar_url}
+                                alt={thread.contact_name || "Contact LinkedIn"}
+                                className="h-9 w-9 shrink-0 rounded-full border border-[#d7e3f4] object-cover"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d7e3f4] bg-[#edf4ff] text-xs font-semibold text-[#325c95]">
+                                {getContactInitials(thread.contact_name)}
+                              </div>
+                            )}
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="truncate text-sm font-medium text-[#0b1c33]">
+                                  {thread.contact_name || "Contact LinkedIn"}
+                                </p>
+                                {unreadCount > 0 ? (
+                                  <span className="rounded-full border border-[#9cc0ff] bg-white px-2 py-0.5 text-[11px] font-semibold text-[#1f5eff]">
+                                    {unreadCount}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <p className="mt-1 truncate text-xs text-[#51627b]">
+                                {thread.last_message_preview || "Aucun aperçu"}
+                              </p>
+
+                              <p className="mt-1 text-[11px] text-[#8093ad]">
+                                {formatDateTime(thread.last_message_at)}
+                              </p>
+                            </div>
                           </div>
-
-                          <p className="mt-1 truncate text-xs text-[#51627b]">
-                            {thread.last_message_preview || "Aucun aperçu"}
-                          </p>
-
-                          <p className="mt-1 text-[11px] text-[#8093ad]">
-                            {formatDateTime(thread.last_message_at)}
-                          </p>
                         </button>
                       );
                     })}

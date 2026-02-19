@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { extractLinkedInProfileSlug, normalizeLinkedInUrl } from "@/lib/linkedin-url";
 import { createServiceSupabase } from "@/lib/inbox-server";
+import { saveAttendeeAvatarToStorage } from "@/lib/unipile-avatar-storage";
 import {
   extractSenderAttendeeId,
   resolveAttendeeForMessage,
@@ -29,6 +30,7 @@ type InboxThreadRow = {
   unread_count: number | null;
   last_message_at: string | null;
   contact_name: string | null;
+  contact_avatar_url: string | null;
 };
 
 type InboxMessageRow = {
@@ -427,7 +429,7 @@ async function upsertThreadAndLoad(params: {
 
   const { data: thread, error: threadErr } = await supabase
     .from("inbox_threads")
-    .select("id, unread_count, last_message_at, contact_name")
+    .select("id, unread_count, last_message_at, contact_name, contact_avatar_url")
     .eq("client_id", clientId)
     .eq("unipile_account_id", parsed.unipileAccountId)
     .eq("unipile_thread_id", parsed.unipileThreadId)
@@ -446,6 +448,8 @@ async function upsertThreadAndLoad(params: {
     last_message_at:
       typeof thread.last_message_at === "string" ? thread.last_message_at : null,
     contact_name: typeof thread.contact_name === "string" ? thread.contact_name : null,
+    contact_avatar_url:
+      typeof thread.contact_avatar_url === "string" ? thread.contact_avatar_url : null,
   };
 }
 
@@ -560,6 +564,26 @@ async function handleNewMessage(params: {
   });
   if (!thread) return;
 
+  const currentThreadAvatar = (thread.contact_avatar_url ?? "").trim();
+  if (!currentThreadAvatar && senderAttendeeId && parsed.direction === "inbound") {
+    const storedAvatarUrl = await saveAttendeeAvatarToStorage({
+      clientId,
+      unipileAccountId: parsed.unipileAccountId,
+      attendeeId: senderAttendeeId,
+    }).catch((error: unknown) => {
+      console.error("UNIPILE_WEBHOOK_AVATAR_STORAGE_ERROR:", error);
+      return null;
+    });
+
+    if (storedAvatarUrl) {
+      senderAvatarUrl = storedAvatarUrl;
+      threadContact = {
+        ...threadContact,
+        contactAvatarUrl: storedAvatarUrl,
+      };
+    }
+  }
+
   await enrichThreadContactIfMissing({
     supabase,
     clientId,
@@ -670,6 +694,7 @@ async function handleNewMessage(params: {
   const normalizedSenderName = (senderName ?? "").trim();
   const normalizedSenderLinkedInUrl = (senderLinkedInUrl ?? "").trim();
   const hasContactName = (thread.contact_name ?? "").trim().length > 0;
+  const hasContactAvatar = currentThreadAvatar.length > 0;
   if (parsed.direction === "inbound" && !hasContactName && normalizedSenderName) {
     threadUpdate.contact_name = normalizedSenderName;
     if (normalizedSenderLinkedInUrl) {
@@ -678,6 +703,10 @@ async function handleNewMessage(params: {
     if (senderAvatarUrl) {
       threadUpdate.contact_avatar_url = senderAvatarUrl;
     }
+  }
+
+  if (parsed.direction === "inbound" && !hasContactAvatar && senderAvatarUrl) {
+    threadUpdate.contact_avatar_url = senderAvatarUrl;
   }
 
   if (wasInserted && parsed.direction === "inbound") {

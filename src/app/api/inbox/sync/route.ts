@@ -16,6 +16,7 @@ import {
   resolveOtherAttendeeForChat,
   type ResolvedAttendee,
 } from "@/lib/unipile-attendees";
+import { saveAttendeeAvatarToStorage } from "@/lib/unipile-avatar-storage";
 import {
   extractArrayCandidates,
   getFirstBoolean,
@@ -363,6 +364,7 @@ export async function POST() {
     const apiKey = requireEnv("UNIPILE_API_KEY");
     const unipileApiConfig = { base, apiKey };
     const attendeeResolutionCache = new Map<string, Promise<ResolvedAttendee | null>>();
+    const avatarStorageCache = new Map<string, Promise<string | null>>();
 
     const threadResult = await fetchFirstSuccessful(
       [
@@ -405,7 +407,7 @@ export async function POST() {
         parsedThread.contactName ?? resolvedThreadAttendee?.name ?? null;
       const threadContactLinkedInUrl =
         parsedThread.contactLinkedInUrl ?? resolvedThreadAttendee?.linkedinUrl ?? null;
-      const threadContactAvatarUrl =
+      let threadContactAvatarUrl =
         parsedThread.contactAvatarUrl ?? resolvedThreadAttendee?.avatarUrl ?? null;
 
       const leadId = await resolveLeadIdByUrl(
@@ -457,7 +459,7 @@ export async function POST() {
 
       const { data: dbThread } = await supabase
         .from("inbox_threads")
-        .select("id, contact_name")
+        .select("id, contact_name, contact_avatar_url")
         .eq("client_id", clientId)
         .eq("unipile_account_id", unipileAccountId)
         .eq("unipile_thread_id", parsedThread.unipileThreadId)
@@ -495,10 +497,36 @@ export async function POST() {
       let latestMessagePreview = parsedThread.lastMessagePreview;
       const existingContactName =
         typeof dbThread.contact_name === "string" ? dbThread.contact_name.trim() : "";
+      const existingContactAvatar =
+        typeof dbThread.contact_avatar_url === "string"
+          ? dbThread.contact_avatar_url.trim()
+          : "";
       let backfillContactName: string | null = null;
       let backfillContactLinkedInUrl: string | null = null;
       let backfillContactAvatarUrl: string | null = null;
       let latestInboundWithNameAtMs = Number.NEGATIVE_INFINITY;
+
+      if (!existingContactAvatar && !threadContactAvatarUrl && resolvedThreadAttendee?.attendeeId) {
+        const avatarCacheKey = `${clientId}:${unipileAccountId}:${resolvedThreadAttendee.attendeeId}`;
+        if (!avatarStorageCache.has(avatarCacheKey)) {
+          avatarStorageCache.set(
+            avatarCacheKey,
+            saveAttendeeAvatarToStorage({
+              clientId,
+              unipileAccountId,
+              attendeeId: resolvedThreadAttendee.attendeeId,
+            }).catch((error: unknown) => {
+              console.error("INBOX_SYNC_THREAD_AVATAR_STORAGE_ERROR:", error);
+              return null;
+            })
+          );
+        }
+        const storedAvatarUrl = await avatarStorageCache.get(avatarCacheKey);
+        if (storedAvatarUrl) {
+          threadContactAvatarUrl = storedAvatarUrl;
+          backfillContactAvatarUrl = storedAvatarUrl;
+        }
+      }
 
       for (const messageItem of messageItems) {
         const parsedMessage = parseUnipileMessage({
@@ -511,6 +539,7 @@ export async function POST() {
         if (!parsedMessage.unipileMessageId) continue;
 
         const senderAttendeeId = extractSenderAttendeeId(messageItem);
+        let resolvedSenderAttendeeId = senderAttendeeId;
         let messageSenderName = parsedMessage.senderName;
         let messageSenderLinkedInUrl = parsedMessage.senderLinkedInUrl;
         let messageSenderAvatar = extractMessageSenderAvatar(messageItem);
@@ -536,6 +565,9 @@ export async function POST() {
 
           const resolvedAttendee = await attendeeResolutionCache.get(cacheKey);
           if (resolvedAttendee) {
+            if (!resolvedSenderAttendeeId && resolvedAttendee.attendeeId) {
+              resolvedSenderAttendeeId = resolvedAttendee.attendeeId;
+            }
             if (!messageSenderName && resolvedAttendee.name) {
               messageSenderName = resolvedAttendee.name;
             }
@@ -546,6 +578,25 @@ export async function POST() {
               messageSenderAvatar = resolvedAttendee.avatarUrl;
             }
           }
+        }
+
+        if (!messageSenderAvatar && !existingContactAvatar && resolvedSenderAttendeeId) {
+          const avatarCacheKey = `${clientId}:${unipileAccountId}:${resolvedSenderAttendeeId}`;
+          if (!avatarStorageCache.has(avatarCacheKey)) {
+            avatarStorageCache.set(
+              avatarCacheKey,
+              saveAttendeeAvatarToStorage({
+                clientId,
+                unipileAccountId,
+                attendeeId: resolvedSenderAttendeeId,
+              }).catch((error: unknown) => {
+                console.error("INBOX_SYNC_MESSAGE_AVATAR_STORAGE_ERROR:", error);
+                return null;
+              })
+            );
+          }
+          const storedAvatarUrl = await avatarStorageCache.get(avatarCacheKey);
+          if (storedAvatarUrl) messageSenderAvatar = storedAvatarUrl;
         }
 
         const messageSentAtMs = parseIsoMs(parsedMessage.sentAtIso);
@@ -566,7 +617,7 @@ export async function POST() {
         }
 
         const resolvedSenderPatch: Record<string, unknown> = {};
-        if (senderAttendeeId) resolvedSenderPatch.attendee_id = senderAttendeeId;
+        if (resolvedSenderAttendeeId) resolvedSenderPatch.attendee_id = resolvedSenderAttendeeId;
         if (messageSenderName) resolvedSenderPatch.name = messageSenderName;
         if (messageSenderLinkedInUrl) {
           resolvedSenderPatch.linkedin_url = messageSenderLinkedInUrl;
@@ -670,9 +721,10 @@ export async function POST() {
         if (backfillContactLinkedInUrl) {
           threadUpdatePayload.contact_linkedin_url = backfillContactLinkedInUrl;
         }
-        if (backfillContactAvatarUrl) {
-          threadUpdatePayload.contact_avatar_url = backfillContactAvatarUrl;
-        }
+      }
+
+      if (!existingContactAvatar && backfillContactAvatarUrl) {
+        threadUpdatePayload.contact_avatar_url = backfillContactAvatarUrl;
       }
 
       const { error: threadPostSyncErr } = await supabase
