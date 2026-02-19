@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
+import { extractLinkedInProfileSlug } from "@/lib/linkedin-url";
 
 type JsonLike = Record<string, unknown> | string | null;
 
@@ -12,30 +13,6 @@ function requireEnv(name: string) {
 
 function normalizeUnipileBase(dsn: string) {
   return dsn.replace(/\/+$/, "").replace(/\/api\/v1\/.*$/, "");
-}
-
-function extractLinkedInIdentifier(linkedinUrl: string) {
-  const raw = linkedinUrl.trim();
-  if (!raw) return null;
-
-  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-
-  try {
-    const url = new URL(withProtocol);
-    const normalizedPath = url.pathname.replace(/\/+$/, "");
-
-    const inMatch = normalizedPath.match(/\/in\/([^/?#]+)/i);
-    if (inMatch?.[1]) return decodeURIComponent(inMatch[1]);
-
-    const singleSegment = normalizedPath.replace(/^\/+/, "");
-    if (singleSegment && !singleSegment.includes("/")) {
-      return decodeURIComponent(singleSegment);
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 async function readResponseBody(res: Response): Promise<JsonLike> {
@@ -108,7 +85,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const profileIdentifier = extractLinkedInIdentifier(lead.LinkedInURL);
+    const profileIdentifier = extractLinkedInProfileSlug(lead.LinkedInURL);
     if (!profileIdentifier) {
       return NextResponse.json(
         { success: false, error: "invalid_linkedin_url" },
@@ -140,7 +117,7 @@ export async function POST(req: Request) {
 
     const { data: existingInvitations, error: existingInviteErr } = await supabase
       .from("linkedin_invitations")
-      .select("id")
+      .select("id, status")
       .eq("client_id", client.id)
       .eq("lead_id", leadId)
       .in("status", ["sent", "accepted"])
@@ -154,6 +131,12 @@ export async function POST(req: Request) {
     }
 
     if ((existingInvitations ?? []).length > 0) {
+      const hasAccepted = (existingInvitations ?? []).some(
+        (invitation) =>
+          String((invitation as { status?: string | null }).status ?? "").toLowerCase() ===
+          "accepted"
+      );
+
       const { error: updateLeadStatusErr } = await supabase
         .from("leads")
         .update({ traite: true })
@@ -164,7 +147,11 @@ export async function POST(req: Request) {
         console.error("LINKEDIN_INVITE_STATUS_UPDATE_ERROR:", updateLeadStatusErr);
       }
 
-      return NextResponse.json({ success: true, alreadySent: true });
+      return NextResponse.json({
+        success: true,
+        alreadySent: true,
+        invitationStatus: hasAccepted ? "accepted" : "sent",
+      });
     }
 
     const UNIPILE_DSN = requireEnv("UNIPILE_DSN");
@@ -260,7 +247,7 @@ export async function POST(req: Request) {
       console.error("LINKEDIN_INVITE_STATUS_UPDATE_ERROR:", updateLeadStatusErr);
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, invitationStatus: "sent" });
   } catch (error: unknown) {
     console.error("LINKEDIN_INVITE_ERROR:", error);
     return NextResponse.json(

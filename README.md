@@ -34,3 +34,13 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Unipile Webhook (On new relation)
+
+- URL: `https://lidmeo.com/api/unipile/webhook`
+- Method: `POST`
+- Required header: `x-unipile-secret: <UNIPILE_WEBHOOK_SECRET>`
+- Required env var (server): `UNIPILE_WEBHOOK_SECRET`
+
+The endpoint logs incoming events in `public.unipile_events` and updates
+`public.linkedin_invitations` to `accepted` when a LinkedIn relation is detected.

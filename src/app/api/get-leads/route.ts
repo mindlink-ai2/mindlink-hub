@@ -8,6 +8,7 @@ type LeadRow = Record<string, unknown> & {
 
 type InvitationRow = {
   lead_id?: number | string | null;
+  status?: string | null;
 };
 
 export async function GET() {
@@ -73,7 +74,7 @@ export async function GET() {
     .map((lead) => lead?.id)
     .filter((id) => id !== null && id !== undefined);
 
-  let invitedLeadIds = new Set<string>();
+  const invitationStatusByLead = new Map<string, "sent" | "accepted">();
 
   if (leadIds.length > 0) {
     const { data: invitations, error: invitationsErr } = await supabase
@@ -90,18 +91,28 @@ export async function GET() {
         ? (invitations as unknown as InvitationRow[])
         : [];
 
-      invitedLeadIds = new Set(
-        invitationRows
-          .map((invitation) => invitation?.lead_id)
-          .filter((leadId) => leadId !== null && leadId !== undefined)
-          .map((leadId) => String(leadId))
-      );
+      invitationRows.forEach((invitation) => {
+        const leadId = invitation?.lead_id;
+        if (leadId === null || leadId === undefined) return;
+
+        const normalizedStatus = String(invitation?.status ?? "")
+          .trim()
+          .toLowerCase();
+        if (normalizedStatus !== "sent" && normalizedStatus !== "accepted") return;
+
+        const key = String(leadId);
+        const current = invitationStatusByLead.get(key);
+        if (normalizedStatus === "accepted" || !current) {
+          invitationStatusByLead.set(key, normalizedStatus as "sent" | "accepted");
+        }
+      });
     }
   }
 
   const leadsWithInvitationState = leadRows.map((lead) => ({
     ...lead,
-    linkedin_invitation_sent: invitedLeadIds.has(String(lead.id)),
+    linkedin_invitation_status: invitationStatusByLead.get(String(lead.id)) ?? null,
+    linkedin_invitation_sent: invitationStatusByLead.has(String(lead.id)),
   }));
 
   return NextResponse.json({

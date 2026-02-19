@@ -23,6 +23,7 @@ type Lead = {
   internal_message?: string | null;
   message_mail?: string | null;
   LinkedInURL?: string | null;
+  linkedin_invitation_status?: "sent" | "accepted" | null;
   linkedin_invitation_sent?: boolean | null;
   [key: string]: unknown;
 };
@@ -384,17 +385,30 @@ export default function LeadsPage() {
         );
       }
 
+      const invitationStatus =
+        data?.invitationStatus === "accepted" ? "accepted" : "sent";
+
       setSafeLeads((prev: Lead[]) =>
         prev.map((l) =>
           String(l.id) === idStr
-            ? { ...l, linkedin_invitation_sent: true, traite: true }
+            ? {
+                ...l,
+                linkedin_invitation_status: invitationStatus,
+                linkedin_invitation_sent: true,
+                traite: true,
+              }
             : l
         )
       );
 
       setOpenLead((prev: Lead | null) =>
         prev && String(prev.id) === idStr
-          ? { ...prev, linkedin_invitation_sent: true, traite: true }
+          ? {
+              ...prev,
+              linkedin_invitation_status: invitationStatus,
+              linkedin_invitation_sent: true,
+              traite: true,
+            }
           : prev
       );
     } catch (e: unknown) {
@@ -902,7 +916,16 @@ export default function LeadsPage() {
                         const isSelected = selectedIds.has(idStr);
                         const isStatusUpdating = updatingStatusIds.has(idStr);
                         const isInviteLoading = invitingLeadIds.has(idStr);
-                        const isInviteSent = Boolean(lead.linkedin_invitation_sent);
+                        const invitationStatus =
+                          lead.linkedin_invitation_status === "accepted"
+                            ? "accepted"
+                            : lead.linkedin_invitation_status === "sent"
+                              ? "sent"
+                              : lead.linkedin_invitation_sent
+                                ? "sent"
+                                : null;
+                        const isInviteAccepted = invitationStatus === "accepted";
+                        const isInviteSent = invitationStatus === "sent";
                         const inviteError = inviteErrors[idStr];
                         const isSent = Boolean(lead.message_sent);
                         const isPending = !isSent && Boolean(lead.traite);
@@ -1082,11 +1105,16 @@ export default function LeadsPage() {
                                   type="button"
                                   onClick={() => handleLinkedInInvite(lead)}
                                   disabled={
-                                    !lead.LinkedInURL || isInviteSent || isInviteLoading
+                                    !lead.LinkedInURL ||
+                                    isInviteAccepted ||
+                                    isInviteSent ||
+                                    isInviteLoading
                                   }
                                   className={[
                                     "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
-                                    isInviteSent
+                                    isInviteAccepted
+                                      ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
+                                      : isInviteSent
                                       ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
                                       : inviteError
                                         ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
@@ -1095,7 +1123,9 @@ export default function LeadsPage() {
                                     isInviteLoading ? "cursor-wait opacity-70" : "",
                                   ].join(" ")}
                                 >
-                                  {isInviteSent
+                                  {isInviteAccepted
+                                    ? "Connecté"
+                                    : isInviteSent
                                     ? "Invitation envoyée"
                                     : isInviteLoading
                                       ? "Envoi..."
