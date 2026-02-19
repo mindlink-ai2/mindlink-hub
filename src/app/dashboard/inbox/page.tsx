@@ -69,6 +69,19 @@ function getContactInitials(name: string | null): string {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 }
 
+function formatUnreadCount(value: number): string {
+  if (value > 99) return "99+";
+  return String(value);
+}
+
+function normalizeSearchValue(value: string | null | undefined): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 function threadFromRealtimePayload(payloadNew: Record<string, unknown>): InboxThread | null {
   const id = String(payloadNew.id ?? "").trim();
   const unipileThreadId = String(payloadNew.unipile_thread_id ?? "").trim();
@@ -129,6 +142,7 @@ export default function InboxPage() {
   const [backfilling, setBackfilling] = useState(false);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
+  const [threadSearch, setThreadSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
 
@@ -136,6 +150,19 @@ export default function InboxPage() {
     () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
     [threads, selectedThreadId]
   );
+
+  const filteredThreads = useMemo(() => {
+    const query = normalizeSearchValue(threadSearch);
+    if (!query) return threads;
+
+    return threads.filter((thread) => {
+      const name = (thread.contact_name ?? "").trim();
+      if (!name) return false;
+      const normalizedName = normalizeSearchValue(name);
+      const firstName = normalizeSearchValue(name.split(/\s+/)[0] ?? "");
+      return normalizedName.includes(query) || firstName.includes(query);
+    });
+  }, [threads, threadSearch]);
 
   const loadThreads = useCallback(async (options?: { keepSelected?: boolean }) => {
     setLoadingThreads(true);
@@ -497,6 +524,15 @@ export default function InboxPage() {
                 <h2 className="text-sm font-semibold text-[#0b1c33]">Conversations</h2>
               </div>
 
+              <div className="border-b border-[#d7e3f4] bg-[#f8fbff] p-3">
+                <input
+                  value={threadSearch}
+                  onChange={(event) => setThreadSearch(event.target.value)}
+                  placeholder="Rechercher un prénom..."
+                  className="h-9 w-full rounded-xl border border-[#c8d6ea] bg-white px-3 text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:border-[#9cc0ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                />
+              </div>
+
               <div className="max-h-[70vh] overflow-y-auto p-3">
                 {loadingThreads ? (
                   <div className="p-3 text-sm text-[#51627b]">Chargement des threads…</div>
@@ -504,9 +540,13 @@ export default function InboxPage() {
                   <div className="p-3 text-sm text-[#51627b]">
                     Aucune conversation synchronisée pour le moment.
                   </div>
+                ) : filteredThreads.length === 0 ? (
+                  <div className="p-3 text-sm text-[#51627b]">
+                    Aucune conversation trouvée pour cette recherche.
+                  </div>
                 ) : (
                   <div className="space-y-2">
-                    {threads.map((thread) => {
+                    {filteredThreads.map((thread) => {
                       const active = thread.id === selectedThreadId;
                       const unreadCount =
                         typeof thread.unread_count === "number" ? thread.unread_count : 0;
@@ -545,7 +585,7 @@ export default function InboxPage() {
                                 </p>
                                 {unreadCount > 0 ? (
                                   <span className="rounded-full border border-[#9cc0ff] bg-white px-2 py-0.5 text-[11px] font-semibold text-[#1f5eff]">
-                                    {unreadCount}
+                                    {formatUnreadCount(unreadCount)}
                                   </span>
                                 ) : null}
                               </div>

@@ -4,6 +4,7 @@ import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
 import "./globals.css";
 import DashboardContainer from "@/components/DashboardContainer";
+import InboxNavLink from "@/components/InboxNavLink";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -149,12 +150,7 @@ export default async function RootLayout({
                       >
                         Relances
                       </Link>
-                      <Link
-                        href="/dashboard/inbox"
-                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
-                      >
-                        Inbox
-                      </Link>
+                      <InboxNavLink />
                       <Link
                         href="/dashboard/hub/billing"
                         className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
