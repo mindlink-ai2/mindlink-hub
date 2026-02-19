@@ -73,7 +73,7 @@ export default function LinkedInSettingsPage() {
           Connexion LinkedIn
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Connecte ton compte LinkedIn pour activer l’inbox et l’automatisation Lidmeo.
+          Connecte ton compte LinkedIn pour activer la messagerie et l’automatisation Lidmeo.
         </p>
       </div>
 
@@ -125,7 +125,7 @@ export default function LinkedInSettingsPage() {
           <CardContent className="space-y-4">
             <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
               <li>Envoi automatique de messages</li>
-              <li>Réception centralisée dans l’inbox Lidmeo</li>
+              <li>Réception centralisée dans la messagerie Lidmeo</li>
               <li>Aucune action manuelle requise</li>
             </ul>
 

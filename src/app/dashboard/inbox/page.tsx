@@ -139,7 +139,6 @@ export default function InboxPage() {
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [backfilling, setBackfilling] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
@@ -397,29 +396,6 @@ export default function InboxPage() {
     }
   };
 
-  const handleBackfillNames = async () => {
-    if (backfilling) return;
-    setBackfilling(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/inbox/backfill-contact-names", { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) {
-        throw new Error(data?.error ?? "Le backfill des noms a échoué.");
-      }
-
-      await loadThreads({ keepSelected: true });
-      if (selectedThreadId) {
-        await loadMessages(selectedThreadId);
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur pendant le backfill des noms.");
-    } finally {
-      setBackfilling(false);
-    }
-  };
-
   const handleMarkAllRead = async () => {
     if (markingAllRead) return;
     setMarkingAllRead(true);
@@ -507,11 +483,12 @@ export default function InboxPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-semibold tracking-tight text-[#0b1c33] sm:text-4xl">
-                  Inbox LinkedIn
+                  Messagerie LinkedIn
                 </h1>
                 <p className="mt-2 text-sm text-[#51627b]">
-                  Conversations synchronisées via Unipile. Les messages entrants et sortants
-                  sont historisés automatiquement.
+                  Toutes vos conversations LinkedIn sont centralisées et mises a jour en
+                  temps reel. Les messages entrants et sortants sont enregistres
+                  automatiquement.
                 </p>
               </div>
 
@@ -521,26 +498,17 @@ export default function InboxPage() {
                   variant="secondary"
                   size="sm"
                   onClick={handleMarkAllRead}
-                  disabled={markingAllRead || syncing || backfilling}
+                  disabled={markingAllRead || syncing}
                 >
                   {markingAllRead ? "Marquage..." : "Marquer tout comme lu"}
                 </HubButton>
                 <HubButton
                   type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleBackfillNames}
-                  disabled={backfilling || syncing || markingAllRead}
-                >
-                  {backfilling ? "Backfill..." : "Backfill names"}
-                </HubButton>
-                <HubButton
-                  type="button"
                   variant="primary"
                   onClick={handleSync}
-                  disabled={syncing || backfilling || markingAllRead}
+                  disabled={syncing || markingAllRead}
                 >
-                  {syncing ? "Synchronisation..." : "Sync Inbox"}
+                  {syncing ? "Synchronisation..." : "Synchroniser"}
                 </HubButton>
               </div>
             </div>

@@ -128,7 +128,7 @@ export const RECOMMENDATIONS = [
     "Personnalisez juste 1 ligne dans vos messages.",
     "Séparez vos campagnes LinkedIn par persona.",
     "Commondez toujours vos relances via Mindlink, pas manuellement.",
-    "Activez l’Inbox Zero pour vos emails.",
+    "Activez une routine zero retard pour vos emails.",
     "Regardez votre score d’activité Mindlink chaque semaine.",
     "Découvrez les recommandations IA pour améliorer votre routine.",
     "Utilisez les statistiques pour comprendre vos patterns.",

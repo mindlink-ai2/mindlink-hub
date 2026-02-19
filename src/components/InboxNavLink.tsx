@@ -81,7 +81,7 @@ export default function InboxNavLink() {
       href="/dashboard/inbox"
       className="inline-flex items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
     >
-      <span>Inbox</span>
+      <span>Messagerie</span>
       {totalUnread > 0 ? (
         <span className="rounded-full border border-[#9cc0ff] bg-white px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[#1f5eff]">
           {formatUnreadTotal(totalUnread)}
