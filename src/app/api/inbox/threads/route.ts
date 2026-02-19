@@ -18,7 +18,7 @@ export async function GET() {
     const { data: threads, error } = await supabase
       .from("inbox_threads")
       .select(
-        "id, provider, unipile_account_id, unipile_thread_id, lead_id, lead_linkedin_url, last_message_at, last_message_preview, unread_count, created_at, updated_at"
+        "id, provider, unipile_account_id, unipile_thread_id, lead_id, lead_linkedin_url, contact_name, contact_linkedin_url, contact_avatar_url, last_message_at, last_message_preview, unread_count, created_at, updated_at"
       )
       .eq("client_id", clientId)
       .order("last_message_at", { ascending: false, nullsFirst: false });

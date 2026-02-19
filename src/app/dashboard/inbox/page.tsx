@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
+import { supabase } from "@/lib/supabase";
 
 type InboxThread = {
   id: string;
@@ -10,6 +11,9 @@ type InboxThread = {
   last_message_at: string | null;
   last_message_preview: string | null;
   unread_count: number | null;
+  contact_name: string | null;
+  contact_linkedin_url: string | null;
+  contact_avatar_url: string | null;
   lead_linkedin_url: string | null;
 };
 
@@ -41,6 +45,72 @@ function formatDateTime(date: string | null) {
   });
 }
 
+function sortThreadsByLastMessage(threads: InboxThread[]) {
+  return [...threads].sort((a, b) => {
+    const aTime = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+    const bTime = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+    return bTime - aTime;
+  });
+}
+
+function sortMessagesBySentAt(messages: InboxMessage[]) {
+  return [...messages].sort((a, b) => {
+    const aTime = a.sent_at ? new Date(a.sent_at).getTime() : 0;
+    const bTime = b.sent_at ? new Date(b.sent_at).getTime() : 0;
+    return aTime - bTime;
+  });
+}
+
+function threadFromRealtimePayload(payloadNew: Record<string, unknown>): InboxThread | null {
+  const id = String(payloadNew.id ?? "").trim();
+  const unipileThreadId = String(payloadNew.unipile_thread_id ?? "").trim();
+  if (!id || !unipileThreadId) return null;
+
+  return {
+    id,
+    unipile_thread_id: unipileThreadId,
+    last_message_at:
+      typeof payloadNew.last_message_at === "string" ? payloadNew.last_message_at : null,
+    last_message_preview:
+      typeof payloadNew.last_message_preview === "string"
+        ? payloadNew.last_message_preview
+        : null,
+    unread_count:
+      typeof payloadNew.unread_count === "number"
+        ? payloadNew.unread_count
+        : Number(payloadNew.unread_count ?? 0),
+    contact_name: typeof payloadNew.contact_name === "string" ? payloadNew.contact_name : null,
+    contact_linkedin_url:
+      typeof payloadNew.contact_linkedin_url === "string"
+        ? payloadNew.contact_linkedin_url
+        : null,
+    contact_avatar_url:
+      typeof payloadNew.contact_avatar_url === "string" ? payloadNew.contact_avatar_url : null,
+    lead_linkedin_url:
+      typeof payloadNew.lead_linkedin_url === "string" ? payloadNew.lead_linkedin_url : null,
+  };
+}
+
+function messageFromRealtimePayload(payloadNew: Record<string, unknown>): InboxMessage | null {
+  const id = String(payloadNew.id ?? "").trim();
+  const unipileMessageId = String(payloadNew.unipile_message_id ?? "").trim();
+  if (!id || !unipileMessageId) return null;
+
+  return {
+    id,
+    unipile_message_id: unipileMessageId,
+    direction: String(payloadNew.direction ?? "inbound"),
+    sender_name: typeof payloadNew.sender_name === "string" ? payloadNew.sender_name : null,
+    sender_linkedin_url:
+      typeof payloadNew.sender_linkedin_url === "string"
+        ? payloadNew.sender_linkedin_url
+        : null,
+    text: typeof payloadNew.text === "string" ? payloadNew.text : null,
+    sent_at: typeof payloadNew.sent_at === "string" ? payloadNew.sent_at : null,
+    raw: payloadNew.raw ?? null,
+  };
+}
+
 export default function InboxPage() {
   const [threads, setThreads] = useState<InboxThread[]>([]);
   const [messages, setMessages] = useState<InboxMessage[]>([]);
@@ -51,6 +121,7 @@ export default function InboxPage() {
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [clientId, setClientId] = useState<string | null>(null);
 
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
@@ -133,9 +204,136 @@ export default function InboxPage() {
   }, [loadThreads]);
 
   useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/inbox/client", { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.clientId) return;
+        setClientId(String(data.clientId));
+      } catch {
+        // no-op
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
     if (!selectedThreadId) return;
     void loadMessages(selectedThreadId);
     void markThreadRead(selectedThreadId);
+  }, [selectedThreadId]);
+
+  useEffect(() => {
+    if (!clientId) return;
+
+    const channel = supabase
+      .channel(`inbox-threads-${clientId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "inbox_threads",
+          filter: `client_id=eq.${clientId}`,
+        },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const oldRow = payload.old as Record<string, unknown> | undefined;
+            const deletedId = String(oldRow?.id ?? "").trim();
+            if (!deletedId) return;
+
+            setThreads((prev) => prev.filter((thread) => thread.id !== deletedId));
+            setSelectedThreadId((prev) => (prev === deletedId ? null : prev));
+            return;
+          }
+
+          const nextRow = payload.new as Record<string, unknown> | undefined;
+          if (!nextRow) return;
+          const realtimeThread = threadFromRealtimePayload(nextRow);
+          if (!realtimeThread) return;
+
+          setThreads((prev) => {
+            const without = prev.filter((thread) => thread.id !== realtimeThread.id);
+            return sortThreadsByLastMessage([...without, realtimeThread]);
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [clientId]);
+
+  useEffect(() => {
+    if (!selectedThreadId) return;
+
+    const channel = supabase
+      .channel(`inbox-messages-${selectedThreadId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "inbox_messages",
+          filter: `thread_db_id=eq.${selectedThreadId}`,
+        },
+        (payload) => {
+          const nextRow = payload.new as Record<string, unknown> | undefined;
+          if (!nextRow) return;
+          const realtimeMessage = messageFromRealtimePayload(nextRow);
+          if (!realtimeMessage) return;
+
+          setMessages((prev) => {
+            const exists = prev.some(
+              (message) =>
+                message.id === realtimeMessage.id ||
+                message.unipile_message_id === realtimeMessage.unipile_message_id
+            );
+            if (exists) {
+              return sortMessagesBySentAt(
+                prev.map((message) =>
+                  message.unipile_message_id === realtimeMessage.unipile_message_id ||
+                  message.id === realtimeMessage.id
+                    ? realtimeMessage
+                    : message
+                )
+              );
+            }
+            return sortMessagesBySentAt([...prev, realtimeMessage]);
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "inbox_messages",
+          filter: `thread_db_id=eq.${selectedThreadId}`,
+        },
+        (payload) => {
+          const nextRow = payload.new as Record<string, unknown> | undefined;
+          if (!nextRow) return;
+          const realtimeMessage = messageFromRealtimePayload(nextRow);
+          if (!realtimeMessage) return;
+
+          setMessages((prev) =>
+            sortMessagesBySentAt(
+              prev.map((message) =>
+                message.id === realtimeMessage.id ||
+                message.unipile_message_id === realtimeMessage.unipile_message_id
+                  ? { ...message, ...realtimeMessage }
+                  : message
+              )
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [selectedThreadId]);
 
   const handleSync = async () => {
@@ -205,12 +403,7 @@ export default function InboxPage() {
               }
             : thread
         );
-
-        return [...next].sort((a, b) => {
-          const aTime = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
-          const bTime = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
-          return bTime - aTime;
-        });
+        return sortThreadsByLastMessage(next);
       });
 
       setDraft("");
@@ -288,9 +481,7 @@ export default function InboxPage() {
                         >
                           <div className="flex items-start justify-between gap-2">
                             <p className="truncate text-sm font-medium text-[#0b1c33]">
-                              {thread.lead_linkedin_url
-                                ? thread.lead_linkedin_url.replace(/^https?:\/\//, "")
-                                : `Thread ${thread.unipile_thread_id}`}
+                              {thread.contact_name || "Contact LinkedIn"}
                             </p>
                             {unreadCount > 0 ? (
                               <span className="rounded-full border border-[#9cc0ff] bg-white px-2 py-0.5 text-[11px] font-semibold text-[#1f5eff]">

@@ -12,6 +12,7 @@ import {
 } from "@/lib/inbox-server";
 import {
   extractArrayCandidates,
+  getFirstBoolean,
   getFirstString,
   parseUnipileMessage,
   truncatePreview,
@@ -22,14 +23,106 @@ type ParsedThread = {
   unipileThreadId: string;
   lastMessageAt: string;
   lastMessagePreview: string | null;
-  leadLinkedInUrl: string | null;
-  leadId: number | string | null;
+  contactName: string | null;
+  contactLinkedInUrl: string | null;
+  contactAvatarUrl: string | null;
 };
 
-function parseThreadFromItem(
-  item: JsonObject,
-  leadId: number | string | null
-): ParsedThread | null {
+type ThreadParticipant = {
+  name: string | null;
+  linkedinUrl: string | null;
+  avatarUrl: string | null;
+  isSelf: boolean | null;
+};
+
+function extractThreadParticipant(value: unknown): ThreadParticipant | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const participant = value as JsonObject;
+
+  return {
+    name:
+      getFirstString(participant, [
+        ["name"],
+        ["full_name"],
+        ["fullName"],
+        ["display_name"],
+        ["displayName"],
+      ]) ?? null,
+    linkedinUrl: normalizeLinkedInUrl(
+      getFirstString(participant, [
+        ["linkedin_url"],
+        ["linkedinUrl"],
+        ["profile_url"],
+        ["profileUrl"],
+        ["url"],
+      ])
+    ),
+    avatarUrl:
+      getFirstString(participant, [
+        ["avatar_url"],
+        ["avatarUrl"],
+        ["photo_url"],
+        ["photoUrl"],
+        ["profile_picture_url"],
+        ["profilePictureUrl"],
+      ]) ?? null,
+    isSelf: getFirstBoolean(participant, [
+      ["is_self"],
+      ["isSelf"],
+      ["self"],
+      ["from_me"],
+      ["is_sender"],
+      ["isSender"],
+    ]),
+  };
+}
+
+function extractOtherParticipant(item: JsonObject): ThreadParticipant | null {
+  const arraysToCheck: unknown[] = [
+    item.participants,
+    item.members,
+    item.recipients,
+    item.counterparts,
+    item.users,
+    item.people,
+  ];
+
+  const parsedParticipants: ThreadParticipant[] = [];
+
+  for (const entry of arraysToCheck) {
+    if (!Array.isArray(entry)) continue;
+    for (const candidate of entry) {
+      const parsed = extractThreadParticipant(candidate);
+      if (parsed) parsedParticipants.push(parsed);
+    }
+  }
+
+  const nestedObjects: unknown[] = [
+    item.participant,
+    item.recipient,
+    item.counterpart,
+    item.contact,
+    item.other,
+  ];
+  for (const entry of nestedObjects) {
+    const parsed = extractThreadParticipant(entry);
+    if (parsed) parsedParticipants.push(parsed);
+  }
+
+  const explicitOther = parsedParticipants.find((participant) => participant.isSelf === false);
+  if (explicitOther) return explicitOther;
+
+  const implicitOther = parsedParticipants.find(
+    (participant) =>
+      participant.isSelf !== true &&
+      Boolean(participant.linkedinUrl || participant.name || participant.avatarUrl)
+  );
+  if (implicitOther) return implicitOther;
+
+  return null;
+}
+
+function parseThreadFromItem(item: JsonObject): ParsedThread | null {
   const unipileThreadId = getFirstString(item, [
     ["thread_id"],
     ["threadId"],
@@ -69,23 +162,72 @@ function parseThreadFromItem(
     ])
   );
 
-  const leadLinkedInUrl = normalizeLinkedInUrl(
+  const otherParticipant = extractOtherParticipant(item);
+
+  const contactLinkedInUrl =
+    otherParticipant?.linkedinUrl ??
+    normalizeLinkedInUrl(
+      getFirstString(item, [
+        ["contact_linkedin_url"],
+        ["contactLinkedInUrl"],
+        ["lead_linkedin_url"],
+        ["leadLinkedInUrl"],
+        ["contact", "linkedin_url"],
+        ["contact", "linkedinUrl"],
+        ["contact", "profile_url"],
+        ["contact", "profileUrl"],
+        ["participant", "linkedin_url"],
+        ["participant", "linkedinUrl"],
+        ["participant", "profile_url"],
+        ["participant", "profileUrl"],
+        ["counterpart", "linkedin_url"],
+        ["counterpart", "linkedinUrl"],
+        ["counterpart", "profile_url"],
+        ["counterpart", "profileUrl"],
+      ])
+    );
+
+  const contactName =
+    otherParticipant?.name ??
     getFirstString(item, [
-      ["lead_linkedin_url"],
-      ["leadLinkedInUrl"],
-      ["participant", "linkedin_url"],
-      ["participant", "profile_url"],
-      ["contact", "linkedin_url"],
-      ["contact", "profile_url"],
-    ])
-  );
+      ["contact_name"],
+      ["contactName"],
+      ["contact", "name"],
+      ["participant", "name"],
+      ["counterpart", "name"],
+      ["recipient", "name"],
+    ]) ??
+    null;
+
+  const contactAvatarUrl =
+    otherParticipant?.avatarUrl ??
+    getFirstString(item, [
+      ["contact_avatar_url"],
+      ["contactAvatarUrl"],
+      ["contact", "avatar_url"],
+      ["contact", "avatarUrl"],
+      ["contact", "photo_url"],
+      ["contact", "photoUrl"],
+      ["contact", "profile_picture_url"],
+      ["contact", "profilePictureUrl"],
+      ["participant", "avatar_url"],
+      ["participant", "avatarUrl"],
+      ["participant", "photo_url"],
+      ["participant", "photoUrl"],
+      ["counterpart", "avatar_url"],
+      ["counterpart", "avatarUrl"],
+      ["counterpart", "photo_url"],
+      ["counterpart", "photoUrl"],
+    ]) ??
+    null;
 
   return {
     unipileThreadId,
     lastMessageAt,
     lastMessagePreview: preview,
-    leadLinkedInUrl,
-    leadId,
+    contactName,
+    contactLinkedInUrl,
+    contactAvatarUrl,
   };
 }
 
@@ -207,20 +349,14 @@ export async function POST() {
     let messagesInserted = 0;
 
     for (const threadItem of threadItems) {
-      const participantUrl = normalizeLinkedInUrl(
-        getFirstString(threadItem, [
-          ["participant", "linkedin_url"],
-          ["participant", "profile_url"],
-          ["contact", "linkedin_url"],
-          ["contact", "profile_url"],
-          ["lead_linkedin_url"],
-          ["leadLinkedInUrl"],
-        ])
-      );
-      const leadId = await resolveLeadIdByUrl(supabase, clientId, participantUrl);
-
-      const parsedThread = parseThreadFromItem(threadItem, leadId);
+      const parsedThread = parseThreadFromItem(threadItem);
       if (!parsedThread) continue;
+
+      const leadId = await resolveLeadIdByUrl(
+        supabase,
+        clientId,
+        parsedThread.contactLinkedInUrl
+      );
 
       const threadUpsertRecord: Record<string, unknown> = {
         client_id: clientId,
@@ -233,13 +369,21 @@ export async function POST() {
         updated_at: new Date().toISOString(),
       };
 
-      if (parsedThread.leadId !== null) {
-        threadUpsertRecord.lead_id = parsedThread.leadId;
+      if (leadId !== null) {
+        threadUpsertRecord.lead_id = leadId;
       }
 
-      const threadLeadUrl = parsedThread.leadLinkedInUrl ?? participantUrl;
-      if (threadLeadUrl) {
-        threadUpsertRecord.lead_linkedin_url = threadLeadUrl;
+      if (parsedThread.contactLinkedInUrl) {
+        threadUpsertRecord.lead_linkedin_url = parsedThread.contactLinkedInUrl;
+        threadUpsertRecord.contact_linkedin_url = parsedThread.contactLinkedInUrl;
+      }
+
+      if (parsedThread.contactName) {
+        threadUpsertRecord.contact_name = parsedThread.contactName;
+      }
+
+      if (parsedThread.contactAvatarUrl) {
+        threadUpsertRecord.contact_avatar_url = parsedThread.contactAvatarUrl;
       }
 
       const { error: threadUpsertErr } = await supabase
