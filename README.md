@@ -44,3 +44,30 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 The endpoint logs incoming events in `public.unipile_events` and updates
 `public.linkedin_invitations` to `accepted` when a LinkedIn relation is detected.
+
+## Inbox LinkedIn (Unipile)
+
+### Env vars
+- `UNIPILE_DSN`
+- `UNIPILE_API_KEY`
+- `UNIPILE_WEBHOOK_SECRET`
+
+### Webhook config (Unipile dashboard)
+- URL: `https://lidmeo.com/api/unipile/webhook`
+- Method: `POST`
+- Header: `x-unipile-secret: <UNIPILE_WEBHOOK_SECRET>`
+- Events recommandés:
+  - `NEW_MESSAGE`
+  - `MESSAGE_EDIT`
+  - `MESSAGE_DELETE`
+  - `MESSAGE_REACTION`
+  - `MESSAGE_DELIVERED`
+  - `MESSAGE_READ`
+  - `NEW_RELATION`
+
+### API routes inbox
+- `POST /api/inbox/sync`: synchronise threads + messages depuis Unipile
+- `POST /api/inbox/send`: envoie un message sur un thread
+- `POST /api/inbox/mark-read`: met un thread en lu (`unread_count=0`)
+- `GET /api/inbox/threads`: liste des threads du client connecté
+- `GET /api/inbox/messages?threadDbId=<id>`: messages d’un thread
