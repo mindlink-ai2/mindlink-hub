@@ -23,6 +23,7 @@ type Lead = {
   internal_message?: string | null;
   message_mail?: string | null;
   LinkedInURL?: string | null;
+  linkedin_invitation_sent?: boolean | null;
   [key: string]: unknown;
 };
 
@@ -59,6 +60,8 @@ export default function LeadsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exportingSelected, setExportingSelected] = useState(false);
   const [updatingStatusIds, setUpdatingStatusIds] = useState<Set<string>>(new Set());
+  const [invitingLeadIds, setInvitingLeadIds] = useState<Set<string>>(new Set());
+  const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
   const selectedCount = selectedIds.size;
 
   // ✅ open lead from query param (?open=ID)
@@ -322,6 +325,85 @@ export default function LeadsPage() {
       );
     } finally {
       setUpdatingStatusIds((prev: Set<string>) => {
+        if (!prev.has(idStr)) return prev;
+        const next = new Set(prev);
+        next.delete(idStr);
+        return next;
+      });
+    }
+  };
+
+  const handleLinkedInInvite = async (lead: Lead) => {
+    const idStr = String(lead.id);
+
+    if (invitingLeadIds.has(idStr) || lead.linkedin_invitation_sent) return;
+
+    if (!lead.LinkedInURL) {
+      setInviteErrors((prev) => ({
+        ...prev,
+        [idStr]: "URL LinkedIn manquante.",
+      }));
+      return;
+    }
+
+    const numericLeadId = Number(lead.id);
+    if (!Number.isFinite(numericLeadId)) {
+      setInviteErrors((prev) => ({
+        ...prev,
+        [idStr]: "Identifiant de lead invalide.",
+      }));
+      return;
+    }
+
+    setInvitingLeadIds((prev: Set<string>) => {
+      const next = new Set(prev);
+      next.add(idStr);
+      return next;
+    });
+
+    setInviteErrors((prev) => {
+      if (!prev[idStr]) return prev;
+      const next = { ...prev };
+      delete next[idStr];
+      return next;
+    });
+
+    try {
+      const res = await fetch("/api/linkedin/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId: numericLeadId }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        throw new Error(
+          typeof data?.error === "string"
+            ? data.error
+            : "Impossible d'envoyer l'invitation."
+        );
+      }
+
+      setSafeLeads((prev: Lead[]) =>
+        prev.map((l) =>
+          String(l.id) === idStr ? { ...l, linkedin_invitation_sent: true } : l
+        )
+      );
+
+      setOpenLead((prev: Lead | null) =>
+        prev && String(prev.id) === idStr
+          ? { ...prev, linkedin_invitation_sent: true }
+          : prev
+      );
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error ? e.message : "Impossible d'envoyer l'invitation.";
+      setInviteErrors((prev) => ({
+        ...prev,
+        [idStr]: errorMessage,
+      }));
+    } finally {
+      setInvitingLeadIds((prev: Set<string>) => {
         if (!prev.has(idStr)) return prev;
         const next = new Set(prev);
         next.delete(idStr);
@@ -765,7 +847,7 @@ export default function LeadsPage() {
               </div>
 
               <div className="w-full overflow-x-auto px-2 pb-2 pt-1">
-                <table className="min-w-[1040px] w-full table-fixed border-separate [border-spacing:0_10px] text-[13px]">
+                <table className="min-w-[1160px] w-full table-fixed border-separate [border-spacing:0_10px] text-[13px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="text-[11px] font-medium tracking-[0.02em] text-[#405770]">
                       <th className="w-[54px] px-3 py-2 text-center whitespace-nowrap">
@@ -780,7 +862,7 @@ export default function LeadsPage() {
                       <th className="w-[250px] px-3 py-2 text-left whitespace-nowrap">
                         Contact
                       </th>
-                      <th className="w-[130px] px-3 py-2 text-left whitespace-nowrap">
+                      <th className="w-[220px] px-3 py-2 text-left whitespace-nowrap">
                         LinkedIn
                       </th>
                       <th className="w-[110px] px-3 py-2 text-center whitespace-nowrap">
@@ -817,6 +899,9 @@ export default function LeadsPage() {
                         const idStr = String(lead.id);
                         const isSelected = selectedIds.has(idStr);
                         const isStatusUpdating = updatingStatusIds.has(idStr);
+                        const isInviteLoading = invitingLeadIds.has(idStr);
+                        const isInviteSent = Boolean(lead.linkedin_invitation_sent);
+                        const inviteError = inviteErrors[idStr];
                         const isSent = Boolean(lead.message_sent);
                         const isPending = !isSent && Boolean(lead.traite);
                         const isTodo = !isSent && !isPending;
@@ -974,19 +1059,53 @@ export default function LeadsPage() {
                             </td>
 
                             <td className={baseCellClass}>
-                              {lead.LinkedInURL ? (
-                                <a
-                                  href={lead.LinkedInURL}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                              <div className="flex flex-col items-start gap-1.5">
+                                {lead.LinkedInURL ? (
+                                  <a
+                                    href={lead.LinkedInURL}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                                  >
+                                    <Linkedin className="h-3.5 w-3.5" />
+                                    Profil
+                                  </a>
+                                ) : (
+                                  <span className="text-[11px] text-[#64748b]">
+                                    Profil indisponible
+                                  </span>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleLinkedInInvite(lead)}
+                                  disabled={
+                                    !lead.LinkedInURL || isInviteSent || isInviteLoading
+                                  }
+                                  className={[
+                                    "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
+                                    isInviteSent
+                                      ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
+                                      : inviteError
+                                        ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
+                                        : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
+                                    !lead.LinkedInURL ? "cursor-not-allowed opacity-60" : "",
+                                    isInviteLoading ? "cursor-wait opacity-70" : "",
+                                  ].join(" ")}
                                 >
-                                  <Linkedin className="h-3.5 w-3.5" />
-                                  Profil
-                                </a>
-                              ) : (
-                                <span className="text-[#64748b]">—</span>
-                              )}
+                                  {isInviteSent
+                                    ? "Invitation envoyée"
+                                    : isInviteLoading
+                                      ? "Envoi..."
+                                      : "Se connecter"}
+                                </button>
+
+                                {inviteError ? (
+                                  <span className="text-[10px] text-red-600">
+                                    {inviteError}
+                                  </span>
+                                ) : null}
+                              </div>
                             </td>
                             <td className={`${baseCellClass} whitespace-nowrap text-center tabular-nums text-[#64748b]`}>
                               {lead.created_at ? new Date(lead.created_at).toLocaleDateString("fr-FR") : "—"}

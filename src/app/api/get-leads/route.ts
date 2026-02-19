@@ -58,8 +58,40 @@ export async function GET() {
     .eq("client_id", clientId)
     .order("created_at", { ascending: false });
 
+  const leadRows = leads ?? [];
+  const leadIds = leadRows
+    .map((lead) => lead?.id)
+    .filter((id) => id !== null && id !== undefined);
+
+  let invitedLeadIds = new Set<string>();
+
+  if (leadIds.length > 0) {
+    const { data: invitations, error: invitationsErr } = await supabase
+      .from("linkedin_invitations")
+      .select("lead_id, status")
+      .eq("client_id", clientId)
+      .in("lead_id", leadIds)
+      .in("status", ["sent", "accepted"]);
+
+    if (invitationsErr) {
+      console.error("Failed to load linkedin invitations:", invitationsErr);
+    } else {
+      invitedLeadIds = new Set(
+        (invitations ?? [])
+          .map((invitation) => invitation?.lead_id)
+          .filter((leadId) => leadId !== null && leadId !== undefined)
+          .map((leadId) => String(leadId))
+      );
+    }
+  }
+
+  const leadsWithInvitationState = leadRows.map((lead) => ({
+    ...lead,
+    linkedin_invitation_sent: invitedLeadIds.has(String(lead.id)),
+  }));
+
   return NextResponse.json({
-    leads: leads ?? [],
+    leads: leadsWithInvitationState,
     client: {
       plan,
       is_premium,
