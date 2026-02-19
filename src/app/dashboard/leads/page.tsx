@@ -1038,10 +1038,10 @@ export default function LeadsPage() {
 
                               <HubButton
                                 type="button"
-                                variant="secondary"
+                                variant="primary"
                                 size="sm"
                                 onClick={() => setOpenLead(lead)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 border-[#c8d6ea] bg-white text-[#35598b] shadow-none hover:translate-y-0 hover:border-[#afc7eb] hover:bg-[#f3f8ff]"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 hover:-translate-y-1/2"
                               >
                                 Voir
                               </HubButton>
