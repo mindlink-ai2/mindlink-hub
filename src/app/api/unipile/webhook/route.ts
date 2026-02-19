@@ -29,6 +29,7 @@ type InboxThreadRow = {
   id: string;
   unread_count: number | null;
   last_message_at: string | null;
+  last_read_at: string | null;
   contact_name: string | null;
   contact_avatar_url: string | null;
 };
@@ -429,7 +430,7 @@ async function upsertThreadAndLoad(params: {
 
   const { data: thread, error: threadErr } = await supabase
     .from("inbox_threads")
-    .select("id, unread_count, last_message_at, contact_name, contact_avatar_url")
+    .select("id, unread_count, last_message_at, last_read_at, contact_name, contact_avatar_url")
     .eq("client_id", clientId)
     .eq("unipile_account_id", parsed.unipileAccountId)
     .eq("unipile_thread_id", parsed.unipileThreadId)
@@ -447,6 +448,8 @@ async function upsertThreadAndLoad(params: {
       typeof thread.unread_count === "number" ? thread.unread_count : Number(thread.unread_count ?? 0),
     last_message_at:
       typeof thread.last_message_at === "string" ? thread.last_message_at : null,
+    last_read_at:
+      typeof thread.last_read_at === "string" ? thread.last_read_at : null,
     contact_name: typeof thread.contact_name === "string" ? thread.contact_name : null,
     contact_avatar_url:
       typeof thread.contact_avatar_url === "string" ? thread.contact_avatar_url : null,
@@ -709,7 +712,13 @@ async function handleNewMessage(params: {
     threadUpdate.contact_avatar_url = senderAvatarUrl;
   }
 
-  if (wasInserted && parsed.direction === "inbound") {
+  const lastReadAt = parseIsoDate(thread.last_read_at);
+  const shouldIncrementUnread =
+    wasInserted &&
+    parsed.direction === "inbound" &&
+    (lastReadAt === null || (incomingLast !== null && incomingLast > lastReadAt));
+
+  if (shouldIncrementUnread) {
     const currentUnread = typeof thread.unread_count === "number" ? thread.unread_count : 0;
     threadUpdate.unread_count = currentUnread + 1;
   }
@@ -797,29 +806,6 @@ async function updateMessage(params: {
 
   if (updateErr) {
     console.error("UNIPILE_WEBHOOK_MESSAGE_UPDATE_ERROR:", updateErr);
-  }
-}
-
-async function markThreadRead(params: {
-  supabase: SupabaseClient;
-  clientId: string;
-  parsed: ParsedUnipileEvent;
-  fallbackThreadId: string | null;
-}) {
-  const { supabase, clientId, parsed, fallbackThreadId } = params;
-  const threadId = parsed.unipileThreadId ?? fallbackThreadId;
-
-  if (!threadId || !parsed.unipileAccountId) return;
-
-  const { error } = await supabase
-    .from("inbox_threads")
-    .update({ unread_count: 0 })
-    .eq("client_id", clientId)
-    .eq("unipile_account_id", parsed.unipileAccountId)
-    .eq("unipile_thread_id", threadId);
-
-  if (error) {
-    console.error("UNIPILE_WEBHOOK_MARK_READ_THREAD_ERROR:", error);
   }
 }
 
@@ -1174,12 +1160,6 @@ export async function POST(req: Request) {
           clientId,
           messageId: message.id,
           rawPatch: { delivery_status: "read", read_event: payload },
-        });
-        await markThreadRead({
-          supabase,
-          clientId,
-          parsed,
-          fallbackThreadId: message.unipile_thread_id,
         });
       }
 

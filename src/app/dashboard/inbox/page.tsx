@@ -140,6 +140,7 @@ export default function InboxPage() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
   const [threadSearch, setThreadSearch] = useState("");
@@ -419,6 +420,30 @@ export default function InboxPage() {
     }
   };
 
+  const handleMarkAllRead = async () => {
+    if (markingAllRead) return;
+    setMarkingAllRead(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/inbox/mark-all-read", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.error ?? "Impossible de marquer toutes les conversations comme lues.");
+      }
+
+      setThreads((prev) => prev.map((thread) => ({ ...thread, unread_count: 0 })));
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Erreur pendant le marquage de toutes les conversations."
+      );
+    } finally {
+      setMarkingAllRead(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!selectedThreadId || !draft.trim() || sending) return;
     setSending(true);
@@ -495,8 +520,17 @@ export default function InboxPage() {
                   type="button"
                   variant="secondary"
                   size="sm"
+                  onClick={handleMarkAllRead}
+                  disabled={markingAllRead || syncing || backfilling}
+                >
+                  {markingAllRead ? "Marquage..." : "Marquer tout comme lu"}
+                </HubButton>
+                <HubButton
+                  type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={handleBackfillNames}
-                  disabled={backfilling || syncing}
+                  disabled={backfilling || syncing || markingAllRead}
                 >
                   {backfilling ? "Backfill..." : "Backfill names"}
                 </HubButton>
@@ -504,7 +538,7 @@ export default function InboxPage() {
                   type="button"
                   variant="primary"
                   onClick={handleSync}
-                  disabled={syncing || backfilling}
+                  disabled={syncing || backfilling || markingAllRead}
                 >
                   {syncing ? "Synchronisation..." : "Sync Inbox"}
                 </HubButton>
