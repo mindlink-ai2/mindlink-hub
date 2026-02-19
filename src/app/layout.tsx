@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import nextDynamic from "next/dynamic";
 import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
 import "./globals.css";
 import DashboardContainer from "@/components/DashboardContainer";
 import InboxNavLink from "@/components/InboxNavLink";
+import SupportWidgetLoader from "@/components/support/SupportWidgetLoader";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-
-const SupportWidget = nextDynamic(() => import("@/components/support/SupportWidget"), {
-  ssr: false,
-});
 
 export const dynamic = "force-dynamic";
 
@@ -212,7 +208,7 @@ export default async function RootLayout({
               <DashboardContainer>{children}</DashboardContainer>
             </main>
 
-            <SupportWidget />
+            <SupportWidgetLoader />
 
             {/* 🔵 FOOTER */}
             <footer className="border-t border-[#c8d6ea] bg-[#f4f8ff]/75 text-xs text-[#3f5470]">
