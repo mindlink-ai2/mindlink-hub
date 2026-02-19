@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceSupabase, getClientIdFromClerkUser } from "@/lib/inbox-server";
+import {
+  extractSenderAttendeeId,
+  resolveAttendeeForMessage,
+} from "@/lib/unipile-attendees";
+import { toJsonObject } from "@/lib/unipile-inbox";
 
 export async function POST() {
   try {
@@ -17,7 +22,7 @@ export async function POST() {
 
     const { data: threads, error: threadsErr } = await supabase
       .from("inbox_threads")
-      .select("id")
+      .select("id, unipile_account_id, unipile_thread_id")
       .eq("client_id", clientId);
 
     if (threadsErr) {
@@ -27,16 +32,18 @@ export async function POST() {
 
     let updatedThreads = 0;
     for (const thread of threads ?? []) {
-      const threadId = String(thread?.id ?? "").trim();
-      if (!threadId) continue;
+      const threadObj = toJsonObject(thread);
+      const threadId = String(threadObj.id ?? "").trim();
+      const unipileAccountId = String(threadObj.unipile_account_id ?? "").trim();
+      const unipileThreadId = String(threadObj.unipile_thread_id ?? "").trim();
+      if (!threadId || !unipileAccountId || !unipileThreadId) continue;
 
       const { data: latestInbound, error: latestInboundErr } = await supabase
         .from("inbox_messages")
-        .select("sender_name, sender_linkedin_url")
+        .select("id, sender_name, sender_linkedin_url, raw")
         .eq("client_id", clientId)
         .eq("thread_db_id", threadId)
         .eq("direction", "inbound")
-        .not("sender_name", "is", null)
         .order("sent_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -50,19 +57,62 @@ export async function POST() {
         typeof latestInbound?.sender_name === "string"
           ? latestInbound.sender_name.trim()
           : "";
-      if (!senderName) continue;
-
-      const updatePayload: Record<string, unknown> = {
-        contact_name: senderName,
-        updated_at: new Date().toISOString(),
-      };
-
       const senderLinkedInUrl =
         typeof latestInbound?.sender_linkedin_url === "string"
           ? latestInbound.sender_linkedin_url.trim()
           : "";
-      if (senderLinkedInUrl) {
-        updatePayload.contact_linkedin_url = senderLinkedInUrl;
+      const senderAttendeeId = extractSenderAttendeeId(latestInbound?.raw);
+
+      let resolvedSenderName = senderName;
+      let resolvedSenderLinkedInUrl = senderLinkedInUrl;
+      if ((!resolvedSenderName || !resolvedSenderLinkedInUrl) && senderAttendeeId) {
+        const resolved = await resolveAttendeeForMessage({
+          supabase,
+          clientId,
+          unipileAccountId,
+          senderAttendeeId,
+          chatId: unipileThreadId,
+        });
+
+        if (resolved?.name && !resolvedSenderName) {
+          resolvedSenderName = resolved.name;
+        }
+        if (resolved?.linkedinUrl && !resolvedSenderLinkedInUrl) {
+          resolvedSenderLinkedInUrl = resolved.linkedinUrl;
+        }
+
+        if (latestInbound?.id && (resolved?.name || resolved?.linkedinUrl)) {
+          const messagePatch: Record<string, unknown> = {};
+          if (resolved?.name && !senderName) {
+            messagePatch.sender_name = resolved.name;
+          }
+          if (resolved?.linkedinUrl && !senderLinkedInUrl) {
+            messagePatch.sender_linkedin_url = resolved.linkedinUrl;
+          }
+
+          if (Object.keys(messagePatch).length > 0) {
+            const { error: messageUpdateErr } = await supabase
+              .from("inbox_messages")
+              .update(messagePatch)
+              .eq("id", String(latestInbound.id))
+              .eq("client_id", clientId);
+
+            if (messageUpdateErr) {
+              console.error("INBOX_BACKFILL_MESSAGE_UPDATE_ERROR:", messageUpdateErr);
+            }
+          }
+        }
+      }
+
+      if (!resolvedSenderName) continue;
+
+      const updatePayload: Record<string, unknown> = {
+        contact_name: resolvedSenderName,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (resolvedSenderLinkedInUrl) {
+        updatePayload.contact_linkedin_url = resolvedSenderLinkedInUrl;
       }
 
       const { error: updateErr } = await supabase

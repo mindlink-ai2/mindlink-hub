@@ -3,6 +3,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { extractLinkedInProfileSlug, normalizeLinkedInUrl } from "@/lib/linkedin-url";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import {
+  extractSenderAttendeeId,
+  resolveAttendeeForMessage,
+} from "@/lib/unipile-attendees";
+import {
   getFirstBoolean,
   getFirstString,
   parseUnipileEvent,
@@ -63,6 +67,35 @@ function mergeRawObject(
       ? (currentRaw as Record<string, unknown>)
       : {};
   return { ...base, ...patch };
+}
+
+function extractSenderAvatarFromPayload(payload: JsonObject): string | null {
+  return (
+    getFirstString(payload, [
+      ["sender_avatar_url"],
+      ["senderAvatarUrl"],
+      ["sender", "avatar_url"],
+      ["sender", "avatarUrl"],
+      ["sender", "photo_url"],
+      ["sender", "photoUrl"],
+      ["sender", "profile_picture_url"],
+      ["sender", "profilePictureUrl"],
+      ["author", "avatar_url"],
+      ["author", "photo_url"],
+      ["data", "sender", "avatar_url"],
+      ["data", "sender", "avatarUrl"],
+      ["data", "sender", "photo_url"],
+      ["data", "sender", "photoUrl"],
+      ["data", "attendee", "avatar_url"],
+      ["data", "attendee", "avatarUrl"],
+      ["data", "attendee", "photo_url"],
+      ["data", "attendee", "photoUrl"],
+      ["data", "contact", "avatar_url"],
+      ["data", "contact", "avatarUrl"],
+      ["data", "contact", "photo_url"],
+      ["data", "contact", "photoUrl"],
+    ]) ?? null
+  );
 }
 
 function extractPayloadParticipant(value: unknown): PayloadParticipant | null {
@@ -474,16 +507,57 @@ async function handleNewMessage(params: {
     return;
   }
 
-  const senderSlug = extractLinkedInProfileSlug(parsed.senderLinkedInUrl);
-  const threadContact = extractThreadContactFromPayload(payload, parsed);
+  const senderAttendeeId = extractSenderAttendeeId(payload);
+  let senderName = parsed.senderName;
+  let senderLinkedInUrl = parsed.senderLinkedInUrl;
+  let senderAvatarUrl = extractSenderAvatarFromPayload(payload);
+
+  if ((!senderName || !senderLinkedInUrl || !senderAvatarUrl) && senderAttendeeId) {
+    const resolvedAttendee = await resolveAttendeeForMessage({
+      supabase,
+      clientId,
+      unipileAccountId: parsed.unipileAccountId,
+      senderAttendeeId,
+      chatId: parsed.unipileThreadId,
+    });
+
+    if (resolvedAttendee) {
+      if (!senderName && resolvedAttendee.name) senderName = resolvedAttendee.name;
+      if (!senderLinkedInUrl && resolvedAttendee.linkedinUrl) {
+        senderLinkedInUrl = resolvedAttendee.linkedinUrl;
+      }
+      if (!senderAvatarUrl && resolvedAttendee.avatarUrl) {
+        senderAvatarUrl = resolvedAttendee.avatarUrl;
+      }
+    }
+  }
+
+  const parsedWithResolvedSender: ParsedUnipileEvent = {
+    ...parsed,
+    senderName,
+    senderLinkedInUrl,
+  };
+  const senderSlug = extractLinkedInProfileSlug(senderLinkedInUrl);
+  let threadContact = extractThreadContactFromPayload(payload, parsedWithResolvedSender);
+  if (!threadContact.contactAvatarUrl && senderAvatarUrl && parsed.direction === "inbound") {
+    threadContact = {
+      ...threadContact,
+      contactAvatarUrl: senderAvatarUrl,
+    };
+  }
   const leadId = await findLeadIdByLinkedInIdentity({
     supabase,
     clientId,
-    linkedinUrl: parsed.senderLinkedInUrl,
+    linkedinUrl: senderLinkedInUrl,
     slug: senderSlug,
   });
 
-  const thread = await upsertThreadAndLoad({ supabase, clientId, parsed, leadId });
+  const thread = await upsertThreadAndLoad({
+    supabase,
+    clientId,
+    parsed: parsedWithResolvedSender,
+    leadId,
+  });
   if (!thread) return;
 
   await enrichThreadContactIfMissing({
@@ -495,24 +569,34 @@ async function handleNewMessage(params: {
     contact: threadContact,
   });
 
+  const resolvedSenderPatch: Record<string, unknown> = {};
+  if (senderAttendeeId) resolvedSenderPatch.attendee_id = senderAttendeeId;
+  if (senderName) resolvedSenderPatch.name = senderName;
+  if (senderLinkedInUrl) resolvedSenderPatch.linkedin_url = senderLinkedInUrl;
+  if (senderAvatarUrl) resolvedSenderPatch.avatar_url = senderAvatarUrl;
+  const messageRaw =
+    Object.keys(resolvedSenderPatch).length > 0
+      ? mergeRawObject(payload, { resolved_sender: resolvedSenderPatch })
+      : payload;
+
   const messageRecord = {
     client_id: clientId,
     provider: "linkedin",
     thread_db_id: thread.id,
-    unipile_account_id: parsed.unipileAccountId,
-    unipile_thread_id: parsed.unipileThreadId,
-    unipile_message_id: parsed.unipileMessageId,
+    unipile_account_id: parsedWithResolvedSender.unipileAccountId,
+    unipile_thread_id: parsedWithResolvedSender.unipileThreadId,
+    unipile_message_id: parsedWithResolvedSender.unipileMessageId,
     direction: parsed.direction,
-    sender_name: parsed.senderName,
-    sender_linkedin_url: parsed.senderLinkedInUrl,
+    sender_name: senderName,
+    sender_linkedin_url: senderLinkedInUrl,
     text: parsed.text,
     sent_at: parsed.sentAtIso,
-    raw: payload,
+    raw: messageRaw,
   };
 
   const { data: existingMessage, error: existingMessageErr } = await supabase
     .from("inbox_messages")
-    .select("id")
+    .select("id, sender_name, sender_linkedin_url, raw")
     .eq("client_id", clientId)
     .eq("unipile_account_id", parsed.unipileAccountId)
     .eq("unipile_message_id", parsed.unipileMessageId)
@@ -537,6 +621,41 @@ async function handleNewMessage(params: {
 
     wasInserted = true;
   }
+
+  if (existingMessage?.id) {
+    const existingSenderName =
+      typeof existingMessage.sender_name === "string" ? existingMessage.sender_name.trim() : "";
+    const existingSenderLinkedInUrl =
+      typeof existingMessage.sender_linkedin_url === "string"
+        ? existingMessage.sender_linkedin_url.trim()
+        : "";
+
+    const existingPatch: Record<string, unknown> = {};
+    if (!existingSenderName && senderName) {
+      existingPatch.sender_name = senderName;
+    }
+    if (!existingSenderLinkedInUrl && senderLinkedInUrl) {
+      existingPatch.sender_linkedin_url = senderLinkedInUrl;
+    }
+    if (Object.keys(resolvedSenderPatch).length > 0) {
+      existingPatch.raw = mergeRawObject(existingMessage.raw, {
+        resolved_sender: resolvedSenderPatch,
+      });
+    }
+
+    if (Object.keys(existingPatch).length > 0) {
+      const { error: messageUpdateErr } = await supabase
+        .from("inbox_messages")
+        .update(existingPatch)
+        .eq("id", String(existingMessage.id))
+        .eq("client_id", clientId);
+
+      if (messageUpdateErr) {
+        console.error("UNIPILE_WEBHOOK_MESSAGE_ENRICH_UPDATE_ERROR:", messageUpdateErr);
+      }
+    }
+  }
+
   const currentLast = parseIsoDate(thread.last_message_at);
   const incomingLast = parseIsoDate(parsed.sentAtIso);
   const shouldRefreshLastMessage =
@@ -548,13 +667,16 @@ async function handleNewMessage(params: {
     threadUpdate.last_message_preview = truncatePreview(parsed.text);
   }
 
-  const senderName = (parsed.senderName ?? "").trim();
-  const senderLinkedInUrl = (parsed.senderLinkedInUrl ?? "").trim();
+  const normalizedSenderName = (senderName ?? "").trim();
+  const normalizedSenderLinkedInUrl = (senderLinkedInUrl ?? "").trim();
   const hasContactName = (thread.contact_name ?? "").trim().length > 0;
-  if (parsed.direction === "inbound" && !hasContactName && senderName) {
-    threadUpdate.contact_name = senderName;
-    if (senderLinkedInUrl) {
-      threadUpdate.contact_linkedin_url = senderLinkedInUrl;
+  if (parsed.direction === "inbound" && !hasContactName && normalizedSenderName) {
+    threadUpdate.contact_name = normalizedSenderName;
+    if (normalizedSenderLinkedInUrl) {
+      threadUpdate.contact_linkedin_url = normalizedSenderLinkedInUrl;
+    }
+    if (senderAvatarUrl) {
+      threadUpdate.contact_avatar_url = senderAvatarUrl;
     }
   }
 

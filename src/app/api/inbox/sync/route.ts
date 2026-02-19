@@ -11,6 +11,12 @@ import {
   requireEnv,
 } from "@/lib/inbox-server";
 import {
+  extractSenderAttendeeId,
+  resolveAttendeeForMessage,
+  resolveOtherAttendeeForChat,
+  type ResolvedAttendee,
+} from "@/lib/unipile-attendees";
+import {
   extractArrayCandidates,
   getFirstBoolean,
   getFirstString,
@@ -40,6 +46,31 @@ function parseIsoMs(value: string | null): number {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return Number.NEGATIVE_INFINITY;
   return date.getTime();
+}
+
+function extractMessageSenderAvatar(payload: JsonObject): string | null {
+  return (
+    getFirstString(payload, [
+      ["sender_avatar_url"],
+      ["senderAvatarUrl"],
+      ["sender", "avatar_url"],
+      ["sender", "avatarUrl"],
+      ["sender", "photo_url"],
+      ["sender", "photoUrl"],
+      ["sender", "profile_picture_url"],
+      ["sender", "profilePictureUrl"],
+      ["author", "avatar_url"],
+      ["author", "photo_url"],
+      ["data", "sender", "avatar_url"],
+      ["data", "sender", "avatarUrl"],
+      ["data", "sender", "photo_url"],
+      ["data", "sender", "photoUrl"],
+      ["data", "attendee", "avatar_url"],
+      ["data", "attendee", "avatarUrl"],
+      ["data", "contact", "avatar_url"],
+      ["data", "contact", "avatarUrl"],
+    ]) ?? null
+  );
 }
 
 function extractThreadParticipant(value: unknown): ThreadParticipant | null {
@@ -330,6 +361,8 @@ export async function POST() {
 
     const base = normalizeUnipileBase(requireEnv("UNIPILE_DSN"));
     const apiKey = requireEnv("UNIPILE_API_KEY");
+    const unipileApiConfig = { base, apiKey };
+    const attendeeResolutionCache = new Map<string, Promise<ResolvedAttendee | null>>();
 
     const threadResult = await fetchFirstSuccessful(
       [
@@ -359,10 +392,26 @@ export async function POST() {
       const parsedThread = parseThreadFromItem(threadItem);
       if (!parsedThread) continue;
 
+      const resolvedThreadAttendee = await resolveOtherAttendeeForChat({
+        unipileAccountId,
+        chatId: parsedThread.unipileThreadId,
+        config: unipileApiConfig,
+      }).catch((error: unknown) => {
+        console.error("INBOX_SYNC_THREAD_ATTENDEE_RESOLVE_ERROR:", error);
+        return null;
+      });
+
+      const threadContactName =
+        parsedThread.contactName ?? resolvedThreadAttendee?.name ?? null;
+      const threadContactLinkedInUrl =
+        parsedThread.contactLinkedInUrl ?? resolvedThreadAttendee?.linkedinUrl ?? null;
+      const threadContactAvatarUrl =
+        parsedThread.contactAvatarUrl ?? resolvedThreadAttendee?.avatarUrl ?? null;
+
       const leadId = await resolveLeadIdByUrl(
         supabase,
         clientId,
-        parsedThread.contactLinkedInUrl
+        threadContactLinkedInUrl
       );
 
       const threadUpsertRecord: Record<string, unknown> = {
@@ -380,17 +429,17 @@ export async function POST() {
         threadUpsertRecord.lead_id = leadId;
       }
 
-      if (parsedThread.contactLinkedInUrl) {
-        threadUpsertRecord.lead_linkedin_url = parsedThread.contactLinkedInUrl;
-        threadUpsertRecord.contact_linkedin_url = parsedThread.contactLinkedInUrl;
+      if (threadContactLinkedInUrl) {
+        threadUpsertRecord.lead_linkedin_url = threadContactLinkedInUrl;
+        threadUpsertRecord.contact_linkedin_url = threadContactLinkedInUrl;
       }
 
-      if (parsedThread.contactName) {
-        threadUpsertRecord.contact_name = parsedThread.contactName;
+      if (threadContactName) {
+        threadUpsertRecord.contact_name = threadContactName;
       }
 
-      if (parsedThread.contactAvatarUrl) {
-        threadUpsertRecord.contact_avatar_url = parsedThread.contactAvatarUrl;
+      if (threadContactAvatarUrl) {
+        threadUpsertRecord.contact_avatar_url = threadContactAvatarUrl;
       }
 
       const { error: threadUpsertErr } = await supabase
@@ -448,6 +497,7 @@ export async function POST() {
         typeof dbThread.contact_name === "string" ? dbThread.contact_name.trim() : "";
       let backfillContactName: string | null = null;
       let backfillContactLinkedInUrl: string | null = null;
+      let backfillContactAvatarUrl: string | null = null;
       let latestInboundWithNameAtMs = Number.NEGATIVE_INFINITY;
 
       for (const messageItem of messageItems) {
@@ -460,6 +510,44 @@ export async function POST() {
 
         if (!parsedMessage.unipileMessageId) continue;
 
+        const senderAttendeeId = extractSenderAttendeeId(messageItem);
+        let messageSenderName = parsedMessage.senderName;
+        let messageSenderLinkedInUrl = parsedMessage.senderLinkedInUrl;
+        let messageSenderAvatar = extractMessageSenderAvatar(messageItem);
+
+        if ((!messageSenderName || !messageSenderLinkedInUrl || !messageSenderAvatar) && senderAttendeeId) {
+          const cacheKey = `${unipileAccountId}:${parsedThread.unipileThreadId}:${senderAttendeeId}`;
+          if (!attendeeResolutionCache.has(cacheKey)) {
+            attendeeResolutionCache.set(
+              cacheKey,
+              resolveAttendeeForMessage({
+                supabase,
+                clientId,
+                unipileAccountId,
+                senderAttendeeId,
+                chatId: parsedThread.unipileThreadId,
+                config: unipileApiConfig,
+              }).catch((error: unknown) => {
+                console.error("INBOX_SYNC_MESSAGE_ATTENDEE_RESOLVE_ERROR:", error);
+                return null;
+              })
+            );
+          }
+
+          const resolvedAttendee = await attendeeResolutionCache.get(cacheKey);
+          if (resolvedAttendee) {
+            if (!messageSenderName && resolvedAttendee.name) {
+              messageSenderName = resolvedAttendee.name;
+            }
+            if (!messageSenderLinkedInUrl && resolvedAttendee.linkedinUrl) {
+              messageSenderLinkedInUrl = resolvedAttendee.linkedinUrl;
+            }
+            if (!messageSenderAvatar && resolvedAttendee.avatarUrl) {
+              messageSenderAvatar = resolvedAttendee.avatarUrl;
+            }
+          }
+        }
+
         const messageSentAtMs = parseIsoMs(parsedMessage.sentAtIso);
         if (messageSentAtMs > latestMessageAtMs) {
           latestMessageAtMs = messageSentAtMs;
@@ -468,17 +556,33 @@ export async function POST() {
         }
 
         if (!existingContactName && parsedMessage.direction === "inbound") {
-          const senderName = (parsedMessage.senderName ?? "").trim();
+          const senderName = (messageSenderName ?? "").trim();
           if (senderName && messageSentAtMs >= latestInboundWithNameAtMs) {
             latestInboundWithNameAtMs = messageSentAtMs;
             backfillContactName = senderName;
-            backfillContactLinkedInUrl = parsedMessage.senderLinkedInUrl;
+            backfillContactLinkedInUrl = messageSenderLinkedInUrl;
+            backfillContactAvatarUrl = messageSenderAvatar;
           }
         }
 
+        const resolvedSenderPatch: Record<string, unknown> = {};
+        if (senderAttendeeId) resolvedSenderPatch.attendee_id = senderAttendeeId;
+        if (messageSenderName) resolvedSenderPatch.name = messageSenderName;
+        if (messageSenderLinkedInUrl) {
+          resolvedSenderPatch.linkedin_url = messageSenderLinkedInUrl;
+        }
+        if (messageSenderAvatar) resolvedSenderPatch.avatar_url = messageSenderAvatar;
+        const messageRaw =
+          Object.keys(resolvedSenderPatch).length > 0
+            ? ({
+                ...messageItem,
+                resolved_sender: resolvedSenderPatch,
+              } satisfies Record<string, unknown>)
+            : messageItem;
+
         const { data: existingMessage, error: existingMessageErr } = await supabase
           .from("inbox_messages")
-          .select("id")
+          .select("id, sender_name, sender_linkedin_url, raw")
           .eq("client_id", clientId)
           .eq("unipile_account_id", unipileAccountId)
           .eq("unipile_message_id", parsedMessage.unipileMessageId)
@@ -490,7 +594,47 @@ export async function POST() {
           continue;
         }
 
-        if (existingMessage?.id) continue;
+        if (existingMessage?.id) {
+          const existingSenderName =
+            typeof existingMessage.sender_name === "string"
+              ? existingMessage.sender_name.trim()
+              : "";
+          const existingSenderLinkedInUrl =
+            typeof existingMessage.sender_linkedin_url === "string"
+              ? existingMessage.sender_linkedin_url.trim()
+              : "";
+
+          const existingPatch: Record<string, unknown> = {};
+          if (!existingSenderName && messageSenderName) {
+            existingPatch.sender_name = messageSenderName;
+          }
+          if (!existingSenderLinkedInUrl && messageSenderLinkedInUrl) {
+            existingPatch.sender_linkedin_url = messageSenderLinkedInUrl;
+          }
+          if (Object.keys(resolvedSenderPatch).length > 0) {
+            const existingRaw =
+              existingMessage.raw && typeof existingMessage.raw === "object"
+                ? (existingMessage.raw as Record<string, unknown>)
+                : {};
+            existingPatch.raw = {
+              ...existingRaw,
+              resolved_sender: resolvedSenderPatch,
+            };
+          }
+
+          if (Object.keys(existingPatch).length > 0) {
+            const { error: existingUpdateErr } = await supabase
+              .from("inbox_messages")
+              .update(existingPatch)
+              .eq("id", String(existingMessage.id))
+              .eq("client_id", clientId);
+
+            if (existingUpdateErr) {
+              console.error("INBOX_SYNC_MESSAGE_ENRICH_UPDATE_ERROR:", existingUpdateErr);
+            }
+          }
+          continue;
+        }
 
         const { error: messageInsertErr } = await supabase.from("inbox_messages").insert({
           client_id: clientId,
@@ -500,11 +644,11 @@ export async function POST() {
           unipile_thread_id: parsedMessage.unipileThreadId ?? parsedThread.unipileThreadId,
           unipile_message_id: parsedMessage.unipileMessageId,
           direction: parsedMessage.direction,
-          sender_name: parsedMessage.senderName,
-          sender_linkedin_url: parsedMessage.senderLinkedInUrl,
+          sender_name: messageSenderName,
+          sender_linkedin_url: messageSenderLinkedInUrl,
           text: parsedMessage.text,
           sent_at: parsedMessage.sentAtIso,
-          raw: messageItem,
+          raw: messageRaw,
         });
 
         if (messageInsertErr) {
@@ -525,6 +669,9 @@ export async function POST() {
         threadUpdatePayload.contact_name = backfillContactName;
         if (backfillContactLinkedInUrl) {
           threadUpdatePayload.contact_linkedin_url = backfillContactLinkedInUrl;
+        }
+        if (backfillContactAvatarUrl) {
+          threadUpdatePayload.contact_avatar_url = backfillContactAvatarUrl;
         }
       }
 
