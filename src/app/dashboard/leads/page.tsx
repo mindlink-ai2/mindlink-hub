@@ -679,8 +679,6 @@ export default function LeadsPage() {
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
         <div className="relative min-h-screen w-full px-4 pb-24 pt-8 sm:px-6">
-          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[440px] bg-[radial-gradient(circle_at_22%_-12%,rgba(31,94,255,0.12),transparent_58%),radial-gradient(circle_at_82%_0%,rgba(35,196,245,0.1),transparent_52%),linear-gradient(180deg,rgba(69,121,214,0.09),rgba(69,121,214,0)_78%)]" />
-
           <div className="mx-auto w-full max-w-[1680px] space-y-8">
             <section className="hub-card-hero relative overflow-hidden p-6 sm:p-7">
               <div className="pointer-events-none absolute inset-0">
