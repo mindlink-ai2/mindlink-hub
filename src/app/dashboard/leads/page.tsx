@@ -386,13 +386,15 @@ export default function LeadsPage() {
 
       setSafeLeads((prev: Lead[]) =>
         prev.map((l) =>
-          String(l.id) === idStr ? { ...l, linkedin_invitation_sent: true } : l
+          String(l.id) === idStr
+            ? { ...l, linkedin_invitation_sent: true, traite: true }
+            : l
         )
       );
 
       setOpenLead((prev: Lead | null) =>
         prev && String(prev.id) === idStr
-          ? { ...prev, linkedin_invitation_sent: true }
+          ? { ...prev, linkedin_invitation_sent: true, traite: true }
           : prev
       );
     } catch (e: unknown) {

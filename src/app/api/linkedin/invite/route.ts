@@ -154,6 +154,16 @@ export async function POST(req: Request) {
     }
 
     if ((existingInvitations ?? []).length > 0) {
+      const { error: updateLeadStatusErr } = await supabase
+        .from("leads")
+        .update({ traite: true })
+        .eq("id", lead.id)
+        .eq("client_id", client.id);
+
+      if (updateLeadStatusErr) {
+        console.error("LINKEDIN_INVITE_STATUS_UPDATE_ERROR:", updateLeadStatusErr);
+      }
+
       return NextResponse.json({ success: true, alreadySent: true });
     }
 
@@ -238,6 +248,16 @@ export async function POST(req: Request) {
         { success: false, error: "invitation_log_failed" },
         { status: 500 }
       );
+    }
+
+    const { error: updateLeadStatusErr } = await supabase
+      .from("leads")
+      .update({ traite: true })
+      .eq("id", lead.id)
+      .eq("client_id", client.id);
+
+    if (updateLeadStatusErr) {
+      console.error("LINKEDIN_INVITE_STATUS_UPDATE_ERROR:", updateLeadStatusErr);
     }
 
     return NextResponse.json({ success: true });
