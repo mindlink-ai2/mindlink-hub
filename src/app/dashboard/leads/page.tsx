@@ -861,28 +861,28 @@ export default function LeadsPage() {
               </div>
 
               <div className="w-full overflow-x-auto px-2 pb-2 pt-1">
-                <table className="min-w-[1160px] w-full table-fixed border-separate [border-spacing:0_10px] text-[13px]">
+                <table className="min-w-[1160px] w-full table-fixed border-separate [border-spacing:0_6px] text-[13px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="text-[11px] font-medium tracking-[0.02em] text-[#405770]">
-                      <th className="w-[54px] px-3 py-2 text-center whitespace-nowrap">
+                      <th className="w-[54px] px-3 py-1.5 text-center whitespace-nowrap">
                         Sel.
                       </th>
-                      <th className="w-[150px] px-3 py-2 text-center whitespace-nowrap">
+                      <th className="w-[150px] px-3 py-1.5 text-center whitespace-nowrap">
                         Statut
                       </th>
-                      <th className="w-[340px] px-3 py-2 text-left whitespace-nowrap">
+                      <th className="w-[340px] px-3 py-1.5 text-left whitespace-nowrap">
                         Prospect
                       </th>
-                      <th className="w-[250px] px-3 py-2 text-left whitespace-nowrap">
+                      <th className="w-[250px] px-3 py-1.5 text-left whitespace-nowrap">
                         Contact
                       </th>
-                      <th className="w-[220px] px-3 py-2 text-left whitespace-nowrap">
+                      <th className="w-[220px] px-3 py-1.5 text-left whitespace-nowrap">
                         LinkedIn
                       </th>
-                      <th className="w-[110px] px-3 py-2 text-center whitespace-nowrap">
+                      <th className="w-[110px] px-3 py-1.5 text-center whitespace-nowrap">
                         Date
                       </th>
-                      <th className="w-[110px] px-3 py-2 text-center whitespace-nowrap">
+                      <th className="w-[110px] px-3 py-1.5 text-center whitespace-nowrap">
                         Supprimer
                       </th>
                     </tr>
@@ -943,7 +943,7 @@ export default function LeadsPage() {
                           : isPending
                             ? "bg-amber-500"
                             : "bg-[#6f85a6]";
-                        const baseCellClass = "border-y border-[#d7e3f4] px-3 py-4 align-middle";
+                        const baseCellClass = "border-y border-[#d7e3f4] px-3 py-2.5 align-middle";
 
                         return (
                           <tr
@@ -973,7 +973,7 @@ export default function LeadsPage() {
                                 onClick={() => handleStatusBadgeClick(lead)}
                                 disabled={isSent || isStatusUpdating}
                                 className={[
-                                  "inline-flex h-9 items-center justify-center rounded-full border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
+                                  "inline-flex h-8 items-center justify-center rounded-full border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
                                   isSent
                                     ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
                                     : isPending
@@ -1008,7 +1008,7 @@ export default function LeadsPage() {
 
                             <td className={`${baseCellClass} relative pr-16 text-[#0b1c33]`}>
                               <div className="flex min-w-0 items-start gap-3">
-                                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#c8d6ea] bg-[#e9f1ff] text-[11px] font-semibold text-[#35598b]">
+                                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#c8d6ea] bg-[#e9f1ff] text-[10px] font-semibold text-[#35598b]">
                                   {initials}
                                 </div>
                                 <div className="min-w-0">
@@ -1048,7 +1048,7 @@ export default function LeadsPage() {
                             </td>
 
                             <td className={`${baseCellClass} text-[#405770]`}>
-                              <div className="space-y-1.5">
+                              <div className="space-y-1">
                                 {lead.email ? (
                                   <a
                                     href={`mailto:${lead.email}`}
@@ -1082,13 +1082,13 @@ export default function LeadsPage() {
                             </td>
 
                             <td className={baseCellClass}>
-                              <div className="flex flex-col items-start gap-1.5">
+                              <div className="flex flex-col items-start gap-1">
                                 {lead.LinkedInURL ? (
                                   <a
                                     href={lead.LinkedInURL}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
                                   >
                                     <Linkedin className="h-3.5 w-3.5" />
                                     Profil
