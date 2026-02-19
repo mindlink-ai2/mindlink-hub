@@ -591,10 +591,11 @@ export default function InboxPage() {
                           type="button"
                           onClick={() => setSelectedThreadId(thread.id)}
                           className={[
-                            "w-full rounded-xl border px-3 py-3 text-left transition",
-                            active
-                              ? "border-[#9cc0ff] bg-[#eef5ff]"
-                              : "border-[#d7e3f4] bg-[#f7fbff] hover:border-[#b9d0f2]",
+                            "w-full rounded-xl border px-3 py-3 text-left transition-colors duration-150",
+                            active ? "border-[#9cc0ff]" : "border-[#d7e3f4] hover:border-[#b9d0f2]",
+                            unreadCount > 0
+                              ? "bg-blue-50 hover:bg-blue-100"
+                              : "bg-transparent hover:bg-gray-50",
                           ].join(" ")}
                         >
                           <div className="flex items-start gap-3">
