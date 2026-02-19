@@ -11,6 +11,27 @@ const querySchema = z.object({
   before: z.string().datetime().optional(),
 });
 
+type MessageRow = {
+  id: string;
+  conversation_id: string;
+  sender_type: "user" | "support";
+  body: string;
+  created_at: string;
+  read_at: string | null;
+  read_by_support_at: string | null;
+};
+
+function isMissingReadBySupportColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const errorCode = String(error.code ?? "");
+  const errorMessage = String(error.message ?? "");
+  return (
+    errorCode === "42703" ||
+    errorCode === "PGRST204" ||
+    errorMessage.includes("read_by_support_at")
+  );
+}
+
 export async function GET(request: Request) {
   try {
     const adminContext = await getSupportAdminContext();
@@ -42,7 +63,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "conversation_not_found" }, { status: 404 });
     }
 
-    let query = supabase
+    let queryWithReadBySupport = supabase
       .from("support_messages")
       .select(
         "id, conversation_id, sender_type, body, created_at, read_at, read_by_support_at"
@@ -52,25 +73,53 @@ export async function GET(request: Request) {
       .limit(limit);
 
     if (before) {
-      query = query.lt("created_at", before);
+      queryWithReadBySupport = queryWithReadBySupport.lt("created_at", before);
     }
 
-    const { data, error } = await query;
-    if (error) {
+    const { data, error } = await queryWithReadBySupport;
+    let rows: MessageRow[] = [];
+
+    if (error && isMissingReadBySupportColumn(error)) {
+      let fallbackQuery = supabase
+        .from("support_messages")
+        .select("id, conversation_id, sender_type, body, created_at, read_at")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (before) {
+        fallbackQuery = fallbackQuery.lt("created_at", before);
+      }
+
+      const { data: fallbackData, error: fallbackErr } = await fallbackQuery;
+      if (fallbackErr) {
+        console.error("ADMIN_SUPPORT_MESSAGES_FETCH_FALLBACK_ERROR:", fallbackErr);
+        return NextResponse.json({ error: "messages_fetch_failed" }, { status: 500 });
+      }
+
+      rows = (Array.isArray(fallbackData) ? fallbackData : []).map((row) => ({
+        ...(row as Omit<MessageRow, "read_by_support_at">),
+        read_by_support_at: null,
+      }));
+    } else if (error) {
       console.error("ADMIN_SUPPORT_MESSAGES_FETCH_ERROR:", error);
       return NextResponse.json({ error: "messages_fetch_failed" }, { status: 500 });
+    } else {
+      rows = Array.isArray(data) ? (data as MessageRow[]) : [];
     }
 
-    const rows = Array.isArray(data) ? data : [];
     const messages = [...rows].reverse();
 
     const nowIso = new Date().toISOString();
-    await supabase
+    const { error: readErr } = await supabase
       .from("support_messages")
       .update({ read_by_support_at: nowIso })
       .eq("conversation_id", conversationId)
       .eq("sender_type", "user")
       .is("read_by_support_at", null);
+    if (readErr && !isMissingReadBySupportColumn(readErr)) {
+      console.error("ADMIN_SUPPORT_MESSAGES_MARK_READ_ERROR:", readErr);
+    }
 
     return NextResponse.json({
       messages,
