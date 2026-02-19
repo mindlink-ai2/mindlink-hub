@@ -6,6 +6,7 @@ import "./globals.css";
 import DashboardContainer from "@/components/DashboardContainer";
 import InboxNavLink from "@/components/InboxNavLink";
 import SupportWidgetLoader from "@/components/support/SupportWidgetLoader";
+import { getSupportAdminContext } from "@/lib/support-admin-auth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -86,6 +87,7 @@ export default async function RootLayout({
       ?.emailAddress || user?.emailAddresses?.[0]?.emailAddress;
 
   let hasAccess = false;
+  let showSupportAdminLink = false;
 
   if (user && email) {
     const { data, error } = await supabaseAdmin
@@ -95,6 +97,11 @@ export default async function RootLayout({
       .maybeSingle();
 
     hasAccess = !error && !!data;
+  }
+
+  if (user) {
+    const adminContext = await getSupportAdminContext();
+    showSupportAdminLink = Boolean(adminContext);
   }
 
   return (
@@ -164,6 +171,14 @@ export default async function RootLayout({
                       >
                         Support
                       </Link>
+                      {showSupportAdminLink ? (
+                        <Link
+                          href="/admin/support"
+                          className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
+                        >
+                          Support Admin
+                        </Link>
+                      ) : null}
                     </nav>
 
                     <div className="flex items-center gap-3">
