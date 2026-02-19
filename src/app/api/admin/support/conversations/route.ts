@@ -88,20 +88,19 @@ export async function GET(request: Request) {
 
     const conversationIds = conversations.map((row) => row.id);
 
-    const [{ data: messageData, error: messageErr }, { data: unreadData, error: unreadErr }] =
-      await Promise.all([
-        supabase
-          .from("support_messages")
-          .select("conversation_id, body, created_at")
-          .in("conversation_id", conversationIds)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("support_messages")
-          .select("conversation_id, read_by_support_at")
-          .in("conversation_id", conversationIds)
-          .eq("sender_type", "user")
-          .is("read_by_support_at", null),
-      ]);
+    const { data: messageData, error: messageErr } = await supabase
+      .from("support_messages")
+      .select("conversation_id, body, created_at")
+      .in("conversation_id", conversationIds)
+      .order("created_at", { ascending: false });
+
+    let unreadRows: MessageRow[] = [];
+    const { data: unreadData, error: unreadErr } = await supabase
+      .from("support_messages")
+      .select("conversation_id, read_by_support_at")
+      .in("conversation_id", conversationIds)
+      .eq("sender_type", "user")
+      .is("read_by_support_at", null);
 
     if (messageErr) {
       console.error("ADMIN_SUPPORT_LAST_MESSAGE_FETCH_ERROR:", messageErr);
@@ -109,8 +108,23 @@ export async function GET(request: Request) {
     }
 
     if (unreadErr) {
-      console.error("ADMIN_SUPPORT_UNREAD_FETCH_ERROR:", unreadErr);
-      return NextResponse.json({ error: "unread_fetch_failed" }, { status: 500 });
+      const errorCode = String(unreadErr.code ?? "");
+      const errorMessage = String(unreadErr.message ?? "");
+      const hasMissingReadBySupportColumn =
+        errorCode === "42703" ||
+        errorCode === "PGRST204" ||
+        errorMessage.includes("read_by_support_at");
+
+      if (!hasMissingReadBySupportColumn) {
+        console.error("ADMIN_SUPPORT_UNREAD_FETCH_ERROR:", unreadErr);
+        return NextResponse.json({ error: "unread_fetch_failed" }, { status: 500 });
+      }
+
+      console.warn(
+        "ADMIN_SUPPORT_UNREAD_FALLBACK: read_by_support_at missing, unread_for_support set to 0."
+      );
+    } else if (Array.isArray(unreadData)) {
+      unreadRows = unreadData as MessageRow[];
     }
 
     const previewByConversationId = new Map<
@@ -126,7 +140,7 @@ export async function GET(request: Request) {
     });
 
     const unreadByConversationId = new Map<string, number>();
-    (Array.isArray(unreadData) ? (unreadData as MessageRow[]) : []).forEach((row) => {
+    unreadRows.forEach((row) => {
       unreadByConversationId.set(
         row.conversation_id,
         (unreadByConversationId.get(row.conversation_id) ?? 0) + 1
