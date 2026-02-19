@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
@@ -19,6 +20,13 @@ function isMissingReadBySupportColumn(error: { code?: string; message?: string }
     errorCode === "PGRST204" ||
     errorMessage.includes("read_by_support_at")
   );
+}
+
+function isDuplicateKeyError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const errorCode = String(error.code ?? "");
+  const errorMessage = String(error.message ?? "");
+  return errorCode === "23505" || errorMessage.toLowerCase().includes("duplicate key");
 }
 
 export async function POST(request: Request) {
@@ -48,14 +56,18 @@ export async function POST(request: Request) {
     }
 
     const createdAt = new Date().toISOString();
+    const messageId = randomUUID();
+    const messageToInsert = {
+      id: messageId,
+      conversation_id: conversationId,
+      sender_type: "support" as const,
+      body,
+      created_at: createdAt,
+    };
+
     const { data: messageWithReadBySupport, error: insertErr } = await supabase
       .from("support_messages")
-      .insert({
-        conversation_id: conversationId,
-        sender_type: "support",
-        body,
-        created_at: createdAt,
-      })
+      .insert(messageToInsert)
       .select(
         "id, conversation_id, sender_type, body, created_at, read_at, read_by_support_at"
       )
@@ -63,18 +75,53 @@ export async function POST(request: Request) {
     let message = messageWithReadBySupport;
 
     if (insertErr && isMissingReadBySupportColumn(insertErr)) {
+      const { data: fallbackInsertedMessage, error: fallbackInsertErr } = await supabase
+        .from("support_messages")
+        .insert(messageToInsert)
+        .select("id, conversation_id, sender_type, body, created_at, read_at")
+        .single();
+
+      if (fallbackInsertErr && !isDuplicateKeyError(fallbackInsertErr)) {
+        console.error("ADMIN_SUPPORT_REPLY_INSERT_FALLBACK_ERROR:", fallbackInsertErr);
+        return NextResponse.json({ error: "reply_insert_failed" }, { status: 500 });
+      }
+
+      if (fallbackInsertedMessage) {
+        message = {
+          ...fallbackInsertedMessage,
+          read_by_support_at: null,
+        };
+      } else {
+        const { data: fallbackMessage, error: fallbackErr } = await supabase
+          .from("support_messages")
+          .select("id, conversation_id, sender_type, body, created_at, read_at")
+          .eq("id", messageId)
+          .maybeSingle();
+
+        if (fallbackErr || !fallbackMessage) {
+          console.error("ADMIN_SUPPORT_REPLY_INSERT_FALLBACK_FETCH_ERROR:", fallbackErr);
+          return NextResponse.json({ error: "reply_insert_failed" }, { status: 500 });
+        }
+
+        message = {
+          ...fallbackMessage,
+          read_by_support_at: null,
+        };
+      }
+    } else if (insertErr || !message) {
+      console.error("ADMIN_SUPPORT_REPLY_INSERT_ERROR:", insertErr);
+      return NextResponse.json({ error: "reply_insert_failed" }, { status: 500 });
+    }
+
+    if (!message) {
       const { data: fallbackMessage, error: fallbackErr } = await supabase
         .from("support_messages")
         .select("id, conversation_id, sender_type, body, created_at, read_at")
-        .eq("conversation_id", conversationId)
-        .eq("sender_type", "support")
-        .eq("created_at", createdAt)
-        .order("created_at", { ascending: false })
-        .limit(1)
+        .eq("id", messageId)
         .maybeSingle();
 
       if (fallbackErr || !fallbackMessage) {
-        console.error("ADMIN_SUPPORT_REPLY_INSERT_FALLBACK_ERROR:", fallbackErr);
+        console.error("ADMIN_SUPPORT_REPLY_INSERT_FALLBACK_FETCH_ERROR:", fallbackErr);
         return NextResponse.json({ error: "reply_insert_failed" }, { status: 500 });
       }
 
@@ -82,9 +129,6 @@ export async function POST(request: Request) {
         ...fallbackMessage,
         read_by_support_at: null,
       };
-    } else if (insertErr || !message) {
-      console.error("ADMIN_SUPPORT_REPLY_INSERT_ERROR:", insertErr);
-      return NextResponse.json({ error: "reply_insert_failed" }, { status: 500 });
     }
 
     const { error: updateConversationErr } = await supabase
