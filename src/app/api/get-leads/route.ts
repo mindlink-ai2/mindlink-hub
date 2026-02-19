@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
 
+type LeadRow = Record<string, unknown> & {
+  id?: number | string | null;
+};
+
+type InvitationRow = {
+  lead_id?: number | string | null;
+};
+
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ leads: [] });
@@ -58,7 +66,9 @@ export async function GET() {
     .eq("client_id", clientId)
     .order("created_at", { ascending: false });
 
-  const leadRows = leads ?? [];
+  const leadRows: LeadRow[] = Array.isArray(leads)
+    ? (leads as unknown as LeadRow[])
+    : [];
   const leadIds = leadRows
     .map((lead) => lead?.id)
     .filter((id) => id !== null && id !== undefined);
@@ -76,8 +86,12 @@ export async function GET() {
     if (invitationsErr) {
       console.error("Failed to load linkedin invitations:", invitationsErr);
     } else {
+      const invitationRows: InvitationRow[] = Array.isArray(invitations)
+        ? (invitations as unknown as InvitationRow[])
+        : [];
+
       invitedLeadIds = new Set(
-        (invitations ?? [])
+        invitationRows
           .map((invitation) => invitation?.lead_id)
           .filter((leadId) => leadId !== null && leadId !== undefined)
           .map((leadId) => String(leadId))
