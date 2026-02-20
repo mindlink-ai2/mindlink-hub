@@ -231,8 +231,8 @@ export default function FollowupsPage() {
     data: FollowupLead[];
     tone: TabKey;
   }) => (
-    <section className="overflow-hidden rounded-2xl border border-[#d7e3f4] bg-[#ecf2fa]/75">
-      <div className="border-b border-[#d7e3f4] bg-transparent px-5 py-4">
+    <section>
+      <div className="px-1 py-1">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold text-[#0b1c33]">{title}</h2>
@@ -248,7 +248,7 @@ export default function FollowupsPage() {
         </div>
       </div>
 
-      <div className="p-5">
+      <div className="pt-3">
         {data.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[#d7e3f4] bg-[#f8fbff] px-4 py-6">
             <p className="text-sm text-[#334155]">Aucune relance ici.</p>
@@ -362,7 +362,7 @@ export default function FollowupsPage() {
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
-        <div className="relative min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(31,94,255,0.14),transparent_56%),radial-gradient(circle_at_80%_0%,rgba(35,196,245,0.12),transparent_48%)]">
+        <div className="relative min-h-screen">
 
           <div className="mx-auto w-full max-w-[1680px] px-4 py-6 sm:px-6 sm:py-7">
             {!loaded ? (
@@ -370,7 +370,7 @@ export default function FollowupsPage() {
             ) : (
               <div className="space-y-5">
                 {/* Header */}
-                <div className="relative flex flex-col gap-3.5 overflow-hidden rounded-2xl border border-[#d7e3f4] bg-[#ecf2fa]/75 p-4 sm:p-5">
+                <div className="relative flex flex-col gap-3.5 p-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
                       <span className="h-1.5 w-1.5 rounded-full bg-[#1f5eff]" />

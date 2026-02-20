@@ -6,6 +6,7 @@ import {
   listSupportConversations,
   refreshSupportConversationProfile,
 } from "@/lib/support-widget-server";
+import { notifySupportTeamTicketCreated } from "@/lib/support-email";
 
 export const runtime = "nodejs";
 
@@ -47,6 +48,12 @@ export async function POST() {
 
     const supabase = createSupportSupabase();
     const conversation = await createSupportConversation(supabase, supportUser);
+
+    try {
+      await notifySupportTeamTicketCreated({ conversation });
+    } catch (notifyError) {
+      console.error("SUPPORT_CONVERSATION_NEW_TICKET_NOTIFY_ERROR:", notifyError);
+    }
 
     return NextResponse.json({
       success: true,

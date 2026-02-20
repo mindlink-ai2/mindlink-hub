@@ -5,6 +5,7 @@ import {
   createSupportSupabase,
   getAuthenticatedSupportUser,
 } from "@/lib/support-widget-server";
+import { notifySupportTeamClientMessage } from "@/lib/support-email";
 
 export const runtime = "nodejs";
 
@@ -49,6 +50,14 @@ export async function POST(request: Request) {
       conversationId,
       supportUser.userId
     );
+    const { count: messageCountBeforeInsert, error: messageCountError } = await supabase
+      .from("support_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("conversation_id", conversationId);
+    if (messageCountError) {
+      console.error("SUPPORT_WIDGET_SEND_MESSAGE_COUNT_ERROR:", messageCountError);
+    }
+    const isFirstMessageInTicket = Number(messageCountBeforeInsert ?? 0) === 0;
 
     const nowIso = new Date().toISOString();
     const { data, error } = await supabase
@@ -104,6 +113,16 @@ export async function POST(request: Request) {
     if (conversationErr || !updatedConversation) {
       console.error("SUPPORT_WIDGET_SEND_CONVERSATION_UPDATE_ERROR:", conversationErr);
       return NextResponse.json({ error: "conversation_update_failed" }, { status: 500 });
+    }
+
+    try {
+      await notifySupportTeamClientMessage({
+        conversation: updatedConversation,
+        messageBody: body,
+        isFirstMessageInTicket,
+      });
+    } catch (notifyError) {
+      console.error("SUPPORT_WIDGET_SEND_NOTIFY_ERROR:", notifyError);
     }
 
     return NextResponse.json({

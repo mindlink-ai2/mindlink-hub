@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
+import { notifyClientSupportReply } from "@/lib/support-email";
 
 export const runtime = "nodejs";
 
@@ -29,6 +30,17 @@ function isDuplicateKeyError(error: { code?: string; message?: string } | null):
   return errorCode === "23505" || errorMessage.toLowerCase().includes("duplicate key");
 }
 
+function isMissingTicketNumberColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const errorCode = String(error.code ?? "");
+  const errorMessage = String(error.message ?? "");
+  return (
+    errorCode === "42703" ||
+    errorCode === "PGRST204" ||
+    errorMessage.includes("ticket_number")
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const adminContext = await getSupportAdminContext();
@@ -45,11 +57,24 @@ export async function POST(request: Request) {
     const { conversationId, body } = parsedBody.data;
     const supabase = createServiceSupabase();
 
-    const { data: conversation, error: conversationErr } = await supabase
+    let { data: conversation, error: conversationErr } = await supabase
       .from("support_conversations")
-      .select("id")
+      .select("id, ticket_number, user_email, user_name, status")
       .eq("id", conversationId)
       .maybeSingle();
+
+    if (conversationErr && isMissingTicketNumberColumn(conversationErr)) {
+      const fallback = await supabase
+        .from("support_conversations")
+        .select("id, user_email, user_name, status")
+        .eq("id", conversationId)
+        .maybeSingle();
+
+      conversation = fallback.data
+        ? { ...fallback.data, ticket_number: null }
+        : null;
+      conversationErr = fallback.error;
+    }
 
     if (conversationErr || !conversation) {
       return NextResponse.json({ error: "conversation_not_found" }, { status: 404 });
@@ -155,6 +180,15 @@ export async function POST(request: Request) {
       .is("read_by_support_at", null);
     if (markReadErr && !isMissingReadBySupportColumn(markReadErr)) {
       console.error("ADMIN_SUPPORT_REPLY_MARK_READ_ERROR:", markReadErr);
+    }
+
+    try {
+      await notifyClientSupportReply({
+        conversation,
+        replyBody: body,
+      });
+    } catch (notifyError) {
+      console.error("ADMIN_SUPPORT_REPLY_EMAIL_NOTIFY_ERROR:", notifyError);
     }
 
     return NextResponse.json({

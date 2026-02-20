@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  Bell,
   CheckCheck,
   Loader2,
   Search,
@@ -36,6 +37,11 @@ type AdminSupportMessage = {
   created_at: string;
   read_at: string | null;
   read_by_support_at: string | null;
+};
+
+type LiveNotice = {
+  tone: "info" | "ticket";
+  text: string;
 };
 
 const QUICK_REPLIES = ["Bien reçu", "On regarde", "Peux-tu préciser ?"] as const;
@@ -92,16 +98,52 @@ export default function AdminSupportPage() {
   const [sending, setSending] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveNotice, setLiveNotice] = useState<LiveNotice | null>(null);
 
   const [draft, setDraft] = useState("");
   const [isMobileThreadOpen, setIsMobileThreadOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const noticeTimerRef = useRef<number | null>(null);
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
+  const conversationsRef = useRef<AdminSupportConversation[]>([]);
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedConversationId) ?? null,
     [conversations, selectedConversationId]
+  );
+
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
+  const clearLiveNoticeTimer = useCallback(() => {
+    if (noticeTimerRef.current === null) return;
+    window.clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = null;
+  }, []);
+
+  const pushLiveNotice = useCallback(
+    (notice: LiveNotice) => {
+      setLiveNotice(notice);
+      clearLiveNoticeTimer();
+      noticeTimerRef.current = window.setTimeout(() => {
+        setLiveNotice(null);
+        noticeTimerRef.current = null;
+      }, 4500);
+
+      if (typeof window === "undefined" || !("Notification" in window)) return;
+      if (document.visibilityState === "visible") return;
+      if (Notification.permission === "granted") {
+        try {
+          new Notification("Lidmeo Support", { body: notice.text });
+        } catch {
+          // no-op
+        }
+      }
+    },
+    [clearLiveNoticeTimer]
   );
 
   const loadConversations = useCallback(
@@ -215,6 +257,13 @@ export default function AdminSupportPage() {
   }, [selectedConversationId, loadMessages]);
 
   useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission === "default") {
+      void Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
     const channel = supabase
       .channel("admin-support-realtime")
       .on(
@@ -232,6 +281,29 @@ export default function AdminSupportPage() {
           ).trim();
           if (!targetConversationId) return;
 
+          if (payload.eventType === "INSERT" && newRow?.sender_type === "user") {
+            const messageId = String(newRow.id ?? "").trim();
+            if (messageId && seenMessageIdsRef.current.has(messageId)) {
+              return;
+            }
+            if (messageId) {
+              seenMessageIdsRef.current.add(messageId);
+            }
+
+            const currentConversation = conversationsRef.current.find(
+              (conversation) => conversation.id === targetConversationId
+            );
+            const ticketLabel = currentConversation?.ticket_number
+              ? `#${currentConversation.ticket_number}`
+              : "";
+            pushLiveNotice({
+              tone: "info",
+              text: ticketLabel
+                ? `Nouveau message client sur le ticket ${ticketLabel}.`
+                : "Nouveau message client reçu.",
+            });
+          }
+
           void loadConversations({ keepSelection: true, silent: true });
 
           if (selectedConversationId === targetConversationId) {
@@ -239,12 +311,31 @@ export default function AdminSupportPage() {
           }
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "support_conversations",
+        },
+        (payload) => {
+          const row = payload.new as Partial<AdminSupportConversation> | undefined;
+          const ticketLabel = row?.ticket_number ? `#${row.ticket_number}` : "";
+          pushLiveNotice({
+            tone: "ticket",
+            text: ticketLabel
+              ? `Nouveau ticket ${ticketLabel} créé.`
+              : "Nouveau ticket créé.",
+          });
+          void loadConversations({ keepSelection: true, silent: true });
+        }
+      )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [loadConversations, loadMessages, selectedConversationId]);
+  }, [loadConversations, loadMessages, pushLiveNotice, selectedConversationId]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -257,6 +348,13 @@ export default function AdminSupportPage() {
 
     return () => window.clearInterval(intervalId);
   }, [loadConversations, loadMessages, selectedConversationId]);
+
+  useEffect(
+    () => () => {
+      clearLiveNoticeTimer();
+    },
+    [clearLiveNoticeTimer]
+  );
 
   useEffect(() => {
     if (!isMobileThreadOpen) return;
@@ -399,6 +497,21 @@ export default function AdminSupportPage() {
         {error ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
+          </div>
+        ) : null}
+        {liveNotice ? (
+          <div
+            className={cn(
+              "flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm",
+              liveNotice.tone === "ticket"
+                ? "border-[#9cc0ff] bg-[#edf4ff] text-[#1f4f96]"
+                : "border-[#c8d6ea] bg-[#f8fbff] text-[#334155]"
+            )}
+            role="status"
+            aria-live="polite"
+          >
+            <Bell className="h-4 w-4 shrink-0" />
+            <span>{liveNotice.text}</span>
           </div>
         ) : null}
 
