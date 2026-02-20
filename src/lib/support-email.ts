@@ -37,9 +37,9 @@ function normalizeBaseUrl(value: string): string {
 }
 
 function getHubBaseUrl(): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL;
-  if (!appUrl) return "https://lidmeo.com";
-  return normalizeBaseUrl(appUrl);
+  const hubUrl = process.env.HUB_APP_URL ?? process.env.SUPPORT_HUB_URL;
+  if (hubUrl) return normalizeBaseUrl(hubUrl);
+  return "https://hub.lidmeo.com";
 }
 
 function getSupportNotifyRecipients(): string[] {
