@@ -718,10 +718,6 @@ export default function LeadsPage() {
 
   const openLeadRawJobTitle = (openLead?.linkedinJobTitle ?? "").trim();
   const openLeadTranslatedJobTitle = translateLinkedInJobTitle(openLeadRawJobTitle);
-  const openLeadHasTranslatedJobTitle =
-    Boolean(openLeadRawJobTitle) &&
-    Boolean(openLeadTranslatedJobTitle) &&
-    openLeadTranslatedJobTitle !== openLeadRawJobTitle;
 
   const isSidebarOpen = Boolean(openLead);
 
@@ -991,31 +987,31 @@ export default function LeadsPage() {
               </div>
 
               <div className="w-full overflow-x-auto px-2 pb-2 pt-1">
-                <table className="min-w-[1320px] w-full table-fixed border-separate [border-spacing:0_6px] text-[13px]">
+                <table className="min-w-[1080px] w-full table-fixed border-separate [border-spacing:0_6px] text-[13px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="text-[11px] font-medium tracking-[0.02em] text-[#405770]">
-                      <th className="w-[54px] px-3 py-1.5 text-center whitespace-nowrap">
+                      <th className="w-[46px] px-2 py-1.5 text-center whitespace-nowrap">
                         Sel.
                       </th>
-                      <th className="w-[150px] px-3 py-1.5 text-center whitespace-nowrap">
+                      <th className="w-[132px] px-2 py-1.5 text-center whitespace-nowrap">
                         Statut
                       </th>
-                      <th className="w-[340px] px-3 py-1.5 text-left whitespace-nowrap">
+                      <th className="w-[280px] px-2 py-1.5 text-left whitespace-nowrap">
                         Prospect
                       </th>
-                      <th className="w-[220px] px-3 py-1.5 text-left whitespace-nowrap">
+                      <th className="w-[170px] px-2 py-1.5 text-left whitespace-nowrap">
                         Poste
                       </th>
-                      <th className="w-[250px] px-3 py-1.5 text-left whitespace-nowrap">
+                      <th className="w-[200px] px-2 py-1.5 text-left whitespace-nowrap">
                         Contact
                       </th>
-                      <th className="w-[220px] px-3 py-1.5 text-left whitespace-nowrap">
+                      <th className="w-[180px] px-2 py-1.5 text-left whitespace-nowrap">
                         LinkedIn
                       </th>
-                      <th className="w-[110px] px-3 py-1.5 text-center whitespace-nowrap">
+                      <th className="w-[92px] px-2 py-1.5 text-center whitespace-nowrap">
                         Date
                       </th>
-                      <th className="w-[110px] px-3 py-1.5 text-center whitespace-nowrap">
+                      <th className="w-[90px] px-2 py-1.5 text-center whitespace-nowrap">
                         Supprimer
                       </th>
                     </tr>
@@ -1044,11 +1040,6 @@ export default function LeadsPage() {
                           "—";
                         const rawJobTitle = (lead.linkedinJobTitle ?? "").trim();
                         const translatedJobTitle = translateLinkedInJobTitle(rawJobTitle);
-                        const hasTranslatedJobTitle =
-                          Boolean(rawJobTitle) &&
-                          Boolean(translatedJobTitle) &&
-                          translatedJobTitle !== rawJobTitle;
-
                         const idStr = String(lead.id);
                         const isSelected = selectedIds.has(idStr);
                         const isStatusUpdating = updatingStatusIds.has(idStr);
@@ -1082,7 +1073,7 @@ export default function LeadsPage() {
                           : isPending
                             ? "bg-amber-500"
                             : "bg-[#6f85a6]";
-                        const baseCellClass = "border-y border-[#d7e3f4] px-3 py-2.5 align-middle";
+                        const baseCellClass = "border-y border-[#d7e3f4] px-2.5 py-2 align-middle";
 
                         return (
                           <tr
@@ -1145,7 +1136,7 @@ export default function LeadsPage() {
                               </button>
                             </td>
 
-                            <td className={`${baseCellClass} relative pr-16 text-[#0b1c33]`}>
+                            <td className={`${baseCellClass} relative pr-14 text-[#0b1c33]`}>
                               <div className="flex min-w-0 items-start gap-3">
                                 <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#c8d6ea] bg-[#e9f1ff] text-[10px] font-semibold text-[#35598b]">
                                   {initials}
@@ -1191,14 +1182,6 @@ export default function LeadsPage() {
                                 <p className="line-clamp-2 text-[12px] font-medium text-[#0f213c]">
                                   {translatedJobTitle || "Poste non renseigné"}
                                 </p>
-                                {hasTranslatedJobTitle ? (
-                                  <p
-                                    className="line-clamp-1 text-[10px] text-[#8093ad]"
-                                    title={rawJobTitle}
-                                  >
-                                    Original : {rawJobTitle}
-                                  </p>
-                                ) : null}
                               </div>
                             </td>
 
@@ -1388,16 +1371,9 @@ export default function LeadsPage() {
                       </InfoBlock>
 
                       <InfoBlock title="Poste">
-                        <div className="space-y-1">
-                          <span className="text-[#0F172A]">
-                            {openLeadTranslatedJobTitle || "—"}
-                          </span>
-                          {openLeadHasTranslatedJobTitle ? (
-                            <p className="text-[11px] text-[#64748b]">
-                              Original : {openLeadRawJobTitle}
-                            </p>
-                          ) : null}
-                        </div>
+                        <span className="text-[#0F172A]">
+                          {openLeadTranslatedJobTitle || "—"}
+                        </span>
                       </InfoBlock>
 
                       {emailOption && (
