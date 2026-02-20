@@ -45,6 +45,7 @@ export async function GET() {
       FirstName,
       LastName,
       Company,
+      linkedinJobTitle,
       LinkedInURL,
       location,
       created_at,

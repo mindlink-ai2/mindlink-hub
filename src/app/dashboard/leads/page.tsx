@@ -22,11 +22,94 @@ type Lead = {
   next_followup_at?: string | null;
   internal_message?: string | null;
   message_mail?: string | null;
+  linkedinJobTitle?: string | null;
   LinkedInURL?: string | null;
   linkedin_invitation_status?: "sent" | "accepted" | null;
   linkedin_invitation_sent?: boolean | null;
   [key: string]: unknown;
 };
+
+const JOB_TITLE_EXACT_TRANSLATIONS: Record<string, string> = {
+  ceo: "Président-directeur général",
+  coo: "Directeur des opérations",
+  cto: "Directeur technique",
+  cmo: "Directeur marketing",
+  cfo: "Directeur financier",
+  founder: "Fondateur",
+  "co-founder": "Co-fondateur",
+  "owner / founder": "Propriétaire / Fondateur",
+  owner: "Propriétaire",
+  freelancer: "Freelance",
+  "business owner": "Dirigeant d'entreprise",
+  "software engineer": "Ingénieur logiciel",
+  "product manager": "Chef de produit",
+  "project manager": "Chef de projet",
+  "sales manager": "Responsable commercial",
+  "marketing manager": "Responsable marketing",
+  "account manager": "Responsable de compte",
+  "customer success manager": "Responsable succès client",
+  recruiter: "Recruteur",
+  "talent acquisition specialist": "Spécialiste acquisition de talents",
+  "human resources manager": "Responsable ressources humaines",
+  consultant: "Consultant",
+  "business development manager": "Responsable développement commercial",
+};
+
+const JOB_TITLE_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bchief executive officer\b/g, "président-directeur général"],
+  [/\bchief operating officer\b/g, "directeur des opérations"],
+  [/\bchief technology officer\b/g, "directeur technique"],
+  [/\bchief marketing officer\b/g, "directeur marketing"],
+  [/\bchief financial officer\b/g, "directeur financier"],
+  [/\bvice president\b/g, "vice-président"],
+  [/\bhead of\b/g, "responsable"],
+  [/\bmanaging director\b/g, "directeur général"],
+  [/\bdirector\b/g, "directeur"],
+  [/\bmanager\b/g, "responsable"],
+  [/\blead\b/g, "référent"],
+  [/\bowner\b/g, "propriétaire"],
+  [/\bfounder\b/g, "fondateur"],
+  [/\bco-founder\b/g, "co-fondateur"],
+  [/\bentrepreneur\b/g, "entrepreneur"],
+  [/\bengineer\b/g, "ingénieur"],
+  [/\bdeveloper\b/g, "développeur"],
+  [/\bproduct\b/g, "produit"],
+  [/\bproject\b/g, "projet"],
+  [/\bsales\b/g, "commercial"],
+  [/\bmarketing\b/g, "marketing"],
+  [/\bgrowth\b/g, "croissance"],
+  [/\boperations\b/g, "opérations"],
+  [/\bfinance\b/g, "finance"],
+  [/\baccounting\b/g, "comptabilité"],
+  [/\bhuman resources\b/g, "ressources humaines"],
+  [/\bhr\b/g, "rh"],
+  [/\brecruiter\b/g, "recruteur"],
+  [/\bconsultant\b/g, "consultant"],
+  [/\banalyst\b/g, "analyste"],
+  [/\bspecialist\b/g, "spécialiste"],
+  [/\bassistant\b/g, "assistant"],
+  [/\bexecutive\b/g, "cadre"],
+];
+
+function translateLinkedInJobTitle(rawValue: string | null | undefined): string | null {
+  const raw = (rawValue ?? "").trim();
+  if (!raw) return null;
+
+  const key = raw.toLowerCase();
+  const exact = JOB_TITLE_EXACT_TRANSLATIONS[key];
+  if (exact) return exact;
+
+  let translated = key;
+  JOB_TITLE_REPLACEMENTS.forEach(([pattern, replacement]) => {
+    translated = translated.replace(pattern, replacement);
+  });
+
+  translated = translated.replace(/\s+/g, " ").trim();
+  if (!translated) return raw;
+  if (translated === key) return raw;
+
+  return translated.charAt(0).toUpperCase() + translated.slice(1);
+}
 
 function filterLeads(leads: Lead[], term: string) {
   const v = term.trim().toLowerCase();
@@ -38,6 +121,7 @@ function filterLeads(leads: Lead[], term: string) {
       name.includes(v) ||
       (l.Company ?? "").toLowerCase().includes(v) ||
       (l.location ?? "").toLowerCase().includes(v) ||
+      (l.linkedinJobTitle ?? "").toLowerCase().includes(v) ||
       (l.email ?? "").toLowerCase().includes(v) ||
       (l.phone ?? "").toLowerCase().includes(v)
     );
@@ -74,7 +158,7 @@ export default function LeadsPage() {
   }, [safeLeads, searchTerm]);
 
   // ✅ Column count for empty state colSpan
-  const colCount = 7;
+  const colCount = 8;
 
   // ✅ Read query param once on mount
   useEffect(() => {
@@ -632,6 +716,13 @@ export default function LeadsPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  const openLeadRawJobTitle = (openLead?.linkedinJobTitle ?? "").trim();
+  const openLeadTranslatedJobTitle = translateLinkedInJobTitle(openLeadRawJobTitle);
+  const openLeadHasTranslatedJobTitle =
+    Boolean(openLeadRawJobTitle) &&
+    Boolean(openLeadTranslatedJobTitle) &&
+    openLeadTranslatedJobTitle !== openLeadRawJobTitle;
+
   const isSidebarOpen = Boolean(openLead);
 
   // UX-only: Escape close + lock page scroll when sidebar is open
@@ -776,7 +867,7 @@ export default function LeadsPage() {
                       <input
                         value={searchTerm}
                         onChange={(e) => handleSearch(e.target.value)}
-                        placeholder="Rechercher (nom, entreprise, ville, email, téléphone)…"
+                        placeholder="Rechercher (nom, entreprise, poste, ville, email, téléphone)…"
                         className="w-full bg-transparent text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:outline-none"
                         aria-label="Rechercher un lead"
                       />
@@ -900,7 +991,7 @@ export default function LeadsPage() {
               </div>
 
               <div className="w-full overflow-x-auto px-2 pb-2 pt-1">
-                <table className="min-w-[1160px] w-full table-fixed border-separate [border-spacing:0_6px] text-[13px]">
+                <table className="min-w-[1320px] w-full table-fixed border-separate [border-spacing:0_6px] text-[13px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="text-[11px] font-medium tracking-[0.02em] text-[#405770]">
                       <th className="w-[54px] px-3 py-1.5 text-center whitespace-nowrap">
@@ -911,6 +1002,9 @@ export default function LeadsPage() {
                       </th>
                       <th className="w-[340px] px-3 py-1.5 text-left whitespace-nowrap">
                         Prospect
+                      </th>
+                      <th className="w-[220px] px-3 py-1.5 text-left whitespace-nowrap">
+                        Poste
                       </th>
                       <th className="w-[250px] px-3 py-1.5 text-left whitespace-nowrap">
                         Contact
@@ -948,6 +1042,12 @@ export default function LeadsPage() {
                           `${lead.FirstName ?? ""} ${lead.LastName ?? ""}`.trim() ||
                           lead.Name ||
                           "—";
+                        const rawJobTitle = (lead.linkedinJobTitle ?? "").trim();
+                        const translatedJobTitle = translateLinkedInJobTitle(rawJobTitle);
+                        const hasTranslatedJobTitle =
+                          Boolean(rawJobTitle) &&
+                          Boolean(translatedJobTitle) &&
+                          translatedJobTitle !== rawJobTitle;
 
                         const idStr = String(lead.id);
                         const isSelected = selectedIds.has(idStr);
@@ -1084,6 +1184,22 @@ export default function LeadsPage() {
                               >
                                 Voir
                               </HubButton>
+                            </td>
+
+                            <td className={`${baseCellClass} text-[#405770]`}>
+                              <div className="space-y-1">
+                                <p className="line-clamp-2 text-[12px] font-medium text-[#0f213c]">
+                                  {translatedJobTitle || "Poste non renseigné"}
+                                </p>
+                                {hasTranslatedJobTitle ? (
+                                  <p
+                                    className="line-clamp-1 text-[10px] text-[#8093ad]"
+                                    title={rawJobTitle}
+                                  >
+                                    Original : {rawJobTitle}
+                                  </p>
+                                ) : null}
+                              </div>
                             </td>
 
                             <td className={`${baseCellClass} text-[#405770]`}>
@@ -1269,6 +1385,19 @@ export default function LeadsPage() {
                         ) : (
                           <span className="text-[#64748b]">—</span>
                         )}
+                      </InfoBlock>
+
+                      <InfoBlock title="Poste">
+                        <div className="space-y-1">
+                          <span className="text-[#0F172A]">
+                            {openLeadTranslatedJobTitle || "—"}
+                          </span>
+                          {openLeadHasTranslatedJobTitle ? (
+                            <p className="text-[11px] text-[#64748b]">
+                              Original : {openLeadRawJobTitle}
+                            </p>
+                          ) : null}
+                        </div>
                       </InfoBlock>
 
                       {emailOption && (
