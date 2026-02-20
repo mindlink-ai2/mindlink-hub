@@ -617,10 +617,18 @@ export default function LeadsPage() {
   };
 
   const handleSidebarWheelCapture = (event: ReactWheelEvent<HTMLDivElement>) => {
-    const panel = event.currentTarget;
-    if (panel.scrollHeight <= panel.clientHeight) return;
+    const target = event.target as HTMLElement | null;
+    const editable = target?.closest("textarea, input, select, [contenteditable='true']");
+    if (editable) {
+      const el = editable as HTMLElement;
+      const canScrollInternally = el.scrollHeight > el.clientHeight;
+      if (canScrollInternally) return;
+    }
 
-    panel.scrollTop += event.deltaY;
+    const panelContent = event.currentTarget;
+    if (panelContent.scrollHeight <= panelContent.clientHeight) return;
+
+    panelContent.scrollTop += event.deltaY;
     event.preventDefault();
   };
 
@@ -1194,11 +1202,8 @@ export default function LeadsPage() {
                 onClick={() => setOpenLead(null)}
               />
 
-              <div
-                className="animate-slideLeft fixed inset-y-0 right-0 z-50 flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-y-auto overscroll-contain border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]"
-                onWheelCapture={handleSidebarWheelCapture}
-              >
-                <div className="sticky top-0 z-10 border-b border-[#e2e8f0] bg-white/95 p-6 pb-4 backdrop-blur-xl">
+              <div className="animate-slideLeft fixed inset-y-0 right-0 z-50 flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
+                <div className="z-10 border-b border-[#e2e8f0] bg-white/95 p-6 pb-4 backdrop-blur-xl">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <HubButton type="button" variant="ghost" size="sm" onClick={() => setOpenLead(null)}>
@@ -1244,7 +1249,10 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                <div className="space-y-5 p-6 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]">
+                <div
+                  className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain touch-pan-y p-6 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]"
+                  onWheelCapture={handleSidebarWheelCapture}
+                >
                   <div className="hub-card-soft p-4">
                     <div className="text-[11px] uppercase tracking-wide text-[#4B5563]">Informations</div>
                     <div className="mt-3 grid grid-cols-1 gap-3">
@@ -1303,7 +1311,7 @@ export default function LeadsPage() {
                         );
                       }}
                       placeholder="Écrivez votre message LinkedIn…"
-                      className="mt-3 h-44 w-full rounded-xl border border-[#dbe5f3] bg-white p-4 text-sm text-[#0F172A] placeholder-[#94a3b8] transition focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                      className="mt-3 min-h-[176px] w-full resize-y overflow-y-auto rounded-xl border border-[#dbe5f3] bg-white p-4 text-sm text-[#0F172A] placeholder-[#94a3b8] transition focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
                     />
 
                     <div className="mt-3">
@@ -1348,7 +1356,7 @@ export default function LeadsPage() {
                         );
                       }}
                       placeholder="Écrivez votre message email…"
-                      className="mt-3 h-44 w-full rounded-xl border border-[#dbe5f3] bg-white p-4 text-sm text-[#0F172A] placeholder-[#94a3b8] transition focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                      className="mt-3 min-h-[176px] w-full resize-y overflow-y-auto rounded-xl border border-[#dbe5f3] bg-white p-4 text-sm text-[#0F172A] placeholder-[#94a3b8] transition focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
                     />
 
                     {(() => {
