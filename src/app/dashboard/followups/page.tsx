@@ -69,6 +69,7 @@ export default function FollowupsPage() {
   const upcoming = leads.filter(
     (l) => cleanDate(l.next_followup_at) > cleanDate(today.toISOString())
   );
+  const totalFollowups = leads.length;
 
   const activeData =
     tab === "overdue" ? overdue : tab === "today" ? todayList : upcoming;
@@ -141,7 +142,6 @@ export default function FollowupsPage() {
     `${lead.FirstName || lead.title || "—"} ${lead.LastName || ""}`.trim();
 
   const renderLeadCard = (lead: FollowupLead, tone: TabKey) => {
-    // ✅ no red (overdue uses amber)
     const toneRing =
       tone === "overdue"
         ? "hover:border-amber-300 hover:bg-amber-50/80"
@@ -158,21 +158,28 @@ export default function FollowupsPage() {
         : tone === "today"
         ? "border-[#d7e3f4] bg-white text-[#51627b]"
         : "border-emerald-200 bg-emerald-50 text-emerald-700";
+    const markerStyle =
+      tone === "overdue"
+        ? "bg-amber-500"
+        : tone === "today"
+        ? "bg-[#1f5eff]"
+        : "bg-emerald-500";
 
     return (
       <button
         type="button"
         onClick={() => setOpenLead(lead)}
         className={[
-          "group w-full text-left",
+          "group w-full text-left relative",
           "rounded-xl border border-[#c8d6ea] bg-[#f7fbff]",
-          "px-4 py-4",
+          "px-4 py-3.5",
           "transition duration-200",
           "shadow-[0_16px_28px_-26px_rgba(18,43,86,0.8)]",
           "focus:outline-none focus:ring-2 focus:ring-[#dce8ff] focus:ring-offset-0",
           toneRing,
         ].join(" ")}
       >
+        <span className={["absolute left-0 top-0 h-full w-1 rounded-l-xl", markerStyle].join(" ")} />
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -191,7 +198,7 @@ export default function FollowupsPage() {
 
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <p className="text-[#51627b]">
-                Prochaine relance :{" "}
+                Date :{" "}
                 <span className="font-semibold text-[#0b1c33]">
                   {formatDateFR(lead.next_followup_at)}
                 </span>
@@ -206,7 +213,7 @@ export default function FollowupsPage() {
           </div>
 
           <div className="shrink-0 text-[#93a6c1] transition group-hover:text-[#51627b]">
-            <span className="text-xs">Ouvrir</span> <span aria-hidden>→</span>
+            <span className="text-xs font-medium">Voir</span> <span aria-hidden>→</span>
           </div>
         </div>
       </button>
@@ -270,13 +277,18 @@ export default function FollowupsPage() {
     value: number;
     variant: TabKey;
   }) => {
-    // ✅ no red (overdue uses amber)
-    const styles =
+    const chipStyles =
       variant === "overdue"
         ? "border-amber-200 bg-amber-50 text-amber-800"
         : variant === "today"
-        ? "border-[#c8d6ea] bg-[#f7fbff] text-[#51627b]"
-        : "border-emerald-200 bg-emerald-50 text-emerald-700";
+          ? "border-[#c8d6ea] bg-[#f7fbff] text-[#51627b]"
+          : "border-emerald-200 bg-emerald-50 text-emerald-700";
+    const dotStyles =
+      variant === "overdue"
+        ? "bg-amber-500"
+        : variant === "today"
+          ? "bg-[#1f5eff]"
+          : "bg-emerald-500";
 
     const isActive =
       (variant === "overdue" && tab === "overdue") ||
@@ -299,21 +311,25 @@ export default function FollowupsPage() {
           "w-full rounded-xl border px-4 py-3 text-left transition",
           "border-[#c8d6ea] bg-[#f7fbff] hover:border-[#9cc0ff]",
           "focus:outline-none focus:ring-2 focus:ring-[#dce8ff]",
-          isActive ? "border-[#90b5ff] ring-1 ring-[#dce8ff]" : "",
+          isActive ? "border-[#90b5ff] bg-white ring-1 ring-[#dce8ff]" : "",
         ].join(" ")}
       >
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-[#51627b]">{label}</p>
-            <span
-              className={[
-                "rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums",
-                styles,
-              ].join(" ")}
-            >
+          <p className="text-xs font-medium text-[#51627b]">{label}</p>
+          <span className={["h-2 w-2 rounded-full", dotStyles].join(" ")} />
+        </div>
+        <div className="mt-2 flex items-end justify-between">
+          <p className="text-2xl font-semibold tabular-nums text-[#0b1c33]">{value}</p>
+          <span
+            className={[
+              "rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+              chipStyles,
+            ].join(" ")}
+          >
             {value}
           </span>
         </div>
-        <p className="mt-2 text-[11px] text-[#51627b]">
+        <p className="mt-1.5 text-[11px] text-[#51627b]">
           {variant === "overdue"
             ? "Prioritaire"
             : variant === "today"
@@ -344,37 +360,43 @@ export default function FollowupsPage() {
   );
 
   return (
-    <SubscriptionGate supportEmail="contact@mindlink.fr">
+    <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
         <div className="relative min-h-screen">
           <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px] bg-[radial-gradient(circle_at_20%_0%,rgba(31,94,255,0.14),transparent_56%),radial-gradient(circle_at_80%_0%,rgba(35,196,245,0.12),transparent_48%)]" />
 
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="mx-auto w-full max-w-[1680px] px-4 py-6 sm:px-6 sm:py-7">
             {!loaded ? (
               renderSkeleton()
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {/* Header */}
-                <div className="hub-card-hero relative flex flex-col gap-4 overflow-hidden p-5 sm:p-6">
+                <div className="hub-card-hero relative flex flex-col gap-3.5 overflow-hidden p-4 sm:p-5">
                   <div className="pointer-events-none absolute -left-16 top-[-90px] h-56 w-56 rounded-full bg-[#dce8ff]/70 blur-3xl" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#1f5eff]" />
+                      Relances Lidmeo
+                    </span>
+                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] tabular-nums">
+                      {totalFollowups} relance(s)
+                    </span>
+                  </div>
+
                   <div className="flex items-start justify-between gap-6">
                     <div className="relative">
-                      <h1 className="hub-page-title">
+                      <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#0b1c33] sm:text-4xl">
                         Relances clients
                       </h1>
-                      <p className="mt-1 text-sm text-[#51627b]">
-                        Clique sur un bloc pour afficher la liste{" "}
-                        <span className="text-[#0b1c33]">En retard</span>,{" "}
-                        <span className="text-[#0b1c33]">Aujourd’hui</span> ou{" "}
-                        <span className="text-[#0b1c33]">À venir</span>.
+                      <p className="mt-1.5 text-sm text-[#51627b]">
+                        Organisez vos suivis en un coup d’œil et traitez en priorité les relances les plus urgentes.
                       </p>
                     </div>
 
-                    {/* Small contextual hint (visual only) */}
                     <div className="hidden items-center gap-2 text-xs text-[#51627b] md:flex">
                       <span className="inline-flex items-center gap-2 rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-3 py-2">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                        Cliquez sur une relance pour ouvrir le détail
+                        <span className="h-2 w-2 rounded-full bg-[#1f5eff]" />
+                        Cliquez sur une ligne pour ouvrir le détail
                       </span>
                     </div>
                   </div>
@@ -463,7 +485,7 @@ export default function FollowupsPage() {
                     onClick={() => markAsResponded(openLead.id)}
                     variant="primary"
                     size="lg"
-                    className="mt-4 w-full border-emerald-600 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:border-emerald-500"
+                    className="mt-4 w-full"
                   >
                     Marquer comme répondu ✓
                   </HubButton>
