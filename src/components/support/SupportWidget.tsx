@@ -553,8 +553,8 @@ export default function SupportWidget() {
   if (pathname?.startsWith("/dashboard/leads") && isLeadsSidebarOpen) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[70]">
-      <div className="pointer-events-auto fixed bottom-5 right-5 sm:bottom-6 sm:right-6">
+    <>
+      <div className="fixed bottom-5 right-5 z-[70] sm:bottom-6 sm:right-6">
         <button
           type="button"
           onClick={handleToggle}
@@ -824,6 +824,6 @@ export default function SupportWidget() {
           )}
         </section>
       </div>
-    </div>
+    </>
   );
 }
