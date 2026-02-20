@@ -1199,9 +1199,8 @@ export default function LeadsPage() {
           {openLead && (
             <>
               <div
-                className="fixed inset-0 z-[80] bg-[#0F172A]/38 backdrop-blur-[3px]"
+                className="pointer-events-none fixed inset-0 z-[80] bg-[#0F172A]/38 backdrop-blur-[3px]"
                 aria-hidden="true"
-                onClick={() => setOpenLead(null)}
               />
 
               <div className="animate-slideLeft fixed inset-y-0 right-0 z-[90] flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
