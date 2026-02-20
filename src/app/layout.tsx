@@ -4,6 +4,7 @@ import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
 import "./globals.css";
 import DashboardContainer from "@/components/DashboardContainer";
+import RightHitboxDebug from "@/components/dev/RightHitboxDebug";
 import InboxNavLink from "@/components/InboxNavLink";
 import SupportWidgetLoader from "@/components/support/SupportWidgetLoader";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
@@ -224,6 +225,7 @@ export default async function RootLayout({
             </main>
 
             <SupportWidgetLoader />
+            {process.env.NODE_ENV === "development" ? <RightHitboxDebug /> : null}
 
             {/* 🔵 FOOTER */}
             <footer className="border-t border-[#c8d6ea] bg-[#f4f8ff]/75 text-xs text-[#3f5470]">

@@ -574,18 +574,13 @@ export default function SupportWidget() {
         </button>
       </div>
 
-      <div
-        className={cn(
-          "fixed bottom-[5.25rem] left-3 right-3 z-[71] w-auto transition-all duration-200 sm:bottom-24 sm:left-auto sm:right-6 sm:w-[min(420px,calc(100vw-1.5rem))]",
-          isOpen ? "pointer-events-auto" : "pointer-events-none",
-          isOpen ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
-        )}
-      >
-        <section
-          role="dialog"
-          aria-label="Messagerie support Lidmeo"
-          className="pointer-events-auto flex h-[min(76vh,680px)] flex-col overflow-hidden rounded-3xl border border-[#d9e5fb] bg-[#F8FAFC] shadow-[0_30px_80px_-40px_rgba(15,23,42,0.5)]"
-        >
+      {isOpen ? (
+        <div className="fixed bottom-[5.25rem] left-3 right-3 z-[71] w-auto translate-y-0 opacity-100 sm:bottom-24 sm:left-auto sm:right-6 sm:w-[min(420px,calc(100vw-1.5rem))]">
+          <section
+            role="dialog"
+            aria-label="Messagerie support Lidmeo"
+            className="flex h-[min(76vh,680px)] flex-col overflow-hidden rounded-3xl border border-[#d9e5fb] bg-[#F8FAFC] shadow-[0_30px_80px_-40px_rgba(15,23,42,0.5)]"
+          >
           <header className="border-b border-[#dce7fb] bg-white/90 px-5 py-4">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -822,8 +817,9 @@ export default function SupportWidget() {
               </div>
             </>
           )}
-        </section>
-      </div>
+          </section>
+        </div>
+      ) : null}
     </>
   );
 }
