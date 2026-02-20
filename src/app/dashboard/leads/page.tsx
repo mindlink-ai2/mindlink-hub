@@ -575,7 +575,23 @@ export default function LeadsPage() {
 
     const mailto = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
-    window.location.href = mailto;
+    const popup = window.open(mailto, "_self");
+    if (!popup) {
+      window.location.assign(mailto);
+    }
+  };
+
+  const openLinkedInProfile = () => {
+    if (!openLead) return;
+
+    const rawUrl = (openLead.LinkedInURL ?? "").trim();
+    if (!rawUrl) {
+      alert("Aucun profil LinkedIn disponible pour ce prospect.");
+      return;
+    }
+
+    const safeUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+    window.open(safeUrl, "_blank", "noopener,noreferrer");
   };
 
   const openGmailWeb = () => {
@@ -1241,14 +1257,13 @@ export default function LeadsPage() {
                     <div className="mt-3 grid grid-cols-1 gap-3">
                       <InfoBlock title="LinkedIn">
                         {openLead.LinkedInURL ? (
-                          <a
-                            href={openLead.LinkedInURL}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            type="button"
+                            onClick={openLinkedInProfile}
                             className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-[#dbe5f3] bg-white px-3 py-2 text-[#334155] transition hover:border-[#bfdbfe] hover:bg-[#f8fbff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
                           >
                             Ouvrir le profil <span className="opacity-80">↗</span>
-                          </a>
+                          </button>
                         ) : (
                           <span className="text-[#64748b]">—</span>
                         )}
