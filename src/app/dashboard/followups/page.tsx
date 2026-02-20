@@ -231,8 +231,8 @@ export default function FollowupsPage() {
     data: FollowupLead[];
     tone: TabKey;
   }) => (
-    <section className="hub-card overflow-hidden">
-      <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-5 py-4">
+    <section className="overflow-hidden rounded-2xl border border-[#d7e3f4] bg-[#ecf2fa]/75">
+      <div className="border-b border-[#d7e3f4] bg-transparent px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold text-[#0b1c33]">{title}</h2>

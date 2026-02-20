@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
 import { supabase } from "@/lib/supabase";
@@ -82,6 +82,12 @@ function normalizeSearchValue(value: string | null | undefined): string {
     .trim();
 }
 
+function toExternalUrl(value: string | null | undefined): string | null {
+  const clean = (value ?? "").trim();
+  if (!clean) return null;
+  return /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
+}
+
 function threadFromRealtimePayload(payloadNew: Record<string, unknown>): InboxThread | null {
   const id = String(payloadNew.id ?? "").trim();
   const unipileThreadId = String(payloadNew.unipile_thread_id ?? "").trim();
@@ -145,11 +151,26 @@ export default function InboxPage() {
   const [threadSearch, setThreadSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
+  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const shouldScrollToBottomRef = useRef(false);
 
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
     [threads, selectedThreadId]
   );
+  const selectedThreadLinkedInUrl = useMemo(
+    () =>
+      toExternalUrl(
+        selectedThread?.contact_linkedin_url ?? selectedThread?.lead_linkedin_url ?? null
+      ),
+    [selectedThread?.contact_linkedin_url, selectedThread?.lead_linkedin_url]
+  );
+
+  const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const viewport = messagesViewportRef.current;
+    if (!viewport) return;
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior });
+  }, []);
 
   const filteredThreads = useMemo(() => {
     const query = normalizeSearchValue(threadSearch);
@@ -255,9 +276,20 @@ export default function InboxPage() {
 
   useEffect(() => {
     if (!selectedThreadId) return;
+    shouldScrollToBottomRef.current = true;
     void loadMessages(selectedThreadId);
     void markThreadRead(selectedThreadId);
   }, [selectedThreadId]);
+
+  useEffect(() => {
+    if (!selectedThreadId || loadingMessages) return;
+    if (!shouldScrollToBottomRef.current) return;
+
+    shouldScrollToBottomRef.current = false;
+    window.requestAnimationFrame(() => {
+      scrollMessagesToBottom("auto");
+    });
+  }, [selectedThreadId, loadingMessages, messages, scrollMessagesToBottom]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -439,6 +471,7 @@ export default function InboxPage() {
       }
 
       const sentAt = String(data?.message?.sent_at ?? new Date().toISOString());
+      shouldScrollToBottomRef.current = true;
 
       setMessages((prev) => [
         ...prev,
@@ -557,7 +590,10 @@ export default function InboxPage() {
                         <button
                           key={thread.id}
                           type="button"
-                          onClick={() => setSelectedThreadId(thread.id)}
+                          onClick={() => {
+                            shouldScrollToBottomRef.current = true;
+                            setSelectedThreadId(thread.id);
+                          }}
                           className={[
                             "w-full rounded-xl border px-3 py-3 text-left transition-colors duration-150",
                             active ? "border-[#9cc0ff]" : "border-[#d7e3f4] hover:border-[#b9d0f2]",
@@ -612,7 +648,19 @@ export default function InboxPage() {
 
             <div className="hub-card overflow-hidden">
               <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
-                <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
+                  {selectedThreadLinkedInUrl ? (
+                    <a
+                      href={selectedThreadLinkedInUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-[#d7e3f4] bg-white px-2.5 py-1 text-[11px] font-medium text-[#36506e] transition hover:border-[#afc7eb] hover:bg-[#edf4fd]"
+                    >
+                      Voir profil LinkedIn
+                    </a>
+                  ) : null}
+                </div>
               </div>
 
               {!selectedThread ? (
@@ -621,7 +669,7 @@ export default function InboxPage() {
                 </div>
               ) : (
                 <>
-                  <div className="max-h-[58vh] overflow-y-auto p-4">
+                  <div ref={messagesViewportRef} className="max-h-[58vh] overflow-y-auto p-4">
                     {loadingMessages ? (
                       <div className="text-sm text-[#51627b]">Chargement des messages…</div>
                     ) : messages.length === 0 ? (
