@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
-import { Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2 } from "lucide-react";
+import { Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2, X } from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -616,15 +616,37 @@ export default function LeadsPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  // UX-only: Escape close
+  // UX-only: Escape close + lock page scroll when sidebar is open
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpenLead(null);
     };
     window.addEventListener("keydown", onKeyDown);
 
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyPaddingRight = body.style.paddingRight;
+
+    if (openLead) {
+      const scrollbarWidth = window.innerWidth - html.clientWidth;
+      html.style.overflow = "hidden";
+      body.style.overflow = "hidden";
+      if (scrollbarWidth > 0) {
+        body.style.paddingRight = `${scrollbarWidth}px`;
+      }
+    } else {
+      html.style.overflow = "";
+      body.style.overflow = "";
+      body.style.paddingRight = "";
+    }
+
     return () => {
       window.removeEventListener("keydown", onKeyDown);
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.paddingRight = prevBodyPaddingRight;
     };
   }, [openLead]);
 
@@ -1164,12 +1186,22 @@ export default function LeadsPage() {
                 onClick={() => setOpenLead(null)}
               />
 
-              <div className="animate-slideLeft fixed inset-y-0 right-0 z-50 flex h-[100dvh] max-h-[100dvh] min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
+              <div className="animate-slideLeft fixed inset-y-0 right-0 z-50 flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-y-auto overscroll-contain border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
                 <div className="sticky top-0 z-10 border-b border-[#e2e8f0] bg-white/95 p-6 pb-4 backdrop-blur-xl">
                   <div className="flex items-start justify-between gap-3">
-                    <HubButton type="button" variant="ghost" size="sm" onClick={() => setOpenLead(null)}>
-                      Fermer
-                    </HubButton>
+                    <div className="flex items-center gap-2">
+                      <HubButton type="button" variant="ghost" size="sm" onClick={() => setOpenLead(null)}>
+                        Fermer
+                      </HubButton>
+                      <button
+                        type="button"
+                        onClick={() => setOpenLead(null)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#dbe5f3] bg-white text-[#4B5563] transition hover:bg-[#f8fbff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                        aria-label="Fermer le panneau"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                     <span className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
                       {plan || "essential"}
                     </span>
@@ -1201,7 +1233,7 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain touch-pan-y p-6 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]">
+                <div className="space-y-5 p-6 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]">
                   <div className="hub-card-soft p-4">
                     <div className="text-[11px] uppercase tracking-wide text-[#4B5563]">Informations</div>
                     <div className="mt-3 grid grid-cols-1 gap-3">
