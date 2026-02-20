@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, ReactNode, type WheelEvent as ReactWheelEvent } from "react";
+import { useEffect, useMemo, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
@@ -616,21 +616,7 @@ export default function LeadsPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const handleSidebarWheelCapture = (event: ReactWheelEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement | null;
-    const editable = target?.closest("textarea, input, select, [contenteditable='true']");
-    if (editable) {
-      const el = editable as HTMLElement;
-      const canScrollInternally = el.scrollHeight > el.clientHeight;
-      if (canScrollInternally) return;
-    }
-
-    const panelContent = event.currentTarget;
-    if (panelContent.scrollHeight <= panelContent.clientHeight) return;
-
-    panelContent.scrollTop += event.deltaY;
-    event.preventDefault();
-  };
+  const isSidebarOpen = Boolean(openLead);
 
   // UX-only: Escape close + lock page scroll when sidebar is open
   useEffect(() => {
@@ -645,7 +631,7 @@ export default function LeadsPage() {
     const prevBodyOverflow = body.style.overflow;
     const prevBodyPaddingRight = body.style.paddingRight;
 
-    if (openLead) {
+    if (isSidebarOpen) {
       const scrollbarWidth = window.innerWidth - html.clientWidth;
       html.style.overflow = "hidden";
       body.style.overflow = "hidden";
@@ -664,7 +650,7 @@ export default function LeadsPage() {
       body.style.overflow = prevBodyOverflow;
       body.style.paddingRight = prevBodyPaddingRight;
     };
-  }, [openLead]);
+  }, [isSidebarOpen]);
 
   if (!clientLoaded) {
     return (
@@ -1197,12 +1183,12 @@ export default function LeadsPage() {
           {openLead && (
             <>
               <div
-                className="fixed inset-0 z-40 bg-[#0F172A]/38 backdrop-blur-[3px]"
+                className="fixed inset-0 z-[80] bg-[#0F172A]/38 backdrop-blur-[3px]"
                 aria-hidden="true"
                 onClick={() => setOpenLead(null)}
               />
 
-              <div className="animate-slideLeft fixed inset-y-0 right-0 z-50 flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
+              <div className="animate-slideLeft fixed inset-y-0 right-0 z-[90] flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
                 <div className="z-10 border-b border-[#e2e8f0] bg-white/95 p-6 pb-4 backdrop-blur-xl">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -1249,10 +1235,7 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                <div
-                  className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain touch-pan-y p-6 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]"
-                  onWheelCapture={handleSidebarWheelCapture}
-                >
+                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain touch-pan-y p-6 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]">
                   <div className="hub-card-soft p-4">
                     <div className="text-[11px] uppercase tracking-wide text-[#4B5563]">Informations</div>
                     <div className="mt-3 grid grid-cols-1 gap-3">
