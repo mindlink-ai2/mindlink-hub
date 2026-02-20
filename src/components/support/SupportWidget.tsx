@@ -137,6 +137,7 @@ export default function SupportWidget() {
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isLeadsSidebarOpen, setIsLeadsSidebarOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -314,6 +315,30 @@ export default function SupportWidget() {
       // no-op
     }
   }, []);
+
+  useEffect(() => {
+    if (!hasHydrated || typeof document === "undefined") return;
+
+    const sync = () => {
+      setIsLeadsSidebarOpen(document.body.dataset.leadsSidebarOpen === "1");
+    };
+
+    sync();
+
+    const observer = new MutationObserver(sync);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-leads-sidebar-open"],
+    });
+
+    return () => observer.disconnect();
+  }, [hasHydrated]);
+
+  useEffect(() => {
+    if (isLeadsSidebarOpen) {
+      setIsOpen(false);
+    }
+  }, [isLeadsSidebarOpen]);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -525,6 +550,7 @@ export default function SupportWidget() {
   };
 
   if (!shouldRenderOnPage || !hasHydrated) return null;
+  if (pathname?.startsWith("/dashboard/leads") && isLeadsSidebarOpen) return null;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[70]">

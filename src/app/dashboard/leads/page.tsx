@@ -651,6 +651,7 @@ export default function LeadsPage() {
       const scrollbarWidth = window.innerWidth - html.clientWidth;
       html.style.overflow = "hidden";
       body.style.overflow = "hidden";
+      body.dataset.leadsSidebarOpen = "1";
       if (scrollbarWidth > 0) {
         body.style.paddingRight = `${scrollbarWidth}px`;
       }
@@ -658,6 +659,7 @@ export default function LeadsPage() {
       html.style.overflow = "";
       body.style.overflow = "";
       body.style.paddingRight = "";
+      delete body.dataset.leadsSidebarOpen;
     }
 
     return () => {
@@ -665,6 +667,7 @@ export default function LeadsPage() {
       html.style.overflow = prevHtmlOverflow;
       body.style.overflow = prevBodyOverflow;
       body.style.paddingRight = prevBodyPaddingRight;
+      delete body.dataset.leadsSidebarOpen;
     };
   }, [isSidebarOpen]);
 
