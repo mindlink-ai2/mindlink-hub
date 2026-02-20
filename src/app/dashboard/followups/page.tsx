@@ -362,8 +362,7 @@ export default function FollowupsPage() {
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
-        <div className="relative min-h-screen">
-          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px] bg-[radial-gradient(circle_at_20%_0%,rgba(31,94,255,0.14),transparent_56%),radial-gradient(circle_at_80%_0%,rgba(35,196,245,0.12),transparent_48%)]" />
+        <div className="relative min-h-screen bg-[radial-gradient(circle_at_20%_0%,rgba(31,94,255,0.14),transparent_56%),radial-gradient(circle_at_80%_0%,rgba(35,196,245,0.12),transparent_48%)]">
 
           <div className="mx-auto w-full max-w-[1680px] px-4 py-6 sm:px-6 sm:py-7">
             {!loaded ? (

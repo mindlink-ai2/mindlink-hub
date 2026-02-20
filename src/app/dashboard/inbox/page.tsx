@@ -161,19 +161,11 @@ export default function InboxPage() {
     [threads, selectedThreadId]
   );
   const selectedThreadLinkedInUrl = useMemo(
-    () => {
-      const urlFromThread =
-        selectedThread?.contact_linkedin_url ?? selectedThread?.lead_linkedin_url ?? null;
-      const urlFromMessages =
-        messages.find((message) => Boolean((message.sender_linkedin_url ?? "").trim()))
-          ?.sender_linkedin_url ?? null;
-      return toExternalUrl(urlFromThread ?? urlFromMessages);
-    },
-    [
-      selectedThread?.contact_linkedin_url,
-      selectedThread?.lead_linkedin_url,
-      messages,
-    ]
+    () =>
+      toExternalUrl(
+        selectedThread?.contact_linkedin_url ?? selectedThread?.lead_linkedin_url ?? null
+      ),
+    [selectedThread?.contact_linkedin_url, selectedThread?.lead_linkedin_url]
   );
 
   const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
@@ -537,15 +529,15 @@ export default function InboxPage() {
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <div className="min-h-screen px-4 pb-20 pt-8 sm:px-6">
-        <div className="mx-auto w-full max-w-[1680px] space-y-4">
-          <section className="hub-card-hero p-4 sm:p-5">
+      <div className="min-h-screen px-4 pb-14 pt-4 sm:px-6 sm:pt-5">
+        <div className="mx-auto w-full max-w-[1680px] space-y-3">
+          <section className="hub-card-hero p-3 sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#0b1c33] sm:text-4xl">
+                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0b1c33] sm:text-3xl">
                   Messagerie LinkedIn
                 </h1>
-                <p className="mt-1 text-sm text-[#51627b]">
+                <p className="mt-1 text-xs text-[#51627b] sm:text-sm">
                   Vos conversations sont centralisées et à jour en temps réel.
                 </p>
               </div>
@@ -578,7 +570,7 @@ export default function InboxPage() {
             ) : null}
           </section>
 
-          <section className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+          <section className="grid gap-3 xl:grid-cols-[330px_minmax(0,1fr)]">
             <div className="hub-card overflow-hidden">
               <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
                 <h2 className="text-sm font-semibold text-[#0b1c33]">Conversations</h2>
@@ -593,7 +585,7 @@ export default function InboxPage() {
                 />
               </div>
 
-              <div className="max-h-[70vh] overflow-y-auto p-3">
+              <div className="max-h-[64vh] overflow-y-auto p-3">
                 {loadingThreads ? (
                   <div className="p-3 text-sm text-[#51627b]">Chargement des threads…</div>
                 ) : threads.length === 0 ? (
@@ -694,7 +686,10 @@ export default function InboxPage() {
                 </div>
               ) : (
                 <>
-                  <div ref={messagesViewportRef} className="max-h-[66vh] overflow-y-auto p-4">
+                  <div
+                    ref={messagesViewportRef}
+                    className="max-h-[44vh] overflow-y-auto p-4 sm:max-h-[48vh] xl:max-h-[52vh]"
+                  >
                     {loadingMessages ? (
                       <div className="text-sm text-[#51627b]">Chargement des messages…</div>
                     ) : messages.length === 0 ? (
