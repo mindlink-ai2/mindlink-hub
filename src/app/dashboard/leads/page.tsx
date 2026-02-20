@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, ReactNode } from "react";
+import { useEffect, useMemo, useState, ReactNode, type WheelEvent as ReactWheelEvent } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
@@ -616,6 +616,14 @@ export default function LeadsPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  const handleSidebarWheelCapture = (event: ReactWheelEvent<HTMLDivElement>) => {
+    const panel = event.currentTarget;
+    if (panel.scrollHeight <= panel.clientHeight) return;
+
+    panel.scrollTop += event.deltaY;
+    event.preventDefault();
+  };
+
   // UX-only: Escape close + lock page scroll when sidebar is open
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1186,7 +1194,10 @@ export default function LeadsPage() {
                 onClick={() => setOpenLead(null)}
               />
 
-              <div className="animate-slideLeft fixed inset-y-0 right-0 z-50 flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-y-auto overscroll-contain border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
+              <div
+                className="animate-slideLeft fixed inset-y-0 right-0 z-50 flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-y-auto overscroll-contain border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]"
+                onWheelCapture={handleSidebarWheelCapture}
+              >
                 <div className="sticky top-0 z-10 border-b border-[#e2e8f0] bg-white/95 p-6 pb-4 backdrop-blur-xl">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2">
