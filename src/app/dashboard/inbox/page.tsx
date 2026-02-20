@@ -12,6 +12,8 @@ type InboxThread = {
   last_message_at: string | null;
   last_message_preview: string | null;
   unread_count: number | null;
+  lead_id?: number | string | null;
+  lead_exists?: boolean | null;
   contact_name: string | null;
   contact_linkedin_url: string | null;
   contact_avatar_url: string | null;
@@ -107,6 +109,14 @@ function threadFromRealtimePayload(payloadNew: Record<string, unknown>): InboxTh
       typeof payloadNew.unread_count === "number"
         ? payloadNew.unread_count
         : Number(payloadNew.unread_count ?? 0),
+    lead_id:
+      payloadNew.lead_id === null || payloadNew.lead_id === undefined
+        ? null
+        : String(payloadNew.lead_id),
+    lead_exists:
+      typeof payloadNew.lead_exists === "boolean"
+        ? payloadNew.lead_exists
+        : null,
     contact_name: typeof payloadNew.contact_name === "string" ? payloadNew.contact_name : null,
     contact_linkedin_url:
       typeof payloadNew.contact_linkedin_url === "string"
@@ -160,12 +170,19 @@ export default function InboxPage() {
     () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
     [threads, selectedThreadId]
   );
+  const selectedThreadHasProspectionLead = Boolean(selectedThread?.lead_exists);
   const selectedThreadLinkedInUrl = useMemo(
-    () =>
-      toExternalUrl(
-        selectedThread?.contact_linkedin_url ?? selectedThread?.lead_linkedin_url ?? null
-      ),
-    [selectedThread?.contact_linkedin_url, selectedThread?.lead_linkedin_url]
+    () => {
+      if (!selectedThreadHasProspectionLead) return null;
+      return toExternalUrl(
+        selectedThread?.lead_linkedin_url ?? selectedThread?.contact_linkedin_url ?? null
+      );
+    },
+    [
+      selectedThreadHasProspectionLead,
+      selectedThread?.contact_linkedin_url,
+      selectedThread?.lead_linkedin_url,
+    ]
   );
 
   const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
@@ -339,8 +356,21 @@ export default function InboxPage() {
           if (!realtimeThread) return;
 
           setThreads((prev) => {
+            const previousThread =
+              prev.find((thread) => thread.id === realtimeThread.id) ?? null;
+            const mergedThread = previousThread
+              ? {
+                  ...previousThread,
+                  ...realtimeThread,
+                  lead_exists:
+                    realtimeThread.lead_exists === null ||
+                    realtimeThread.lead_exists === undefined
+                      ? previousThread.lead_exists
+                      : realtimeThread.lead_exists,
+                }
+              : realtimeThread;
             const without = prev.filter((thread) => thread.id !== realtimeThread.id);
-            return sortThreadsByLastMessage([...without, realtimeThread]);
+            return sortThreadsByLastMessage([...without, mergedThread]);
           });
         }
       )

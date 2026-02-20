@@ -27,7 +27,45 @@ export async function GET() {
       return NextResponse.json({ error: "threads_fetch_failed" }, { status: 500 });
     }
 
-    return NextResponse.json({ threads: threads ?? [] });
+    const threadRows = Array.isArray(threads) ? threads : [];
+    const leadIds = threadRows
+      .map((thread) => thread?.lead_id)
+      .filter((leadId) => leadId !== null && leadId !== undefined);
+
+    let existingLeadIdSet = new Set<string>();
+
+    if (leadIds.length > 0) {
+      const { data: existingLeads, error: leadsError } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("client_id", clientId)
+        .in("id", leadIds);
+
+      if (leadsError) {
+        console.error("INBOX_THREADS_LEADS_FETCH_ERROR:", leadsError);
+      } else {
+        existingLeadIdSet = new Set(
+          (existingLeads ?? [])
+            .map((lead) => String(lead.id))
+            .filter((id) => id !== "")
+        );
+      }
+    }
+
+    const threadsWithLeadPresence = threadRows.map((thread) => {
+      const leadId = thread?.lead_id;
+      const leadExists =
+        leadId !== null &&
+        leadId !== undefined &&
+        existingLeadIdSet.has(String(leadId));
+
+      return {
+        ...thread,
+        lead_exists: leadExists,
+      };
+    });
+
+    return NextResponse.json({ threads: threadsWithLeadPresence });
   } catch (error: unknown) {
     console.error("INBOX_THREADS_GET_ERROR:", error);
     return NextResponse.json({ error: "server_error" }, { status: 500 });
