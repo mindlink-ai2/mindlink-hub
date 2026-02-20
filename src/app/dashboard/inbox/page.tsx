@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
 import { supabase } from "@/lib/supabase";
+import { Linkedin } from "lucide-react";
 
 type InboxThread = {
   id: string;
@@ -153,17 +154,26 @@ export default function InboxPage() {
   const [clientId, setClientId] = useState<string | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
   const shouldScrollToBottomRef = useRef(false);
+  const loadedMessagesThreadIdRef = useRef<string | null>(null);
 
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
     [threads, selectedThreadId]
   );
   const selectedThreadLinkedInUrl = useMemo(
-    () =>
-      toExternalUrl(
-        selectedThread?.contact_linkedin_url ?? selectedThread?.lead_linkedin_url ?? null
-      ),
-    [selectedThread?.contact_linkedin_url, selectedThread?.lead_linkedin_url]
+    () => {
+      const urlFromThread =
+        selectedThread?.contact_linkedin_url ?? selectedThread?.lead_linkedin_url ?? null;
+      const urlFromMessages =
+        messages.find((message) => Boolean((message.sender_linkedin_url ?? "").trim()))
+          ?.sender_linkedin_url ?? null;
+      return toExternalUrl(urlFromThread ?? urlFromMessages);
+    },
+    [
+      selectedThread?.contact_linkedin_url,
+      selectedThread?.lead_linkedin_url,
+      messages,
+    ]
   );
 
   const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
@@ -171,6 +181,12 @@ export default function InboxPage() {
     if (!viewport) return;
     viewport.scrollTo({ top: viewport.scrollHeight, behavior });
   }, []);
+
+  const handleOpenSelectedThreadLinkedInProfile = useCallback(() => {
+    const url = selectedThreadLinkedInUrl;
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, [selectedThreadLinkedInUrl]);
 
   const filteredThreads = useMemo(() => {
     const query = normalizeSearchValue(threadSearch);
@@ -223,8 +239,10 @@ export default function InboxPage() {
   }, []);
 
   const loadMessages = async (threadDbId: string) => {
+    loadedMessagesThreadIdRef.current = null;
     setLoadingMessages(true);
     setError(null);
+    setMessages([]);
 
     try {
       const res = await fetch(
@@ -234,10 +252,15 @@ export default function InboxPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? "Impossible de charger les messages.");
 
-      setMessages(Array.isArray(data?.messages) ? (data.messages as InboxMessage[]) : []);
+      const loadedMessages = Array.isArray(data?.messages)
+        ? (data.messages as InboxMessage[])
+        : [];
+      setMessages(loadedMessages);
+      loadedMessagesThreadIdRef.current = threadDbId;
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur de chargement des messages.");
       setMessages([]);
+      loadedMessagesThreadIdRef.current = threadDbId;
     } finally {
       setLoadingMessages(false);
     }
@@ -276,6 +299,7 @@ export default function InboxPage() {
 
   useEffect(() => {
     if (!selectedThreadId) return;
+    loadedMessagesThreadIdRef.current = null;
     shouldScrollToBottomRef.current = true;
     void loadMessages(selectedThreadId);
     void markThreadRead(selectedThreadId);
@@ -284,10 +308,12 @@ export default function InboxPage() {
   useEffect(() => {
     if (!selectedThreadId || loadingMessages) return;
     if (!shouldScrollToBottomRef.current) return;
+    if (loadedMessagesThreadIdRef.current !== selectedThreadId) return;
 
     shouldScrollToBottomRef.current = false;
     window.requestAnimationFrame(() => {
       scrollMessagesToBottom("auto");
+      window.setTimeout(() => scrollMessagesToBottom("auto"), 60);
     });
   }, [selectedThreadId, loadingMessages, messages, scrollMessagesToBottom]);
 
@@ -471,6 +497,7 @@ export default function InboxPage() {
       }
 
       const sentAt = String(data?.message?.sent_at ?? new Date().toISOString());
+      loadedMessagesThreadIdRef.current = selectedThreadId;
       shouldScrollToBottomRef.current = true;
 
       setMessages((prev) => [
@@ -511,17 +538,15 @@ export default function InboxPage() {
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <div className="min-h-screen px-4 pb-20 pt-8 sm:px-6">
-        <div className="mx-auto w-full max-w-[1680px] space-y-6">
-          <section className="hub-card-hero p-6 sm:p-7">
+        <div className="mx-auto w-full max-w-[1680px] space-y-4">
+          <section className="hub-card-hero p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h1 className="hub-page-title">
+                <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#0b1c33] sm:text-4xl">
                   Messagerie LinkedIn
                 </h1>
-                <p className="mt-2 text-sm text-[#51627b]">
-                  Toutes vos conversations LinkedIn sont centralisées et mises a jour en
-                  temps reel. Les messages entrants et sortants sont enregistres
-                  automatiquement.
+                <p className="mt-1 text-sm text-[#51627b]">
+                  Vos conversations sont centralisées et à jour en temps réel.
                 </p>
               </div>
 
@@ -553,7 +578,7 @@ export default function InboxPage() {
             ) : null}
           </section>
 
-          <section className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+          <section className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
             <div className="hub-card overflow-hidden">
               <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
                 <h2 className="text-sm font-semibold text-[#0b1c33]">Conversations</h2>
@@ -651,14 +676,14 @@ export default function InboxPage() {
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
                   {selectedThreadLinkedInUrl ? (
-                    <a
-                      href={selectedThreadLinkedInUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-lg border border-[#d7e3f4] bg-white px-2.5 py-1 text-[11px] font-medium text-[#36506e] transition hover:border-[#afc7eb] hover:bg-[#edf4fd]"
+                    <button
+                      type="button"
+                      onClick={handleOpenSelectedThreadLinkedInProfile}
+                      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
                     >
-                      Voir profil LinkedIn
-                    </a>
+                      <Linkedin className="h-3.5 w-3.5" />
+                      Voir profil
+                    </button>
                   ) : null}
                 </div>
               </div>
@@ -669,7 +694,7 @@ export default function InboxPage() {
                 </div>
               ) : (
                 <>
-                  <div ref={messagesViewportRef} className="max-h-[58vh] overflow-y-auto p-4">
+                  <div ref={messagesViewportRef} className="max-h-[66vh] overflow-y-auto p-4">
                     {loadingMessages ? (
                       <div className="text-sm text-[#51627b]">Chargement des messages…</div>
                     ) : messages.length === 0 ? (

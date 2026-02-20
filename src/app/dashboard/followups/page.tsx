@@ -371,8 +371,7 @@ export default function FollowupsPage() {
             ) : (
               <div className="space-y-5">
                 {/* Header */}
-                <div className="hub-card-hero relative flex flex-col gap-3.5 overflow-hidden p-4 sm:p-5">
-                  <div className="pointer-events-none absolute -left-16 top-[-90px] h-56 w-56 rounded-full bg-[#dce8ff]/70 blur-3xl" />
+                <div className="relative flex flex-col gap-3.5 overflow-hidden rounded-2xl border border-[#d7e3f4] bg-[#ecf2fa]/75 p-4 sm:p-5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
                       <span className="h-1.5 w-1.5 rounded-full bg-[#1f5eff]" />
