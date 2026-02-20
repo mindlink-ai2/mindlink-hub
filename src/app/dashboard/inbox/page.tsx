@@ -482,7 +482,7 @@ export default function InboxPage() {
           <section className="hub-card-hero p-6 sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-semibold tracking-tight text-[#0b1c33] sm:text-4xl">
+                <h1 className="hub-page-title">
                   Messagerie LinkedIn
                 </h1>
                 <p className="mt-2 text-sm text-[#51627b]">
@@ -587,7 +587,7 @@ export default function InboxPage() {
                                   {thread.contact_name || "Contact LinkedIn"}
                                 </p>
                                 {unreadCount > 0 ? (
-                                  <span className="rounded-full border border-[#9cc0ff] bg-white px-2 py-0.5 text-[11px] font-semibold text-[#1f5eff]">
+                                  <span className="rounded-full border border-[#9cc0ff] bg-white px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#1f5eff]">
                                     {formatUnreadCount(unreadCount)}
                                   </span>
                                 ) : null}

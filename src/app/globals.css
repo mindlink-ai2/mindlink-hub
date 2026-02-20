@@ -152,6 +152,27 @@ body {
 }
 
 @layer components {
+  .hub-page-title {
+    font-size: 2.25rem;
+    line-height: 1.08;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: #0b1c33;
+  }
+
+  @media (min-width: 640px) {
+    .hub-page-title {
+      font-size: 3rem;
+    }
+  }
+
+  .hub-kpi-number {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: #0b1c33;
+  }
+
   .hub-card {
     background-color: var(--hub-surface);
     border: 1px solid var(--hub-border);

@@ -237,7 +237,7 @@ export default function DashboardPage() {
                   <span className="h-2 w-2 rounded-full bg-[#1f5eff]" />
                   Pilotage SaaS
                 </div>
-                <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-[#0b1c33] md:text-5xl">
+                <h1 className="hub-page-title mt-3">
                   Dashboard Lidmeo
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm text-[#51627b] md:text-base">
@@ -599,7 +599,7 @@ function KPI({
           </span>
         </div>
 
-        <div className="mt-3 text-4xl font-extrabold text-[#0b1c33]">
+        <div className="hub-kpi-number mt-3 text-4xl">
           {loading ? <span className="opacity-50">—</span> : value}
         </div>
 

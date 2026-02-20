@@ -179,7 +179,7 @@ export default function SupportPage() {
                 <span className="h-2 w-2 rounded-full bg-[#3771ed]" />
                 Centre support
               </div>
-              <h1 className="text-3xl font-semibold tracking-tight text-[#122b52] sm:text-[34px]">
+              <h1 className="hub-page-title">
                 Support
               </h1>
               <p className="max-w-2xl text-sm text-[#5d759c]">

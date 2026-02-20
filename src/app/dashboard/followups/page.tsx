@@ -234,7 +234,7 @@ export default function FollowupsPage() {
 
           <div className="shrink-0 flex items-center gap-2">
             <span className="text-xs text-[#51627b]">Total</span>
-            <span className="rounded-lg border border-[#d7e3f4] bg-white px-2 py-1 text-xs font-semibold text-[#0b1c33]">
+            <span className="rounded-lg border border-[#d7e3f4] bg-white px-2 py-1 text-xs font-semibold tabular-nums text-[#0b1c33]">
               {data.length}
             </span>
           </div>
@@ -304,12 +304,12 @@ export default function FollowupsPage() {
       >
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-[#51627b]">{label}</p>
-          <span
-            className={[
-              "rounded-full border px-2 py-0.5 text-xs",
-              styles,
-            ].join(" ")}
-          >
+            <span
+              className={[
+                "rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums",
+                styles,
+              ].join(" ")}
+            >
             {value}
           </span>
         </div>
@@ -359,7 +359,7 @@ export default function FollowupsPage() {
                   <div className="pointer-events-none absolute -left-16 top-[-90px] h-56 w-56 rounded-full bg-[#dce8ff]/70 blur-3xl" />
                   <div className="flex items-start justify-between gap-6">
                     <div className="relative">
-                      <h1 className="text-2xl font-semibold tracking-tight text-[#0b1c33] sm:text-3xl">
+                      <h1 className="hub-page-title">
                         Relances clients
                       </h1>
                       <p className="mt-1 text-sm text-[#51627b]">

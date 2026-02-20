@@ -742,7 +742,7 @@ export default function LeadsPage() {
                     </span>
                   </div>
 
-                  <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[#0b1c33] sm:text-5xl">
+                  <h1 className="hub-page-title mt-4">
                     Pilotage de la prospection
                   </h1>
                   <p className="mt-3 max-w-2xl text-sm text-[#51627b] sm:text-base">

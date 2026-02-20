@@ -188,7 +188,7 @@ export default function BillingPage() {
                 Espace abonnements
               </div>
 
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[#112a51] sm:text-4xl">
+              <h1 className="hub-page-title mt-4">
                 Facturation & abonnement
               </h1>
               <p className="mt-2 max-w-2xl text-sm text-[#61789f] sm:text-base">
@@ -256,7 +256,7 @@ export default function BillingPage() {
               </div>
 
               <div className="mt-6 flex items-end gap-2">
-                <div className="text-4xl font-semibold tracking-tight text-[#102a50]">
+                <div className="hub-kpi-number text-4xl">
                   {essentialPrice}€
                 </div>
                 <div className="pb-1 text-[#6e87ad]">/ mois</div>
@@ -406,7 +406,7 @@ export default function BillingPage() {
                       <div className="text-sm text-[#5a729a]">
                         Prospects contactés
                       </div>
-                      <div className="text-xl font-semibold text-[#13335e]">
+                      <div className="hub-kpi-number text-xl text-[#13335e]">
                         450/mois
                       </div>
                     </div>
@@ -421,7 +421,7 @@ export default function BillingPage() {
               </div>
 
               <div className="mt-6 flex items-end gap-2">
-                <div className="text-4xl font-semibold tracking-tight text-[#102a50]">
+                <div className="hub-kpi-number text-4xl">
                   199€
                 </div>
                 <div className="pb-1 text-[#6e87ad]">/ mois</div>
