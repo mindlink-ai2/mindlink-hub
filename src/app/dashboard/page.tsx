@@ -246,7 +246,7 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2.5">
+              <div className="relative z-[90] flex flex-wrap gap-2.5">
                 <Link
                   href="/dashboard/prospection"
                   className="inline-flex items-center justify-center rounded-full border border-[#1f5eff] bg-gradient-to-r from-[#1f5eff] to-[#1254ec] px-5 py-2.5 text-xs font-semibold text-white shadow-[0_14px_30px_-18px_rgba(31,94,255,0.9)] transition hover:-translate-y-[1px] md:text-sm"
