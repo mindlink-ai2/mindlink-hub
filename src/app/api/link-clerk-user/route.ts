@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  ensureClientOnboardingStateRow,
+  resolveClientContextForUser,
+} from "@/lib/client-onboarding-state";
 
 export async function POST() {
   const { userId } = await auth();
@@ -27,23 +31,32 @@ export async function POST() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // ✅ update uniquement si clerk_user_id est NULL (ça évite d’écraser)
-  const { data, error } = await supabase
-    .from("clients")
-    .update({ clerk_user_id: userId })
-    .eq("email", email)
-    .is("clerk_user_id", null)
-    .select("id, email, clerk_user_id")
-    .maybeSingle();
+  try {
+    const context = await resolveClientContextForUser(supabase, userId, email);
+    if (!context) {
+      return NextResponse.json({
+        ok: true,
+        linked: false,
+        reason: "not_found_or_already_linked",
+        email,
+      });
+    }
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (context.linkedNow) {
+      await ensureClientOnboardingStateRow(supabase, context.clientId);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      linked: context.linkedNow,
+      client: {
+        id: context.clientId,
+        email,
+        clerk_user_id: userId,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "server_error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  if (!data) {
-    // soit email pas trouvé, soit déjà lié
-    return NextResponse.json({ ok: true, linked: false, reason: "not_found_or_already_linked", email });
-  }
-
-  return NextResponse.json({ ok: true, linked: true, client: data });
 }

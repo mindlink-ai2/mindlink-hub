@@ -16,6 +16,7 @@ function normalizeUnipileBase(dsn: string) {
 
 export async function POST(req: Request) {
   try {
+    const url = new URL(req.url);
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -39,14 +40,27 @@ export async function POST(req: Request) {
 
     const UNIPILE_DSN = requireEnv("UNIPILE_DSN");
     const UNIPILE_API_KEY = requireEnv("UNIPILE_API_KEY");
-    const success_redirect_url = requireEnv("UNIPILE_SUCCESS_REDIRECT_URL");
-    const failure_redirect_url = requireEnv("UNIPILE_FAILURE_REDIRECT_URL");
     const notify_url = requireEnv("UNIPILE_NOTIFY_URL");
+
+    const returnToRaw = url.searchParams.get("returnTo");
+    const returnTo =
+      typeof returnToRaw === "string" && returnToRaw.startsWith("/")
+        ? returnToRaw
+        : null;
+
+    const success_redirect_url =
+      returnTo && url.origin
+        ? `${url.origin}${returnTo}`
+        : requireEnv("UNIPILE_SUCCESS_REDIRECT_URL");
+    const failure_redirect_url =
+      returnTo && url.origin
+        ? `${url.origin}${returnTo}`
+        : requireEnv("UNIPILE_FAILURE_REDIRECT_URL");
 
     const BASE = normalizeUnipileBase(UNIPILE_DSN);
 
     // ✅ DEBUG (à appeler avec ?debug=1)
-    const debug = new URL(req.url).searchParams.get("debug") === "1";
+    const debug = url.searchParams.get("debug") === "1";
     if (debug) {
       return NextResponse.json({
         ok: true,
@@ -98,9 +112,9 @@ export async function POST(req: Request) {
     }
 
     const json = await res.json();
-    const url = json?.url;
+    const redirectUrl = json?.url;
 
-    if (!url) {
+    if (!redirectUrl) {
       console.error("UNIPILE_CONNECT_MISSING_URL:", json);
       return NextResponse.json(
         { error: "unipile_missing_url", raw: json },
@@ -108,11 +122,12 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({ url });
-  } catch (e: any) {
+    return NextResponse.json({ url: redirectUrl });
+  } catch (e: unknown) {
     console.error("UNIPILE_CONNECT_ERROR:", e);
+    const details = e instanceof Error ? e.message : String(e);
     return NextResponse.json(
-      { error: "server_error", details: e?.message ?? String(e) },
+      { error: "server_error", details },
       { status: 500 }
     );
   }

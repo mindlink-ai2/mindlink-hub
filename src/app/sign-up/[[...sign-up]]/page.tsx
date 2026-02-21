@@ -1,5 +1,4 @@
 import { SignUp } from "@clerk/nextjs";
-import { getOnboardingUnsafeMetadataForSignup } from "@/lib/onboarding";
 
 export default function SignUpPage() {
   return (
@@ -26,7 +25,6 @@ export default function SignUpPage() {
         <SignUp
           forceRedirectUrl="/onboarding"
           fallbackRedirectUrl="/onboarding"
-          unsafeMetadata={getOnboardingUnsafeMetadataForSignup()}
           appearance={{
             elements: {
               card: "shadow-none border-0 bg-transparent",

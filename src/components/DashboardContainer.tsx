@@ -4,10 +4,6 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import {
-  getOnboardingCompletedStorageKey,
-  getOnboardingState,
-} from "@/lib/onboarding";
 
 export default function DashboardContainer({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -27,23 +23,33 @@ export default function DashboardContainer({ children }: { children: React.React
     if (!isLoaded || !isSignedIn || !user) return;
     if (
       pathname.startsWith("/onboarding") ||
+      pathname.startsWith("/onboarding/form") ||
       pathname.startsWith("/sign-in") ||
       pathname.startsWith("/sign-up")
     ) {
       return;
     }
 
-    const onboarding = getOnboardingState(
-      user.publicMetadata,
-      user.unsafeMetadata
-    );
-    const completedInBrowser =
-      typeof window !== "undefined" &&
-      window.localStorage.getItem(getOnboardingCompletedStorageKey(user.id)) === "1";
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/onboarding/status", { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!mounted || !res.ok) return;
 
-    if (onboarding.required && !completedInBrowser) {
-      router.replace("/onboarding");
-    }
+        const state = data?.state;
+        const completed = data?.completed === true || state === "completed";
+        if (state && !completed) {
+          router.replace("/onboarding");
+        }
+      } catch {
+        // no-op
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
   }, [isLoaded, isSignedIn, pathname, router, user]);
 
   return (

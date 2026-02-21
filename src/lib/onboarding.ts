@@ -1,8 +1,6 @@
 const ONBOARDING_COMPLETED_KEY = "onboardingCompleted";
 const ONBOARDING_COMPLETED_AT_KEY = "onboardingCompletedAt";
 const ONBOARDING_REQUIRED_KEY = "onboardingRequired";
-const ONBOARDING_INTRO_SEEN_KEY_PREFIX = "mindlink:onboarding:intro-seen";
-const ONBOARDING_COMPLETED_KEY_PREFIX = "mindlink:onboarding:completed";
 
 type MetaRecord = Record<string, unknown> | null;
 
@@ -39,12 +37,4 @@ export function getOnboardingUnsafeMetadataForSignup() {
   return {
     [ONBOARDING_REQUIRED_KEY]: true,
   };
-}
-
-export function getOnboardingIntroSeenStorageKey(userId: string) {
-  return `${ONBOARDING_INTRO_SEEN_KEY_PREFIX}:${userId}`;
-}
-
-export function getOnboardingCompletedStorageKey(userId: string) {
-  return `${ONBOARDING_COMPLETED_KEY_PREFIX}:${userId}`;
 }

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
 import { getOnboardingMetadataForCompletion } from "@/lib/onboarding";
+import { createServiceSupabase } from "@/lib/inbox-server";
+import {
+  markClientOnboardingCompleted,
+  resolveClientContextForUser,
+} from "@/lib/client-onboarding-state";
 
 export const runtime = "nodejs"; // important (fetch externes + email)
 
@@ -175,6 +180,21 @@ export async function POST(req: Request) {
 
     // 7) Email récap interne (Resend)
     await sendNotifyEmail(n8nBody);
+
+    // 7bis) Onboarding wizard state completed (nouveau flux)
+    try {
+      const supabase = createServiceSupabase();
+      const clientContext = await resolveClientContextForUser(
+        supabase,
+        userId,
+        clerkEmail
+      );
+      if (clientContext) {
+        await markClientOnboardingCompleted(supabase, clientContext.clientId);
+      }
+    } catch (onboardingStateErr) {
+      console.error("Unable to mark onboarding state completed:", onboardingStateErr);
+    }
 
     // 8) Marque l'onboarding comme complété pour stopper les redirections
     let onboardingMarked = false;
