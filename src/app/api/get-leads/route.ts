@@ -14,66 +14,6 @@ type InvitationRow = {
   status?: string | null;
 };
 
-async function fetchAllLeadsForClient(
-  supabase: ReturnType<typeof createClient>,
-  clientId: number | string,
-  selectFields: string
-): Promise<LeadRow[]> {
-  const rows: LeadRow[] = [];
-  let from = 0;
-
-  while (true) {
-    const to = from + SUPABASE_PAGE_SIZE - 1;
-    const { data, error } = await supabase
-      .from("leads")
-      .select(selectFields)
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false })
-      .range(from, to);
-
-    if (error) throw error;
-
-    const batch: LeadRow[] = Array.isArray(data) ? (data as unknown as LeadRow[]) : [];
-    rows.push(...batch);
-
-    if (batch.length < SUPABASE_PAGE_SIZE) break;
-    from += SUPABASE_PAGE_SIZE;
-  }
-
-  return rows;
-}
-
-async function fetchAllInvitationsForClient(
-  supabase: ReturnType<typeof createClient>,
-  clientId: number | string
-): Promise<InvitationRow[]> {
-  const rows: InvitationRow[] = [];
-  let from = 0;
-
-  while (true) {
-    const to = from + SUPABASE_PAGE_SIZE - 1;
-    const { data, error } = await supabase
-      .from("linkedin_invitations")
-      .select("id, lead_id, status")
-      .eq("client_id", clientId)
-      .in("status", ["sent", "accepted"])
-      .order("id", { ascending: true })
-      .range(from, to);
-
-    if (error) throw error;
-
-    const batch: InvitationRow[] = Array.isArray(data)
-      ? (data as unknown as InvitationRow[])
-      : [];
-    rows.push(...batch);
-
-    if (batch.length < SUPABASE_PAGE_SIZE) break;
-    from += SUPABASE_PAGE_SIZE;
-  }
-
-  return rows;
-}
-
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ leads: [] });
@@ -93,15 +33,65 @@ export async function GET() {
 
   const clientId = client.id;
 
-  // ✅ plan
+  async function fetchAllLeadsForClient(selectFields: string): Promise<LeadRow[]> {
+    const rows: LeadRow[] = [];
+    let from = 0;
+
+    while (true) {
+      const to = from + SUPABASE_PAGE_SIZE - 1;
+      const { data, error } = await supabase
+        .from("leads")
+        .select(selectFields)
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+
+      const batch: LeadRow[] = Array.isArray(data) ? (data as unknown as LeadRow[]) : [];
+      rows.push(...batch);
+
+      if (batch.length < SUPABASE_PAGE_SIZE) break;
+      from += SUPABASE_PAGE_SIZE;
+    }
+
+    return rows;
+  }
+
+  async function fetchAllInvitationsForClient(): Promise<InvitationRow[]> {
+    const rows: InvitationRow[] = [];
+    let from = 0;
+
+    while (true) {
+      const to = from + SUPABASE_PAGE_SIZE - 1;
+      const { data, error } = await supabase
+        .from("linkedin_invitations")
+        .select("id, lead_id, status")
+        .eq("client_id", clientId)
+        .in("status", ["sent", "accepted"])
+        .order("id", { ascending: true })
+        .range(from, to);
+
+      if (error) throw error;
+
+      const batch: InvitationRow[] = Array.isArray(data)
+        ? (data as unknown as InvitationRow[])
+        : [];
+      rows.push(...batch);
+
+      if (batch.length < SUPABASE_PAGE_SIZE) break;
+      from += SUPABASE_PAGE_SIZE;
+    }
+
+    return rows;
+  }
+
   const plan = (client.plan ?? "").toLowerCase();
   const is_premium = plan === "premium";
 
-  // ✅ options (fallback false if null/undefined)
   const email_option = Boolean(client.email_option);
   const phone_option = Boolean(client.phone_option);
 
-  // ✅ Build select list safely (don’t leak fields if not paid)
   const baseSelect = `
       id,
       Name,
@@ -127,7 +117,7 @@ export async function GET() {
 
   let leadRows: LeadRow[] = [];
   try {
-    leadRows = await fetchAllLeadsForClient(supabase, clientId, selectFields);
+    leadRows = await fetchAllLeadsForClient(selectFields);
   } catch (leadsErr) {
     console.error("Failed to load leads:", leadsErr);
     return NextResponse.json({ error: "Failed to load leads" }, { status: 500 });
@@ -142,7 +132,7 @@ export async function GET() {
 
   if (leadIds.length > 0) {
     try {
-      const invitationRows = await fetchAllInvitationsForClient(supabase, clientId);
+      const invitationRows = await fetchAllInvitationsForClient();
 
       invitationRows.forEach((invitation) => {
         const leadId = invitation?.lead_id;
