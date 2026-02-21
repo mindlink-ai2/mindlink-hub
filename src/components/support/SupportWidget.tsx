@@ -572,9 +572,7 @@ export default function SupportWidget() {
       }
 
       setFeatureDraft("");
-      setFeatureSuccess(
-        "Merci, ton idee a bien ete recue. Notre equipe produit l'etudie avec attention."
-      );
+      setFeatureSuccess("Merci, ton idée a bien été reçue.");
     } catch (err) {
       setFeatureError(err instanceof Error ? err.message : "Erreur pendant l’envoi.");
     } finally {
@@ -812,7 +810,7 @@ export default function SupportWidget() {
                         Cree ton premier ticket pour une question support.
                       </p>
                       <p className="mt-2 text-xs leading-relaxed text-[#4B5563]">
-                        Et si tu as une idee produit, utilise le formulaire juste en dessous.
+                        Et si tu as une idée produit, utilise le formulaire juste en dessous.
                       </p>
                     </div>
                   </div>
@@ -865,13 +863,10 @@ export default function SupportWidget() {
                     </span>
                     <div className="min-w-0">
                       <p className="text-[12px] font-semibold text-[#0F172A]">
-                        Une idee de fonctionnalite a proposer ?
+                        Une idée à proposer ?
                       </p>
                       <p className="mt-1 text-[11px] leading-relaxed text-[#51627b]">
-                        Cet espace sert uniquement aux idees produit. Ce n&apos;est pas un ticket support.
-                      </p>
-                      <p className="mt-1 text-[11px] leading-relaxed text-[#51627b]">
-                        On lit chaque demande avec attention pour faire evoluer Lidmeo dans le bon sens.
+                        On lit chaque idée avec attention.
                       </p>
                     </div>
                   </div>
@@ -885,7 +880,7 @@ export default function SupportWidget() {
                         if (featureError) setFeatureError(null);
                       }}
                       rows={2}
-                      placeholder="Exemple : Ajouter des vues enregistrees pour filtrer les leads plus vite."
+                      placeholder="Exemple : Ajouter une vue favoris."
                       className="max-h-28 min-h-[44px] flex-1 resize-y rounded-xl border border-[#d3def4] bg-[#F8FAFC] px-3 py-2 text-sm text-[#0F172A] placeholder:text-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
                     />
                     <button
@@ -899,7 +894,7 @@ export default function SupportWidget() {
                           "cursor-not-allowed opacity-60"
                       )}
                     >
-                      {featureSending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Envoyer l'idee"}
+                      {featureSending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Envoyer l’idée"}
                     </button>
                   </div>
 
