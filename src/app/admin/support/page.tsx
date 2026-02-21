@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Bell,
   CheckCheck,
+  Lightbulb,
   Loader2,
   Search,
   Send,
@@ -42,6 +43,18 @@ type AdminSupportMessage = {
 type LiveNotice = {
   tone: "info" | "ticket";
   text: string;
+};
+
+type FeatureRequestStatus = "new" | "reviewed" | "all";
+
+type AdminFeatureRequest = {
+  id: string;
+  user_name: string | null;
+  user_email: string | null;
+  body: string;
+  status: "new" | "reviewed";
+  created_at: string;
+  updated_at: string;
 };
 
 const QUICK_REPLIES = ["Bien reçu", "On regarde", "Peux-tu préciser ?"] as const;
@@ -83,6 +96,11 @@ function dedupeMessages(messages: AdminSupportMessage[]): AdminSupportMessage[] 
   );
 }
 
+function truncateCopy(value: string, max = 220): string {
+  if (value.length <= max) return value;
+  return `${value.slice(0, max - 1)}…`;
+}
+
 export default function AdminSupportPage() {
   const [statusFilter, setStatusFilter] = useState<ConversationStatus>("open");
   const [searchInput, setSearchInput] = useState("");
@@ -102,6 +120,11 @@ export default function AdminSupportPage() {
 
   const [draft, setDraft] = useState("");
   const [isMobileThreadOpen, setIsMobileThreadOpen] = useState(false);
+  const [featureRequests, setFeatureRequests] = useState<AdminFeatureRequest[]>([]);
+  const [featureStatusFilter, setFeatureStatusFilter] =
+    useState<FeatureRequestStatus>("new");
+  const [loadingFeatureRequests, setLoadingFeatureRequests] = useState(true);
+  const [updatingFeatureRequestId, setUpdatingFeatureRequestId] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -240,6 +263,40 @@ export default function AdminSupportPage() {
     }
   }, []);
 
+  const loadFeatureRequests = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!options?.silent) {
+        setLoadingFeatureRequests(true);
+      }
+      setError(null);
+
+      try {
+        const params = new URLSearchParams({
+          status: featureStatusFilter,
+          limit: "24",
+        });
+        const res = await fetch(`/api/admin/support/feature-requests?${params.toString()}`, {
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.error ?? "Impossible de charger les demandes fonctionnalité.");
+        }
+
+        setFeatureRequests(
+          Array.isArray(data?.requests) ? (data.requests as AdminFeatureRequest[]) : []
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erreur de chargement.");
+      } finally {
+        if (!options?.silent) {
+          setLoadingFeatureRequests(false);
+        }
+      }
+    },
+    [featureStatusFilter]
+  );
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setSearchQuery(searchInput.trim());
@@ -250,6 +307,10 @@ export default function AdminSupportPage() {
   useEffect(() => {
     void loadConversations();
   }, [loadConversations]);
+
+  useEffect(() => {
+    void loadFeatureRequests();
+  }, [loadFeatureRequests]);
 
   useEffect(() => {
     if (!selectedConversationId) return;
@@ -330,24 +391,48 @@ export default function AdminSupportPage() {
           void loadConversations({ keepSelection: true, silent: true });
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "support_feature_requests",
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            pushLiveNotice({
+              tone: "ticket",
+              text: "Nouvelle demande fonctionnalité reçue.",
+            });
+          }
+          void loadFeatureRequests({ silent: true });
+        }
+      )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [loadConversations, loadMessages, pushLiveNotice, selectedConversationId]);
+  }, [
+    loadConversations,
+    loadFeatureRequests,
+    loadMessages,
+    pushLiveNotice,
+    selectedConversationId,
+  ]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
       void loadConversations({ keepSelection: true, silent: true });
+      void loadFeatureRequests({ silent: true });
       if (selectedConversationId) {
         void loadMessages(selectedConversationId, true);
       }
     }, 10000);
 
     return () => window.clearInterval(intervalId);
-  }, [loadConversations, loadMessages, selectedConversationId]);
+  }, [loadConversations, loadFeatureRequests, loadMessages, selectedConversationId]);
 
   useEffect(
     () => () => {
@@ -460,6 +545,33 @@ export default function AdminSupportPage() {
     }
   };
 
+  const handleFeatureRequestStatus = async (
+    requestId: string,
+    nextStatus: "new" | "reviewed"
+  ) => {
+    if (!requestId || updatingFeatureRequestId) return;
+    setUpdatingFeatureRequestId(requestId);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/admin/support/feature-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId, status: nextStatus }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.error ?? "Impossible de mettre à jour la demande.");
+      }
+
+      await loadFeatureRequests({ silent: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur de mise à jour.");
+    } finally {
+      setUpdatingFeatureRequestId(null);
+    }
+  };
+
   const onDraftKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -514,6 +626,122 @@ export default function AdminSupportPage() {
             <span>{liveNotice.text}</span>
           </div>
         ) : null}
+
+        <section className="hub-card overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#cfe0f8] bg-white text-[#1f5eff]">
+                <Lightbulb className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-[#0b1c33]">
+                  Demandes de fonctionnalité
+                </h2>
+                <p className="text-[11px] text-[#6b7f99]">
+                  Idées envoyées depuis le widget client
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {(["new", "reviewed", "all"] as const).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setFeatureStatusFilter(status)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-[11px] transition",
+                    featureStatusFilter === status
+                      ? "border-[#9cc0ff] bg-[#edf4ff] text-[#1f4f96]"
+                      : "border-[#d7e3f4] bg-white text-[#51627b] hover:bg-[#f3f8ff]"
+                  )}
+                >
+                  {status === "new" ? "Nouvelles" : status === "reviewed" ? "Traitées" : "Toutes"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="max-h-[32vh] overflow-y-auto p-3">
+            {loadingFeatureRequests ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    key={`feature-skeleton-${index}`}
+                    className="h-20 animate-pulse rounded-xl border border-[#d7e3f4] bg-[#f5f9ff]"
+                  />
+                ))}
+              </div>
+            ) : featureRequests.length === 0 ? (
+              <div className="rounded-xl border border-[#d7e3f4] bg-[#f8fbff] p-4 text-sm text-[#51627b]">
+                Aucune demande de fonctionnalité pour ce filtre.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {featureRequests.map((request) => (
+                  <article
+                    key={request.id}
+                    className="rounded-xl border border-[#d7e3f4] bg-white px-3 py-2.5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[#0b1c33]">
+                          {request.user_name?.trim() || "Client"}
+                        </p>
+                        <p className="truncate text-[11px] text-[#64748b]">
+                          {request.user_email?.trim() || "Email indisponible"}
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-[#6b7f99]">
+                          Reçue le {formatRelative(request.created_at)}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                            request.status === "new"
+                              ? "border-amber-200 bg-amber-50 text-amber-700"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          )}
+                        >
+                          {request.status === "new" ? "Nouveau" : "Traité"}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleFeatureRequestStatus(
+                              request.id,
+                              request.status === "new" ? "reviewed" : "new"
+                            )
+                          }
+                          disabled={updatingFeatureRequestId === request.id}
+                          className={cn(
+                            "rounded-lg border px-2 py-1 text-[10px] font-medium transition",
+                            "border-[#c8d6ea] bg-[#f8fbff] text-[#3f516b] hover:bg-[#eef4ff]",
+                            updatingFeatureRequestId === request.id &&
+                              "cursor-not-allowed opacity-60"
+                          )}
+                        >
+                          {updatingFeatureRequestId === request.id
+                            ? "..."
+                            : request.status === "new"
+                              ? "Marquer traité"
+                              : "Remettre en nouveau"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <p className="mt-2 whitespace-pre-wrap text-[12px] leading-relaxed text-[#334155]">
+                      {truncateCopy(request.body, 320)}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
 
         <section className="grid gap-6 lg:grid-cols-[330px_minmax(0,1fr)]">
           <div

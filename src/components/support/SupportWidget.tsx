@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, Loader2, MessageCircleMore, Plus, Send, X } from "lucide-react";
+import { ArrowLeft, Loader2, MessageCircleMore, Plus, Send, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { supabase } from "@/lib/supabase";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "lidmeo_support_widget_open";
 const MARK_READ_MIN_INTERVAL_MS = 1600;
+const FEATURE_REQUEST_MIN_LENGTH = 6;
 
 type SupportConversation = {
   id: string;
@@ -138,6 +139,10 @@ export default function SupportWidget() {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLeadsSidebarOpen, setIsLeadsSidebarOpen] = useState(false);
+  const [featureDraft, setFeatureDraft] = useState("");
+  const [featureSending, setFeatureSending] = useState(false);
+  const [featureSuccess, setFeatureSuccess] = useState<string | null>(null);
+  const [featureError, setFeatureError] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -542,6 +547,39 @@ export default function SupportWidget() {
     }
   };
 
+  const handleFeatureRequestSend = async () => {
+    if (!isSignedIn || featureSending) return;
+    const body = featureDraft.trim();
+    if (body.length < FEATURE_REQUEST_MIN_LENGTH) {
+      setFeatureError("Ajoute un peu plus de contexte (minimum 6 caractères).");
+      setFeatureSuccess(null);
+      return;
+    }
+
+    setFeatureSending(true);
+    setFeatureError(null);
+    setFeatureSuccess(null);
+
+    try {
+      const res = await fetch("/api/support/feature-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.error ?? "Impossible d’envoyer la demande.");
+      }
+
+      setFeatureDraft("");
+      setFeatureSuccess("Merci, ta demande a bien été transmise à notre équipe produit.");
+    } catch (err) {
+      setFeatureError(err instanceof Error ? err.message : "Erreur pendant l’envoi.");
+    } finally {
+      setFeatureSending(false);
+    }
+  };
+
   const onComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -814,6 +852,60 @@ export default function SupportWidget() {
                     ))}
                   </div>
                 )}
+
+                <section className="mt-4 rounded-2xl border border-[#d7e3f4] bg-white px-3 py-3">
+                  <div className="flex items-start gap-2">
+                    <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#dbe5f8] bg-[#f5f9ff] text-[#1f5eff]">
+                      <Sparkles className="h-3.5 w-3.5" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-semibold text-[#0F172A]">
+                        Vous souhaitez une fonctionnalité en plus ?
+                      </p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-[#51627b]">
+                        Faites-le nous savoir. Votre demande est envoyée directement à notre équipe.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-end gap-2">
+                    <textarea
+                      value={featureDraft}
+                      onChange={(event) => {
+                        setFeatureDraft(event.target.value);
+                        if (featureSuccess) setFeatureSuccess(null);
+                        if (featureError) setFeatureError(null);
+                      }}
+                      rows={2}
+                      placeholder="Exemple : Ajouter un export PDF des tickets..."
+                      className="max-h-28 min-h-[44px] flex-1 resize-y rounded-xl border border-[#d3def4] bg-[#F8FAFC] px-3 py-2 text-sm text-[#0F172A] placeholder:text-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleFeatureRequestSend()}
+                      disabled={featureSending || featureDraft.trim().length < FEATURE_REQUEST_MIN_LENGTH}
+                      className={cn(
+                        "inline-flex h-11 items-center justify-center rounded-xl border border-[#1f5eff] bg-[#2563EB] px-3 text-[11px] font-semibold text-white transition",
+                        "hover:bg-[#1e56d4] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]",
+                        (featureSending || featureDraft.trim().length < FEATURE_REQUEST_MIN_LENGTH) &&
+                          "cursor-not-allowed opacity-60"
+                      )}
+                    >
+                      {featureSending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Envoyer"}
+                    </button>
+                  </div>
+
+                  {featureSuccess ? (
+                    <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-700">
+                      {featureSuccess}
+                    </p>
+                  ) : null}
+                  {featureError ? (
+                    <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] text-red-700">
+                      {featureError}
+                    </p>
+                  ) : null}
+                </section>
               </div>
             </>
           )}

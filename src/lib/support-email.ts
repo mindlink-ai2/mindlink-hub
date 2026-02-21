@@ -23,6 +23,18 @@ type NotifyClientSupportReplyInput = {
   replyBody: string;
 };
 
+type FeatureRequestEmailContext = {
+  id: string;
+  user_name: string | null;
+  user_email: string | null;
+  body: string;
+  created_at?: string | null;
+};
+
+type NotifySupportTeamFeatureRequestInput = {
+  request: FeatureRequestEmailContext;
+};
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -52,6 +64,24 @@ function getSupportNotifyRecipients(): string[] {
     .split(",")
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+function getFeatureRequestNotifyRecipients(): string[] {
+  const raw =
+    process.env.SUPPORT_FEATURE_REQUEST_NOTIFY_EMAIL ??
+    process.env.SUPPORT_NOTIFY_EMAIL ??
+    "contact@lidmeo.com";
+
+  const list = raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  if (!list.includes("contact@lidmeo.com")) {
+    list.push("contact@lidmeo.com");
+  }
+
+  return list;
 }
 
 function getResendFrom(): string {
@@ -215,5 +245,46 @@ export async function notifyClientSupportReply(
     subject: `✅ Réponse sur votre ticket ${ticketLabel} — Lidmeo`,
     html,
     replyTo: "contact@lidmeo.com",
+  });
+}
+
+export async function notifySupportTeamFeatureRequest(
+  input: NotifySupportTeamFeatureRequestInput
+): Promise<void> {
+  const { request } = input;
+  const hubBase = getHubBaseUrl();
+  const userName = request.user_name?.trim() || "Client";
+  const userEmail = request.user_email?.trim() || "email indisponible";
+  const createdAt = request.created_at
+    ? new Date(request.created_at).toLocaleString("fr-FR")
+    : new Date().toLocaleString("fr-FR");
+  const snippet = truncate(request.body.trim(), 1200);
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.55;color:#0f172a">
+      <h2 style="margin:0 0 12px">Nouvelle demande de fonctionnalité</h2>
+      <p><strong>Client :</strong> ${escapeHtml(userName)}</p>
+      <p><strong>Email :</strong> ${escapeHtml(userEmail)}</p>
+      <p><strong>Date :</strong> ${escapeHtml(createdAt)}</p>
+      <p><strong>Demande :</strong></p>
+      <div style="border:1px solid #d7e3f4;background:#f8fbff;border-radius:10px;padding:12px;white-space:pre-wrap">
+        ${escapeHtml(snippet || "(message vide)")}
+      </div>
+      <p style="margin-top:16px">
+        <a href="${escapeHtml(`${hubBase}/admin/support`)}" target="_blank" rel="noopener noreferrer">
+          Ouvrir le Support Admin
+        </a>
+      </p>
+      <p style="margin-top:8px;font-size:12px;color:#64748b">
+        Feature Request ID: ${escapeHtml(request.id)}
+      </p>
+    </div>
+  `;
+
+  await sendEmail({
+    to: getFeatureRequestNotifyRecipients(),
+    subject: `✨ Nouvelle demande fonctionnalité — ${userName}`,
+    html,
+    replyTo: request.user_email ?? "contact@lidmeo.com",
   });
 }
