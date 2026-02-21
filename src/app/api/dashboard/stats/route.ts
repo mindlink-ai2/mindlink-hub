@@ -2,8 +2,68 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
 
+const SUPABASE_PAGE_SIZE = 1000;
+
+type LeadMetricsRow = {
+  created_at?: string | null;
+  traite?: boolean | null;
+  next_followup_at?: string | null;
+};
+
+type InboxThreadRow = {
+  id?: number | string | null;
+  last_message_at?: string | null;
+  unread_count?: number | string | null;
+};
+
+type InboundMessageRow = {
+  thread_db_id?: number | string | null;
+};
+
+type InvitationMetricsRow = {
+  id?: number | string | null;
+  lead_id?: number | string | null;
+  status?: string | null;
+};
+
 function normalizeInvitationStatus(value: unknown): string {
   return String(value ?? "").trim().toLowerCase();
+}
+
+async function fetchAllClientRows(
+  supabase: ReturnType<typeof createClient>,
+  table: string,
+  selectFields: string,
+  clientId: number | string,
+  options?: {
+    orderBy?: string;
+    ascending?: boolean;
+    applyFilters?: <T>(query: T) => T;
+  }
+): Promise<Record<string, unknown>[]> {
+  const rows: Record<string, unknown>[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + SUPABASE_PAGE_SIZE - 1;
+    let query = supabase.from(table).select(selectFields).eq("client_id", clientId);
+
+    if (options?.applyFilters) query = options.applyFilters(query);
+    if (options?.orderBy) {
+      query = query.order(options.orderBy, { ascending: options.ascending ?? true });
+    }
+
+    const { data, error } = await query.range(from, to);
+    if (error) throw error;
+
+    const batch = Array.isArray(data) ? data : [];
+    rows.push(...batch);
+
+    if (batch.length < SUPABASE_PAGE_SIZE) break;
+    from += SUPABASE_PAGE_SIZE;
+  }
+
+  return rows;
 }
 
 export async function GET() {
@@ -41,32 +101,54 @@ export async function GET() {
   const now = new Date();
 
   // 3️⃣ Leads + Maps leads + next_followup_at
-  const [leads, maps, inboxThreads, inboundMessages, invitations] = await Promise.all([
-    supabase
-      .from("leads")
-      .select("created_at, traite, next_followup_at")
-      .eq("client_id", clientId),
-    supabase
-      .from("map_leads")
-      .select("created_at, traite, next_followup_at")
-      .eq("client_id", clientId),
-    supabase
-      .from("inbox_threads")
-      .select("id, last_message_at, unread_count")
-      .eq("client_id", clientId),
-    supabase
-      .from("inbox_messages")
-      .select("thread_db_id")
-      .eq("client_id", clientId)
-      .eq("direction", "inbound"),
-    supabase
-      .from("linkedin_invitations")
-      .select("id, lead_id, status")
-      .eq("client_id", clientId)
-      .in("status", ["pending", "sent", "accepted", "connected"]),
-  ]);
+  let leads: LeadMetricsRow[] = [];
+  let maps: LeadMetricsRow[] = [];
+  let inboxThreads: InboxThreadRow[] = [];
+  let inboundMessages: InboundMessageRow[] = [];
+  let invitations: InvitationMetricsRow[] = [];
 
-  const all = [...(leads.data || []), ...(maps.data || [])];
+  try {
+    const [leadsRows, mapsRows, inboxThreadRows, inboundMessageRows, invitationRows] =
+      await Promise.all([
+        fetchAllClientRows(supabase, "leads", "created_at, traite, next_followup_at", clientId, {
+          orderBy: "created_at",
+          ascending: false,
+        }),
+        fetchAllClientRows(
+          supabase,
+          "map_leads",
+          "created_at, traite, next_followup_at",
+          clientId,
+          { orderBy: "created_at", ascending: false }
+        ),
+        fetchAllClientRows(supabase, "inbox_threads", "id, last_message_at, unread_count", clientId, {
+          orderBy: "id",
+          ascending: true,
+        }),
+        fetchAllClientRows(supabase, "inbox_messages", "thread_db_id", clientId, {
+          orderBy: "id",
+          ascending: true,
+          applyFilters: (query) => query.eq("direction", "inbound"),
+        }),
+        fetchAllClientRows(supabase, "linkedin_invitations", "id, lead_id, status", clientId, {
+          orderBy: "id",
+          ascending: true,
+          applyFilters: (query) =>
+            query.in("status", ["pending", "sent", "accepted", "connected"]),
+        }),
+      ]);
+
+    leads = leadsRows as LeadMetricsRow[];
+    maps = mapsRows as LeadMetricsRow[];
+    inboxThreads = inboxThreadRows as InboxThreadRow[];
+    inboundMessages = inboundMessageRows as InboundMessageRow[];
+    invitations = invitationRows as InvitationMetricsRow[];
+  } catch (statsErr) {
+    console.error("Failed to load dashboard stats:", statsErr);
+    return NextResponse.json({ error: "Failed to load dashboard stats" }, { status: 500 });
+  }
+
+  const all = [...leads, ...maps];
 
   const leadsToday = all.filter(
     (l) => new Date(l.created_at) >= todayStart
@@ -100,7 +182,7 @@ export async function GET() {
   // 5️⃣ MESSAGERIE
   // ----------------------------------------------------------------------
 
-  const threadRows = Array.isArray(inboxThreads.data) ? inboxThreads.data : [];
+  const threadRows = inboxThreads;
   const totalThreads = threadRows.length;
 
   const unreadMessages = threadRows.reduce((acc, row) => {
@@ -117,7 +199,7 @@ export async function GET() {
     return !Number.isNaN(parsed.getTime()) && parsed >= activeThreshold;
   }).length;
 
-  const inboundRows = Array.isArray(inboundMessages.data) ? inboundMessages.data : [];
+  const inboundRows = inboundMessages;
   const threadsWithInbound = new Set(
     inboundRows
       .map((row) => String(row?.thread_db_id ?? "").trim())
@@ -127,10 +209,9 @@ export async function GET() {
   const responseRate =
     totalThreads === 0 ? 0 : Math.round((threadsWithInbound / totalThreads) * 100);
 
-  const invitationRows = Array.isArray(invitations.data) ? invitations.data : [];
   const invitationStatusByKey = new Map<string, "pending" | "connected">();
 
-  invitationRows.forEach((row) => {
+  invitations.forEach((row) => {
     const key =
       row?.lead_id === null || row?.lead_id === undefined
         ? `row:${String(row?.id ?? "")}`

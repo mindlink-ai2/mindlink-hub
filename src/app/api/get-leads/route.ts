@@ -2,14 +2,77 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
 
+const SUPABASE_PAGE_SIZE = 1000;
+
 type LeadRow = Record<string, unknown> & {
   id?: number | string | null;
 };
 
 type InvitationRow = {
+  id?: number | string | null;
   lead_id?: number | string | null;
   status?: string | null;
 };
+
+async function fetchAllLeadsForClient(
+  supabase: ReturnType<typeof createClient>,
+  clientId: number | string,
+  selectFields: string
+): Promise<LeadRow[]> {
+  const rows: LeadRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + SUPABASE_PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from("leads")
+      .select(selectFields)
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+
+    const batch: LeadRow[] = Array.isArray(data) ? (data as unknown as LeadRow[]) : [];
+    rows.push(...batch);
+
+    if (batch.length < SUPABASE_PAGE_SIZE) break;
+    from += SUPABASE_PAGE_SIZE;
+  }
+
+  return rows;
+}
+
+async function fetchAllInvitationsForClient(
+  supabase: ReturnType<typeof createClient>,
+  clientId: number | string
+): Promise<InvitationRow[]> {
+  const rows: InvitationRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + SUPABASE_PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from("linkedin_invitations")
+      .select("id, lead_id, status")
+      .eq("client_id", clientId)
+      .in("status", ["sent", "accepted"])
+      .order("id", { ascending: true })
+      .range(from, to);
+
+    if (error) throw error;
+
+    const batch: InvitationRow[] = Array.isArray(data)
+      ? (data as unknown as InvitationRow[])
+      : [];
+    rows.push(...batch);
+
+    if (batch.length < SUPABASE_PAGE_SIZE) break;
+    from += SUPABASE_PAGE_SIZE;
+  }
+
+  return rows;
+}
 
 export async function GET() {
   const { userId } = await auth();
@@ -62,51 +125,44 @@ export async function GET() {
     (email_option ? `, email` : ``) +
     (phone_option ? `, phone` : ``);
 
-  const { data: leads } = await supabase
-    .from("leads")
-    .select(selectFields)
-    .eq("client_id", clientId)
-    .order("created_at", { ascending: false });
+  let leadRows: LeadRow[] = [];
+  try {
+    leadRows = await fetchAllLeadsForClient(supabase, clientId, selectFields);
+  } catch (leadsErr) {
+    console.error("Failed to load leads:", leadsErr);
+    return NextResponse.json({ error: "Failed to load leads" }, { status: 500 });
+  }
 
-  const leadRows: LeadRow[] = Array.isArray(leads)
-    ? (leads as unknown as LeadRow[])
-    : [];
   const leadIds = leadRows
     .map((lead) => lead?.id)
     .filter((id) => id !== null && id !== undefined);
+  const leadIdSet = new Set(leadIds.map((id) => String(id)));
 
   const invitationStatusByLead = new Map<string, "sent" | "accepted">();
 
   if (leadIds.length > 0) {
-    const { data: invitations, error: invitationsErr } = await supabase
-      .from("linkedin_invitations")
-      .select("lead_id, status")
-      .eq("client_id", clientId)
-      .in("lead_id", leadIds)
-      .in("status", ["sent", "accepted"]);
-
-    if (invitationsErr) {
-      console.error("Failed to load linkedin invitations:", invitationsErr);
-    } else {
-      const invitationRows: InvitationRow[] = Array.isArray(invitations)
-        ? (invitations as unknown as InvitationRow[])
-        : [];
+    try {
+      const invitationRows = await fetchAllInvitationsForClient(supabase, clientId);
 
       invitationRows.forEach((invitation) => {
         const leadId = invitation?.lead_id;
         if (leadId === null || leadId === undefined) return;
+
+        const key = String(leadId);
+        if (!leadIdSet.has(key)) return;
 
         const normalizedStatus = String(invitation?.status ?? "")
           .trim()
           .toLowerCase();
         if (normalizedStatus !== "sent" && normalizedStatus !== "accepted") return;
 
-        const key = String(leadId);
         const current = invitationStatusByLead.get(key);
         if (normalizedStatus === "accepted" || !current) {
           invitationStatusByLead.set(key, normalizedStatus as "sent" | "accepted");
         }
       });
+    } catch (invitationsErr) {
+      console.error("Failed to load linkedin invitations:", invitationsErr);
     }
   }
 
