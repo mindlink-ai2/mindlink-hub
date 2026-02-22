@@ -57,7 +57,7 @@ export default async function OnboardingWizardPage() {
   );
 
   if (onboarding.state === "completed" && linkedinConnected) {
-    redirect("/dashboard");
+    redirect("/");
   }
 
   const initialStatus: WizardInitialState = {

@@ -57,8 +57,13 @@ export default function OnboardingActivationWizard({
         };
         setStatus(nextStatus);
 
-        if (!nextStatus.state || nextStatus.completed || nextStatus.state === "completed") {
+        if (!nextStatus.state) {
           router.replace("/dashboard");
+          return;
+        }
+
+        if (nextStatus.completed || nextStatus.state === "completed") {
+          router.replace(nextStatus.linkedinConnected ? "/" : "/dashboard");
           return;
         }
 

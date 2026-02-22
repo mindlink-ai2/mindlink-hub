@@ -83,10 +83,16 @@ function OnboardingForm() {
         const res = await fetch("/api/onboarding/status", { cache: "no-store" });
         const data = await res.json().catch(() => ({}));
         const state = data?.state;
+        const linkedinConnected = data?.linkedinConnected === true;
         const completed = data?.completed === true || state === "completed";
 
-        if (!state || completed) {
+        if (!state) {
           router.replace("/dashboard");
+          return;
+        }
+
+        if (completed) {
+          router.replace(linkedinConnected ? "/" : "/dashboard");
           return;
         }
       } catch {
@@ -181,7 +187,7 @@ function OnboardingForm() {
       });
       await fetch("/api/onboarding/complete", { method: "POST" }).catch(() => null);
       await user?.reload().catch(() => {});
-      router.replace("/dashboard");
+      router.replace("/");
     } catch {
       setStatus({ ok: false, msg: "Erreur réseau. Réessaie dans 30 secondes." });
     } finally {
