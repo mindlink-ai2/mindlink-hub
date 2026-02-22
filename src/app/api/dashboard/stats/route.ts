@@ -4,6 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const SUPABASE_PAGE_SIZE = 1000;
+const ROUTE_NAME = "GET /api/dashboard/stats";
+const SAFE_STATS_ERROR_MESSAGE = "Impossible de charger les statistiques pour le moment.";
 
 type LeadMetricsRow = {
   created_at?: string | null;
@@ -35,6 +37,12 @@ type PostgrestErrorLike = {
   message?: string | null;
   details?: string | null;
   hint?: string | null;
+};
+
+type ApiErrorPayload = {
+  error: string;
+  message: string;
+  details?: unknown;
 };
 
 function normalizeInvitationStatus(value: unknown): string {
@@ -78,6 +86,55 @@ function isMissingColumnError(error: unknown, column: string): boolean {
   return code === "42703" && message.includes(col);
 }
 
+function isMissingRelationError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const pgErr = error as PostgrestErrorLike;
+  return String(pgErr.code ?? "") === "42P01";
+}
+
+function toErrorDetails(error: unknown): unknown {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+  if (error && typeof error === "object") {
+    return error;
+  }
+  return { message: String(error) };
+}
+
+function buildErrorResponse(params: {
+  status: number;
+  code: string;
+  message?: string;
+  context?: Record<string, unknown>;
+  error?: unknown;
+}) {
+  const { status, code, message = SAFE_STATS_ERROR_MESSAGE, context, error } = params;
+
+  console.error("DASHBOARD_STATS_ERROR", {
+    route: ROUTE_NAME,
+    status,
+    code,
+    context: context ?? {},
+    error: toErrorDetails(error),
+  });
+
+  const payload: ApiErrorPayload = {
+    error: code,
+    message,
+  };
+
+  if (process.env.NODE_ENV !== "production" && error) {
+    payload.details = toErrorDetails(error);
+  }
+
+  return NextResponse.json(payload, { status });
+}
+
 async function fetchInvitationMetricsRows(
   supabase: SupabaseClient,
   clientId: number
@@ -104,6 +161,9 @@ async function fetchInvitationMetricsRows(
       });
     } catch (error) {
       lastError = error;
+      if (isMissingRelationError(error)) {
+        return [];
+      }
       if (isMissingColumnError(error, "accepted_at") || isMissingColumnError(error, "sent_at")) {
         continue;
       }
@@ -117,27 +177,64 @@ async function fetchInvitationMetricsRows(
 
 export async function GET() {
   const { userId } = await auth();
-
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return buildErrorResponse({
+      status: 401,
+      code: "unauthorized",
+      message: "Authentification requise.",
+      context: { userId: null },
+    });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  const { data: client } = await supabase
+  if (!supabaseUrl || !serviceRoleKey) {
+    return buildErrorResponse({
+      status: 500,
+      code: "missing_env",
+      context: {
+        userId,
+        hasSupabaseUrl: Boolean(supabaseUrl),
+        hasServiceRoleKey: Boolean(serviceRoleKey),
+      },
+    });
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  const { data: client, error: clientErr } = await supabase
     .from("clients")
     .select("id")
     .eq("clerk_user_id", userId)
     .single();
 
-  if (!client) {
-    return NextResponse.json({ error: "Client not found" }, { status: 404 });
+  if (clientErr) {
+    return buildErrorResponse({
+      status: 500,
+      code: "client_lookup_failed",
+      context: { userId },
+      error: clientErr,
+    });
   }
 
-  const clientId = client.id;
+  if (!client?.id) {
+    return buildErrorResponse({
+      status: 404,
+      code: "client_not_found",
+      message: "Client introuvable.",
+      context: { userId },
+    });
+  }
+
+  const clientId = Number(client.id);
+  if (!Number.isFinite(clientId)) {
+    return buildErrorResponse({
+      status: 500,
+      code: "invalid_client_id",
+      context: { userId, rawClientId: client.id },
+    });
+  }
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -195,8 +292,12 @@ export async function GET() {
       fetchInvitationMetricsRows(supabase, clientId),
     ]);
   } catch (statsErr) {
-    console.error("Failed to load dashboard stats:", statsErr);
-    return NextResponse.json({ error: "Failed to load dashboard stats" }, { status: 500 });
+    return buildErrorResponse({
+      status: 500,
+      code: "stats_load_failed",
+      context: { userId, clientId },
+      error: statsErr,
+    });
   }
 
   const all = [...leads, ...maps];

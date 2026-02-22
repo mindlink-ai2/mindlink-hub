@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import SubscriptionGate from "@/components/SubscriptionGate";
 
@@ -63,45 +63,49 @@ export default function DashboardPage() {
   const [q, setQ] = useState("");
   const drilldownRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    async function loadStats() {
-      setLoadingStats(true);
-      setStatsError(null);
+  const loadStats = useCallback(async () => {
+    setLoadingStats(true);
+    setStatsError(null);
 
-      try {
-        const res = await fetch("/api/dashboard/stats", {
-          method: "GET",
-          credentials: "include",
+    try {
+      const res = await fetch("/api/dashboard/stats", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        console.error("DASHBOARD_STATS_HTTP_ERROR:", {
+          status: res.status,
+          body: data,
         });
-
-        if (!res.ok) {
-          const txt = await res.text().catch(() => "");
-          setStatsError(txt || "Erreur lors du chargement des statistiques.");
-          return;
-        }
-
-        const data = await res.json().catch(() => ({}));
-        setStats({
-          leadsToday: Number(data?.leadsToday ?? 0),
-          leadsWeek: Number(data?.leadsWeek ?? 0),
-          traitementRate: Number(data?.traitementRate ?? 0),
-          relancesCount: Number(data?.relancesCount ?? 0),
-          relancesLate: Number(data?.relancesLate ?? 0),
-          unreadMessages: Number(data?.unreadMessages ?? 0),
-          acceptedConnections30d: Number(data?.acceptedConnections30d ?? 0),
-          pendingLinkedinInvitations: Number(data?.pendingLinkedinInvitations ?? 0),
-          responseRate: Number(data?.responseRate ?? 0),
-        });
-      } catch (err) {
-        console.error("DASHBOARD_STATS_LOAD_ERROR:", err);
-        setStatsError("Erreur réseau.");
-      } finally {
-        setLoadingStats(false);
+        setStatsError("Impossible de charger les statistiques pour le moment.");
+        return;
       }
-    }
 
-    void loadStats();
+      setStats({
+        leadsToday: Number(data?.leadsToday ?? 0),
+        leadsWeek: Number(data?.leadsWeek ?? 0),
+        traitementRate: Number(data?.traitementRate ?? 0),
+        relancesCount: Number(data?.relancesCount ?? 0),
+        relancesLate: Number(data?.relancesLate ?? 0),
+        unreadMessages: Number(data?.unreadMessages ?? 0),
+        acceptedConnections30d: Number(data?.acceptedConnections30d ?? 0),
+        pendingLinkedinInvitations: Number(data?.pendingLinkedinInvitations ?? 0),
+        responseRate: Number(data?.responseRate ?? 0),
+      });
+    } catch (err) {
+      console.error("DASHBOARD_STATS_LOAD_ERROR:", err);
+      setStatsError("Impossible de charger les statistiques pour le moment.");
+    } finally {
+      setLoadingStats(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadStats();
+  }, [loadStats]);
 
   useEffect(() => {
     if (!active) return;
@@ -271,7 +275,16 @@ export default function DashboardPage() {
 
           {statsError ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {statsError}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span>{statsError}</span>
+                <button
+                  type="button"
+                  onClick={() => void loadStats()}
+                  className="rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
+                >
+                  Réessayer
+                </button>
+              </div>
             </div>
           ) : null}
 
