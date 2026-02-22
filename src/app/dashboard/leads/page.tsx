@@ -1554,7 +1554,7 @@ function Metric({
         <span className={["h-1.5 w-1.5 rounded-full", chipColor].join(" ")} />
         {title}
       </div>
-      <div className={["mt-1 truncate whitespace-nowrap text-[28px] font-semibold leading-none tabular-nums", valueColor].join(" ")}>
+      <div className={["hub-kpi-number mt-1 truncate whitespace-nowrap text-4xl leading-none tabular-nums", valueColor].join(" ")}>
         {value}
       </div>
     </div>
