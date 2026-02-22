@@ -42,9 +42,7 @@ export async function POST() {
       });
     }
 
-    if (context.linkedNow) {
-      await ensureClientOnboardingStateRow(supabase, context.clientId);
-    }
+    await ensureClientOnboardingStateRow(supabase, context.clientId);
 
     return NextResponse.json({
       ok: true,

@@ -23,6 +23,8 @@ export default function SignInPage() {
         </p>
 
         <SignIn
+          forceRedirectUrl="/onboarding"
+          fallbackRedirectUrl="/onboarding"
           appearance={{
             elements: {
               card: "shadow-none border-0 bg-transparent",

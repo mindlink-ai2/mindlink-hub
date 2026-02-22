@@ -18,7 +18,7 @@ type DashboardStats = {
   relancesCount: number;
   relancesLate: number;
   unreadMessages: number;
-  activeConversations: number;
+  acceptedConnections30d: number;
   pendingLinkedinInvitations: number;
   responseRate: number;
 };
@@ -46,7 +46,7 @@ const EMPTY_STATS: DashboardStats = {
   relancesCount: 0,
   relancesLate: 0,
   unreadMessages: 0,
-  activeConversations: 0,
+  acceptedConnections30d: 0,
   pendingLinkedinInvitations: 0,
   responseRate: 0,
 };
@@ -88,7 +88,7 @@ export default function DashboardPage() {
           relancesCount: Number(data?.relancesCount ?? 0),
           relancesLate: Number(data?.relancesLate ?? 0),
           unreadMessages: Number(data?.unreadMessages ?? 0),
-          activeConversations: Number(data?.activeConversations ?? 0),
+          acceptedConnections30d: Number(data?.acceptedConnections30d ?? 0),
           pendingLinkedinInvitations: Number(data?.pendingLinkedinInvitations ?? 0),
           responseRate: Number(data?.responseRate ?? 0),
         });
@@ -340,8 +340,8 @@ export default function DashboardPage() {
                 loading={loadingStats}
               />
               <KPI
-                label="Conversations actives (30 jours)"
-                value={stats.activeConversations}
+                label="Connexions acceptées (30 jours)"
+                value={stats.acceptedConnections30d}
                 color="from-[#0e9a7a] to-[#7fdac4]"
                 clickable={false}
                 loading={loadingStats}

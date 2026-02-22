@@ -40,9 +40,7 @@ export async function GET() {
       });
     }
 
-    if (clientContext.linkedNow) {
-      await ensureClientOnboardingStateRow(supabase, clientContext.clientId);
-    }
+    await ensureClientOnboardingStateRow(supabase, clientContext.clientId);
 
     const onboarding = await getClientOnboardingStateRow(supabase, clientContext.clientId);
     if (!onboarding) {
@@ -71,16 +69,15 @@ export async function GET() {
       await markClientOnboardingLinkedinConnected(supabase, clientContext.clientId);
     }
 
-    const finalState =
-      onboarding.state === "completed"
+    const finalState = connected
+      ? onboarding.state === "completed"
         ? "completed"
-        : connected
-          ? "linkedin_connected"
-          : onboarding.state;
+        : "linkedin_connected"
+      : "created";
 
     return NextResponse.json({
       state: finalState,
-      linkedinConnected: connected || finalState === "linkedin_connected" || finalState === "completed",
+      linkedinConnected: connected,
       completed: finalState === "completed",
     });
   } catch (error) {

@@ -36,9 +36,7 @@ export async function GET() {
       return NextResponse.json({ connected: false });
     }
 
-    if (clientContext.linkedNow) {
-      await ensureClientOnboardingStateRow(supabase, clientContext.clientId);
-    }
+    await ensureClientOnboardingStateRow(supabase, clientContext.clientId);
 
     const onboarding = await getClientOnboardingStateRow(supabase, clientContext.clientId);
     if (!onboarding) {

@@ -245,6 +245,9 @@ export default function OnboardingActivationWizard({
               <p className="mt-1 text-sm text-[#5f779e]">
                 Complétez le formulaire existant pour finaliser votre activation.
               </p>
+              <p className="mt-1 text-xs text-[#6f84a6]">
+                Si vous avez deja rempli un formulaire, indiquez N/A dans les champs deja traites.
+              </p>
             </div>
             <span
               className={cn(

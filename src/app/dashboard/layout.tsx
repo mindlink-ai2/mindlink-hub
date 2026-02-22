@@ -1,19 +1,11 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import OnboardingActivationWizard from "@/components/onboarding/OnboardingActivationWizard";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import {
   ensureClientOnboardingStateRow,
-  getClientOnboardingStateRow,
   isLinkedinConnectedInAccounts,
   resolveClientContextForUser,
 } from "@/lib/client-onboarding-state";
-
-type WizardInitialState = {
-  state: "created" | "linkedin_connected" | null;
-  linkedinConnected: boolean;
-  completed: boolean;
-};
 
 function getPrimaryEmail(user: Awaited<ReturnType<typeof currentUser>>): string | null {
   return (
@@ -24,7 +16,11 @@ function getPrimaryEmail(user: Awaited<ReturnType<typeof currentUser>>): string 
   );
 }
 
-export default async function OnboardingWizardPage() {
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { userId } = await auth();
   if (!userId) {
     redirect("/sign-in");
@@ -36,35 +32,26 @@ export default async function OnboardingWizardPage() {
 
   const clientContext = await resolveClientContextForUser(supabase, userId, email);
   if (!clientContext) {
-    redirect("/dashboard");
+    return <>{children}</>;
   }
 
   await ensureClientOnboardingStateRow(supabase, clientContext.clientId);
 
-  const onboarding = await getClientOnboardingStateRow(supabase, clientContext.clientId);
-  if (!onboarding) {
-    redirect("/dashboard");
-  }
-
-  const { data: accountRows } = await supabase
+  const { data: accountRows, error: accountErr } = await supabase
     .from("unipile_accounts")
     .select("provider, connected, status")
     .eq("client_id", clientContext.clientId)
     .limit(25);
 
-  const linkedinConnected = isLinkedinConnectedInAccounts(
-    Array.isArray(accountRows) ? (accountRows as Array<Record<string, unknown>>) : []
-  );
+  if (!accountErr) {
+    const linkedinConnected = isLinkedinConnectedInAccounts(
+      Array.isArray(accountRows) ? (accountRows as Array<Record<string, unknown>>) : []
+    );
 
-  if (onboarding.state === "completed" && linkedinConnected) {
-    redirect("/dashboard");
+    if (!linkedinConnected) {
+      redirect("/onboarding");
+    }
   }
 
-  const initialStatus: WizardInitialState = {
-    state: linkedinConnected ? onboarding.state : "created",
-    linkedinConnected,
-    completed: false,
-  };
-
-  return <OnboardingActivationWizard initialStatus={initialStatus} />;
+  return <>{children}</>;
 }
