@@ -10,7 +10,7 @@ import {
 } from "@/lib/client-onboarding-state";
 
 type WizardInitialState = {
-  state: "created" | "linkedin_connected" | null;
+  state: "created" | "linkedin_connected" | "completed" | null;
   linkedinConnected: boolean;
   completed: boolean;
 };
