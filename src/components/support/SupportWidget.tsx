@@ -855,8 +855,10 @@ export default function SupportWidget() {
                     ))}
                   </div>
                 )}
+              </div>
 
-                <section className="mt-4 rounded-2xl border border-[#d7e3f4] bg-white px-3 py-3">
+              <div className="border-t border-[#dce7fb] bg-white/95 px-4 py-3">
+                <section className="rounded-2xl border border-[#d7e3f4] bg-white px-3 py-3">
                   <div className="flex items-start gap-2">
                     <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#dbe5f8] bg-[#f5f9ff] text-[#1f5eff]">
                       <Sparkles className="h-3.5 w-3.5" />
