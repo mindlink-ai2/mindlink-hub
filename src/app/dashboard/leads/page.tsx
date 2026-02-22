@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
-import { Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2, X } from "lucide-react";
+import { AlertTriangle, Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2, X } from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -836,6 +836,13 @@ export default function LeadsPage() {
                     Centralisez vos leads, priorisez vos actions et suivez votre pipeline
                     de manière structurée, avec une vue opérationnelle.
                   </p>
+                  <div className="mt-3 inline-flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[11px] text-amber-800 sm:text-xs">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Rappel sécurité: évitez les connexions trop rapides et ne dépassez pas 30
+                      invitations LinkedIn par jour.
+                    </span>
+                  </div>
 
                   <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
                     <Metric title="Total leads" value={total} tone="default" />
@@ -964,7 +971,7 @@ export default function LeadsPage() {
                 <div className="min-w-0">
                   <h2 className="text-sm font-semibold text-[#0b1c33]">Table des leads</h2>
                   <p className="text-[11px] text-[#51627b]">
-                    Cliquez sur “Voir” pour ouvrir le panneau de traitement.
+                    Utilisez “Voir” pour ouvrir le panneau de traitement.
                   </p>
                 </div>
 
@@ -1110,19 +1117,18 @@ export default function LeadsPage() {
                                   isSent
                                     ? "Message déjà envoyé"
                                     : isPending
-                                      ? "Cliquer pour repasser À faire"
-                                      : "Cliquer pour marquer en attente d'envoi"
+                                      ? "Repasser à À faire"
+                                      : "Marquer en attente d'envoi"
                                 }
                                 aria-label={`Statut du lead ${fullName} : ${statusLabel}`}
                               >
                                 {isStatusUpdating ? (
                                   "Mise à jour..."
                                 ) : isTodo ? (
-                                  <span className="inline-flex items-center gap-1">
+                                  <span className="inline-flex items-center gap-1.5">
                                     <span>À faire</span>
-                                    <span className="inline-flex items-center gap-0.5 rounded-full border border-[#c6dbff] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#1f5eff]">
-                                      <MoveRight className="h-3 w-3" />
-                                      Cliquer
+                                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#c6dbff] bg-white text-[#1f5eff]">
+                                      <MoveRight className="h-2.5 w-2.5" />
                                     </span>
                                   </span>
                                 ) : (
@@ -1285,7 +1291,7 @@ export default function LeadsPage() {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#d7e3f4] bg-[#f8fbff] px-6 py-3 text-[11px] text-[#51627b]">
-                <div>Cliquez sur “À faire” pour passer en “En attente”, puis “Voir” pour traiter le lead.</div>
+                <div>Passez “À faire” en “En attente”, puis “Voir” pour traiter le lead.</div>
                 <div className="tabular-nums">
                   {treatedCount} traité(s) • {remainingToTreat} à traiter
                 </div>
