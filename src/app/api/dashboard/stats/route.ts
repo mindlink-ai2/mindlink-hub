@@ -27,6 +27,7 @@ type InvitationMetricsRow = {
   id?: number | string | null;
   lead_id?: number | string | null;
   status?: string | null;
+  created_at?: string | null;
 };
 
 type PostgrestErrorLike = {
@@ -80,6 +81,14 @@ function isMissingRelationError(error: unknown): boolean {
   return String(pgErr.code ?? "") === "42P01";
 }
 
+function isMissingColumnError(error: unknown, column: string): boolean {
+  if (!error || typeof error !== "object") return false;
+  const pgErr = error as PostgrestErrorLike;
+  const code = String(pgErr.code ?? "");
+  const message = `${pgErr.message ?? ""} ${pgErr.details ?? ""} ${pgErr.hint ?? ""}`.toLowerCase();
+  return code === "42703" && message.includes(column.toLowerCase());
+}
+
 function toErrorDetails(error: unknown): unknown {
   if (error instanceof Error) {
     return {
@@ -127,23 +136,35 @@ async function fetchInvitationMetricsRows(
   supabase: SupabaseClient,
   clientId: number
 ): Promise<InvitationMetricsRow[]> {
-  try {
-    return await fetchPagedRows<InvitationMetricsRow>(async (from, to) => {
-      const { data, error } = await supabase
-        .from("linkedin_invitations")
-        .select("id, lead_id, status")
-        .eq("client_id", clientId)
-        .in("status", ["pending", "sent", "accepted", "connected"])
-        .order("id", { ascending: true })
-        .range(from, to);
-      return { data: data as InvitationMetricsRow[] | null, error };
-    });
-  } catch (error) {
-    if (isMissingRelationError(error)) {
-      return [];
+  const selectCandidates = [
+    "id, lead_id, status, created_at",
+    "id, lead_id, status",
+  ];
+
+  let lastError: unknown = null;
+
+  for (const selectFields of selectCandidates) {
+    try {
+      return await fetchPagedRows<InvitationMetricsRow>(async (from, to) => {
+        const { data, error } = await supabase
+          .from("linkedin_invitations")
+          .select(selectFields)
+          .eq("client_id", clientId)
+          .in("status", ["pending", "sent", "accepted", "connected"])
+          .order("id", { ascending: true })
+          .range(from, to);
+        return { data: data as InvitationMetricsRow[] | null, error };
+      });
+    } catch (error) {
+      lastError = error;
+      if (isMissingRelationError(error)) return [];
+      if (isMissingColumnError(error, "created_at")) continue;
+      throw error;
     }
-    throw error;
   }
+
+  if (lastError) throw lastError;
+  return [];
 }
 
 export async function GET() {
@@ -298,8 +319,6 @@ export async function GET() {
     return followupAt !== null && followupAt < now;
   }).length;
 
-  const totalThreads = inboxThreads.length;
-
   const unreadMessages = inboxThreads.reduce((acc, row) => {
     const unreadCount = Number(row?.unread_count ?? 0);
     return acc + (Number.isFinite(unreadCount) && unreadCount > 0 ? unreadCount : 0);
@@ -308,22 +327,8 @@ export async function GET() {
   const activeThreshold = new Date(now);
   activeThreshold.setDate(activeThreshold.getDate() - 30);
 
-  const activeConversations = inboxThreads.filter((row) => {
-    const lastMessageAt = parseIsoDate(row.last_message_at);
-    return lastMessageAt !== null && lastMessageAt >= activeThreshold;
-  });
-  const activeConversationsCount = activeConversations.length;
-
-  const threadsWithInbound = new Set(
-    inboundMessages
-      .map((row) => String(row?.thread_db_id ?? "").trim())
-      .filter(Boolean)
-  ).size;
-
-  const responseRate =
-    totalThreads === 0 ? 0 : Math.round((threadsWithInbound / totalThreads) * 100);
-
   const invitationStatusByKey = new Map<string, "pending" | "connected">();
+  const acceptedConnectedAtByKey = new Map<string, Date | null>();
 
   invitations.forEach((row) => {
     const key =
@@ -347,7 +352,30 @@ export async function GET() {
     if (mapped === "connected" || !current) {
       invitationStatusByKey.set(key, mapped);
     }
+
+    if (mapped === "connected") {
+      const connectedAt = parseIsoDate(row?.created_at);
+      const currentAt = acceptedConnectedAtByKey.get(key);
+      if (!currentAt || (connectedAt !== null && connectedAt > currentAt)) {
+        acceptedConnectedAtByKey.set(key, connectedAt);
+      }
+    }
   });
+
+  const acceptedConnections = Array.from(invitationStatusByKey.values()).filter(
+    (status) => status === "connected"
+  ).length;
+
+  const acceptedConnections30d = Array.from(acceptedConnectedAtByKey.values()).filter(
+    (connectedAt) => connectedAt !== null && connectedAt >= activeThreshold
+  ).length;
+
+  const inboundMessagesCount = inboundMessages.length;
+
+  const responseRate =
+    acceptedConnections === 0
+      ? 0
+      : Math.round((inboundMessagesCount / acceptedConnections) * 100);
 
   const pendingLinkedinInvitations = Array.from(invitationStatusByKey.values()).filter(
     (status) => status === "pending"
@@ -360,7 +388,7 @@ export async function GET() {
     relancesCount,
     relancesLate,
     unreadMessages,
-    activeConversations: activeConversationsCount,
+    acceptedConnections30d,
     pendingLinkedinInvitations,
     responseRate,
   });
