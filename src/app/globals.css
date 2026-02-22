@@ -154,15 +154,15 @@ body {
 @layer components {
   .hub-page-title {
     font-size: 2.25rem;
-    line-height: 1.08;
-    font-weight: 600;
-    letter-spacing: -0.015em;
+    line-height: 1.06;
+    font-weight: 800;
+    letter-spacing: -0.025em;
     color: #0b1c33;
   }
 
-  @media (min-width: 640px) {
+  @media (min-width: 768px) {
     .hub-page-title {
-      font-size: 3rem;
+      font-size: 3.75rem;
     }
   }
 

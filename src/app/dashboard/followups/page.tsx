@@ -383,7 +383,7 @@ export default function FollowupsPage() {
 
                   <div className="flex items-start justify-between gap-6">
                     <div className="relative">
-                      <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#0b1c33] sm:text-4xl">
+                      <h1 className="hub-page-title mt-1">
                         Relances clients
                       </h1>
                       <p className="mt-1.5 text-sm text-[#51627b]">

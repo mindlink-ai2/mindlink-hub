@@ -564,7 +564,7 @@ export default function InboxPage() {
           <section className="hub-card-hero p-3 sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#0b1c33] sm:text-3xl">
+                <h1 className="hub-page-title mt-1">
                   Messagerie LinkedIn
                 </h1>
                 <p className="mt-1 text-xs text-[#51627b] sm:text-sm">
