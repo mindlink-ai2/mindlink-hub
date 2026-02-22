@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const SUPABASE_PAGE_SIZE = 1000;
 
@@ -27,6 +28,13 @@ type InvitationMetricsRow = {
   sent_at?: string | null;
   accepted_at?: string | null;
   created_at?: string | null;
+};
+
+type PostgrestErrorLike = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
 };
 
 function normalizeInvitationStatus(value: unknown): string {
@@ -59,6 +67,52 @@ async function fetchPagedRows<TRow>(
   }
 
   return rows;
+}
+
+function isMissingColumnError(error: unknown, column: string): boolean {
+  if (!error || typeof error !== "object") return false;
+  const pgErr = error as PostgrestErrorLike;
+  const code = String(pgErr.code ?? "");
+  const message = `${pgErr.message ?? ""} ${pgErr.details ?? ""} ${pgErr.hint ?? ""}`.toLowerCase();
+  const col = column.toLowerCase();
+  return code === "42703" && message.includes(col);
+}
+
+async function fetchInvitationMetricsRows(
+  supabase: SupabaseClient,
+  clientId: number
+): Promise<InvitationMetricsRow[]> {
+  const selectCandidates = [
+    "id, lead_id, status, sent_at, accepted_at, created_at",
+    "id, lead_id, status, sent_at, created_at",
+    "id, lead_id, status, created_at",
+  ];
+
+  let lastError: unknown = null;
+
+  for (const selectFields of selectCandidates) {
+    try {
+      return await fetchPagedRows<InvitationMetricsRow>(async (from, to) => {
+        const { data, error } = await supabase
+          .from("linkedin_invitations")
+          .select(selectFields)
+          .eq("client_id", clientId)
+          .in("status", ["pending", "sent", "accepted", "connected"])
+          .order("id", { ascending: true })
+          .range(from, to);
+        return { data: data as InvitationMetricsRow[] | null, error };
+      });
+    } catch (error) {
+      lastError = error;
+      if (isMissingColumnError(error, "accepted_at") || isMissingColumnError(error, "sent_at")) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (lastError) throw lastError;
+  return [];
 }
 
 export async function GET() {
@@ -138,16 +192,7 @@ export async function GET() {
           .range(from, to);
         return { data: data as InboundMessageRow[] | null, error };
       }),
-      fetchPagedRows<InvitationMetricsRow>(async (from, to) => {
-        const { data, error } = await supabase
-          .from("linkedin_invitations")
-          .select("id, lead_id, status, sent_at, accepted_at, created_at")
-          .eq("client_id", clientId)
-          .in("status", ["pending", "sent", "accepted", "connected"])
-          .order("id", { ascending: true })
-          .range(from, to);
-        return { data: data as InvitationMetricsRow[] | null, error };
-      }),
+      fetchInvitationMetricsRows(supabase, clientId),
     ]);
   } catch (statsErr) {
     console.error("Failed to load dashboard stats:", statsErr);
