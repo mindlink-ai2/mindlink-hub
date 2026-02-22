@@ -27,9 +27,6 @@ type InvitationMetricsRow = {
   id?: number | string | null;
   lead_id?: number | string | null;
   status?: string | null;
-  sent_at?: string | null;
-  accepted_at?: string | null;
-  created_at?: string | null;
 };
 
 type PostgrestErrorLike = {
@@ -75,15 +72,6 @@ async function fetchPagedRows<TRow>(
   }
 
   return rows;
-}
-
-function isMissingColumnError(error: unknown, column: string): boolean {
-  if (!error || typeof error !== "object") return false;
-  const pgErr = error as PostgrestErrorLike;
-  const code = String(pgErr.code ?? "");
-  const message = `${pgErr.message ?? ""} ${pgErr.details ?? ""} ${pgErr.hint ?? ""}`.toLowerCase();
-  const col = column.toLowerCase();
-  return code === "42703" && message.includes(col);
 }
 
 function isMissingRelationError(error: unknown): boolean {
@@ -139,40 +127,23 @@ async function fetchInvitationMetricsRows(
   supabase: SupabaseClient,
   clientId: number
 ): Promise<InvitationMetricsRow[]> {
-  const selectCandidates = [
-    "id, lead_id, status, sent_at, accepted_at, created_at",
-    "id, lead_id, status, sent_at, created_at",
-    "id, lead_id, status, created_at",
-  ];
-
-  let lastError: unknown = null;
-
-  for (const selectFields of selectCandidates) {
-    try {
-      return await fetchPagedRows<InvitationMetricsRow>(async (from, to) => {
-        const { data, error } = await supabase
-          .from("linkedin_invitations")
-          .select(selectFields)
-          .eq("client_id", clientId)
-          .in("status", ["pending", "sent", "accepted", "connected"])
-          .order("id", { ascending: true })
-          .range(from, to);
-        return { data: data as InvitationMetricsRow[] | null, error };
-      });
-    } catch (error) {
-      lastError = error;
-      if (isMissingRelationError(error)) {
-        return [];
-      }
-      if (isMissingColumnError(error, "accepted_at") || isMissingColumnError(error, "sent_at")) {
-        continue;
-      }
-      throw error;
+  try {
+    return await fetchPagedRows<InvitationMetricsRow>(async (from, to) => {
+      const { data, error } = await supabase
+        .from("linkedin_invitations")
+        .select("id, lead_id, status")
+        .eq("client_id", clientId)
+        .in("status", ["pending", "sent", "accepted", "connected"])
+        .order("id", { ascending: true })
+        .range(from, to);
+      return { data: data as InvitationMetricsRow[] | null, error };
+    });
+  } catch (error) {
+    if (isMissingRelationError(error)) {
+      return [];
     }
+    throw error;
   }
-
-  if (lastError) throw lastError;
-  return [];
 }
 
 export async function GET() {
@@ -327,6 +298,8 @@ export async function GET() {
     return followupAt !== null && followupAt < now;
   }).length;
 
+  const totalThreads = inboxThreads.length;
+
   const unreadMessages = inboxThreads.reduce((acc, row) => {
     const unreadCount = Number(row?.unread_count ?? 0);
     return acc + (Number.isFinite(unreadCount) && unreadCount > 0 ? unreadCount : 0);
@@ -335,40 +308,20 @@ export async function GET() {
   const activeThreshold = new Date(now);
   activeThreshold.setDate(activeThreshold.getDate() - 30);
 
-  const trackedAcceptedInvitationByKey = new Map<string, Date | null>();
-
-  invitations.forEach((row) => {
-    const status = normalizeInvitationStatus(row?.status);
-    if (status !== "accepted" && status !== "connected") return;
-
-    // "Tracké Hub" : invitation envoyée depuis le Hub => sent_at présent.
-    const sentAt = parseIsoDate(row?.sent_at);
-    if (!sentAt) return;
-
-    const key =
-      row?.lead_id === null || row?.lead_id === undefined
-        ? `row:${String(row?.id ?? "")}`
-        : `lead:${String(row.lead_id)}`;
-    if (!key) return;
-
-    const acceptedAt = parseIsoDate(row?.accepted_at) ?? parseIsoDate(row?.created_at);
-    const current = trackedAcceptedInvitationByKey.get(key);
-
-    if (!current || (acceptedAt !== null && acceptedAt > current)) {
-      trackedAcceptedInvitationByKey.set(key, acceptedAt);
-    }
+  const activeConversations = inboxThreads.filter((row) => {
+    const lastMessageAt = parseIsoDate(row.last_message_at);
+    return lastMessageAt !== null && lastMessageAt >= activeThreshold;
   });
+  const activeConversationsCount = activeConversations.length;
 
-  const acceptedConnections = trackedAcceptedInvitationByKey.size;
-  const acceptedConnections30d = Array.from(trackedAcceptedInvitationByKey.values()).filter(
-    (acceptedAt) => acceptedAt !== null && acceptedAt >= activeThreshold
-  ).length;
+  const threadsWithInbound = new Set(
+    inboundMessages
+      .map((row) => String(row?.thread_db_id ?? "").trim())
+      .filter(Boolean)
+  ).size;
 
-  const inboundMessagesCount = inboundMessages.length;
   const responseRate =
-    acceptedConnections === 0
-      ? 0
-      : Math.round((inboundMessagesCount / acceptedConnections) * 100);
+    totalThreads === 0 ? 0 : Math.round((threadsWithInbound / totalThreads) * 100);
 
   const invitationStatusByKey = new Map<string, "pending" | "connected">();
 
@@ -407,7 +360,7 @@ export async function GET() {
     relancesCount,
     relancesLate,
     unreadMessages,
-    acceptedConnections30d,
+    activeConversations: activeConversationsCount,
     pendingLinkedinInvitations,
     responseRate,
   });
