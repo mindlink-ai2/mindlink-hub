@@ -147,6 +147,8 @@ export default function LeadsPage() {
   const [updatingStatusIds, setUpdatingStatusIds] = useState<Set<string>>(new Set());
   const [invitingLeadIds, setInvitingLeadIds] = useState<Set<string>>(new Set());
   const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
+  const [sendingLinkedInMessageLeadIds, setSendingLinkedInMessageLeadIds] = useState<Set<string>>(new Set());
+  const [linkedInMessageSendErrors, setLinkedInMessageSendErrors] = useState<Record<string, string>>({});
   const selectedCount = selectedIds.size;
 
   // ✅ open lead from query param (?open=ID)
@@ -602,47 +604,110 @@ export default function LeadsPage() {
     return () => clearTimeout(delay);
   }, [openLead?.message_mail]);
 
-  // 🔵 Fonction pour marquer "Message envoyé"
-  const handleMessageSent = async () => {
+  const handleSendLinkedInMessage = async () => {
     if (!openLead) return;
-
-    const res = await fetch("/api/leads/message-sent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId: openLead.id }),
-    });
-
-    const data = await res.json();
-
-    if (data.error) {
-      alert("Erreur lors de l'envoi.");
+    const leadId = Number(openLead.id);
+    const idStr = String(openLead.id);
+    if (!Number.isFinite(leadId)) {
+      setLinkedInMessageSendErrors((prev) => ({
+        ...prev,
+        [idStr]: "Identifiant de prospect invalide.",
+      }));
       return;
     }
 
-    setOpenLead((prev: Lead | null) =>
-      prev
-        ? {
-            ...prev,
-            message_sent: true,
-            message_sent_at: data.lead?.message_sent_at,
-            next_followup_at: data.lead?.next_followup_at,
-          }
-        : prev
-    );
+    if (openLead.message_sent || sendingLinkedInMessageLeadIds.has(idStr)) return;
 
-    setSafeLeads((prev: Lead[]) =>
-      prev.map((l) =>
-        l.id === openLead.id
+    const content = String(openLead.internal_message ?? "").trim();
+    if (!content) {
+      setLinkedInMessageSendErrors((prev) => ({
+        ...prev,
+        [idStr]: "Le message LinkedIn est vide.",
+      }));
+      return;
+    }
+
+    setSendingLinkedInMessageLeadIds((prev: Set<string>) => {
+      const next = new Set(prev);
+      next.add(idStr);
+      return next;
+    });
+
+    setLinkedInMessageSendErrors((prev) => {
+      if (!prev[idStr]) return prev;
+      const next = { ...prev };
+      delete next[idStr];
+      return next;
+    });
+
+    try {
+      const res = await fetch("/api/prospection/send-linkedin-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId,
+          content,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok === false) {
+        throw new Error(
+          typeof data?.message === "string"
+            ? data.message
+            : "Erreur pendant l’envoi du message LinkedIn."
+        );
+      }
+
+      setOpenLead((prev: Lead | null) =>
+        prev
           ? {
-              ...l,
+              ...prev,
               message_sent: true,
-              message_sent_at: data.lead?.message_sent_at,
-              next_followup_at: data.lead?.next_followup_at,
+              message_sent_at: data?.lead?.message_sent_at ?? new Date().toISOString(),
+              next_followup_at: data?.lead?.next_followup_at ?? prev.next_followup_at ?? null,
             }
-          : l
-      )
-    );
+          : prev
+      );
+
+      setSafeLeads((prev: Lead[]) =>
+        prev.map((l) =>
+          l.id === openLead.id
+            ? {
+                ...l,
+                message_sent: true,
+                message_sent_at: data?.lead?.message_sent_at ?? new Date().toISOString(),
+                next_followup_at: data?.lead?.next_followup_at ?? l.next_followup_at ?? null,
+              }
+            : l
+        )
+      );
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Erreur pendant l’envoi du message LinkedIn.";
+      setLinkedInMessageSendErrors((prev) => ({
+        ...prev,
+        [idStr]: errorMessage,
+      }));
+    } finally {
+      setSendingLinkedInMessageLeadIds((prev: Set<string>) => {
+        if (!prev.has(idStr)) return prev;
+        const next = new Set(prev);
+        next.delete(idStr);
+        return next;
+      });
+    }
   };
+
+  const openLeadId = openLead ? String(openLead.id) : null;
+  const isSendingOpenLeadLinkedInMessage = openLeadId
+    ? sendingLinkedInMessageLeadIds.has(openLeadId)
+    : false;
+  const openLeadLinkedInMessageError = openLeadId
+    ? linkedInMessageSendErrors[openLeadId]
+    : null;
 
   // ✅ Email actions — now for everyone (no premium gating)
   const openPrefilledEmail = () => {
@@ -1430,18 +1495,32 @@ export default function LeadsPage() {
                     <div className="mt-3">
                       <button
                         type="button"
-                        onClick={handleMessageSent}
-                        disabled={Boolean(openLead.message_sent)}
+                        onClick={handleSendLinkedInMessage}
+                        disabled={Boolean(openLead.message_sent) || isSendingOpenLeadLinkedInMessage}
                         className={[
                           "w-full rounded-xl px-4 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2",
                           openLead.message_sent
                             ? "cursor-default bg-emerald-600 text-white focus:ring-emerald-200"
+                            : openLeadLinkedInMessageError
+                              ? "bg-red-600 text-white hover:bg-red-700 focus:ring-red-200"
+                              : isSendingOpenLeadLinkedInMessage
+                                ? "cursor-wait bg-[#2563EB]/80 text-white focus:ring-[#bfdbfe]"
                             : "bg-[#2563EB] text-white hover:bg-[#1d4ed8] focus:ring-[#bfdbfe]",
                         ].join(" ")}
                       >
-                        {openLead.message_sent ? "Message envoyé ✓" : "Marquer comme envoyé"}
+                        {openLead.message_sent
+                          ? "Envoyé ✅"
+                          : isSendingOpenLeadLinkedInMessage
+                            ? "Envoi…"
+                            : openLeadLinkedInMessageError
+                              ? "Erreur — réessayer"
+                              : "Envoyer le message"}
                       </button>
                     </div>
+
+                    {openLeadLinkedInMessageError ? (
+                      <p className="mt-2 text-xs text-red-600">{openLeadLinkedInMessageError}</p>
+                    ) : null}
 
                     {openLead.next_followup_at && (
                       <p className="mt-2 text-xs text-[#4B5563]">
