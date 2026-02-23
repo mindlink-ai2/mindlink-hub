@@ -1060,11 +1060,14 @@ export default function LeadsPage() {
                         const isSent = Boolean(lead.message_sent);
                         const isPending = !isSent && Boolean(lead.traite);
                         const isTodo = !isSent && !isPending;
+                        const isConnectedLeft = !isSent && isInviteAccepted;
                         const statusLabel = isSent
                           ? "Envoyé"
-                          : isPending
-                            ? "En attente"
-                            : "À faire";
+                          : isConnectedLeft
+                            ? "Connecté"
+                            : isPending
+                              ? "En attente"
+                              : "À faire";
                         const initials =
                           (
                             `${lead.FirstName?.[0] ?? ""}${lead.LastName?.[0] ?? ""}`.toUpperCase() ||
@@ -1103,11 +1106,13 @@ export default function LeadsPage() {
                               <button
                                 type="button"
                                 onClick={() => handleStatusBadgeClick(lead)}
-                                disabled={isSent || isStatusUpdating}
+                                disabled={isSent || isConnectedLeft || isStatusUpdating}
                                 className={[
                                   "inline-flex h-8 items-center justify-center rounded-full border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
                                   isSent
                                     ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
+                                    : isConnectedLeft
+                                      ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
                                     : isPending
                                       ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 focus:ring-amber-200"
                                       : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
@@ -1116,6 +1121,8 @@ export default function LeadsPage() {
                                 title={
                                   isSent
                                     ? "Message déjà envoyé"
+                                    : isConnectedLeft
+                                      ? "Connexion LinkedIn acceptée"
                                     : isPending
                                       ? "Repasser à À faire"
                                       : "Marquer en attente d'envoi"
@@ -1124,7 +1131,7 @@ export default function LeadsPage() {
                               >
                                 {isStatusUpdating ? (
                                   "Mise à jour..."
-                                ) : isTodo ? (
+                                ) : isTodo && !isConnectedLeft ? (
                                   <span className="inline-flex items-center gap-1.5">
                                     <span>À faire</span>
                                     <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#c6dbff] bg-white text-[#1f5eff]">
