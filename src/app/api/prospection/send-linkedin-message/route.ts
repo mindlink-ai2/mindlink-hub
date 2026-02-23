@@ -449,6 +449,7 @@ async function createConversationThreadId(params: {
 
 async function updateLeadSentMetadata(
   supabase: SupabaseClient,
+  clientId: string,
   leadId: number
 ): Promise<{ message_sent_at: string | null; next_followup_at: string | null } | null> {
   const now = new Date();
@@ -463,6 +464,7 @@ async function updateLeadSentMetadata(
       next_followup_at: next.toISOString(),
     })
     .eq("id", leadId)
+    .eq("client_id", clientId)
     .select("message_sent_at, next_followup_at")
     .limit(1)
     .maybeSingle();
@@ -742,7 +744,7 @@ export async function POST(req: Request) {
           );
         }
 
-        const leadUpdate = await updateLeadSentMetadata(supabase, leadId);
+        const leadUpdate = await updateLeadSentMetadata(supabase, clientId, leadId);
         return NextResponse.json({
           ok: true,
           status: "sent",
@@ -796,7 +798,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const leadUpdate = await updateLeadSentMetadata(supabase, leadId);
+    const leadUpdate = await updateLeadSentMetadata(supabase, clientId, leadId);
 
     return NextResponse.json({
       ok: true,
