@@ -78,13 +78,22 @@ function normalizeEventType(rawEvent: string | null): string {
     .trim()
     .replace(/\s+/g, "_")
     .replace(/-/g, "_")
+    .replace(/\./g, "_")
+    .replace(/\//g, "_")
     .toUpperCase();
 }
 
 export function classifyInboxEvent(eventType: string): InboxEventKind {
   const e = eventType.toUpperCase();
 
-  if (e.includes("NEW_RELATION")) return "new_relation";
+  if (
+    e.includes("NEW_RELATION") ||
+    e.includes("RELATION_NEW") ||
+    e.includes("NEW_CONNECTION") ||
+    e.includes("CONNECTION_NEW")
+  ) {
+    return "new_relation";
+  }
   if (e.includes("MESSAGE_EDIT") || e.includes("EDIT_MESSAGE")) return "message_edit";
   if (e.includes("MESSAGE_DELETE") || e.includes("DELETE_MESSAGE")) return "message_delete";
   if (e.includes("MESSAGE_REACTION") || e.includes("NEW_REACTION") || e.includes("REACTION")) {
@@ -104,7 +113,14 @@ function extractEventType(payload: JsonObject): string {
       ["eventType"],
       ["event"],
       ["type"],
+      ["object"],
       ["name"],
+      ["data", "event_type"],
+      ["data", "eventType"],
+      ["data", "event"],
+      ["data", "type"],
+      ["webhook", "event"],
+      ["webhook", "type"],
       ["event", "type"],
       ["event", "name"],
       ["trigger"],

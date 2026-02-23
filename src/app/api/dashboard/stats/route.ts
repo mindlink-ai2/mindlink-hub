@@ -28,6 +28,8 @@ type InvitationMetricsRow = {
   lead_id?: number | string | null;
   status?: string | null;
   created_at?: string | null;
+  accepted_at?: string | null;
+  sent_at?: string | null;
 };
 
 type PostgrestErrorLike = {
@@ -45,6 +47,15 @@ type ApiErrorPayload = {
 
 function normalizeInvitationStatus(value: unknown): string {
   return String(value ?? "").trim().toLowerCase();
+}
+
+function getInvitationConnectedAt(row: InvitationMetricsRow): Date | null {
+  return (
+    parseIsoDate(row.accepted_at) ??
+    parseIsoDate(row.created_at) ??
+    parseIsoDate(row.sent_at) ??
+    null
+  );
 }
 
 function parseIsoDate(value: string | null | undefined): Date | null {
@@ -87,6 +98,12 @@ function isMissingColumnError(error: unknown, column: string): boolean {
   const code = String(pgErr.code ?? "");
   const message = `${pgErr.message ?? ""} ${pgErr.details ?? ""} ${pgErr.hint ?? ""}`.toLowerCase();
   return code === "42703" && message.includes(column.toLowerCase());
+}
+
+function isMissingAnyColumnError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const pgErr = error as PostgrestErrorLike;
+  return String(pgErr.code ?? "") === "42703";
 }
 
 function toErrorDetails(error: unknown): unknown {
@@ -137,6 +154,10 @@ async function fetchInvitationMetricsRows(
   clientId: number
 ): Promise<InvitationMetricsRow[]> {
   const selectCandidates = [
+    "id, lead_id, status, accepted_at, sent_at, created_at",
+    "id, lead_id, status, accepted_at, sent_at",
+    "id, lead_id, status, accepted_at, created_at",
+    "id, lead_id, status, accepted_at",
     "id, lead_id, status, created_at",
     "id, lead_id, status",
   ];
@@ -159,6 +180,9 @@ async function fetchInvitationMetricsRows(
       lastError = error;
       if (isMissingRelationError(error)) return [];
       if (isMissingColumnError(error, "created_at")) continue;
+      if (isMissingColumnError(error, "accepted_at")) continue;
+      if (isMissingColumnError(error, "sent_at")) continue;
+      if (isMissingAnyColumnError(error)) continue;
       throw error;
     }
   }
@@ -354,7 +378,7 @@ export async function GET() {
     }
 
     if (mapped === "connected") {
-      const connectedAt = parseIsoDate(row?.created_at);
+      const connectedAt = getInvitationConnectedAt(row);
       const currentAt = acceptedConnectedAtByKey.get(key);
       if (!currentAt || (connectedAt !== null && connectedAt > currentAt)) {
         acceptedConnectedAtByKey.set(key, connectedAt);

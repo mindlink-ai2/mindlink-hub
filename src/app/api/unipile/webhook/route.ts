@@ -54,11 +54,27 @@ type PayloadParticipant = {
   isSelf: boolean | null;
 };
 
+type PostgrestErrorLike = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+
 function parseIsoDate(value: string | null): number | null {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return date.getTime();
+}
+
+function isMissingColumnError(error: unknown, columnName: string): boolean {
+  if (!error || typeof error !== "object") return false;
+  const pgError = error as PostgrestErrorLike;
+  if (String(pgError.code ?? "") !== "42703") return false;
+  const details = `${pgError.message ?? ""} ${pgError.details ?? ""} ${pgError.hint ?? ""}`
+    .toLowerCase();
+  return details.includes(columnName.toLowerCase());
 }
 
 function mergeRawObject(
@@ -308,8 +324,22 @@ async function resolveClientId(
     return null;
   }
 
-  if (!account?.client_id) return null;
-  return String(account.client_id);
+  if (account?.client_id) return String(account.client_id);
+
+  const { data: anyProviderAccount, error: fallbackError } = await supabase
+    .from("unipile_accounts")
+    .select("client_id")
+    .eq("unipile_account_id", unipileAccountId)
+    .limit(1)
+    .maybeSingle();
+
+  if (fallbackError) {
+    console.error("UNIPILE_WEBHOOK_ACCOUNT_LOOKUP_FALLBACK_ERROR:", fallbackError);
+    return null;
+  }
+
+  if (!anyProviderAccount?.client_id) return null;
+  return String(anyProviderAccount.client_id);
 }
 
 async function logUnipileEvent(params: {
@@ -320,18 +350,36 @@ async function logUnipileEvent(params: {
   payload: JsonObject;
 }) {
   const { supabase, eventType, clientId, unipileAccountId, payload } = params;
-
-  const { error } = await supabase.from("unipile_events").insert({
+  const base = {
     provider: "linkedin",
     event_type: eventType,
     client_id: clientId,
-    unipile_account_id: unipileAccountId,
     received_at: new Date().toISOString(),
-    raw: payload,
-  });
+  };
 
-  if (error) {
-    console.error("UNIPILE_WEBHOOK_EVENT_LOG_ERROR:", error);
+  const candidates: Array<Record<string, unknown>> = [
+    { ...base, unipile_account_id: unipileAccountId, payload },
+    { ...base, payload },
+    { ...base, unipile_account_id: unipileAccountId, raw: payload },
+    { ...base, raw: payload },
+  ];
+
+  let lastError: unknown = null;
+
+  for (const row of candidates) {
+    const { error } = await supabase.from("unipile_events").insert(row);
+    if (!error) return;
+
+    lastError = error;
+    const canRetry =
+      isMissingColumnError(error, "unipile_account_id") ||
+      isMissingColumnError(error, "payload") ||
+      isMissingColumnError(error, "raw");
+    if (!canRetry) break;
+  }
+
+  if (lastError) {
+    console.error("UNIPILE_WEBHOOK_EVENT_LOG_ERROR:", lastError);
   }
 }
 
@@ -814,12 +862,26 @@ function extractRelationIdentity(payload: JsonObject): {
   slug: string | null;
 } {
   const urlCandidate = getFirstString(payload, [
+    ["user_profile_url"],
+    ["userProfileUrl"],
     ["profile_url"],
     ["profileUrl"],
     ["linkedin_url"],
     ["linkedinUrl"],
+    ["data", "user_profile_url"],
+    ["data", "userProfileUrl"],
+    ["data", "profile_url"],
+    ["data", "profileUrl"],
+    ["data", "linkedin_url"],
+    ["data", "linkedinUrl"],
+    ["data", "user", "profile_url"],
+    ["data", "user", "profileUrl"],
+    ["data", "user", "linkedin_url"],
+    ["data", "user", "linkedinUrl"],
     ["user", "profile_url"],
     ["user", "profileUrl"],
+    ["user", "linkedin_url"],
+    ["user", "linkedinUrl"],
     ["contact", "profile_url"],
     ["contact", "profileUrl"],
     ["contact", "linkedin_url"],
@@ -839,10 +901,26 @@ function extractRelationIdentity(payload: JsonObject): {
   ]);
 
   const slugCandidate = getFirstString(payload, [
+    ["user_public_identifier"],
+    ["userPublicIdentifier"],
+    ["user_provider_id"],
+    ["userProviderId"],
     ["public_identifier"],
     ["publicIdentifier"],
     ["provider_id"],
     ["providerId"],
+    ["data", "user_public_identifier"],
+    ["data", "userPublicIdentifier"],
+    ["data", "user_provider_id"],
+    ["data", "userProviderId"],
+    ["data", "public_identifier"],
+    ["data", "publicIdentifier"],
+    ["data", "provider_id"],
+    ["data", "providerId"],
+    ["data", "user", "public_identifier"],
+    ["data", "user", "publicIdentifier"],
+    ["data", "user", "provider_id"],
+    ["data", "user", "providerId"],
     ["contact", "public_identifier"],
     ["contact", "publicIdentifier"],
     ["contact", "provider_id"],
@@ -933,7 +1011,7 @@ async function markInvitationAccepted(params: {
     .eq("client_id", clientId)
     .eq("lead_id", leadId)
     .eq("unipile_account_id", unipileAccountId)
-    .eq("status", "sent")
+    .in("status", ["sent", "pending"])
     .order("sent_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -995,7 +1073,7 @@ async function fallbackAcceptLastSent(params: {
     .select("id, lead_id, raw")
     .eq("client_id", clientId)
     .eq("unipile_account_id", unipileAccountId)
-    .eq("status", "sent")
+    .in("status", ["sent", "pending"])
     .order("sent_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -1060,13 +1138,22 @@ async function handleNewRelation(params: {
     return;
   }
 
-  await fallbackAcceptLastSent({
+  const fallbackLeadId = await fallbackAcceptLastSent({
     supabase,
     clientId,
     unipileAccountId,
     payload,
     match,
   });
+
+  if (fallbackLeadId === null) {
+    console.warn("UNIPILE_WEBHOOK_RELATION_NO_MATCH_NO_FALLBACK", {
+      clientId,
+      unipileAccountId,
+      normalizedUrl: identity.normalizedUrl,
+      slug: identity.slug,
+    });
+  }
 }
 
 export async function POST(req: Request) {
