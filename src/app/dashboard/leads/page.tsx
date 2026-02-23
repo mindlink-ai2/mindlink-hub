@@ -1252,7 +1252,7 @@ export default function LeadsPage() {
                                     isInviteAccepted
                                       ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
                                       : isInviteSent
-                                      ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
+                                      ? "cursor-default border-amber-200 bg-amber-50 text-amber-700 focus:ring-amber-200"
                                       : inviteError
                                         ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
                                         : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
@@ -1263,7 +1263,7 @@ export default function LeadsPage() {
                                   {isInviteAccepted
                                     ? "Connecté"
                                     : isInviteSent
-                                    ? "Invitation envoyée"
+                                    ? "Connexion envoyée"
                                     : isInviteLoading
                                       ? "Envoi..."
                                       : "Se connecter"}

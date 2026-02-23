@@ -68,7 +68,7 @@ export async function GET() {
         .from("linkedin_invitations")
         .select("id, lead_id, status")
         .eq("client_id", clientId)
-        .in("status", ["sent", "accepted"])
+        .in("status", ["sent", "accepted", "connected"])
         .order("id", { ascending: true })
         .range(from, to);
 
@@ -144,11 +144,19 @@ export async function GET() {
         const normalizedStatus = String(invitation?.status ?? "")
           .trim()
           .toLowerCase();
-        if (normalizedStatus !== "sent" && normalizedStatus !== "accepted") return;
+        if (
+          normalizedStatus !== "sent" &&
+          normalizedStatus !== "accepted" &&
+          normalizedStatus !== "connected"
+        ) {
+          return;
+        }
+
+        const mappedStatus = normalizedStatus === "connected" ? "accepted" : normalizedStatus;
 
         const current = invitationStatusByLead.get(key);
-        if (normalizedStatus === "accepted" || !current) {
-          invitationStatusByLead.set(key, normalizedStatus as "sent" | "accepted");
+        if (mappedStatus === "accepted" || !current) {
+          invitationStatusByLead.set(key, mappedStatus as "sent" | "accepted");
         }
       });
     } catch (invitationsErr) {

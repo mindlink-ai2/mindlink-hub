@@ -120,7 +120,7 @@ export async function POST(req: Request) {
       .select("id, status")
       .eq("client_id", client.id)
       .eq("lead_id", leadId)
-      .in("status", ["sent", "accepted"])
+      .in("status", ["sent", "accepted", "connected"])
       .limit(1);
 
     if (existingInviteErr) {
@@ -133,8 +133,9 @@ export async function POST(req: Request) {
     if ((existingInvitations ?? []).length > 0) {
       const hasAccepted = (existingInvitations ?? []).some(
         (invitation) =>
-          String((invitation as { status?: string | null }).status ?? "").toLowerCase() ===
-          "accepted"
+          ["accepted", "connected"].includes(
+            String((invitation as { status?: string | null }).status ?? "").toLowerCase()
+          )
       );
 
       const { error: updateLeadStatusErr } = await supabase
