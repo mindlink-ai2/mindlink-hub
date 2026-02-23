@@ -165,6 +165,7 @@ export default function InboxPage() {
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
   const shouldScrollToBottomRef = useRef(false);
   const loadedMessagesThreadIdRef = useRef<string | null>(null);
+  const syncInFlightRef = useRef(false);
 
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
@@ -453,28 +454,64 @@ export default function InboxPage() {
     };
   }, [selectedThreadId]);
 
+  const runSync = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const silent = options?.silent === true;
+      if (syncInFlightRef.current) return;
+      syncInFlightRef.current = true;
+
+      if (!silent) {
+        setSyncing(true);
+        setError(null);
+      }
+
+      try {
+        const res = await fetch("/api/inbox/sync", { method: "POST" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data?.success === false) {
+          throw new Error(data?.error ?? "La synchronisation a échoué.");
+        }
+
+        await loadThreads({ keepSelected: true });
+        if (selectedThreadId) {
+          await loadMessages(selectedThreadId);
+        }
+      } catch (e: unknown) {
+        if (!silent) {
+          setError(e instanceof Error ? e.message : "Erreur pendant la synchronisation.");
+        } else {
+          console.error("INBOX_BACKGROUND_SYNC_ERROR:", e);
+        }
+      } finally {
+        syncInFlightRef.current = false;
+        if (!silent) setSyncing(false);
+      }
+    },
+    [loadThreads, selectedThreadId]
+  );
+
   const handleSync = async () => {
     if (syncing) return;
-    setSyncing(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/inbox/sync", { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) {
-        throw new Error(data?.error ?? "La synchronisation a échoué.");
-      }
-
-      await loadThreads({ keepSelected: true });
-      if (selectedThreadId) {
-        await loadMessages(selectedThreadId);
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur pendant la synchronisation.");
-    } finally {
-      setSyncing(false);
-    }
+    await runSync({ silent: false });
   };
+
+  useEffect(() => {
+    const syncIfVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      void runSync({ silent: true });
+    };
+
+    // Premier refresh silencieux pour réduire le délai perçu à l'ouverture.
+    syncIfVisible();
+
+    const intervalId = window.setInterval(syncIfVisible, 45000);
+    document.addEventListener("visibilitychange", syncIfVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", syncIfVisible);
+    };
+  }, [runSync]);
 
   const handleMarkAllRead = async () => {
     if (markingAllRead) return;
