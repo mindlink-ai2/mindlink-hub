@@ -1073,7 +1073,7 @@ export default function LeadsPage() {
                             `${lead.FirstName?.[0] ?? ""}${lead.LastName?.[0] ?? ""}`.toUpperCase() ||
                             fullName.slice(0, 2).toUpperCase()
                           ) || "—";
-                        const statusDotClass = isSent
+                        const statusDotClass = isSent || isConnectedLeft
                           ? "bg-emerald-500"
                           : isPending
                             ? "bg-amber-500"
