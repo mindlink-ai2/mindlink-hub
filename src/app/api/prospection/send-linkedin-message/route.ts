@@ -106,6 +106,31 @@ function getErrorMessage(payload: unknown): string | null {
   return null;
 }
 
+function dedupeBodies(candidates: Record<string, unknown>[]): Record<string, unknown>[] {
+  const seen = new Set<string>();
+  const unique: Record<string, unknown>[] = [];
+
+  for (const candidate of candidates) {
+    const key = JSON.stringify(candidate);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(candidate);
+  }
+
+  return unique;
+}
+
+function buildRecipientTargetVariants(providerId: string): Array<Record<string, unknown>> {
+  return [
+    { provider_id: providerId },
+    { recipient_provider_id: providerId },
+    { attendee_id: providerId },
+    { participant_id: providerId },
+    { user_id: providerId },
+    { id: providerId },
+  ];
+}
+
 async function postFirstSuccessful(
   urls: string[],
   initBuilder: (url: string) => RequestInit
@@ -415,14 +440,17 @@ async function createConversationThreadId(params: {
     `${base}/api/v1/conversations`,
   ];
 
-  const bodyCandidates: Record<string, unknown>[] = [
-    { account_id: unipileAccountId, provider_id: providerId },
-    { account_id: unipileAccountId, recipient_provider_id: providerId },
-    { account_id: unipileAccountId, attendee_id: providerId },
-    { account_id: unipileAccountId, attendees: [{ provider_id: providerId }] },
-    { account_id: unipileAccountId, participants: [{ provider_id: providerId }] },
+  const targetVariants = buildRecipientTargetVariants(providerId);
+  const bodyCandidates: Record<string, unknown>[] = dedupeBodies([
+    ...targetVariants.map((target) => ({ account_id: unipileAccountId, ...target })),
+    ...targetVariants.map((target) => ({ account_id: unipileAccountId, attendees: [target] })),
+    ...targetVariants.map((target) => ({ account_id: unipileAccountId, participants: [target] })),
     { account_id: unipileAccountId, participant_ids: [providerId] },
-  ];
+    { account_id: unipileAccountId, attendee_ids: [providerId] },
+    { account_id: unipileAccountId, provider_ids: [providerId] },
+  ]);
+
+  const failures: Array<{ endpoint: string; details: string | null; status: number }> = [];
 
   for (const endpoint of endpointCandidates) {
     for (const body of bodyCandidates) {
@@ -437,11 +465,26 @@ async function createConversationThreadId(params: {
       });
 
       const payload = await readResponseBody(res);
-      if (!res.ok) continue;
+      if (!res.ok) {
+        failures.push({
+          endpoint,
+          status: res.status,
+          details: getErrorMessage(payload),
+        });
+        continue;
+      }
 
       const threadId = extractThreadId(payload);
       if (threadId) return threadId;
     }
+  }
+
+  if (failures.length > 0) {
+    console.error("PROSPECTION_SEND_CONVERSATION_CREATE_FAILED", {
+      unipileAccountId,
+      providerId,
+      failures: failures.slice(0, 8),
+    });
   }
 
   return null;
@@ -652,24 +695,68 @@ export async function POST(req: Request) {
         threadCreated = true;
       } else {
         // Fallback: certains comptes Unipile créent implicitement la conversation à l'envoi.
-        const directSend = await postFirstSuccessful(
-          [`${base}/api/v1/messages`],
-          () => ({
+        const directSendBodies = dedupeBodies([
+          ...buildRecipientTargetVariants(providerId).map((target) => ({
+            account_id: unipileAccountId,
+            text: content,
+            ...target,
+          })),
+          ...buildRecipientTargetVariants(providerId).map((target) => ({
+            account_id: unipileAccountId,
+            message: content,
+            ...target,
+          })),
+          ...buildRecipientTargetVariants(providerId).map((target) => ({
+            account_id: unipileAccountId,
+            content,
+            ...target,
+          })),
+          ...buildRecipientTargetVariants(providerId).map((target) => ({
+            account_id: unipileAccountId,
+            text: content,
+            attendees: [target],
+          })),
+          ...buildRecipientTargetVariants(providerId).map((target) => ({
+            account_id: unipileAccountId,
+            text: content,
+            participants: [target],
+          })),
+          { account_id: unipileAccountId, text: content, participant_ids: [providerId] },
+          { account_id: unipileAccountId, text: content, attendee_ids: [providerId] },
+          { account_id: unipileAccountId, text: content, provider_ids: [providerId] },
+        ]);
+
+        let directSend: { payload: unknown; url: string } | null = null;
+        const directSendFailures: Array<{ status: number; details: string | null }> = [];
+        for (const requestBody of directSendBodies) {
+          const res = await fetch(`${base}/api/v1/messages`, {
             method: "POST",
             headers: {
               "X-API-KEY": apiKey,
               accept: "application/json",
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              account_id: unipileAccountId,
-              provider_id: providerId,
-              text: content,
-            }),
-          })
-        );
+            body: JSON.stringify(requestBody),
+          });
+
+          const payload = await readResponseBody(res);
+          if (!res.ok) {
+            directSendFailures.push({
+              status: res.status,
+              details: getErrorMessage(payload),
+            });
+            continue;
+          }
+          directSend = { payload, url: `${base}/api/v1/messages` };
+          break;
+        }
 
         if (!directSend) {
+          console.error("PROSPECTION_SEND_DIRECT_MESSAGE_FALLBACK_FAILED", {
+            unipileAccountId,
+            providerId,
+            failures: directSendFailures.slice(0, 8),
+          });
           return NextResponse.json(
             {
               ok: false,
