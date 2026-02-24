@@ -10,7 +10,13 @@ import {
   readResponseBody,
   requireEnv,
 } from "@/lib/inbox-server";
-import { getFirstString, parseUnipileMessage, toJsonObject, truncatePreview } from "@/lib/unipile-inbox";
+import {
+  extractArrayCandidates,
+  getFirstString,
+  parseUnipileMessage,
+  toJsonObject,
+  truncatePreview,
+} from "@/lib/unipile-inbox";
 
 type LeadRow = {
   id: number | string;
@@ -157,10 +163,11 @@ function dedupeBodies(candidates: Record<string, unknown>[]): Record<string, unk
 
 function buildRecipientTargetVariants(params: {
   providerId: string;
+  attendeeId?: string | null;
   profileSlug?: string | null;
   normalizedLeadLinkedInUrl?: string | null;
 }): Array<Record<string, unknown>> {
-  const { providerId, profileSlug, normalizedLeadLinkedInUrl } = params;
+  const { providerId, attendeeId, profileSlug, normalizedLeadLinkedInUrl } = params;
   const variants: Array<Record<string, unknown>> = [
     { provider_id: providerId },
     { recipient_provider_id: providerId },
@@ -189,7 +196,141 @@ function buildRecipientTargetVariants(params: {
     );
   }
 
+  const cleanAttendeeId = String(attendeeId ?? "").trim();
+  if (cleanAttendeeId) {
+    variants.unshift(
+      { attendee_id: cleanAttendeeId },
+      { participant_id: cleanAttendeeId },
+      { recipient_attendee_id: cleanAttendeeId }
+    );
+  }
+
   return variants;
+}
+
+function extractAttendeeIdFromCandidate(candidate: Record<string, unknown>): string | null {
+  return getFirstString(candidate, [
+    ["attendee_id"],
+    ["attendeeId"],
+    ["participant_id"],
+    ["participantId"],
+    ["user_id"],
+    ["userId"],
+    ["id"],
+  ]);
+}
+
+function extractProviderIdFromCandidate(candidate: Record<string, unknown>): string | null {
+  return getFirstString(candidate, [
+    ["provider_id"],
+    ["providerId"],
+    ["user_provider_id"],
+    ["userProviderId"],
+    ["profile", "provider_id"],
+    ["profile", "providerId"],
+  ]);
+}
+
+function extractNormalizedLinkedinFromCandidate(candidate: Record<string, unknown>): string | null {
+  return normalizeLinkedInUrl(
+    getFirstString(candidate, [
+      ["linkedin_url"],
+      ["linkedinUrl"],
+      ["profile_url"],
+      ["profileUrl"],
+      ["public_profile_url"],
+      ["publicProfileUrl"],
+      ["url"],
+      ["profile", "url"],
+    ])
+  );
+}
+
+async function resolveRecipientAttendeeId(params: {
+  base: string;
+  apiKey: string;
+  unipileAccountId: string;
+  providerId: string;
+  normalizedLeadLinkedInUrl: string | null;
+  profileSlug: string | null;
+}): Promise<string | null> {
+  const {
+    base,
+    apiKey,
+    unipileAccountId,
+    providerId,
+    normalizedLeadLinkedInUrl,
+    profileSlug,
+  } = params;
+
+  const accountId = encodeURIComponent(unipileAccountId);
+  const encodedProviderId = encodeURIComponent(providerId);
+  const encodedLinkedInUrl = normalizedLeadLinkedInUrl
+    ? encodeURIComponent(normalizedLeadLinkedInUrl)
+    : null;
+  const encodedSlug = profileSlug ? encodeURIComponent(profileSlug) : null;
+
+  const endpointCandidates = [
+    `${base}/api/v1/attendees?account_id=${accountId}&provider_id=${encodedProviderId}`,
+    `${base}/api/v1/attendees?account_id=${accountId}&user_provider_id=${encodedProviderId}`,
+    `${base}/api/v1/attendees?account_id=${accountId}&id=${encodedProviderId}`,
+    ...(encodedLinkedInUrl
+      ? [
+          `${base}/api/v1/attendees?account_id=${accountId}&linkedin_url=${encodedLinkedInUrl}`,
+          `${base}/api/v1/attendees?account_id=${accountId}&profile_url=${encodedLinkedInUrl}`,
+        ]
+      : []),
+    ...(encodedSlug
+      ? [
+          `${base}/api/v1/attendees?account_id=${accountId}&public_identifier=${encodedSlug}`,
+          `${base}/api/v1/attendees?account_id=${accountId}&profile_slug=${encodedSlug}`,
+        ]
+      : []),
+    `${base}/api/v1/attendees?account_id=${accountId}&limit=200`,
+  ];
+
+  for (const endpoint of endpointCandidates) {
+    const res = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        "X-API-KEY": apiKey,
+        accept: "application/json",
+      },
+    }).catch(() => null);
+
+    if (!res || !res.ok) continue;
+    const payload = await readResponseBody(res);
+    const candidates = [
+      toJsonObject(payload),
+      ...extractArrayCandidates(payload).map((entry) => toJsonObject(entry)),
+    ];
+
+    let fallbackAttendeeId: string | null = null;
+    for (const candidate of candidates) {
+      const attendeeId = extractAttendeeIdFromCandidate(candidate);
+      if (!attendeeId) continue;
+      if (!fallbackAttendeeId) fallbackAttendeeId = attendeeId;
+
+      const candidateProviderId = extractProviderIdFromCandidate(candidate);
+      if (candidateProviderId && candidateProviderId === providerId) {
+        return attendeeId;
+      }
+
+      const candidateLinkedInUrl = extractNormalizedLinkedinFromCandidate(candidate);
+      if (candidateLinkedInUrl && normalizedLeadLinkedInUrl && candidateLinkedInUrl === normalizedLeadLinkedInUrl) {
+        return attendeeId;
+      }
+
+      const candidateSlug = extractLinkedInProfileSlug(candidateLinkedInUrl);
+      if (candidateSlug && profileSlug && candidateSlug === profileSlug) {
+        return attendeeId;
+      }
+    }
+
+    if (fallbackAttendeeId) return fallbackAttendeeId;
+  }
+
+  return null;
 }
 
 async function postFirstSuccessful(
@@ -725,8 +866,18 @@ export async function POST(req: Request) {
         );
       }
 
+      const resolvedAttendeeId = await resolveRecipientAttendeeId({
+        base,
+        apiKey,
+        unipileAccountId,
+        providerId,
+        normalizedLeadLinkedInUrl,
+        profileSlug,
+      });
+
       const targetVariants = buildRecipientTargetVariants({
         providerId,
+        attendeeId: resolvedAttendeeId,
         profileSlug,
         normalizedLeadLinkedInUrl,
       });
