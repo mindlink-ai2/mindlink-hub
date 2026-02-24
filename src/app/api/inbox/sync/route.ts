@@ -577,7 +577,15 @@ export async function POST() {
         let messageSenderLinkedInUrl = parsedMessage.senderLinkedInUrl;
         let messageSenderAvatar = extractMessageSenderAvatar(messageItem);
 
-        if ((!messageSenderName || !messageSenderLinkedInUrl || !messageSenderAvatar) && senderAttendeeId) {
+        if (parsedMessage.direction === "outbound") {
+          messageSenderName = null;
+        }
+
+        if (
+          parsedMessage.direction === "inbound" &&
+          (!messageSenderName || !messageSenderLinkedInUrl || !messageSenderAvatar) &&
+          senderAttendeeId
+        ) {
           const cacheKey = `${unipileAccountId}:${parsedThread.unipileThreadId}:${senderAttendeeId}`;
           if (!attendeeResolutionCache.has(cacheKey)) {
             attendeeResolutionCache.set(
@@ -686,6 +694,9 @@ export async function POST() {
               : "";
 
           const existingPatch: Record<string, unknown> = {};
+          if (parsedMessage.direction === "outbound" && existingSenderName) {
+            existingPatch.sender_name = null;
+          }
           if (!existingSenderName && messageSenderName) {
             existingPatch.sender_name = messageSenderName;
           }
@@ -725,7 +736,7 @@ export async function POST() {
           unipile_thread_id: parsedMessage.unipileThreadId ?? parsedThread.unipileThreadId,
           unipile_message_id: parsedMessage.unipileMessageId,
           direction: parsedMessage.direction,
-          sender_name: messageSenderName,
+          sender_name: parsedMessage.direction === "outbound" ? null : messageSenderName,
           sender_linkedin_url: messageSenderLinkedInUrl,
           text: parsedMessage.text,
           sent_at: parsedMessage.sentAtIso,

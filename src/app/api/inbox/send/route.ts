@@ -129,7 +129,7 @@ export async function POST(req: Request) {
       unipile_thread_id: unipileThreadId,
       unipile_message_id: parsedMessage.unipileMessageId,
       direction: "outbound",
-      sender_name: parsedMessage.senderName,
+      sender_name: null,
       sender_linkedin_url: parsedMessage.senderLinkedInUrl,
       text,
       sent_at: sentAt,

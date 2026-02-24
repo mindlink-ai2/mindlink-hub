@@ -567,7 +567,11 @@ async function handleNewMessage(params: {
   let senderLinkedInUrl = parsed.senderLinkedInUrl;
   let senderAvatarUrl = extractSenderAvatarFromPayload(payload);
 
-  if ((!senderName || !senderLinkedInUrl || !senderAvatarUrl) && senderAttendeeId) {
+  if (
+    parsed.direction === "inbound" &&
+    (!senderName || !senderLinkedInUrl || !senderAvatarUrl) &&
+    senderAttendeeId
+  ) {
     const resolvedAttendee = await resolveAttendeeForMessage({
       supabase,
       clientId,
@@ -585,6 +589,10 @@ async function handleNewMessage(params: {
         senderAvatarUrl = resolvedAttendee.avatarUrl;
       }
     }
+  }
+
+  if (parsed.direction === "outbound") {
+    senderName = null;
   }
 
   const parsedWithResolvedSender: ParsedUnipileEvent = {
@@ -662,7 +670,7 @@ async function handleNewMessage(params: {
     unipile_thread_id: parsedWithResolvedSender.unipileThreadId,
     unipile_message_id: parsedWithResolvedSender.unipileMessageId,
     direction: parsed.direction,
-    sender_name: senderName,
+    sender_name: parsed.direction === "outbound" ? null : senderName,
     sender_linkedin_url: senderLinkedInUrl,
     text: parsed.text,
     sent_at: parsed.sentAtIso,
