@@ -444,7 +444,6 @@ export async function POST() {
         provider: "linkedin",
         unipile_account_id: unipileAccountId,
         unipile_thread_id: parsedThread.unipileThreadId,
-        unread_count: 0,
         updated_at: new Date().toISOString(),
       };
 
@@ -480,7 +479,7 @@ export async function POST() {
 
       const { data: dbThread } = await supabase
         .from("inbox_threads")
-        .select("id, contact_name, contact_avatar_url")
+        .select("id, unread_count, last_read_at, contact_name, contact_avatar_url")
         .eq("client_id", clientId)
         .eq("unipile_account_id", unipileAccountId)
         .eq("unipile_thread_id", parsedThread.unipileThreadId)
@@ -488,6 +487,11 @@ export async function POST() {
         .maybeSingle();
 
       if (!dbThread?.id) continue;
+      const threadLastReadAtMs = parseIsoMs(
+        typeof dbThread.last_read_at === "string" ? dbThread.last_read_at : null
+      );
+      const threadUnreadCount = Number(dbThread.unread_count ?? 0);
+      let unreadIncrement = 0;
 
       const messagesResult = await fetchFirstSuccessful(
         [
@@ -733,6 +737,14 @@ export async function POST() {
           continue;
         }
 
+        const shouldIncrementUnread =
+          parsedMessage.direction === "inbound" &&
+          (threadLastReadAtMs === Number.NEGATIVE_INFINITY ||
+            messageSentAtMs > threadLastReadAtMs);
+        if (shouldIncrementUnread) {
+          unreadIncrement += 1;
+        }
+
         messagesInserted += 1;
       }
 
@@ -756,6 +768,11 @@ export async function POST() {
 
       if (!existingContactAvatar && backfillContactAvatarUrl) {
         threadUpdatePayload.contact_avatar_url = backfillContactAvatarUrl;
+      }
+
+      if (unreadIncrement > 0) {
+        const safeThreadUnread = Number.isFinite(threadUnreadCount) ? threadUnreadCount : 0;
+        threadUpdatePayload.unread_count = safeThreadUnread + unreadIncrement;
       }
 
       if (Object.keys(threadUpdatePayload).length === 0) {

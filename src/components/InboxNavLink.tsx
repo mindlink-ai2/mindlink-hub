@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { INBOX_GLOBAL_SYNC_EVENT, INBOX_SYNC_INTERVAL_MS } from "@/lib/inbox-events";
 import { supabase } from "@/lib/supabase";
 
 function formatUnreadTotal(total: number): string {
@@ -73,6 +74,39 @@ export default function InboxNavLink() {
 
     return () => {
       void supabase.removeChannel(channel);
+    };
+  }, [clientId, loadUnreadCount]);
+
+  useEffect(() => {
+    if (!clientId) return;
+
+    const handleGlobalInboxSync = () => {
+      void loadUnreadCount();
+    };
+
+    window.addEventListener(INBOX_GLOBAL_SYNC_EVENT, handleGlobalInboxSync);
+
+    return () => {
+      window.removeEventListener(INBOX_GLOBAL_SYNC_EVENT, handleGlobalInboxSync);
+    };
+  }, [clientId, loadUnreadCount]);
+
+  useEffect(() => {
+    if (!clientId) return;
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      void loadUnreadCount();
+    };
+
+    refreshIfVisible();
+
+    const intervalId = window.setInterval(refreshIfVisible, INBOX_SYNC_INTERVAL_MS);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
     };
   }, [clientId, loadUnreadCount]);
 
