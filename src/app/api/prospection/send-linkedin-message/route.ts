@@ -77,16 +77,16 @@ function extractProviderId(payload: unknown): string | null {
   return getFirstString(data, [
     ["provider_id"],
     ["providerId"],
-    ["id"],
     ["data", "provider_id"],
     ["data", "providerId"],
-    ["data", "id"],
     ["user", "provider_id"],
     ["user", "providerId"],
-    ["user", "id"],
     ["profile", "provider_id"],
     ["profile", "providerId"],
-    ["profile", "id"],
+    ["data", "user", "provider_id"],
+    ["data", "user", "providerId"],
+    ["data", "profile", "provider_id"],
+    ["data", "profile", "providerId"],
   ]);
 }
 
@@ -104,6 +104,33 @@ function getErrorMessage(payload: unknown): string | null {
     return clean || null;
   }
   return null;
+}
+
+type ConversationFailure = {
+  endpoint: string;
+  status: number;
+  details: string | null;
+};
+
+function buildConversationCreateUserMessage(rawDetails: string | null): string {
+  const defaultMessage = "Impossible d’envoyer : création de conversation LinkedIn échouée.";
+  if (!rawDetails) return defaultMessage;
+
+  const details = rawDetails.trim();
+  if (!details) return defaultMessage;
+  const normalized = details.toLowerCase();
+
+  if (
+    normalized.includes("not connected") ||
+    normalized.includes("not a 1st degree") ||
+    normalized.includes("invitation") ||
+    normalized.includes("relation") ||
+    normalized.includes("connection")
+  ) {
+    return "Impossible d’envoyer : le prospect doit d’abord accepter votre invitation LinkedIn.";
+  }
+
+  return `Impossible d’envoyer : ${details}`;
 }
 
 function dedupeBodies(candidates: Record<string, unknown>[]): Record<string, unknown>[] {
@@ -343,7 +370,6 @@ async function persistOutboundMessage(params: {
   text: string;
   sentAt: string;
   payload: unknown;
-  senderName: string | null;
   senderLinkedInUrl: string | null;
 }) {
   const {
@@ -356,7 +382,6 @@ async function persistOutboundMessage(params: {
     text,
     sentAt,
     payload,
-    senderName,
     senderLinkedInUrl,
   } = params;
 
@@ -388,7 +413,7 @@ async function persistOutboundMessage(params: {
       unipile_thread_id: unipileThreadId,
       unipile_message_id: unipileMessageId,
       direction: "outbound",
-      sender_name: senderName,
+      sender_name: null,
       sender_linkedin_url: senderLinkedInUrl,
       text,
       sent_at: sentAt,
@@ -432,7 +457,7 @@ async function createConversationThreadId(params: {
   apiKey: string;
   unipileAccountId: string;
   providerId: string;
-}): Promise<string | null> {
+}): Promise<{ threadId: string | null; failures: ConversationFailure[] }> {
   const { base, apiKey, unipileAccountId, providerId } = params;
 
   const endpointCandidates = [
@@ -450,7 +475,7 @@ async function createConversationThreadId(params: {
     { account_id: unipileAccountId, provider_ids: [providerId] },
   ]);
 
-  const failures: Array<{ endpoint: string; details: string | null; status: number }> = [];
+  const failures: ConversationFailure[] = [];
 
   for (const endpoint of endpointCandidates) {
     for (const body of bodyCandidates) {
@@ -475,7 +500,7 @@ async function createConversationThreadId(params: {
       }
 
       const threadId = extractThreadId(payload);
-      if (threadId) return threadId;
+      if (threadId) return { threadId, failures };
     }
   }
 
@@ -487,7 +512,7 @@ async function createConversationThreadId(params: {
     });
   }
 
-  return null;
+  return { threadId: null, failures };
 }
 
 async function updateLeadSentMetadata(
@@ -666,12 +691,13 @@ export async function POST(req: Request) {
         );
       }
 
-      const createdThreadId = await createConversationThreadId({
+      const conversationCreate = await createConversationThreadId({
         base,
         apiKey,
         unipileAccountId,
         providerId,
       });
+      const createdThreadId = conversationCreate.threadId;
 
       if (createdThreadId) {
         const ensured = await ensureThreadRow({
@@ -757,11 +783,20 @@ export async function POST(req: Request) {
             providerId,
             failures: directSendFailures.slice(0, 8),
           });
+          const combinedFailures = [
+            ...conversationCreate.failures,
+            ...directSendFailures.map((failure) => ({
+              endpoint: `${base}/api/v1/messages`,
+              status: failure.status,
+              details: failure.details,
+            })),
+          ];
+          const firstDetail = combinedFailures.find((failure) => failure.details)?.details ?? null;
           return NextResponse.json(
             {
               ok: false,
               status: "conversation_create_failed",
-              message: "Impossible d’envoyer : création de conversation LinkedIn échouée.",
+              message: buildConversationCreateUserMessage(firstDetail),
             },
             { status: 502 }
           );
@@ -820,7 +855,6 @@ export async function POST(req: Request) {
           text: content,
           sentAt: parsedDirectMessage.sentAtIso,
           payload: directSend.payload,
-          senderName: parsedDirectMessage.senderName,
           senderLinkedInUrl: parsedDirectMessage.senderLinkedInUrl,
         });
 
@@ -874,7 +908,6 @@ export async function POST(req: Request) {
       text: content,
       sentAt: sent.sentAt,
       payload: sent.payload,
-      senderName: sent.senderName,
       senderLinkedInUrl: sent.senderLinkedInUrl,
     });
 
