@@ -130,6 +130,14 @@ function buildConversationCreateUserMessage(rawDetails: string | null): string {
     return "Impossible d’envoyer : le prospect doit d’abord accepter votre invitation LinkedIn.";
   }
 
+  if (
+    normalized === "not found" ||
+    normalized.includes("not found") ||
+    normalized.includes("404")
+  ) {
+    return "Impossible d’envoyer : prospect introuvable côté messagerie LinkedIn (souvent pas encore connecté).";
+  }
+
   return `Impossible d’envoyer : ${details}`;
 }
 
@@ -147,8 +155,13 @@ function dedupeBodies(candidates: Record<string, unknown>[]): Record<string, unk
   return unique;
 }
 
-function buildRecipientTargetVariants(providerId: string): Array<Record<string, unknown>> {
-  return [
+function buildRecipientTargetVariants(params: {
+  providerId: string;
+  profileSlug?: string | null;
+  normalizedLeadLinkedInUrl?: string | null;
+}): Array<Record<string, unknown>> {
+  const { providerId, profileSlug, normalizedLeadLinkedInUrl } = params;
+  const variants: Array<Record<string, unknown>> = [
     { provider_id: providerId },
     { recipient_provider_id: providerId },
     { attendee_id: providerId },
@@ -156,6 +169,27 @@ function buildRecipientTargetVariants(providerId: string): Array<Record<string, 
     { user_id: providerId },
     { id: providerId },
   ];
+
+  const normalizedUrl = String(normalizedLeadLinkedInUrl ?? "").trim();
+  if (normalizedUrl) {
+    variants.push(
+      { linkedin_url: normalizedUrl },
+      { profile_url: normalizedUrl },
+      { recipient_linkedin_url: normalizedUrl },
+      { recipient_profile_url: normalizedUrl }
+    );
+  }
+
+  const slug = String(profileSlug ?? "").trim();
+  if (slug) {
+    variants.push(
+      { public_identifier: slug },
+      { profile_slug: slug },
+      { username: slug }
+    );
+  }
+
+  return variants;
 }
 
 async function postFirstSuccessful(
@@ -457,15 +491,15 @@ async function createConversationThreadId(params: {
   apiKey: string;
   unipileAccountId: string;
   providerId: string;
+  targetVariants: Array<Record<string, unknown>>;
 }): Promise<{ threadId: string | null; failures: ConversationFailure[] }> {
-  const { base, apiKey, unipileAccountId, providerId } = params;
+  const { base, apiKey, unipileAccountId, providerId, targetVariants } = params;
 
   const endpointCandidates = [
     `${base}/api/v1/chats`,
     `${base}/api/v1/conversations`,
   ];
 
-  const targetVariants = buildRecipientTargetVariants(providerId);
   const bodyCandidates: Record<string, unknown>[] = dedupeBodies([
     ...targetVariants.map((target) => ({ account_id: unipileAccountId, ...target })),
     ...targetVariants.map((target) => ({ account_id: unipileAccountId, attendees: [target] })),
@@ -691,11 +725,18 @@ export async function POST(req: Request) {
         );
       }
 
+      const targetVariants = buildRecipientTargetVariants({
+        providerId,
+        profileSlug,
+        normalizedLeadLinkedInUrl,
+      });
+
       const conversationCreate = await createConversationThreadId({
         base,
         apiKey,
         unipileAccountId,
         providerId,
+        targetVariants,
       });
       const createdThreadId = conversationCreate.threadId;
 
@@ -722,27 +763,27 @@ export async function POST(req: Request) {
       } else {
         // Fallback: certains comptes Unipile créent implicitement la conversation à l'envoi.
         const directSendBodies = dedupeBodies([
-          ...buildRecipientTargetVariants(providerId).map((target) => ({
+          ...targetVariants.map((target) => ({
             account_id: unipileAccountId,
             text: content,
             ...target,
           })),
-          ...buildRecipientTargetVariants(providerId).map((target) => ({
+          ...targetVariants.map((target) => ({
             account_id: unipileAccountId,
             message: content,
             ...target,
           })),
-          ...buildRecipientTargetVariants(providerId).map((target) => ({
+          ...targetVariants.map((target) => ({
             account_id: unipileAccountId,
             content,
             ...target,
           })),
-          ...buildRecipientTargetVariants(providerId).map((target) => ({
+          ...targetVariants.map((target) => ({
             account_id: unipileAccountId,
             text: content,
             attendees: [target],
           })),
-          ...buildRecipientTargetVariants(providerId).map((target) => ({
+          ...targetVariants.map((target) => ({
             account_id: unipileAccountId,
             text: content,
             participants: [target],
