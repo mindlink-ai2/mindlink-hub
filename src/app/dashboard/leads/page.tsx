@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
-import { AlertTriangle, Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2, X } from "lucide-react";
+import { AlertTriangle, Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2 } from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -1309,8 +1309,9 @@ export default function LeadsPage() {
           {openLead && (
             <>
               <div
-                className="pointer-events-none fixed inset-0 z-[80] bg-[#0F172A]/38 backdrop-blur-[3px]"
+                className="fixed inset-0 z-[80] bg-[#0F172A]/38 backdrop-blur-[3px]"
                 aria-hidden="true"
+                onClick={() => setOpenLead(null)}
               />
 
               <div className="animate-slideLeft fixed inset-y-0 right-0 z-[90] flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
@@ -1320,14 +1321,6 @@ export default function LeadsPage() {
                       <HubButton type="button" variant="ghost" size="sm" onClick={() => setOpenLead(null)}>
                         Fermer
                       </HubButton>
-                      <button
-                        type="button"
-                        onClick={() => setOpenLead(null)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#dbe5f3] bg-white text-[#4B5563] transition hover:bg-[#f8fbff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
-                        aria-label="Fermer le panneau"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
                     </div>
                     <span className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
                       {plan || "essential"}
