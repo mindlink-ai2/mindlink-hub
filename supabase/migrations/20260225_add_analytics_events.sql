@@ -275,18 +275,18 @@ with filtered as (
 ),
 steps as (
   select
-    count(distinct e.session_id)::bigint filter (
+    count(distinct e.session_id) filter (
       where e.event_name = 'page_view'
         and e.page_path like '/onboarding%'
-    ) as step_1,
-    count(distinct e.session_id)::bigint filter (
+    )::bigint as step_1,
+    count(distinct e.session_id) filter (
       where e.event_name = 'form_submit'
         and (
           coalesce(e.metadata->>'form', '') in ('onboarding', 'onboarding_form')
           or coalesce(e.page_path, '') like '/onboarding%'
         )
-    ) as step_2,
-    count(distinct e.session_id)::bigint filter (
+    )::bigint as step_2,
+    count(distinct e.session_id) filter (
       where e.event_name = 'feature_used'
         and coalesce(e.metadata->>'feature', '') in (
           'first_action',
@@ -294,7 +294,7 @@ steps as (
           'open_inbox',
           'create_leads_export'
         )
-    ) as step_3
+    )::bigint as step_3
   from filtered e
 )
 select
