@@ -362,9 +362,9 @@ export default function FollowupsPage() {
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
-        <div className="relative min-h-screen">
+        <div className="relative h-full min-h-0">
 
-          <div className="mx-auto w-full max-w-[1680px] px-4 py-6 sm:px-6 sm:py-7">
+          <div className="mx-auto h-full min-h-0 w-full max-w-[1680px] px-4 py-6 sm:px-6 sm:py-7">
             {!loaded ? (
               renderSkeleton()
             ) : (

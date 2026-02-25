@@ -227,7 +227,7 @@ export default function DashboardPage() {
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <div className="min-h-screen w-full bg-[linear-gradient(180deg,#f4f8ff_0%,#eef4ff_45%,#f7faff_100%)] px-4 pb-24 pt-8 sm:px-6">
+      <div className="h-full min-h-0 w-full bg-[linear-gradient(180deg,#f4f8ff_0%,#eef4ff_45%,#f7faff_100%)] px-4 pb-24 pt-8 sm:px-6">
         <div className="mx-auto w-full max-w-7xl space-y-8">
           <section className="relative overflow-hidden rounded-3xl border border-[#d8e4f8] bg-white/90 p-6 shadow-[0_30px_60px_-42px_rgba(22,64,128,0.6)] md:p-8">
             <div className="pointer-events-none absolute inset-0">

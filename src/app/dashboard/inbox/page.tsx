@@ -596,8 +596,8 @@ export default function InboxPage() {
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <div className="min-h-screen px-4 pb-14 pt-4 sm:px-6 sm:pt-5">
-        <div className="mx-auto w-full max-w-[1680px] space-y-3">
+      <div className="h-full min-h-0 px-4 pb-14 pt-4 sm:px-6 sm:pt-5">
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-3">
           <section className="hub-card-hero p-3 sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -637,8 +637,8 @@ export default function InboxPage() {
             ) : null}
           </section>
 
-          <section className="grid gap-3 xl:grid-cols-[330px_minmax(0,1fr)]">
-            <div className="hub-card overflow-hidden">
+          <section className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[330px_minmax(0,1fr)]">
+            <div className="hub-card flex min-h-0 flex-col overflow-hidden">
               <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
                 <h2 className="text-sm font-semibold text-[#0b1c33]">Conversations</h2>
               </div>
@@ -652,7 +652,7 @@ export default function InboxPage() {
                 />
               </div>
 
-              <div className="max-h-[64vh] overflow-y-auto p-3">
+              <div className="min-h-0 flex-1 overflow-y-auto p-3">
                 {loadingThreads ? (
                   <div className="p-3 text-sm text-[#51627b]">Chargement des threads…</div>
                 ) : threads.length === 0 ? (
@@ -730,7 +730,7 @@ export default function InboxPage() {
               </div>
             </div>
 
-            <div className="hub-card overflow-hidden">
+            <div className="hub-card flex min-h-0 flex-col overflow-hidden">
               <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
@@ -755,7 +755,7 @@ export default function InboxPage() {
                 <>
                   <div
                     ref={messagesViewportRef}
-                    className="max-h-[44vh] overflow-y-auto p-4 sm:max-h-[48vh] xl:max-h-[52vh]"
+                    className="min-h-0 flex-1 overflow-y-auto p-4"
                   >
                     {loadingMessages ? (
                       <div className="text-sm text-[#51627b]">Chargement des messages…</div>

@@ -760,7 +760,7 @@ export default function LeadsPage() {
 
   if (!clientLoaded) {
     return (
-      <div className="min-h-screen w-full px-4 pb-24 pt-10 sm:px-6">
+      <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
         <div className="mx-auto w-full max-w-[1680px]">
           <div className="hub-card-hero p-6 sm:p-7">
             <div className="flex items-center justify-between gap-4">
@@ -804,15 +804,15 @@ export default function LeadsPage() {
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
-        <div className="relative min-h-screen w-full px-4 pb-24 pt-4 sm:px-6 sm:pt-5">
-          <div className="mx-auto w-full max-w-[1680px] space-y-5">
+        <div className="relative h-full min-h-0 w-full px-4 pb-24 pt-4 sm:px-6 sm:pt-5">
+          <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-5">
             <section className="hub-card-hero relative overflow-hidden p-4 sm:p-5">
               <div className="pointer-events-none absolute inset-0">
                 <div className="absolute -left-16 top-[-120px] h-64 w-64 rounded-full bg-[#dce8ff]/70 blur-3xl" />
                 <div className="absolute -right-20 top-[-140px] h-72 w-72 rounded-full bg-[#d8f4ff]/65 blur-3xl" />
               </div>
 
-              <div className="relative grid gap-4 xl:grid-cols-[1.42fr_0.78fr]">
+              <div className="relative grid gap-4 lg:grid-cols-[1.42fr_0.78fr]">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
@@ -844,7 +844,7 @@ export default function LeadsPage() {
                     </span>
                   </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
+                  <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
                     <Metric title="Total leads" value={total} tone="default" />
                     <Metric title="Traités" value={treatedCount} tone="success" />
                     <Metric title="En attente" value={pendingCount} tone="info" />
@@ -966,7 +966,7 @@ export default function LeadsPage() {
               </div>
             </section>
 
-            <section className="hub-card overflow-hidden">
+            <section className="hub-card flex min-h-0 flex-1 flex-col overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d7e3f4] bg-[#f8fbff] px-6 py-4">
                 <div className="min-w-0">
                   <h2 className="text-sm font-semibold text-[#0b1c33]">Table des leads</h2>
@@ -988,7 +988,7 @@ export default function LeadsPage() {
                 </div>
               </div>
 
-              <div className="w-full overflow-x-auto px-2 pb-2 pt-1">
+              <div className="min-h-0 flex-1 w-full overflow-auto px-2 pb-2 pt-1">
                 <table className="min-w-[1080px] w-full table-fixed border-separate [border-spacing:0_6px] text-[13px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="text-[11px] font-medium tracking-[0.02em] text-[#405770]">
