@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
+import { trackFeatureUsed } from "@/lib/analytics/client";
 import { AlertTriangle, Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2 } from "lucide-react";
 
 type Lead = {
@@ -331,6 +332,12 @@ export default function LeadsPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+
+      trackFeatureUsed("create_leads_export", {
+        source: "prospection",
+        mode: "selected",
+        count: ids.length,
+      });
     } catch (e) {
       console.error(e);
       alert("Erreur réseau pendant l'export.");
@@ -642,6 +649,11 @@ export default function LeadsPage() {
           : l
       )
     );
+
+    trackFeatureUsed("send_linkedin_message", {
+      source: "prospection",
+      mode: "manual_mark_sent",
+    });
   };
 
   // ✅ Email actions — now for everyone (no premium gating)
@@ -930,7 +942,17 @@ export default function LeadsPage() {
 
                     <div className="mt-3">
                       <HubButton asChild variant="secondary" size="sm" className="w-full">
-                        <a href="/dashboard/leads/export">Exporter tout en CSV</a>
+                        <a
+                          href="/dashboard/leads/export"
+                          onClick={() =>
+                            trackFeatureUsed("create_leads_export", {
+                              source: "prospection",
+                              mode: "all",
+                            })
+                          }
+                        >
+                          Exporter tout en CSV
+                        </a>
                       </HubButton>
                     </div>
 
