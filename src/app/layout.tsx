@@ -215,7 +215,7 @@ export default async function RootLayout({
             </header>
 
             {/* 🔵 PAGE CONTENT */}
-            <main className="flex-1">
+            <main className="flex min-h-0 flex-1">
               <DashboardContainer>{children}</DashboardContainer>
             </main>
 
