@@ -162,6 +162,8 @@ export default function InboxPage() {
   const [threadSearch, setThreadSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
+  const [availableHeight, setAvailableHeight] = useState<number | null>(null);
+  const pageContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
   const shouldScrollToBottomRef = useRef(false);
   const loadedMessagesThreadIdRef = useRef<string | null>(null);
@@ -190,6 +192,16 @@ export default function InboxPage() {
     const viewport = messagesViewportRef.current;
     if (!viewport) return;
     viewport.scrollTo({ top: viewport.scrollHeight, behavior });
+  }, []);
+
+  const updateAvailableHeight = useCallback(() => {
+    const container = pageContainerRef.current;
+    if (!container) return;
+
+    const top = container.getBoundingClientRect().top;
+    const nextHeight = Math.max(360, Math.floor(window.innerHeight - top - 8));
+
+    setAvailableHeight((prev) => (prev === nextHeight ? prev : nextHeight));
   }, []);
 
   const handleOpenSelectedThreadLinkedInProfile = useCallback(() => {
@@ -326,6 +338,18 @@ export default function InboxPage() {
       window.setTimeout(() => scrollMessagesToBottom("auto"), 60);
     });
   }, [selectedThreadId, loadingMessages, messages, scrollMessagesToBottom]);
+
+  useEffect(() => {
+    updateAvailableHeight();
+
+    window.addEventListener("resize", updateAvailableHeight);
+    window.addEventListener("orientationchange", updateAvailableHeight);
+
+    return () => {
+      window.removeEventListener("resize", updateAvailableHeight);
+      window.removeEventListener("orientationchange", updateAvailableHeight);
+    };
+  }, [updateAvailableHeight]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -599,7 +623,11 @@ export default function InboxPage() {
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <div className="flex h-full min-h-0 flex-col px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
+      <div
+        ref={pageContainerRef}
+        className="flex min-h-0 flex-col overflow-hidden px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5"
+        style={availableHeight ? { height: `${availableHeight}px` } : undefined}
+      >
         <div className="mx-auto flex min-h-0 w-full max-w-[1680px] flex-1 flex-col gap-3">
           <section className="hub-card-hero p-3 sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -640,13 +668,13 @@ export default function InboxPage() {
             ) : null}
           </section>
 
-          <section className="grid min-h-0 flex-1 gap-3 md:grid-cols-[330px_minmax(0,1fr)]">
+          <section className="grid min-h-0 flex-1 gap-3 overflow-hidden md:grid-cols-[330px_minmax(0,1fr)]">
             <div className="hub-card flex min-h-0 flex-col overflow-hidden">
-              <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
+              <div className="shrink-0 border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
                 <h2 className="text-sm font-semibold text-[#0b1c33]">Conversations</h2>
               </div>
 
-              <div className="border-b border-[#d7e3f4] bg-[#f8fbff] p-3">
+              <div className="shrink-0 border-b border-[#d7e3f4] bg-[#f8fbff] p-3">
                 <input
                   value={threadSearch}
                   onChange={(event) => setThreadSearch(event.target.value)}
@@ -734,7 +762,7 @@ export default function InboxPage() {
             </div>
 
             <div className="hub-card flex min-h-0 flex-col overflow-hidden">
-              <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
+              <div className="shrink-0 border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
                   {selectedThreadLinkedInUrl ? (
@@ -812,7 +840,7 @@ export default function InboxPage() {
                     )}
                   </div>
 
-                  <div className="border-t border-[#d7e3f4] bg-[#f8fbff] p-3">
+                  <div className="shrink-0 border-t border-[#d7e3f4] bg-[#f8fbff] p-3">
                     <div className="flex items-end gap-2">
                       <textarea
                         value={draft}
