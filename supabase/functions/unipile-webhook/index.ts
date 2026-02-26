@@ -1,7 +1,16 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { extractLinkedInProfileSlug, requireEnv } from "../_shared/unipile.ts";
+import {
+  extractLinkedInProfileSlug,
+  normalizeUnipileBase,
+  requireEnv,
+  sendUnipileMessage,
+} from "../_shared/unipile.ts";
 
 type JsonObject = Record<string, unknown>;
+type AcceptedResolution = {
+  invitationId: string;
+  leadId: string;
+};
 
 function asObject(value: unknown): JsonObject {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -175,12 +184,265 @@ async function buildDraftPayload(params: {
   };
 }
 
+async function isClientFullActivePlan(
+  supabase: ReturnType<typeof createClient>,
+  clientId: string
+): Promise<boolean> {
+  const { data: client } = await supabase
+    .from("clients")
+    .select("plan, subscription_status")
+    .eq("id", clientId)
+    .limit(1)
+    .maybeSingle();
+
+  if (!client) return false;
+
+  const plan = String(client.plan ?? "").trim().toLowerCase();
+  const subscriptionStatus = String(client.subscription_status ?? "")
+    .trim()
+    .toLowerCase();
+  return plan === "full" && subscriptionStatus === "active";
+}
+
+async function resolveThreadForAutoSend(params: {
+  supabase: ReturnType<typeof createClient>;
+  clientId: string;
+  leadId: string;
+  unipileAccountId: string;
+  payload: JsonObject;
+}): Promise<{ threadDbId: string; unipileThreadId: string } | null> {
+  const { supabase, clientId, leadId, unipileAccountId, payload } = params;
+
+  const threadIdFromPayload = firstString(payload, [
+    ["thread_id"],
+    ["threadId"],
+    ["conversation_id"],
+    ["conversationId"],
+    ["chat_id"],
+    ["chatId"],
+    ["data", "thread_id"],
+    ["data", "conversation_id"],
+    ["message", "thread_id"],
+    ["message", "conversation_id"],
+  ]);
+
+  if (threadIdFromPayload) {
+    await supabase.from("inbox_threads").upsert(
+      {
+        client_id: clientId,
+        provider: "linkedin",
+        lead_id: leadId,
+        unipile_account_id: unipileAccountId,
+        unipile_thread_id: threadIdFromPayload,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "client_id,unipile_account_id,unipile_thread_id" }
+    );
+
+    const { data: threadById } = await supabase
+      .from("inbox_threads")
+      .select("id, unipile_thread_id")
+      .eq("client_id", clientId)
+      .eq("unipile_account_id", unipileAccountId)
+      .eq("unipile_thread_id", threadIdFromPayload)
+      .limit(1)
+      .maybeSingle();
+
+    if (threadById?.id && threadById.unipile_thread_id) {
+      return {
+        threadDbId: String(threadById.id),
+        unipileThreadId: String(threadById.unipile_thread_id),
+      };
+    }
+  }
+
+  const { data: latestThread } = await supabase
+    .from("inbox_threads")
+    .select("id, unipile_thread_id")
+    .eq("client_id", clientId)
+    .eq("lead_id", leadId)
+    .eq("unipile_account_id", unipileAccountId)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!latestThread?.id || !latestThread.unipile_thread_id) return null;
+  return {
+    threadDbId: String(latestThread.id),
+    unipileThreadId: String(latestThread.unipile_thread_id),
+  };
+}
+
+async function autoSendDraftAfterAccepted(params: {
+  supabase: ReturnType<typeof createClient>;
+  clientId: string;
+  invitationId: string;
+  leadId: string;
+  unipileAccountId: string;
+  payload: JsonObject;
+}) {
+  const { supabase, clientId, invitationId, leadId, unipileAccountId, payload } = params;
+
+  const isFullActive = await isClientFullActivePlan(supabase, clientId);
+  if (!isFullActive) return;
+
+  const thread = await resolveThreadForAutoSend({
+    supabase,
+    clientId,
+    leadId,
+    unipileAccountId,
+    payload,
+  });
+
+  if (!thread) {
+    await supabase
+      .from("linkedin_invitations")
+      .update({ last_error: "auto_send_thread_not_found" })
+      .eq("id", invitationId)
+      .eq("client_id", clientId)
+      .eq("dm_draft_status", "draft");
+    return;
+  }
+
+  const provisionalSentAt = new Date().toISOString();
+  const { data: claimed } = await supabase
+    .from("linkedin_invitations")
+    .update({
+      dm_draft_status: "sent",
+      dm_sent_at: provisionalSentAt,
+      last_error: null,
+    })
+    .eq("id", invitationId)
+    .eq("client_id", clientId)
+    .eq("dm_draft_status", "draft")
+    .is("dm_sent_at", null)
+    .select("id, dm_draft_text")
+    .limit(1)
+    .maybeSingle();
+
+  if (!claimed?.id) return;
+
+  const draftText = String(claimed.dm_draft_text ?? "").trim();
+  if (!draftText) {
+    await supabase
+      .from("linkedin_invitations")
+      .update({
+        dm_draft_status: "none",
+        dm_sent_at: null,
+        last_error: "draft_text_empty",
+      })
+      .eq("id", invitationId)
+      .eq("client_id", clientId);
+    return;
+  }
+
+  const unipileBase = normalizeUnipileBase(requireEnv("UNIPILE_DSN"));
+  const unipileApiKey = requireEnv("UNIPILE_API_KEY");
+
+  const sendResult = await sendUnipileMessage({
+    baseUrl: unipileBase,
+    apiKey: unipileApiKey,
+    accountId: unipileAccountId,
+    threadId: thread.unipileThreadId,
+    text: draftText,
+  });
+
+  if (!sendResult.ok) {
+    await supabase
+      .from("linkedin_invitations")
+      .update({
+        dm_draft_status: "draft",
+        dm_sent_at: null,
+        last_error: sendResult.error,
+      })
+      .eq("id", invitationId)
+      .eq("client_id", clientId);
+    return;
+  }
+
+  const payloadObject = asObject(sendResult.payload);
+  const sentAtCandidate =
+    firstString(payloadObject, [
+      ["sent_at"],
+      ["timestamp"],
+      ["created_at"],
+      ["data", "sent_at"],
+      ["data", "timestamp"],
+    ]) ?? provisionalSentAt;
+  const sentAt = Number.isNaN(new Date(sentAtCandidate).getTime())
+    ? provisionalSentAt
+    : new Date(sentAtCandidate).toISOString();
+  const messageId =
+    firstString(payloadObject, [
+      ["message_id"],
+      ["id"],
+      ["provider_id"],
+      ["data", "message_id"],
+      ["data", "id"],
+    ]) ?? `edge-auto-${Date.now()}`;
+
+  const { data: existingMessage } = await supabase
+    .from("inbox_messages")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("unipile_account_id", unipileAccountId)
+    .eq("unipile_message_id", messageId)
+    .limit(1)
+    .maybeSingle();
+
+  if (!existingMessage?.id) {
+    await supabase.from("inbox_messages").insert({
+      client_id: clientId,
+      provider: "linkedin",
+      thread_db_id: thread.threadDbId,
+      unipile_account_id: unipileAccountId,
+      unipile_thread_id: thread.unipileThreadId,
+      unipile_message_id: messageId,
+      direction: "outbound",
+      sender_name: null,
+      sender_linkedin_url: null,
+      text: draftText,
+      sent_at: sentAt,
+      raw: sendResult.payload,
+    });
+  }
+
+  await supabase
+    .from("inbox_threads")
+    .update({
+      last_message_at: sentAt,
+      last_message_preview: truncatePreview(draftText),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", thread.threadDbId)
+    .eq("client_id", clientId);
+
+  await supabase
+    .from("linkedin_invitations")
+    .update({
+      dm_draft_status: "sent",
+      dm_sent_at: sentAt,
+      last_error: null,
+    })
+    .eq("id", invitationId)
+    .eq("client_id", clientId);
+
+  await supabase
+    .from("leads")
+    .update({
+      message_sent: true,
+      message_sent_at: sentAt,
+    })
+    .eq("id", leadId)
+    .eq("client_id", clientId);
+}
+
 async function handleAccepted(params: {
   supabase: ReturnType<typeof createClient>;
   clientId: string;
   unipileAccountId: string;
   payload: JsonObject;
-}) {
+}): Promise<AcceptedResolution | null> {
   const { supabase, clientId, unipileAccountId, payload } = params;
 
   const identityUrl = normalizeLinkedInUrl(
@@ -274,20 +536,34 @@ async function handleAccepted(params: {
       .eq("id", invitationId)
       .eq("client_id", clientId);
 
-    return;
+    if (leadId) {
+      return {
+        invitationId,
+        leadId,
+      };
+    }
+    return null;
   }
 
-  if (!leadId) return;
+  if (!leadId) return null;
 
-  await supabase.from("linkedin_invitations").insert({
-    client_id: clientId,
-    lead_id: leadId,
-    unipile_account_id: unipileAccountId,
-    status: "accepted",
-    accepted_at: acceptedAt,
-    raw: { acceptance: payload },
-    ...draftPayload,
-  });
+  const { data: inserted } = await supabase
+    .from("linkedin_invitations")
+    .insert({
+      client_id: clientId,
+      lead_id: leadId,
+      unipile_account_id: unipileAccountId,
+      status: "accepted",
+      accepted_at: acceptedAt,
+      raw: { acceptance: payload },
+      ...draftPayload,
+    })
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+
+  if (!inserted?.id) return null;
+  return { invitationId: String(inserted.id), leadId };
 }
 
 async function handleInvitationSent(params: {
@@ -498,7 +774,22 @@ Deno.serve(async (req) => {
     }
 
     if (kind === "accepted") {
-      await handleAccepted({ supabase, clientId, unipileAccountId, payload });
+      const accepted = await handleAccepted({
+        supabase,
+        clientId,
+        unipileAccountId,
+        payload,
+      });
+      if (accepted?.invitationId) {
+        await autoSendDraftAfterAccepted({
+          supabase,
+          clientId,
+          invitationId: accepted.invitationId,
+          leadId: accepted.leadId,
+          unipileAccountId,
+          payload,
+        });
+      }
     }
 
     return new Response(JSON.stringify({ ok: true, kind, processed: true }), {
