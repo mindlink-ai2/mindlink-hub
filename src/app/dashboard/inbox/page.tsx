@@ -36,17 +36,20 @@ type InboxMessage = {
 
 type LinkedinAutomationSettings = {
   enabled: boolean;
-  daily_invite_quota: 10 | 20 | 30;
+  daily_invite_quota: number;
   timezone: string;
   start_time: string;
   end_time: string;
   unipile_account_id: string | null;
 };
 
-function normalizeInviteQuota(value: unknown): LinkedinAutomationSettings["daily_invite_quota"] {
+function normalizeDailyQuota(value: unknown): number {
   const parsed = Number(value);
-  if (parsed === 20 || parsed === 30) return parsed;
-  return 10;
+  if (!Number.isFinite(parsed)) return 10;
+  const quota = Math.trunc(parsed);
+  if (quota < 1) return 10;
+  if (quota > 200) return 200;
+  return quota;
 }
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -187,7 +190,6 @@ export default function InboxPage() {
   const [automationSentToday, setAutomationSentToday] = useState(0);
   const [automationAcceptedToday, setAutomationAcceptedToday] = useState(0);
   const [loadingAutomationSettings, setLoadingAutomationSettings] = useState(true);
-  const [savingAutomationSettings, setSavingAutomationSettings] = useState(false);
   const [sendingDraft, setSendingDraft] = useState(false);
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
   const pageContainerRef = useRef<HTMLDivElement | null>(null);
@@ -275,7 +277,7 @@ export default function InboxPage() {
       if (settings && typeof settings === "object") {
         setAutomationSettings({
           enabled: settings.enabled === true,
-          daily_invite_quota: normalizeInviteQuota(settings.daily_invite_quota),
+          daily_invite_quota: normalizeDailyQuota(settings.daily_invite_quota),
           timezone: String(settings.timezone ?? "Europe/Paris"),
           start_time: String(settings.start_time ?? "08:00:00"),
           end_time: String(settings.end_time ?? "18:00:00"),
@@ -301,46 +303,6 @@ export default function InboxPage() {
       setLoadingAutomationSettings(false);
     }
   }, []);
-
-  const saveAutomationSettings = useCallback(
-    async (nextSettings: LinkedinAutomationSettings) => {
-      if (!isFullActivePlan || savingAutomationSettings) return;
-      setSavingAutomationSettings(true);
-      setError(null);
-
-      try {
-        const res = await fetch("/api/linkedin/settings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(nextSettings),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || data?.success !== true) {
-          throw new Error(data?.error ?? "settings_update_failed");
-        }
-
-        const settings = data?.settings ?? null;
-        if (settings && typeof settings === "object") {
-          setAutomationSettings({
-            enabled: settings.enabled === true,
-            daily_invite_quota: normalizeInviteQuota(settings.daily_invite_quota),
-            timezone: String(settings.timezone ?? "Europe/Paris"),
-            start_time: String(settings.start_time ?? "08:00:00"),
-            end_time: String(settings.end_time ?? "18:00:00"),
-            unipile_account_id:
-              typeof settings.unipile_account_id === "string"
-                ? settings.unipile_account_id
-                : null,
-          });
-        }
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Impossible de mettre à jour les paramètres.");
-      } finally {
-        setSavingAutomationSettings(false);
-      }
-    },
-    [isFullActivePlan, savingAutomationSettings]
-  );
 
   const loadThreads = useCallback(async (options?: { keepSelected?: boolean }) => {
     setLoadingThreads(true);
@@ -858,50 +820,19 @@ export default function InboxPage() {
                   <div className="text-sm font-semibold text-[#0b1c33]">
                     Automatisation LinkedIn (FULL)
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <label className="inline-flex items-center gap-2 rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 py-2 text-sm text-[#1f3552]">
-                      <input
-                        type="checkbox"
-                        checked={automationSettings.enabled}
-                        onChange={(event) => {
-                          const next = {
-                            ...automationSettings,
-                            enabled: event.target.checked,
-                          };
-                          setAutomationSettings(next);
-                          void saveAutomationSettings(next);
-                        }}
-                        disabled={savingAutomationSettings}
-                      />
-                      Activer les invitations auto
-                    </label>
-
-                    <div className="inline-flex items-center gap-2 rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 py-2 text-sm text-[#1f3552]">
-                      <span>Quota / jour</span>
-                      <select
-                        value={automationSettings.daily_invite_quota}
-                        disabled={savingAutomationSettings}
-                        onChange={(event) => {
-                          const quota = normalizeInviteQuota(event.target.value);
-                          const next = {
-                            ...automationSettings,
-                            daily_invite_quota: quota,
-                          };
-                          setAutomationSettings(next);
-                          void saveAutomationSettings(next);
-                        }}
-                        className="rounded-lg border border-[#c8d6ea] bg-white px-2 py-1 text-sm text-[#0b1c33]"
-                      >
-                        <option value={10}>10</option>
-                        <option value={20}>20</option>
-                        <option value={30}>30</option>
-                      </select>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 py-2 text-sm text-[#1f3552]">
+                      Automatisation active automatiquement
+                    </div>
+                    <div className="rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 py-2 text-sm text-[#1f3552]">
+                      Quota du jour: {automationSettings.daily_invite_quota}
                     </div>
                   </div>
 
                   <p className="text-xs text-[#51627b]">
                     Fenêtre active: {automationSettings.start_time.slice(0, 5)} →{" "}
-                    {automationSettings.end_time.slice(0, 5)} ({automationSettings.timezone}).
+                    {automationSettings.end_time.slice(0, 5)} ({automationSettings.timezone}). Les
+                    invitations partent automatiquement sur les leads du jour.
                   </p>
                 </div>
 

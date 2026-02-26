@@ -7,14 +7,10 @@ import {
   sendUnipileInvitation,
 } from "../_shared/unipile.ts";
 
-type ClientRow = { id: number | string };
+type ClientRow = { id: number | string; quota: string | number | null };
 type SettingsRow = {
   client_id: number | string;
-  enabled: boolean | null;
-  daily_invite_quota: number | null;
   timezone: string | null;
-  start_time: string | null;
-  end_time: string | null;
   unipile_account_id: string | null;
 };
 type LeadRow = {
@@ -35,18 +31,6 @@ type TimeParts = {
 };
 
 const RUNNER_NAME = "linkedin-cron-runner";
-
-function parseTimeToMinutes(rawValue: string | null | undefined, fallback: number): number {
-  const value = String(rawValue ?? "").trim();
-  const match = value.match(/^(\d{2}):(\d{2})/);
-  if (!match) return fallback;
-
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return fallback;
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return fallback;
-  return hour * 60 + minute;
-}
 
 function getTimePartsInZone(date: Date, timezone: string): TimeParts {
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -137,13 +121,13 @@ function isWithinWindow(nowMinutes: number, startMinutes: number, endMinutes: nu
   return nowMinutes >= startMinutes && nowMinutes < endMinutes;
 }
 
-function isWeekdayInZone(date: Date, timezone: string): boolean {
-  const day = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    weekday: "short",
-  }).format(date);
-
-  return day !== "Sat" && day !== "Sun";
+function normalizeClientQuota(rawQuota: unknown): number {
+  const parsed = Number(rawQuota);
+  if (!Number.isFinite(parsed)) return 10;
+  const intQuota = Math.trunc(parsed);
+  if (intQuota < 1) return 10;
+  if (intQuota > 200) return 200;
+  return intQuota;
 }
 
 async function logAutomation(params: {
@@ -227,7 +211,7 @@ Deno.serve(async (req) => {
     try {
       const { data: clients, error: clientsErr } = await supabase
         .from("clients")
-        .select("id")
+        .select("id, quota")
         .eq("plan", "full")
         .eq("subscription_status", "active");
 
@@ -248,11 +232,8 @@ Deno.serve(async (req) => {
 
       const { data: settingsRows, error: settingsErr } = await supabase
         .from("client_linkedin_settings")
-        .select(
-          "client_id, enabled, daily_invite_quota, timezone, start_time, end_time, unipile_account_id"
-        )
-        .in("client_id", clientIds)
-        .eq("enabled", true);
+        .select("client_id, timezone, unipile_account_id")
+        .in("client_id", clientIds);
 
       if (settingsErr) {
         return new Response(JSON.stringify({ ok: false, error: "settings_fetch_failed", details: settingsErr }), {
@@ -261,31 +242,33 @@ Deno.serve(async (req) => {
         });
       }
 
-      for (const rawSettings of settingsRows ?? []) {
-        const settings = rawSettings as SettingsRow;
-        const clientId = String(settings.client_id);
-        const timezone = String(settings.timezone ?? "Europe/Paris") || "Europe/Paris";
+      const settingsByClientId = new Map<string, SettingsRow>();
+      for (const row of settingsRows ?? []) {
+        const settings = row as SettingsRow;
+        settingsByClientId.set(String(settings.client_id), settings);
+      }
 
-        if (!isWeekdayInZone(new Date(), timezone)) {
-          processed.push({ client_id: clientId, skipped: "weekend" });
-          continue;
-        }
+      for (const rawClient of clients ?? []) {
+        const client = rawClient as ClientRow;
+        const clientId = String(client.id);
+        const settings = settingsByClientId.get(clientId) ?? null;
+        const timezone = String(settings?.timezone ?? "Europe/Paris") || "Europe/Paris";
 
         const { startIso, endIso, nowParts } = getTodayBoundsUtc(timezone);
 
         const nowMinutes = nowParts.hour * 60 + nowParts.minute;
-        const startMinutes = Math.max(8 * 60, parseTimeToMinutes(settings.start_time, 8 * 60));
-        const endMinutes = parseTimeToMinutes(settings.end_time, 18 * 60);
+        const startMinutes = 8 * 60;
+        const endMinutes = 18 * 60;
         if (!isWithinWindow(nowMinutes, startMinutes, endMinutes)) {
           processed.push({ client_id: clientId, skipped: "outside_window" });
           continue;
         }
 
-        const dailyQuota = settings.daily_invite_quota === 20 || settings.daily_invite_quota === 30 ? settings.daily_invite_quota : 10;
+        const dailyQuota = normalizeClientQuota(client.quota);
         const unipileAccountId = await resolveAccountId({
           supabase,
           clientId,
-          settingsAccountId: settings.unipile_account_id,
+          settingsAccountId: settings?.unipile_account_id ?? null,
         });
 
         if (!unipileAccountId) {
@@ -335,7 +318,7 @@ Deno.serve(async (req) => {
           .gte("created_at", startIso)
           .lt("created_at", endIso)
           .not("LinkedInURL", "is", null)
-          .order("created_at", { ascending: true })
+          .order("created_at", { ascending: false })
           .limit(200);
 
         if (leadsErr) {

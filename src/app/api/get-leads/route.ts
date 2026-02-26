@@ -89,6 +89,10 @@ export async function GET() {
   const plan = (client.plan ?? "").toLowerCase();
   const normalizedPlan = plan === "full" ? "full" : "essential";
   const is_full = normalizedPlan === "full";
+  const subscriptionStatus = String(client.subscription_status ?? "")
+    .trim()
+    .toLowerCase();
+  const isFullActive = is_full && subscriptionStatus === "active";
 
   const email_option = Boolean(client.email_option);
   const phone_option = Boolean(client.phone_option);
@@ -181,7 +185,9 @@ export async function GET() {
     leads: leadsWithInvitationState,
     client: {
       plan: normalizedPlan,
+      subscription_status: subscriptionStatus,
       is_full,
+      is_full_active: isFullActive,
       is_premium: is_full, // legacy compatibility for old UI consumers
       email_option,
       phone_option,

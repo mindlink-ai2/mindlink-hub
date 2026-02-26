@@ -129,6 +129,13 @@ function filterLeads(leads: Lead[], term: string) {
   });
 }
 
+function getLeadInvitationStatus(lead: Lead): "sent" | "accepted" | null {
+  if (lead.linkedin_invitation_status === "accepted") return "accepted";
+  if (lead.linkedin_invitation_status === "sent") return "sent";
+  if (lead.linkedin_invitation_sent) return "sent";
+  return null;
+}
+
 export default function LeadsPage() {
   const [safeLeads, setSafeLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -142,6 +149,7 @@ export default function LeadsPage() {
 
   // ✅ plan (on garde la logique existante côté API, mais plus de premium gating)
   const [plan, setPlan] = useState<string>("essential");
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>("inactive");
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exportingSelected, setExportingSelected] = useState(false);
@@ -186,6 +194,7 @@ export default function LeadsPage() {
 
       // ✅ plan (fallback essential)
       setPlan(String(client?.plan ?? "essential").toLowerCase());
+      setSubscriptionStatus(String(client?.subscription_status ?? "inactive").toLowerCase());
 
       // ✅ Tout le monde a email + phone
       setEmailOption(true);
@@ -426,6 +435,8 @@ export default function LeadsPage() {
   };
 
   const handleLinkedInInvite = async (lead: Lead) => {
+    if (plan === "full" && subscriptionStatus === "active") return;
+
     const idStr = String(lead.id);
 
     if (invitingLeadIds.has(idStr) || lead.linkedin_invitation_sent) return;
@@ -798,6 +809,12 @@ export default function LeadsPage() {
     (l) => Boolean(l.traite) && !Boolean(l.message_sent)
   ).length;
   const remainingToTreat = total - treatedCount;
+  const isFullActivePlan = plan === "full" && subscriptionStatus === "active";
+  const invitationsSentCount = safeLeads.filter((lead) => getLeadInvitationStatus(lead) !== null).length;
+  const invitationsConnectedCount = safeLeads.filter(
+    (lead) => getLeadInvitationStatus(lead) === "accepted"
+  ).length;
+  const messagesSentCount = safeLeads.filter((lead) => Boolean(lead.message_sent)).length;
 
   // Next import (Paris)
   const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
@@ -925,17 +942,23 @@ export default function LeadsPage() {
                       </div>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="mt-3 grid grid-cols-3 gap-2">
                       <div className="rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-2.5 py-2">
-                        <p className="text-[10px] uppercase tracking-wide text-[#68809d]">En attente</p>
+                        <p className="text-[10px] uppercase tracking-wide text-[#68809d]">Invitation envoyée</p>
                         <p className="mt-1 text-base font-semibold leading-none text-[#0b1c33] tabular-nums">
-                          {pendingCount}
+                          {invitationsSentCount}
                         </p>
                       </div>
                       <div className="rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-2.5 py-2">
-                        <p className="text-[10px] uppercase tracking-wide text-[#68809d]">À traiter</p>
+                        <p className="text-[10px] uppercase tracking-wide text-[#68809d]">Invitation connectée</p>
                         <p className="mt-1 text-base font-semibold leading-none text-[#0b1c33] tabular-nums">
-                          {remainingToTreat}
+                          {invitationsConnectedCount}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-2.5 py-2">
+                        <p className="text-[10px] uppercase tracking-wide text-[#68809d]">Message envoyé</p>
+                        <p className="mt-1 text-base font-semibold leading-none text-[#0b1c33] tabular-nums">
+                          {messagesSentCount}
                         </p>
                       </div>
                     </div>
@@ -1068,16 +1091,10 @@ export default function LeadsPage() {
                         const isSelected = selectedIds.has(idStr);
                         const isStatusUpdating = updatingStatusIds.has(idStr);
                         const isInviteLoading = invitingLeadIds.has(idStr);
-                        const invitationStatus =
-                          lead.linkedin_invitation_status === "accepted"
-                            ? "accepted"
-                            : lead.linkedin_invitation_status === "sent"
-                              ? "sent"
-                              : lead.linkedin_invitation_sent
-                                ? "sent"
-                                : null;
+                        const invitationStatus = getLeadInvitationStatus(lead);
                         const isInviteAccepted = invitationStatus === "accepted";
                         const isInviteSent = invitationStatus === "sent";
+                        const isInviteAutoManaged = isFullActivePlan;
                         const inviteError = inviteErrors[idStr];
                         const isSent = Boolean(lead.message_sent);
                         const isPending = !isSent && Boolean(lead.traite);
@@ -1269,8 +1286,13 @@ export default function LeadsPage() {
 
                                 <button
                                   type="button"
-                                  onClick={() => handleLinkedInInvite(lead)}
+                                  onClick={() => {
+                                    if (!isInviteAutoManaged) {
+                                      void handleLinkedInInvite(lead);
+                                    }
+                                  }}
                                   disabled={
+                                    isInviteAutoManaged ||
                                     !lead.LinkedInURL ||
                                     isInviteAccepted ||
                                     isInviteSent ||
@@ -1280,8 +1302,10 @@ export default function LeadsPage() {
                                     "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
                                     isInviteAccepted
                                       ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
-                                      : isInviteSent
+                                    : isInviteSent
                                       ? "cursor-default border-amber-200 bg-amber-50 text-amber-700 focus:ring-amber-200"
+                                      : isInviteAutoManaged
+                                        ? "cursor-not-allowed border-[#d7e3f4] bg-[#f8fbff] text-[#6b7f9b] focus:ring-[#dce8ff]"
                                       : inviteError
                                         ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
                                         : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
@@ -1293,12 +1317,14 @@ export default function LeadsPage() {
                                     ? "Connecté"
                                     : isInviteSent
                                     ? "Connexion envoyée"
+                                    : isInviteAutoManaged
+                                      ? "Automatique"
                                     : isInviteLoading
                                       ? "Envoi..."
                                       : "Se connecter"}
                                 </button>
 
-                                {inviteError ? (
+                                {inviteError && !isInviteAutoManaged ? (
                                   <span className="text-[10px] text-red-600">
                                     {inviteError}
                                   </span>

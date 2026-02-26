@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 
     const { data: client, error: clientErr } = await supabase
       .from("clients")
-      .select("id")
+      .select("id, plan, subscription_status")
       .eq("clerk_user_id", userId)
       .single();
 
@@ -61,6 +61,18 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { success: false, error: "client_not_found" },
         { status: 404 }
+      );
+    }
+
+    const plan = String(client.plan ?? "").trim().toLowerCase();
+    const subscriptionStatus = String(client.subscription_status ?? "")
+      .trim()
+      .toLowerCase();
+
+    if (plan === "full" && subscriptionStatus === "active") {
+      return NextResponse.json(
+        { success: false, error: "invitation_managed_automatically" },
+        { status: 403 }
       );
     }
 
