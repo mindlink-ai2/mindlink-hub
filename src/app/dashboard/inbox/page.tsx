@@ -43,6 +43,12 @@ type LinkedinAutomationSettings = {
   unipile_account_id: string | null;
 };
 
+function normalizeInviteQuota(value: unknown): LinkedinAutomationSettings["daily_invite_quota"] {
+  const parsed = Number(value);
+  if (parsed === 20 || parsed === 30) return parsed;
+  return 10;
+}
+
 function asObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value as Record<string, unknown>;
@@ -267,11 +273,9 @@ export default function InboxPage() {
 
       const settings = data?.settings ?? null;
       if (settings && typeof settings === "object") {
-        const quotaValue = Number(settings.daily_invite_quota);
         setAutomationSettings({
           enabled: settings.enabled === true,
-          daily_invite_quota:
-            quotaValue === 20 || quotaValue === 30 ? quotaValue : 10,
+          daily_invite_quota: normalizeInviteQuota(settings.daily_invite_quota),
           timezone: String(settings.timezone ?? "Europe/Paris"),
           start_time: String(settings.start_time ?? "08:00:00"),
           end_time: String(settings.end_time ?? "18:00:00"),
@@ -317,11 +321,9 @@ export default function InboxPage() {
 
         const settings = data?.settings ?? null;
         if (settings && typeof settings === "object") {
-          const quotaValue = Number(settings.daily_invite_quota);
           setAutomationSettings({
             enabled: settings.enabled === true,
-            daily_invite_quota:
-              quotaValue === 20 || quotaValue === 30 ? quotaValue : 10,
+            daily_invite_quota: normalizeInviteQuota(settings.daily_invite_quota),
             timezone: String(settings.timezone ?? "Europe/Paris"),
             start_time: String(settings.start_time ?? "08:00:00"),
             end_time: String(settings.end_time ?? "18:00:00"),
@@ -880,8 +882,7 @@ export default function InboxPage() {
                         value={automationSettings.daily_invite_quota}
                         disabled={savingAutomationSettings}
                         onChange={(event) => {
-                          const raw = Number(event.target.value);
-                          const quota = raw === 20 || raw === 30 ? raw : 10;
+                          const quota = normalizeInviteQuota(event.target.value);
                           const next = {
                             ...automationSettings,
                             daily_invite_quota: quota,
