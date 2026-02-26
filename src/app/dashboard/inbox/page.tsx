@@ -265,7 +265,7 @@ export default function InboxPage() {
       const loadedMessages = Array.isArray(data?.messages)
         ? (data.messages as InboxMessage[])
         : [];
-      setMessages(loadedMessages);
+      setMessages(sortMessagesBySentAt(loadedMessages));
       loadedMessagesThreadIdRef.current = threadDbId;
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur de chargement des messages.");
@@ -400,6 +400,8 @@ export default function InboxPage() {
           if (!nextRow) return;
           const realtimeMessage = messageFromRealtimePayload(nextRow);
           if (!realtimeMessage) return;
+          loadedMessagesThreadIdRef.current = selectedThreadId;
+          shouldScrollToBottomRef.current = true;
 
           setMessages((prev) => {
             const exists = prev.some(
@@ -474,6 +476,7 @@ export default function InboxPage() {
 
         await loadThreads({ keepSelected: true });
         if (selectedThreadId) {
+          shouldScrollToBottomRef.current = true;
           await loadMessages(selectedThreadId);
         }
       } catch (e: unknown) {
@@ -596,8 +599,8 @@ export default function InboxPage() {
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <div className="h-full min-h-0 px-4 pb-14 pt-4 sm:px-6 sm:pt-5">
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-3">
+      <div className="flex h-full min-h-0 flex-col px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
+        <div className="mx-auto flex min-h-0 w-full max-w-[1680px] flex-1 flex-col gap-3">
           <section className="hub-card-hero p-3 sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -637,7 +640,7 @@ export default function InboxPage() {
             ) : null}
           </section>
 
-          <section className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[330px_minmax(0,1fr)]">
+          <section className="grid min-h-0 flex-1 gap-3 md:grid-cols-[330px_minmax(0,1fr)]">
             <div className="hub-card flex min-h-0 flex-col overflow-hidden">
               <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
                 <h2 className="text-sm font-semibold text-[#0b1c33]">Conversations</h2>
