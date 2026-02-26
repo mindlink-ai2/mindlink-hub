@@ -137,6 +137,15 @@ function isWithinWindow(nowMinutes: number, startMinutes: number, endMinutes: nu
   return nowMinutes >= startMinutes && nowMinutes < endMinutes;
 }
 
+function isWeekdayInZone(date: Date, timezone: string): boolean {
+  const day = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "short",
+  }).format(date);
+
+  return day !== "Sat" && day !== "Sun";
+}
+
 async function logAutomation(params: {
   supabase: ReturnType<typeof createClient>;
   clientId: string;
@@ -256,6 +265,11 @@ Deno.serve(async (req) => {
         const settings = rawSettings as SettingsRow;
         const clientId = String(settings.client_id);
         const timezone = String(settings.timezone ?? "Europe/Paris") || "Europe/Paris";
+
+        if (!isWeekdayInZone(new Date(), timezone)) {
+          processed.push({ client_id: clientId, skipped: "weekend" });
+          continue;
+        }
 
         const { startIso, endIso, nowParts } = getTodayBoundsUtc(timezone);
 
