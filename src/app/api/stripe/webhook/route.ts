@@ -91,9 +91,10 @@ export async function POST(req: Request) {
         const { plan, quota } = priceToPlanAndQuota(priceId);
         const safePlan = plan === "full" || plan === "essential" ? plan : "essential";
 
-        // Dates
-        const periodEndIso = sub.current_period_end
-          ? new Date(sub.current_period_end * 1000).toISOString()
+        // Stripe SDK (API récente) expose la période sur les items d'abonnement.
+        const itemPeriodEnd = sub.items?.data?.[0]?.current_period_end ?? null;
+        const periodEndIso = itemPeriodEnd
+          ? new Date(itemPeriodEnd * 1000).toISOString()
           : null;
 
         // Si deleted, Stripe envoie sub.status mais parfois “canceled” / “incomplete_expired”
