@@ -120,7 +120,7 @@ export async function POST(req: Request) {
       .select("id, status")
       .eq("client_id", client.id)
       .eq("lead_id", leadId)
-      .in("status", ["sent", "accepted", "connected"])
+      .in("status", ["queued", "pending", "sent", "accepted", "connected"])
       .limit(1);
 
     if (existingInviteErr) {
@@ -222,14 +222,17 @@ export async function POST(req: Request) {
 
     const { error: invitationInsertErr } = await supabase
       .from("linkedin_invitations")
-      .insert({
-        client_id: client.id,
-        lead_id: lead.id,
-        unipile_account_id: unipileAccountId,
-        status: "sent",
-        sent_at: new Date().toISOString(),
-        raw: invitePayload,
-      });
+      .upsert(
+        {
+          client_id: client.id,
+          lead_id: lead.id,
+          unipile_account_id: unipileAccountId,
+          status: "sent",
+          sent_at: new Date().toISOString(),
+          raw: invitePayload,
+        },
+        { onConflict: "client_id,lead_id,unipile_account_id" }
+      );
 
     if (invitationInsertErr) {
       return NextResponse.json(

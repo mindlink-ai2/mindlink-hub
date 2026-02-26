@@ -993,6 +993,77 @@ async function findLeadForRelation(params: {
   };
 }
 
+async function getLeadInternalMessage(params: {
+  supabase: SupabaseClient;
+  clientId: string;
+  leadId: number | string;
+}): Promise<string | null> {
+  const { supabase, clientId, leadId } = params;
+  const { data: lead } = await supabase
+    .from("leads")
+    .select("internal_message")
+    .eq("client_id", clientId)
+    .eq("id", leadId)
+    .limit(1)
+    .maybeSingle();
+
+  const draftText =
+    typeof lead?.internal_message === "string" ? lead.internal_message.trim() : "";
+  return draftText || null;
+}
+
+async function updateInvitationAcceptedWithDraft(params: {
+  supabase: SupabaseClient;
+  clientId: string;
+  invitationId: string;
+  acceptedAtIso: string;
+  raw: Record<string, unknown>;
+  draftText: string | null;
+}) {
+  const { supabase, clientId, invitationId, acceptedAtIso, raw, draftText } = params;
+
+  const draftAwarePayload: Record<string, unknown> = {
+    status: "accepted",
+    accepted_at: acceptedAtIso,
+    raw,
+    dm_draft_text: draftText,
+    dm_draft_status: draftText ? "draft" : "none",
+    last_error: null,
+  };
+
+  const { error } = await supabase
+    .from("linkedin_invitations")
+    .update(draftAwarePayload)
+    .eq("id", invitationId)
+    .eq("client_id", clientId);
+
+  if (
+    error &&
+    (isMissingColumnError(error, "dm_draft_text") ||
+      isMissingColumnError(error, "dm_draft_status") ||
+      isMissingColumnError(error, "last_error"))
+  ) {
+    const { error: fallbackErr } = await supabase
+      .from("linkedin_invitations")
+      .update({
+        status: "accepted",
+        accepted_at: acceptedAtIso,
+        raw,
+      })
+      .eq("id", invitationId)
+      .eq("client_id", clientId);
+
+    if (fallbackErr) {
+      console.error("UNIPILE_WEBHOOK_RELATION_UPDATE_FALLBACK_ERROR:", fallbackErr);
+    }
+    return;
+  }
+
+  if (error) {
+    console.error("UNIPILE_WEBHOOK_RELATION_UPDATE_DRAFT_ERROR:", error);
+  }
+}
+
 async function markInvitationAccepted(params: {
   supabase: SupabaseClient;
   clientId: string;
@@ -1003,6 +1074,7 @@ async function markInvitationAccepted(params: {
 }) {
   const { supabase, clientId, leadId, unipileAccountId, payload, match } = params;
   const now = new Date().toISOString();
+  const draftText = await getLeadInternalMessage({ supabase, clientId, leadId });
   const acceptanceRaw = {
     webhook_payload: payload,
     matching: {
@@ -1019,26 +1091,23 @@ async function markInvitationAccepted(params: {
     .eq("client_id", clientId)
     .eq("lead_id", leadId)
     .eq("unipile_account_id", unipileAccountId)
-    .in("status", ["sent", "pending"])
+    .in("status", ["queued", "sent", "pending"])
     .order("sent_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (sentInvitation?.id) {
-    const { error } = await supabase
-      .from("linkedin_invitations")
-      .update({
-        status: "accepted",
-        accepted_at: now,
-        raw: {
-          invitation: sentInvitation.raw ?? null,
-          acceptance: acceptanceRaw,
-        },
-      })
-      .eq("id", sentInvitation.id)
-      .eq("client_id", clientId);
-
-    if (error) console.error("UNIPILE_WEBHOOK_RELATION_UPDATE_SENT_ERROR:", error);
+    await updateInvitationAcceptedWithDraft({
+      supabase,
+      clientId,
+      invitationId: String(sentInvitation.id),
+      acceptedAtIso: now,
+      raw: {
+        invitation: sentInvitation.raw ?? null,
+        acceptance: acceptanceRaw,
+      },
+      draftText,
+    });
     return;
   }
 
@@ -1054,14 +1123,42 @@ async function markInvitationAccepted(params: {
 
   if (existingAccepted?.id) return;
 
-  const { error: insertErr } = await supabase.from("linkedin_invitations").insert({
+  const draftAwareInsert: Record<string, unknown> = {
     client_id: clientId,
     lead_id: leadId,
     unipile_account_id: unipileAccountId,
     status: "accepted",
     accepted_at: now,
     raw: acceptanceRaw,
-  });
+    dm_draft_text: draftText,
+    dm_draft_status: draftText ? "draft" : "none",
+    last_error: null,
+  };
+
+  const { error: insertErr } = await supabase.from("linkedin_invitations").insert(
+    draftAwareInsert
+  );
+
+  if (
+    insertErr &&
+    (isMissingColumnError(insertErr, "dm_draft_text") ||
+      isMissingColumnError(insertErr, "dm_draft_status") ||
+      isMissingColumnError(insertErr, "last_error"))
+  ) {
+    const { error: legacyInsertErr } = await supabase.from("linkedin_invitations").insert({
+      client_id: clientId,
+      lead_id: leadId,
+      unipile_account_id: unipileAccountId,
+      status: "accepted",
+      accepted_at: now,
+      raw: acceptanceRaw,
+    });
+
+    if (legacyInsertErr) {
+      console.error("UNIPILE_WEBHOOK_RELATION_INSERT_ACCEPTED_LEGACY_ERROR:", legacyInsertErr);
+    }
+    return;
+  }
 
   if (insertErr) console.error("UNIPILE_WEBHOOK_RELATION_INSERT_ACCEPTED_ERROR:", insertErr);
 }
@@ -1081,7 +1178,7 @@ async function fallbackAcceptLastSent(params: {
     .select("id, lead_id, raw")
     .eq("client_id", clientId)
     .eq("unipile_account_id", unipileAccountId)
-    .in("status", ["sent", "pending"])
+    .in("status", ["queued", "sent", "pending"])
     .order("sent_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -1090,31 +1187,31 @@ async function fallbackAcceptLastSent(params: {
     return null;
   }
 
-  const { error } = await supabase
-    .from("linkedin_invitations")
-    .update({
-      status: "accepted",
-      accepted_at: now,
-      raw: {
-        invitation: lastSent.raw ?? null,
-        acceptance: {
-          webhook_payload: payload,
-          matching: {
-            strategy: "fallback_last_sent",
-            uncertain: true,
-            normalized_linkedin_url: match.matchedLinkedInUrl,
-            profile_slug: match.matchedSlug,
-          },
+  const draftText = await getLeadInternalMessage({
+    supabase,
+    clientId,
+    leadId: lastSent.lead_id,
+  });
+
+  await updateInvitationAcceptedWithDraft({
+    supabase,
+    clientId,
+    invitationId: String(lastSent.id),
+    acceptedAtIso: now,
+    raw: {
+      invitation: lastSent.raw ?? null,
+      acceptance: {
+        webhook_payload: payload,
+        matching: {
+          strategy: "fallback_last_sent",
+          uncertain: true,
+          normalized_linkedin_url: match.matchedLinkedInUrl,
+          profile_slug: match.matchedSlug,
         },
       },
-    })
-    .eq("id", lastSent.id)
-    .eq("client_id", clientId);
-
-  if (error) {
-    console.error("UNIPILE_WEBHOOK_RELATION_FALLBACK_UPDATE_ERROR:", error);
-    return null;
-  }
+    },
+    draftText,
+  });
 
   return lastSent.lead_id;
 }

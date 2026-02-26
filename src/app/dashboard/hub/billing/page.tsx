@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
 
 type BillingStatus = {
-  plan: string | null; // "essential" | "premium" | "automated" | ...
+  plan: string | null; // "essential" | "full"
   quota: string | number | null; // ✅ NEW (text en DB, parfois NULL/EMPTY)
   subscription_status: string | null; // "active" | "trialing" | ...
   current_period_end: string | null;
@@ -24,9 +24,8 @@ function normalizeQuota(q?: string | number | null) {
 
 function prettyPlan(p?: string | null) {
   const n = normalizePlan(p);
-  if (n === "premium") return "Premium";
+  if (n === "full" || n === "premium" || n === "automated") return "Full";
   if (n === "essential") return "Essential";
-  if (n === "automated") return "Full automatisé";
   return p ? p : "—";
 }
 
@@ -58,7 +57,7 @@ export default function BillingPage() {
   const currentQuota = normalizeQuota(billing.quota);
 
   const isEssential = currentPlan === "essential";
-  const isAutomated = currentPlan === "automated";
+  const isAutomated = currentPlan === "full" || currentPlan === "automated";
   const isPremium = currentPlan === "premium";
 
   const isActive = (billing.subscription_status ?? "").toLowerCase().trim() === "active";

@@ -18,6 +18,9 @@ type InboxThread = {
   contact_linkedin_url: string | null;
   contact_avatar_url: string | null;
   lead_linkedin_url: string | null;
+  dm_draft_invitation_id?: string | null;
+  dm_draft_status?: "none" | "draft" | "sent" | string | null;
+  dm_draft_text?: string | null;
 };
 
 type InboxMessage = {
@@ -29,6 +32,15 @@ type InboxMessage = {
   text: string | null;
   sent_at: string | null;
   raw: unknown;
+};
+
+type LinkedinAutomationSettings = {
+  enabled: boolean;
+  daily_invite_quota: 10 | 20 | 30;
+  timezone: string;
+  start_time: string;
+  end_time: string;
+  unipile_account_id: string | null;
 };
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -162,6 +174,15 @@ export default function InboxPage() {
   const [threadSearch, setThreadSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
+  const [plan, setPlan] = useState<"essential" | "full">("essential");
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>("inactive");
+  const [automationSettings, setAutomationSettings] =
+    useState<LinkedinAutomationSettings | null>(null);
+  const [automationSentToday, setAutomationSentToday] = useState(0);
+  const [automationAcceptedToday, setAutomationAcceptedToday] = useState(0);
+  const [loadingAutomationSettings, setLoadingAutomationSettings] = useState(true);
+  const [savingAutomationSettings, setSavingAutomationSettings] = useState(false);
+  const [sendingDraft, setSendingDraft] = useState(false);
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
   const pageContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
@@ -187,6 +208,10 @@ export default function InboxPage() {
       selectedThread?.lead_linkedin_url,
     ]
   );
+  const isFullActivePlan = plan === "full" && subscriptionStatus === "active";
+  const selectedThreadHasDraft =
+    selectedThread?.dm_draft_status === "draft" &&
+    Boolean((selectedThread?.dm_draft_text ?? "").trim());
 
   const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
     const viewport = messagesViewportRef.current;
@@ -222,6 +247,98 @@ export default function InboxPage() {
       return normalizedName.includes(query) || firstName.includes(query);
     });
   }, [threads, threadSearch]);
+
+  const loadAutomationSettings = useCallback(async () => {
+    setLoadingAutomationSettings(true);
+    try {
+      const res = await fetch("/api/linkedin/settings", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "settings_fetch_failed");
+
+      const nextPlan = String(data?.plan ?? "essential").toLowerCase() === "full"
+        ? "full"
+        : "essential";
+      const nextSubscriptionStatus = String(data?.subscription_status ?? "inactive")
+        .trim()
+        .toLowerCase();
+
+      setPlan(nextPlan);
+      setSubscriptionStatus(nextSubscriptionStatus);
+
+      const settings = data?.settings ?? null;
+      if (settings && typeof settings === "object") {
+        const quotaValue = Number(settings.daily_invite_quota);
+        setAutomationSettings({
+          enabled: settings.enabled === true,
+          daily_invite_quota:
+            quotaValue === 20 || quotaValue === 30 ? quotaValue : 10,
+          timezone: String(settings.timezone ?? "Europe/Paris"),
+          start_time: String(settings.start_time ?? "08:00:00"),
+          end_time: String(settings.end_time ?? "18:00:00"),
+          unipile_account_id:
+            typeof settings.unipile_account_id === "string"
+              ? settings.unipile_account_id
+              : null,
+        });
+      } else {
+        setAutomationSettings(null);
+      }
+
+      setAutomationSentToday(Number(data?.stats?.sent_today ?? 0));
+      setAutomationAcceptedToday(Number(data?.stats?.accepted_today ?? 0));
+    } catch (e) {
+      console.error("INBOX_AUTOMATION_SETTINGS_LOAD_ERROR:", e);
+      setPlan("essential");
+      setSubscriptionStatus("inactive");
+      setAutomationSettings(null);
+      setAutomationSentToday(0);
+      setAutomationAcceptedToday(0);
+    } finally {
+      setLoadingAutomationSettings(false);
+    }
+  }, []);
+
+  const saveAutomationSettings = useCallback(
+    async (nextSettings: LinkedinAutomationSettings) => {
+      if (!isFullActivePlan || savingAutomationSettings) return;
+      setSavingAutomationSettings(true);
+      setError(null);
+
+      try {
+        const res = await fetch("/api/linkedin/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(nextSettings),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data?.success !== true) {
+          throw new Error(data?.error ?? "settings_update_failed");
+        }
+
+        const settings = data?.settings ?? null;
+        if (settings && typeof settings === "object") {
+          const quotaValue = Number(settings.daily_invite_quota);
+          setAutomationSettings({
+            enabled: settings.enabled === true,
+            daily_invite_quota:
+              quotaValue === 20 || quotaValue === 30 ? quotaValue : 10,
+            timezone: String(settings.timezone ?? "Europe/Paris"),
+            start_time: String(settings.start_time ?? "08:00:00"),
+            end_time: String(settings.end_time ?? "18:00:00"),
+            unipile_account_id:
+              typeof settings.unipile_account_id === "string"
+                ? settings.unipile_account_id
+                : null,
+          });
+        }
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Impossible de mettre à jour les paramètres.");
+      } finally {
+        setSavingAutomationSettings(false);
+      }
+    },
+    [isFullActivePlan, savingAutomationSettings]
+  );
 
   const loadThreads = useCallback(async (options?: { keepSelected?: boolean }) => {
     setLoadingThreads(true);
@@ -305,6 +422,10 @@ export default function InboxPage() {
   useEffect(() => {
     void loadThreads();
   }, [loadThreads]);
+
+  useEffect(() => {
+    void loadAutomationSettings();
+  }, [loadAutomationSettings]);
 
   useEffect(() => {
     (async () => {
@@ -621,6 +742,64 @@ export default function InboxPage() {
     }
   };
 
+  const handleSendDraft = async () => {
+    if (!selectedThreadId || !selectedThreadHasDraft || sendingDraft) return;
+    setSendingDraft(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/inbox/send-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threadDbId: selectedThreadId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success !== true) {
+        throw new Error(data?.error ?? "send_draft_failed");
+      }
+
+      const sentAt = String(data?.message?.sent_at ?? new Date().toISOString());
+      const text = String(data?.message?.text ?? selectedThread?.dm_draft_text ?? "").trim();
+
+      if (text) {
+        loadedMessagesThreadIdRef.current = selectedThreadId;
+        shouldScrollToBottomRef.current = true;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `local-draft-${Date.now()}`,
+            unipile_message_id: String(data?.message?.unipile_message_id ?? ""),
+            direction: "outbound",
+            sender_name: null,
+            sender_linkedin_url: null,
+            text,
+            sent_at: sentAt,
+            raw: { delivery_status: "delivered", source: "draft_send" },
+          },
+        ]);
+      }
+
+      setThreads((prev) =>
+        sortThreadsByLastMessage(
+          prev.map((thread) =>
+            thread.id === selectedThreadId
+              ? {
+                  ...thread,
+                  last_message_at: sentAt,
+                  last_message_preview: text || thread.last_message_preview,
+                  dm_draft_status: "sent",
+                }
+              : thread
+          )
+        )
+      );
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erreur pendant l'envoi du draft.");
+    } finally {
+      setSendingDraft(false);
+    }
+  };
+
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <div
@@ -666,6 +845,82 @@ export default function InboxPage() {
                 {error}
               </div>
             ) : null}
+          </section>
+
+          <section className="hub-card p-3 sm:p-4">
+            {loadingAutomationSettings ? (
+              <div className="text-sm text-[#51627b]">Chargement des paramètres d’automatisation…</div>
+            ) : isFullActivePlan && automationSettings ? (
+              <div className="grid gap-3 lg:grid-cols-[1.25fr_0.75fr]">
+                <div className="space-y-3">
+                  <div className="text-sm font-semibold text-[#0b1c33]">
+                    Automatisation LinkedIn (FULL)
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-2 rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 py-2 text-sm text-[#1f3552]">
+                      <input
+                        type="checkbox"
+                        checked={automationSettings.enabled}
+                        onChange={(event) => {
+                          const next = {
+                            ...automationSettings,
+                            enabled: event.target.checked,
+                          };
+                          setAutomationSettings(next);
+                          void saveAutomationSettings(next);
+                        }}
+                        disabled={savingAutomationSettings}
+                      />
+                      Activer les invitations auto
+                    </label>
+
+                    <div className="inline-flex items-center gap-2 rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 py-2 text-sm text-[#1f3552]">
+                      <span>Quota / jour</span>
+                      <select
+                        value={automationSettings.daily_invite_quota}
+                        disabled={savingAutomationSettings}
+                        onChange={(event) => {
+                          const raw = Number(event.target.value);
+                          const quota = raw === 20 || raw === 30 ? raw : 10;
+                          const next = {
+                            ...automationSettings,
+                            daily_invite_quota: quota,
+                          };
+                          setAutomationSettings(next);
+                          void saveAutomationSettings(next);
+                        }}
+                        className="rounded-lg border border-[#c8d6ea] bg-white px-2 py-1 text-sm text-[#0b1c33]"
+                      >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={30}>30</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-[#51627b]">
+                    Fenêtre active: {automationSettings.start_time.slice(0, 5)} →{" "}
+                    {automationSettings.end_time.slice(0, 5)} ({automationSettings.timezone}).
+                  </p>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                  <div className="rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 py-2">
+                    <p className="text-[11px] text-[#6a7f9f]">Invitations aujourd’hui</p>
+                    <p className="text-lg font-semibold text-[#0b1c33]">{automationSentToday}</p>
+                  </div>
+                  <div className="rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 py-2">
+                    <p className="text-[11px] text-[#6a7f9f]">Acceptées aujourd’hui</p>
+                    <p className="text-lg font-semibold text-[#0b1c33]">{automationAcceptedToday}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-[#51627b]">
+                Mode <span className="font-semibold text-[#0b1c33]">Essential</span>: aucune
+                automatisation d’invitation. Les messages restent manuels.
+              </div>
+            )}
           </section>
 
           <section className="grid min-h-0 flex-1 gap-3 overflow-hidden md:grid-cols-[330px_minmax(0,1fr)]">
@@ -747,6 +1002,12 @@ export default function InboxPage() {
                               <p className="mt-1 truncate text-xs text-[#51627b]">
                                 {thread.last_message_preview || "Aucun aperçu"}
                               </p>
+
+                              {thread.dm_draft_status === "draft" ? (
+                                <p className="mt-1 inline-flex rounded-full border border-[#9cc0ff] bg-[#eef4ff] px-2 py-0.5 text-[10px] font-medium text-[#1f5eff]">
+                                  Message prêt
+                                </p>
+                              ) : null}
 
                               <p className="mt-1 text-[11px] text-[#8093ad]">
                                 {formatDateTime(thread.last_message_at)}
@@ -841,6 +1102,23 @@ export default function InboxPage() {
                   </div>
 
                   <div className="shrink-0 border-t border-[#d7e3f4] bg-[#f8fbff] p-3">
+                    {selectedThreadHasDraft ? (
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#c8d6ea] bg-white px-3 py-2">
+                        <p className="text-xs text-[#334155]">
+                          Message prêt à envoyer pour ce contact.
+                        </p>
+                        <HubButton
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleSendDraft}
+                          disabled={sendingDraft}
+                        >
+                          {sendingDraft ? "Envoi du draft..." : "Envoyer le message prêt"}
+                        </HubButton>
+                      </div>
+                    ) : null}
+
                     <div className="flex items-end gap-2">
                       <textarea
                         value={draft}

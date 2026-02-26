@@ -171,7 +171,7 @@ async function fetchInvitationMetricsRows(
           .from("linkedin_invitations")
           .select(selectFields)
           .eq("client_id", clientId)
-          .in("status", ["pending", "sent", "accepted", "connected"])
+          .in("status", ["queued", "pending", "sent", "accepted", "connected"])
           .order("id", { ascending: true })
           .range(from, to);
         return { data: data as InvitationMetricsRow[] | null, error };
@@ -366,7 +366,7 @@ export async function GET() {
 
     if (status === "accepted" || status === "connected") {
       mapped = "connected";
-    } else if (status === "pending" || status === "sent") {
+    } else if (status === "queued" || status === "pending" || status === "sent") {
       mapped = "pending";
     }
 
