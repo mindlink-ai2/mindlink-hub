@@ -1,5 +1,13 @@
 export function requireEnv(name: string): string {
-  const value = Deno.env.get(name);
+  const valueFromProcess =
+    typeof process !== "undefined" && process?.env ? process.env[name] : undefined;
+  const valueFromDeno = (
+    globalThis as {
+      Deno?: { env?: { get?: (key: string) => string | undefined } };
+    }
+  ).Deno?.env?.get?.(name);
+  const value = valueFromProcess ?? valueFromDeno;
+
   if (!value) throw new Error(`Missing env var: ${name}`);
   return value;
 }
