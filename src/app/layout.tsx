@@ -8,6 +8,7 @@ import InboxBackgroundSync from "@/components/InboxBackgroundSync";
 import RightHitboxDebug from "@/components/dev/RightHitboxDebug";
 import InboxNavLink from "@/components/InboxNavLink";
 import SupportWidgetLoader from "@/components/support/SupportWidgetLoader";
+import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
 import { getAnalyticsAdminContext } from "@/lib/analytics/server";
