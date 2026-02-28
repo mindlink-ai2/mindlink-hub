@@ -109,18 +109,42 @@ export type ResolveProviderIdResult =
 export function extractProviderId(payload: unknown): string | null {
   const data = toJsonObject(payload);
   return getFirstString(data, [
+    ["user_provider_id"],
+    ["userProviderId"],
     ["provider_id"],
     ["providerId"],
+    ["recipient_provider_id"],
+    ["recipientProviderId"],
+    ["counterpart_provider_id"],
+    ["counterpartProviderId"],
     ["data", "provider_id"],
     ["data", "providerId"],
+    ["data", "user_provider_id"],
+    ["data", "userProviderId"],
+    ["data", "recipient_provider_id"],
+    ["data", "recipientProviderId"],
     ["user", "provider_id"],
     ["user", "providerId"],
+    ["user", "user_provider_id"],
+    ["user", "userProviderId"],
+    ["contact", "provider_id"],
+    ["contact", "providerId"],
+    ["counterpart", "provider_id"],
+    ["counterpart", "providerId"],
+    ["webhook_payload", "user_provider_id"],
+    ["webhook_payload", "userProviderId"],
+    ["webhook_payload", "provider_id"],
+    ["webhook_payload", "providerId"],
     ["profile", "provider_id"],
     ["profile", "providerId"],
     ["message", "provider_id"],
     ["message", "providerId"],
     ["data", "user", "provider_id"],
     ["data", "user", "providerId"],
+    ["data", "user", "user_provider_id"],
+    ["data", "user", "userProviderId"],
+    ["data", "contact", "provider_id"],
+    ["data", "contact", "providerId"],
     ["data", "profile", "provider_id"],
     ["data", "profile", "providerId"],
   ]);
@@ -641,7 +665,7 @@ export async function resolveLinkedinProviderIdForLead(params: {
 }): Promise<ResolveProviderIdResult> {
   const { supabase, clientId, leadId, unipileAccountId, leadLinkedInUrl } = params;
 
-  const { data: invitations, error: invitationError } = await supabase
+  const { data: invitationsByAccount, error: invitationByAccountError } = await supabase
     .from("linkedin_invitations")
     .select("id, raw")
     .eq("client_id", clientId)
@@ -650,14 +674,37 @@ export async function resolveLinkedinProviderIdForLead(params: {
     .order("id", { ascending: false })
     .limit(20);
 
-  if (!invitationError && Array.isArray(invitations)) {
+  let invitations = Array.isArray(invitationsByAccount) ? invitationsByAccount : [];
+
+  if (
+    !invitationByAccountError &&
+    invitations.length === 0
+  ) {
+    const { data: invitationsAnyAccount, error: invitationAnyAccountError } = await supabase
+      .from("linkedin_invitations")
+      .select("id, raw, unipile_account_id")
+      .eq("client_id", clientId)
+      .eq("lead_id", leadId)
+      .order("id", { ascending: false })
+      .limit(20);
+
+    if (!invitationAnyAccountError && Array.isArray(invitationsAnyAccount)) {
+      invitations = invitationsAnyAccount;
+    }
+  }
+
+  if (!invitationByAccountError && Array.isArray(invitations)) {
     for (const invitation of invitations as Array<{ raw?: unknown }>) {
       const raw = toJsonObject(invitation.raw);
       const candidates = [
         raw,
+        toJsonObject(raw.webhook_payload),
         toJsonObject(raw.invitation),
+        toJsonObject(toJsonObject(raw.invitation).webhook_payload),
         toJsonObject(raw.acceptance),
         toJsonObject(toJsonObject(raw.acceptance).webhook_payload),
+        toJsonObject(raw.relation),
+        toJsonObject(toJsonObject(raw.relation).webhook_payload),
         ...extractArrayCandidates(raw),
       ];
 
