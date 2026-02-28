@@ -8,8 +8,9 @@ import { getLeadStatusKey } from "@/components/leads/LeadCard";
 import LeadsMobileFilters, {
   type MobileLeadFilterKey,
 } from "@/components/leads/LeadsMobileFilters";
+import LeadDetailsOverlay from "@/components/leads/LeadDetailsOverlay";
 import { HubButton } from "@/components/ui/hub-button";
-import { AlertTriangle, Building2, LayoutGrid, Linkedin, List, Mail, MapPin, MoveRight, Phone, UserCircle2, X } from "lucide-react";
+import { AlertTriangle, Building2, LayoutGrid, Linkedin, List, Mail, MapPin, MoveRight, Phone, UserCircle2 } from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -817,45 +818,25 @@ export default function LeadsPage() {
 
   const openLeadRawJobTitle = (openLead?.linkedinJobTitle ?? "").trim();
   const openLeadTranslatedJobTitle = translateLinkedInJobTitle(openLeadRawJobTitle);
-
-  const isSidebarOpen = Boolean(openLead);
-
-  // UX-only: Escape close + lock page scroll when sidebar is open
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenLead(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-
-    const html = document.documentElement;
-    const body = document.body;
-    const prevHtmlOverflow = html.style.overflow;
-    const prevBodyOverflow = body.style.overflow;
-    const prevBodyPaddingRight = body.style.paddingRight;
-
-    if (isSidebarOpen) {
-      const scrollbarWidth = window.innerWidth - html.clientWidth;
-      html.style.overflow = "hidden";
-      body.style.overflow = "hidden";
-      body.dataset.leadsSidebarOpen = "1";
-      if (scrollbarWidth > 0) {
-        body.style.paddingRight = `${scrollbarWidth}px`;
-      }
-    } else {
-      html.style.overflow = "";
-      body.style.overflow = "";
-      body.style.paddingRight = "";
-      delete body.dataset.leadsSidebarOpen;
-    }
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      html.style.overflow = prevHtmlOverflow;
-      body.style.overflow = prevBodyOverflow;
-      body.style.paddingRight = prevBodyPaddingRight;
-      delete body.dataset.leadsSidebarOpen;
-    };
-  }, [isSidebarOpen]);
+  const openLeadDisplayName = openLead
+    ? `${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim() || "Fiche prospect"
+    : "Fiche prospect";
+  const openLeadSubtitle = openLead
+    ? `${openLead.Company || "—"} • ${openLead.location || "—"}`
+    : undefined;
+  const openLeadStatusBadge = openLead ? (
+    openLead.message_sent ? (
+      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] text-emerald-700 whitespace-nowrap">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        Envoyé
+      </span>
+    ) : (
+      <span className="inline-flex items-center gap-2 rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" />
+        À faire
+      </span>
+    )
+  ) : null;
 
   if (!clientLoaded) {
     return (
@@ -1520,72 +1501,18 @@ export default function LeadsPage() {
               </div>
           </div>
 
-          {openLead && (
-            <>
-              <div
-                className="pointer-events-none fixed inset-0 z-[80] bg-[#0F172A]/38 backdrop-blur-[3px]"
-                aria-hidden="true"
-              />
-
-              <div className="animate-slideLeft fixed inset-y-0 right-0 z-[90] flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
-                <button
-                  type="button"
-                  onClick={() => setOpenLead(null)}
-                  className="absolute right-4 top-[max(env(safe-area-inset-top),12px)] z-20 inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#dbe5f3] bg-white/95 px-3 text-[12px] font-medium text-[#334155] shadow-[0_8px_22px_-16px_rgba(15,23,42,0.55)] transition hover:bg-[#f8fbff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
-                  aria-label="Fermer la fiche prospect"
-                  title="Fermer"
-                >
-                  <span>Fermer</span>
-                  <X className="h-4 w-4" />
-                </button>
-
-                <div className="z-10 border-b border-[#e2e8f0] bg-white/95 p-6 pb-4 backdrop-blur-xl">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <HubButton type="button" variant="ghost" size="sm" onClick={() => setOpenLead(null)}>
-                        Fermer
-                      </HubButton>
-                      <button
-                        type="button"
-                        onClick={() => setOpenLead(null)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#dbe5f3] bg-white text-[#4B5563] transition hover:bg-[#f8fbff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
-                        aria-label="Fermer le panneau"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <span className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
-                      {plan || "essential"}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="truncate text-2xl font-semibold leading-tight text-[#0F172A]">
-                        {(openLead.FirstName ?? "")} {(openLead.LastName ?? "")}
-                      </h2>
-                      <p className="mt-1 truncate text-[12px] text-[#4B5563]">
-                        {openLead.Company || "—"} • {openLead.location || "—"}
-                      </p>
-                    </div>
-
-                    <div className="shrink-0">
-                      {openLead.message_sent ? (
-                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] text-emerald-700 whitespace-nowrap">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          Envoyé
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-2 rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" />
-                          À faire
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain touch-pan-y p-6 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]">
+          <LeadDetailsOverlay
+            open={Boolean(openLead)}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) setOpenLead(null);
+            }}
+            title={openLeadDisplayName}
+            subtitle={openLeadSubtitle}
+            planLabel={plan || "essential"}
+            statusBadge={openLeadStatusBadge}
+          >
+            {openLead ? (
+              <div className="space-y-5">
                   <div className="hub-card-soft p-4">
                     <div className="text-[11px] uppercase tracking-wide text-[#4B5563]">Informations</div>
                     <div className="mt-3 grid grid-cols-1 gap-3">
@@ -1756,10 +1683,9 @@ export default function LeadsPage() {
                       );
                     })()}
                   </div>
-                </div>
               </div>
-            </>
-          )}
+            ) : null}
+          </LeadDetailsOverlay>
         </div>
       </div>
     </SubscriptionGate>
