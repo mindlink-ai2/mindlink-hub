@@ -95,7 +95,16 @@ export default function LeadsCards({
         const id = String(lead.id);
 
         if (viewMode === "compact") {
-          return <CompactLeadRow key={id} lead={lead} onOpenLead={onOpenLead} />;
+          return (
+            <CompactLeadRow
+              key={id}
+              lead={lead}
+              onOpenLead={onOpenLead}
+              onInviteLinkedIn={onInviteLinkedIn}
+              isInviteLoading={invitingLeadIds.has(id)}
+              inviteError={inviteErrors[id]}
+            />
+          );
         }
 
         return (

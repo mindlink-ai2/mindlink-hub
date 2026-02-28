@@ -56,10 +56,6 @@ function getStatusClasses(status: LeadCardStatusKey): string {
   return "border-[#c8d6ea] bg-[#f4f8ff] text-[#34527a]";
 }
 
-function safeExternalUrl(rawUrl: string): string {
-  return /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
-}
-
 function formatRecencyLabel(createdAt: string | null | undefined): string | null {
   if (!createdAt) return null;
 
@@ -129,24 +125,24 @@ function LeadCardComponent({
           icon: Phone,
         }
       : null,
-    lead.LinkedInURL
-      ? {
-          key: "linkedin",
-          label: lead.LinkedInURL,
-          href: safeExternalUrl(lead.LinkedInURL),
-          icon: Linkedin,
-          external: true,
-        }
-      : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);
 
   const inviteState = getLinkedInInviteState(lead);
+  const isInviteAccepted = inviteState === "accepted";
+  const isInviteSent = inviteState === "sent";
   const canToggleStatus = status !== "sent" && status !== "connected";
   const canInvite =
     Boolean(lead.LinkedInURL) &&
-    inviteState !== "accepted" &&
-    inviteState !== "sent" &&
+    !isInviteAccepted &&
+    !isInviteSent &&
     !isInviteLoading;
+  const inviteButtonLabel = isInviteAccepted
+    ? "Connecte"
+    : isInviteSent
+      ? "Invitation envoyee"
+      : isInviteLoading
+        ? "Connexion..."
+        : "Se connecter";
 
   return (
     <article className="rounded-2xl border border-[#d7e3f4] bg-white p-4 shadow-[0_16px_28px_-24px_rgba(18,43,86,0.72)]">
@@ -222,26 +218,24 @@ function LeadCardComponent({
             type="button"
             onClick={() => onInviteLinkedIn(lead)}
             disabled={!canInvite}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#d7e3f4] bg-white text-[#3f5675] transition hover:bg-[#f4f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff] disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={`Envoyer une invitation LinkedIn a ${displayName}`}
-            title="Inviter sur LinkedIn"
+            className={[
+              "inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-[11px] transition focus:outline-none focus:ring-2 focus:ring-[#dce8ff]",
+              isInviteAccepted
+                ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700"
+                : isInviteSent
+                  ? "cursor-default border-amber-200 bg-amber-50 text-amber-700"
+                  : inviteError
+                    ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                    : "border-[#d7e3f4] bg-white text-[#3f5675] hover:bg-[#f4f8ff]",
+              !canInvite ? "cursor-not-allowed opacity-60" : "",
+            ].join(" ")}
+            aria-label="Se connecter sur LinkedIn"
+            title="Se connecter sur LinkedIn"
           >
-            <Linkedin className="h-4 w-4" />
+            <Linkedin className="h-3.5 w-3.5 text-[#0A66C2]" />
+            <span>{inviteButtonLabel}</span>
           </button>
 
-          {lead.LinkedInURL ? (
-            <a
-              href={safeExternalUrl(lead.LinkedInURL)}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-[#d7e3f4] bg-white px-2.5 text-[11px] text-[#3f5675] transition hover:bg-[#f4f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
-              aria-label="Se connecter sur LinkedIn"
-              title="Se connecter sur LinkedIn"
-            >
-              <Linkedin className="h-3.5 w-3.5 text-[#0A66C2]" />
-              <span>Se connecter</span>
-            </a>
-          ) : null}
         </div>
       </div>
 
