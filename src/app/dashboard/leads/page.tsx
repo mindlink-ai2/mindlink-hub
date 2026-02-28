@@ -1528,6 +1528,17 @@ export default function LeadsPage() {
               />
 
               <div className="animate-slideLeft fixed inset-y-0 right-0 z-[90] flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
+                <button
+                  type="button"
+                  onClick={() => setOpenLead(null)}
+                  className="absolute right-4 top-[max(env(safe-area-inset-top),12px)] z-20 inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#dbe5f3] bg-white/95 px-3 text-[12px] font-medium text-[#334155] shadow-[0_8px_22px_-16px_rgba(15,23,42,0.55)] transition hover:bg-[#f8fbff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                  aria-label="Fermer la fiche prospect"
+                  title="Fermer"
+                >
+                  <span>Fermer</span>
+                  <X className="h-4 w-4" />
+                </button>
+
                 <div className="z-10 border-b border-[#e2e8f0] bg-white/95 p-6 pb-4 backdrop-blur-xl">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2">
