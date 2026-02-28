@@ -623,9 +623,11 @@ export async function findProviderIdFromInvitations(params: {
     .limit(1200)
     .gte("created_at", cutoffIso);
 
-  let rowsResult = await queryWithDate;
+  const rowsResultWithDate = await queryWithDate;
+  let rowsError: unknown = null;
+  let rows: InvitationLookupRow[] = [];
 
-  if (rowsResult.error && isMissingColumnError(rowsResult.error, "created_at")) {
+  if (rowsResultWithDate.error && isMissingColumnError(rowsResultWithDate.error, "created_at")) {
     usedDateFilter = false;
     const fallbackQuery = supabase
       .from("linkedin_invitations")
@@ -634,16 +636,25 @@ export async function findProviderIdFromInvitations(params: {
       .order("id", { ascending: false })
       .limit(1200);
 
-    rowsResult = await fallbackQuery;
+    const fallbackResult = await fallbackQuery;
+    rowsError = fallbackResult.error;
+    rows = Array.isArray(fallbackResult.data)
+      ? (fallbackResult.data as InvitationLookupRow[])
+      : [];
+  } else {
+    rowsError = rowsResultWithDate.error;
+    rows = Array.isArray(rowsResultWithDate.data)
+      ? (rowsResultWithDate.data as InvitationLookupRow[])
+      : [];
   }
 
-  if (rowsResult.error) {
+  if (rowsError) {
     console.error("PROVIDER_LOOKUP_INVITATIONS_QUERY_ERROR", {
       leadId,
       clientId,
       normalized_lead_url: normalizedLeadUrl,
       slug,
-      error: rowsResult.error,
+      error: rowsError,
     });
     return {
       providerId: null,
@@ -658,8 +669,6 @@ export async function findProviderIdFromInvitations(params: {
       usedDateFilter,
     };
   }
-
-  const rows = Array.isArray(rowsResult.data) ? (rowsResult.data as InvitationLookupRow[]) : [];
   const recentProfileUrls: string[] = [];
   const matchedRows: Array<{
     invitationId: string;
