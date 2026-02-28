@@ -10,7 +10,6 @@ import {
 import {
   ensureThreadAndSendMessage,
   findExistingThreadForLead,
-  resolveLinkedinProviderIdForLead,
 } from "@/lib/linkedin-messaging";
 
 type LeadRow = {
@@ -72,17 +71,8 @@ function extractLeadThreadId(lead: LeadRow): string | null {
 }
 
 function extractLeadProviderId(lead: LeadRow): string | null {
-  const candidates = [
-    lead.provider_id,
-    lead.linkedin_provider_id,
-    lead.unipile_provider_id,
-  ];
-
-  for (const candidate of candidates) {
-    const value = String(candidate ?? "").trim();
-    if (value) return value;
-  }
-  return null;
+  const value = String(lead.linkedin_provider_id ?? "").trim();
+  return value || null;
 }
 
 async function updateLeadSentMetadata(
@@ -258,38 +248,15 @@ export async function POST(req: Request) {
     const existingThreadDbId = existingThread?.threadDbId ?? null;
     const existingUnipileThreadId = existingThread?.unipileThreadId ?? leadThreadId;
 
-    let providerId: string | null = extractLeadProviderId(lead);
-    if (!existingUnipileThreadId && !providerId) {
-      const providerResolution = await resolveLinkedinProviderIdForLead({
-        supabase,
-        clientId,
-        leadId,
-        unipileAccountId,
-        leadLinkedInUrl: lead.LinkedInURL,
-      });
-
-      if (!providerResolution.ok) {
-        return buildErrorResponse({
-          status: providerResolution.status,
-          httpStatus: providerResolution.status === "provider_id_missing" ? 400 : 502,
-          errorCode:
-            providerResolution.status === "provider_id_missing"
-              ? "MISSING_PROVIDER_ID"
-              : "UNIPILE_PROFILE_LOOKUP_FAILED",
-          errorMessage: providerResolution.userMessage,
-          debug: providerResolution.details ?? null,
-        });
-      }
-
-      providerId = providerResolution.providerId;
-    }
+    const providerId: string | null = extractLeadProviderId(lead);
 
     if (!existingUnipileThreadId && !providerId) {
       return buildErrorResponse({
         status: "provider_id_missing",
         httpStatus: 400,
         errorCode: "MISSING_PROVIDER_ID",
-        errorMessage: "provider_id manquant sur ce prospect.",
+        errorMessage:
+          "Impossible d’envoyer un message: le provider_id n’est pas encore connu. Il est récupéré automatiquement quand le prospect accepte la connexion (webhook new_relation).",
       });
     }
 
