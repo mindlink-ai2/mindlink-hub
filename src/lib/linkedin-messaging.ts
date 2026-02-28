@@ -394,6 +394,11 @@ async function callUnipile(params: {
   body?: JsonObject;
 }): Promise<{ status: number; payload: unknown; text: string }> {
   const { url, method, apiKey, body } = params;
+  console.log("UNIPILE_HTTP_REQUEST", {
+    method,
+    url,
+    body: safeStringify(body ?? null),
+  });
   const response = await fetch(url, {
     method,
     headers: {
@@ -413,6 +418,14 @@ async function callUnipile(params: {
       payload = text;
     }
   }
+  console.log("UNIPILE_HTTP_RESPONSE", {
+    method,
+    url,
+    status: response.status,
+    ok: response.ok,
+    response_body: payload,
+    response_text: text,
+  });
 
   if (!response.ok) {
     const message = getUnipileErrorText(payload, text);
@@ -768,16 +781,36 @@ async function createConversationThreadId(params: {
 
   const endpoints = [`${baseUrl}/api/v1/chats`, `${baseUrl}/api/v1/conversations`];
   const bodyCandidates = dedupeBodies([
-    { account_id: unipileAccountId, provider: "LINKEDIN", attendee_provider_id: providerId },
-    { account_id: unipileAccountId, attendees: [{ provider_id: providerId }] },
-    { account_id: unipileAccountId, participants: [{ provider_id: providerId }] },
-    { account_id: unipileAccountId, provider_id: providerId },
+    {
+      account_id: unipileAccountId,
+      provider: "LINKEDIN",
+      attendees: [{ provider_id: providerId }],
+    },
+    {
+      account_id: unipileAccountId,
+      provider: "LINKEDIN",
+      attendee_provider_id: providerId,
+    },
+    {
+      account_id: unipileAccountId,
+      provider: "LINKEDIN",
+      participant_provider_ids: [providerId],
+    },
   ]);
+  const attemptNames = ["A", "B", "C"];
 
   const failures: UnipileCallFailureDetail[] = [];
 
   for (const url of endpoints) {
-    for (const body of bodyCandidates) {
+    for (let index = 0; index < bodyCandidates.length; index += 1) {
+      const body = bodyCandidates[index];
+      const attempt = attemptNames[index] ?? `FALLBACK_${index + 1}`;
+      console.log("UNIPILE_CREATE_CHAT_ATTEMPT", {
+        attempt,
+        method: "POST",
+        url,
+        body: safeStringify(body),
+      });
       try {
         const response = await callUnipile({
           url,
@@ -786,6 +819,15 @@ async function createConversationThreadId(params: {
           body,
         });
         const threadId = extractThreadId(response.payload);
+        console.log("UNIPILE_CREATE_CHAT_ATTEMPT_RESULT", {
+          attempt,
+          method: "POST",
+          url,
+          status: response.status,
+          thread_id: threadId,
+          response_body: response.payload,
+          response_text: response.text,
+        });
         if (threadId) return { threadId, details: failures };
 
         failures.push({
@@ -805,6 +847,17 @@ async function createConversationThreadId(params: {
             requestBody: body,
           })
         );
+        const lastFailure = failures[failures.length - 1] ?? null;
+        console.warn("UNIPILE_CREATE_CHAT_ATTEMPT_FAILED", {
+          attempt,
+          method: "POST",
+          url,
+          body: safeStringify(body),
+          status: lastFailure?.status ?? null,
+          data: lastFailure?.data ?? null,
+          text: lastFailure?.text ?? null,
+          message: lastFailure?.message ?? null,
+        });
       }
     }
   }
@@ -839,6 +892,11 @@ export async function sendOutboundMessageInThread(params: {
           account_id: unipileAccountId,
           text,
         };
+    console.log("UNIPILE_SEND_MESSAGE_ATTEMPT", {
+      method: "POST",
+      url,
+      body: safeStringify(body),
+    });
 
     let payload: unknown = null;
     let responseStatus = 0;
@@ -853,14 +911,29 @@ export async function sendOutboundMessageInThread(params: {
       payload = response.payload;
       responseStatus = response.status;
       responseText = response.text;
+      console.log("UNIPILE_SEND_MESSAGE_ATTEMPT_RESULT", {
+        method: "POST",
+        url,
+        status: responseStatus,
+        response_body: payload,
+        response_text: responseText,
+      });
     } catch (error) {
-      failures.push(
-        toUnipileFailureMessage(error, {
-          method: "POST",
-          url,
-          requestBody: body,
-        })
-      );
+      const failure = toUnipileFailureMessage(error, {
+        method: "POST",
+        url,
+        requestBody: body,
+      });
+      failures.push(failure);
+      console.warn("UNIPILE_SEND_MESSAGE_ATTEMPT_FAILED", {
+        method: "POST",
+        url,
+        body: safeStringify(body),
+        status: failure.status,
+        data: failure.data,
+        text: failure.text,
+        message: failure.message,
+      });
       continue;
     }
 
