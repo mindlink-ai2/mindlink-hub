@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
-import LeadsCards, { LeadsCardsSkeleton } from "@/components/leads/LeadsCards";
+import LeadsCards, { LeadsCardsSkeleton, type MobileLeadsViewMode } from "@/components/leads/LeadsCards";
 import { getLeadStatusKey } from "@/components/leads/LeadCard";
 import LeadsMobileFilters, {
   type MobileLeadFilterKey,
 } from "@/components/leads/LeadsMobileFilters";
 import { HubButton } from "@/components/ui/hub-button";
-import { AlertTriangle, Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2, X } from "lucide-react";
+import { AlertTriangle, Building2, LayoutGrid, Linkedin, List, Mail, MapPin, MoveRight, Phone, UserCircle2, X } from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -137,6 +137,7 @@ export default function LeadsPage() {
   const [safeLeads, setSafeLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileStatusFilter, setMobileStatusFilter] = useState<MobileLeadFilterKey>("all");
+  const [mobileViewMode, setMobileViewMode] = useState<MobileLeadsViewMode>("compact");
   const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
@@ -867,7 +868,7 @@ export default function LeadsPage() {
                 <div className="mt-3 h-10 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
                 <div className="mt-3 h-8 w-32 animate-pulse rounded-full bg-[#edf3fb]" />
               </div>
-              <LeadsCardsSkeleton count={6} />
+              <LeadsCardsSkeleton count={8} viewMode="compact" />
               <div className="text-xs text-[#4B5563]">Chargement des leads...</div>
             </div>
           </div>
@@ -930,9 +931,31 @@ export default function LeadsPage() {
                     <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
                       Prospects
                     </span>
-                    <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 text-[11px] tabular-nums text-[#4f6784]">
-                      {mobileFilteredLeads.length}/{filteredLeads.length}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 text-[11px] tabular-nums text-[#4f6784]">
+                        {mobileFilteredLeads.length}/{filteredLeads.length}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMobileViewMode((prev) => (prev === "compact" ? "comfort" : "compact"))
+                        }
+                        className="inline-flex h-8 items-center gap-1 rounded-full border border-[#d7e3f4] bg-white px-2.5 text-[11px] font-medium text-[#4f6784] transition hover:bg-[#f7fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                        aria-label={
+                          mobileViewMode === "compact"
+                            ? "Passer en affichage confort"
+                            : "Passer en affichage compact"
+                        }
+                        title={mobileViewMode === "compact" ? "Mode compact actif" : "Mode confort actif"}
+                      >
+                        {mobileViewMode === "compact" ? (
+                          <List className="h-3.5 w-3.5" />
+                        ) : (
+                          <LayoutGrid className="h-3.5 w-3.5" />
+                        )}
+                        {mobileViewMode === "compact" ? "Compact" : "Confort"}
+                      </button>
+                    </div>
                   </div>
 
                   <h1 className="mt-2 text-[22px] font-semibold leading-tight text-[#0b1c33]">
@@ -978,6 +1001,7 @@ export default function LeadsPage() {
                   <LeadsCards
                     leads={mobileFilteredLeads}
                     hasActiveFilters={Boolean(searchTerm.trim()) || mobileStatusFilter !== "all"}
+                    viewMode={mobileViewMode}
                     onOpenLead={(lead) => setOpenLead(lead as Lead)}
                     onToggleStatus={(lead) => handleStatusBadgeClick(lead as Lead)}
                     onInviteLinkedIn={(lead) => handleLinkedInInvite(lead as Lead)}

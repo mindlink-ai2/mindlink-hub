@@ -1,10 +1,14 @@
 import { SearchX } from "lucide-react";
 
+import CompactLeadRow from "./CompactLeadRow";
 import LeadCard, { type LeadCardLead } from "./LeadCard";
+
+export type MobileLeadsViewMode = "compact" | "comfort";
 
 type LeadsCardsProps = {
   leads: LeadCardLead[];
   hasActiveFilters: boolean;
+  viewMode: MobileLeadsViewMode;
   onOpenLead: (lead: LeadCardLead) => void;
   onToggleStatus: (lead: LeadCardLead) => void;
   onInviteLinkedIn: (lead: LeadCardLead) => void;
@@ -14,20 +18,36 @@ type LeadsCardsProps = {
   onResetFilters: () => void;
 };
 
-export function LeadsCardsSkeleton({ count = 5 }: { count?: number }) {
+export function LeadsCardsSkeleton({
+  count = 5,
+  viewMode = "compact",
+}: {
+  count?: number;
+  viewMode?: MobileLeadsViewMode;
+}) {
   return (
-    <div className="space-y-3">
+    <div className={viewMode === "compact" ? "space-y-2" : "space-y-3"}>
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}
           className="overflow-hidden rounded-2xl border border-[#d7e3f4] bg-white p-4"
           aria-hidden="true"
         >
-          <div className="h-4 w-40 animate-pulse rounded bg-[#e9f1ff]" />
-          <div className="mt-2 h-3 w-52 animate-pulse rounded bg-[#eef4fd]" />
-          <div className="mt-3 h-8 animate-pulse rounded-xl bg-[#f3f8ff]" />
-          <div className="mt-2 h-8 animate-pulse rounded-xl bg-[#f3f8ff]" />
-          <div className="mt-3 h-9 animate-pulse rounded-xl bg-[#e9f1ff]" />
+          {viewMode === "compact" ? (
+            <>
+              <div className="h-3.5 w-36 animate-pulse rounded bg-[#e9f1ff]" />
+              <div className="mt-2 h-3 w-48 animate-pulse rounded bg-[#eef4fd]" />
+              <div className="mt-2 h-2.5 w-28 animate-pulse rounded bg-[#eef4fd]" />
+            </>
+          ) : (
+            <>
+              <div className="h-4 w-40 animate-pulse rounded bg-[#e9f1ff]" />
+              <div className="mt-2 h-3 w-52 animate-pulse rounded bg-[#eef4fd]" />
+              <div className="mt-3 h-8 animate-pulse rounded-xl bg-[#f3f8ff]" />
+              <div className="mt-2 h-8 animate-pulse rounded-xl bg-[#f3f8ff]" />
+              <div className="mt-3 h-9 animate-pulse rounded-xl bg-[#e9f1ff]" />
+            </>
+          )}
         </div>
       ))}
     </div>
@@ -37,6 +57,7 @@ export function LeadsCardsSkeleton({ count = 5 }: { count?: number }) {
 export default function LeadsCards({
   leads,
   hasActiveFilters,
+  viewMode,
   onOpenLead,
   onToggleStatus,
   onInviteLinkedIn,
@@ -69,9 +90,13 @@ export default function LeadsCards({
   }
 
   return (
-    <div className="space-y-3">
+    <div className={viewMode === "compact" ? "space-y-2" : "space-y-3"}>
       {leads.map((lead) => {
         const id = String(lead.id);
+
+        if (viewMode === "compact") {
+          return <CompactLeadRow key={id} lead={lead} onOpenLead={onOpenLead} />;
+        }
 
         return (
           <LeadCard
