@@ -6,26 +6,13 @@ import { Inbox, LifeBuoy, MessageSquare, Settings2, UsersRound } from "lucide-re
 
 import { cn } from "@/lib/utils";
 
-const SUPPORT_WIDGET_EVENT = "mindlink:support-widget-open";
-
 type MobileNavItem = {
   key: string;
   label: string;
   href?: string;
   match: (pathname: string) => boolean;
   icon: typeof UsersRound;
-  onClick?: () => void;
 };
-
-function openSupportWidget() {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem("lidmeo_support_widget_open", "1");
-  } catch {
-    // no-op
-  }
-  window.dispatchEvent(new CustomEvent(SUPPORT_WIDGET_EVENT));
-}
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
@@ -61,8 +48,8 @@ export default function MobileBottomNav() {
     {
       key: "support",
       label: "Support",
-      match: () => false,
-      onClick: openSupportWidget,
+      href: "/dashboard/support",
+      match: (current) => current.startsWith("/dashboard/support"),
       icon: LifeBuoy,
     },
     {
@@ -121,19 +108,7 @@ export default function MobileBottomNav() {
             );
           }
 
-          return (
-            <li key={item.key}>
-              <button
-                type="button"
-                onClick={item.onClick}
-                className="inline-flex h-[52px] w-full flex-col items-center justify-center rounded-xl border border-transparent bg-transparent transition hover:border-[#d7e3f4] hover:bg-[#f7fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
-                aria-label="Ouvrir le support"
-                title="Ouvrir le support"
-              >
-                {content}
-              </button>
-            </li>
-          );
+          return null;
         })}
       </ul>
     </nav>

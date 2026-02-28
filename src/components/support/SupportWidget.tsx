@@ -150,7 +150,9 @@ export default function SupportWidget() {
   const lastMarkReadAtRef = useRef<number>(0);
   const pendingMarkReadRef = useRef<number | null>(null);
 
-  const shouldRenderOnPage = pathname ? !pathname.startsWith("/admin/support") : true;
+  const shouldRenderOnPage = pathname
+    ? !pathname.startsWith("/admin/support") && !pathname.startsWith("/dashboard/support")
+    : true;
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedConversationId) ?? null,
@@ -604,7 +606,7 @@ export default function SupportWidget() {
   if (pathname?.startsWith("/dashboard/leads") && isLeadsSidebarOpen) return null;
 
   return (
-    <>
+    <div className="hidden md:block">
       <div className="fixed bottom-5 right-5 z-[70] sm:bottom-6 sm:right-6">
         <button
           type="button"
@@ -930,6 +932,6 @@ export default function SupportWidget() {
           </section>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }
