@@ -9,6 +9,7 @@ import LeadsMobileFilters, {
   type MobileLeadFilterKey,
 } from "@/components/leads/LeadsMobileFilters";
 import LeadDetailsOverlay from "@/components/leads/LeadDetailsOverlay";
+import { trackFeatureUsed } from "@/lib/analytics/client";
 import { HubButton } from "@/components/ui/hub-button";
 import { AlertTriangle, Building2, LayoutGrid, Linkedin, List, Mail, MapPin, MoveRight, Phone, UserCircle2 } from "lucide-react";
 
