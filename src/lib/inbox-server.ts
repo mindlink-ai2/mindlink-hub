@@ -37,11 +37,24 @@ export async function getLinkedinUnipileAccountId(
   supabase: SupabaseClient,
   clientId: string
 ): Promise<string | null> {
+  const { data: settings, error: settingsError } = await supabase
+    .from("client_linkedin_settings")
+    .select("unipile_account_id")
+    .eq("client_id", clientId)
+    .limit(1)
+    .maybeSingle();
+
+  const settingsAccountId = String(settings?.unipile_account_id ?? "").trim();
+  if (!settingsError && settingsAccountId) {
+    return settingsAccountId;
+  }
+
   const { data: account, error } = await supabase
     .from("unipile_accounts")
     .select("unipile_account_id")
     .eq("client_id", clientId)
     .eq("provider", "linkedin")
+    .order("connected_at", { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle();
 

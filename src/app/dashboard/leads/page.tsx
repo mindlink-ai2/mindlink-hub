@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
@@ -27,6 +27,12 @@ type Lead = {
   linkedin_invitation_status?: "sent" | "accepted" | null;
   linkedin_invitation_sent?: boolean | null;
   [key: string]: unknown;
+};
+
+type SidebarToast = {
+  id: number;
+  tone: "success" | "error";
+  message: string;
 };
 
 const JOB_TITLE_EXACT_TRANSLATIONS: Record<string, string> = {
@@ -149,6 +155,8 @@ export default function LeadsPage() {
   const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
   const [sendingLinkedInMessageLeadIds, setSendingLinkedInMessageLeadIds] = useState<Set<string>>(new Set());
   const [linkedInMessageSendErrors, setLinkedInMessageSendErrors] = useState<Record<string, string>>({});
+  const [sidebarToast, setSidebarToast] = useState<SidebarToast | null>(null);
+  const sidebarToastTimeoutRef = useRef<number | null>(null);
   const selectedCount = selectedIds.size;
 
   // ✅ open lead from query param (?open=ID)
@@ -171,6 +179,34 @@ export default function LeadsPage() {
     } catch (e) {
       console.error(e);
     }
+  }, []);
+
+  const showSidebarToast = (tone: "success" | "error", message: string) => {
+    if (sidebarToastTimeoutRef.current) {
+      window.clearTimeout(sidebarToastTimeoutRef.current);
+      sidebarToastTimeoutRef.current = null;
+    }
+
+    const nextToast: SidebarToast = {
+      id: Date.now(),
+      tone,
+      message,
+    };
+    setSidebarToast(nextToast);
+
+    sidebarToastTimeoutRef.current = window.setTimeout(() => {
+      setSidebarToast((current) => (current?.id === nextToast.id ? null : current));
+      sidebarToastTimeoutRef.current = null;
+    }, 3200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (sidebarToastTimeoutRef.current) {
+        window.clearTimeout(sidebarToastTimeoutRef.current);
+        sidebarToastTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   // Load leads + options + plan
@@ -682,6 +718,8 @@ export default function LeadsPage() {
             : l
         )
       );
+      showSidebarToast("success", "Message envoyé");
+      void fetch("/api/inbox/threads", { cache: "no-store" }).catch(() => undefined);
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
@@ -691,6 +729,7 @@ export default function LeadsPage() {
         ...prev,
         [idStr]: errorMessage,
       }));
+      showSidebarToast("error", errorMessage);
     } finally {
       setSendingLinkedInMessageLeadIds((prev: Set<string>) => {
         if (!prev.has(idStr)) return prev;
@@ -1514,7 +1553,7 @@ export default function LeadsPage() {
                             ? "Envoi…"
                             : openLeadLinkedInMessageError
                               ? "Erreur — réessayer"
-                              : "Envoyer le message"}
+                              : "Envoyer un message"}
                       </button>
                     </div>
 
@@ -1600,6 +1639,21 @@ export default function LeadsPage() {
               </div>
             </>
           )}
+
+          {sidebarToast ? (
+            <div
+              className={[
+                "fixed bottom-5 right-5 z-[120] max-w-[min(90vw,360px)] rounded-xl border px-4 py-3 text-sm shadow-[0_20px_45px_-25px_rgba(2,6,23,0.55)]",
+                sidebarToast.tone === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-red-200 bg-red-50 text-red-800",
+              ].join(" ")}
+              role="status"
+              aria-live="polite"
+            >
+              {sidebarToast.message}
+            </div>
+          ) : null}
         </div>
 
       </>
