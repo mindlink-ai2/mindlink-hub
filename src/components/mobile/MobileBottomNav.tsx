@@ -37,7 +37,7 @@ export default function MobileBottomNav() {
     },
     {
       key: "inbox",
-      label: "Inbox",
+      label: "Messagerie",
       href: "/dashboard/inbox",
       match: (current) => current.startsWith("/dashboard/inbox"),
       icon: Inbox,
@@ -51,7 +51,7 @@ export default function MobileBottomNav() {
     },
     {
       key: "settings",
-      label: "Plus",
+      label: "Abonnement",
       href: "/dashboard/hub/billing",
       match: (current) => current.startsWith("/dashboard/hub/billing"),
       icon: Settings2,

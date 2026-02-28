@@ -37,6 +37,8 @@ type InboxMessage = {
   raw: unknown;
 };
 
+type MobileThreadFilter = "all" | "unread";
+
 function asObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return value as Record<string, unknown>;
@@ -166,6 +168,7 @@ export default function InboxPage() {
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
   const [threadSearch, setThreadSearch] = useState("");
+  const [mobileThreadFilter, setMobileThreadFilter] = useState<MobileThreadFilter>("all");
   const [mobileThreadSheetOpen, setMobileThreadSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
@@ -223,6 +226,21 @@ export default function InboxPage() {
       return normalizedName.includes(query) || firstName.includes(query);
     });
   }, [threads, threadSearch]);
+
+  const mobileFilteredThreads = useMemo(() => {
+    if (mobileThreadFilter === "all") return filteredThreads;
+    return filteredThreads.filter((thread) => Number(thread.unread_count ?? 0) > 0);
+  }, [filteredThreads, mobileThreadFilter]);
+
+  const unreadThreadsCount = useMemo(
+    () => threads.filter((thread) => Number(thread.unread_count ?? 0) > 0).length,
+    [threads]
+  );
+
+  const filteredUnreadThreadsCount = useMemo(
+    () => filteredThreads.filter((thread) => Number(thread.unread_count ?? 0) > 0).length,
+    [filteredThreads]
+  );
 
   const loadThreads = useCallback(async (options?: { keepSelected?: boolean }) => {
     setLoadingThreads(true);
@@ -616,8 +634,8 @@ export default function InboxPage() {
         <div className="mx-auto flex min-h-0 w-full max-w-[1680px] flex-1 flex-col gap-3">
           <MobileLayout>
             <MobilePageHeader
-              title="Inbox LinkedIn"
-              subtitle={`${threads.length} conversation(s)`}
+              title="Messagerie LinkedIn"
+              subtitle={`${threads.length} conversation(s) · ${unreadThreadsCount} non lue(s)`}
               actions={
                 <button
                   type="button"
@@ -629,6 +647,36 @@ export default function InboxPage() {
                 </button>
               }
             />
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMobileThreadFilter("all")}
+                className={[
+                  "inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2 focus:ring-[#dce8ff]",
+                  mobileThreadFilter === "all"
+                    ? "border-[#9cc0ff] bg-[#edf4ff] text-[#1f4f96]"
+                    : "border-[#d7e3f4] bg-white text-[#607894] hover:bg-[#f7fbff]",
+                ].join(" ")}
+                aria-pressed={mobileThreadFilter === "all"}
+              >
+                Tous ({filteredThreads.length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMobileThreadFilter("unread")}
+                className={[
+                  "inline-flex h-8 items-center rounded-full border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2 focus:ring-[#dce8ff]",
+                  mobileThreadFilter === "unread"
+                    ? "border-[#9cc0ff] bg-[#edf4ff] text-[#1f4f96]"
+                    : "border-[#d7e3f4] bg-white text-[#607894] hover:bg-[#f7fbff]",
+                ].join(" ")}
+                aria-pressed={mobileThreadFilter === "unread"}
+              >
+                Non lus ({filteredUnreadThreadsCount})
+              </button>
+            </div>
 
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0bb]" />
@@ -648,18 +696,20 @@ export default function InboxPage() {
 
             {loadingThreads ? (
               <MobileSkeleton rows={8} />
-            ) : filteredThreads.length === 0 ? (
+            ) : mobileFilteredThreads.length === 0 ? (
               <MobileEmptyState
                 title="Aucune conversation"
                 description={
                   threads.length === 0
                     ? "La synchronisation n'a encore ramené aucun thread."
-                    : "Aucune conversation ne correspond à cette recherche."
+                    : mobileThreadFilter === "unread"
+                      ? "Aucune conversation non lue pour ce filtre."
+                      : "Aucune conversation ne correspond à cette recherche."
                 }
               />
             ) : (
               <div className="space-y-2">
-                {filteredThreads.map((thread) => {
+                {mobileFilteredThreads.map((thread) => {
                   const unreadCount =
                     typeof thread.unread_count === "number" ? thread.unread_count : 0;
 
