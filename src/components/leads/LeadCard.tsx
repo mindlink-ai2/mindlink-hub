@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Building2, ExternalLink, Linkedin, Mail, MapPin, MoveRight, Phone } from "lucide-react";
+import { Building2, Linkedin, Mail, MapPin, MoveRight, Phone } from "lucide-react";
 
 import { HubButton } from "@/components/ui/hub-button";
 
@@ -234,11 +234,12 @@ function LeadCardComponent({
               href={safeExternalUrl(lead.LinkedInURL)}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#d7e3f4] bg-white text-[#3f5675] transition hover:bg-[#f4f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
-              aria-label={`Ouvrir le profil LinkedIn de ${displayName}`}
-              title="Ouvrir LinkedIn"
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-[#d7e3f4] bg-white px-2.5 text-[11px] text-[#3f5675] transition hover:bg-[#f4f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+              aria-label="Se connecter sur LinkedIn"
+              title="Se connecter sur LinkedIn"
             >
-              <ExternalLink className="h-4 w-4" />
+              <Linkedin className="h-3.5 w-3.5 text-[#0A66C2]" />
+              <span>Se connecter</span>
             </a>
           ) : null}
         </div>

@@ -1,5 +1,5 @@
-import { memo } from "react";
-import { ChevronRight } from "lucide-react";
+import { memo, type MouseEvent } from "react";
+import { ChevronRight, Linkedin } from "lucide-react";
 
 import { getLeadStatusKey, type LeadCardLead, type LeadCardStatusKey } from "./LeadCard";
 
@@ -50,6 +50,10 @@ function formatCompactDate(createdAt: string | null | undefined): string | null 
   })}`;
 }
 
+function safeExternalUrl(rawUrl: string): string {
+  return /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+}
+
 export type CompactLeadRowProps = {
   lead: LeadCardLead;
   onOpenLead: (lead: LeadCardLead) => void;
@@ -65,36 +69,60 @@ function CompactLeadRowComponent({ lead, onOpenLead }: CompactLeadRowProps) {
     .filter(Boolean)
     .join(" - ");
   const dateLabel = formatCompactDate(lead.created_at);
+  const linkedInUrl = (lead.LinkedInURL ?? "").trim()
+    ? safeExternalUrl(String(lead.LinkedInURL))
+    : null;
+
+  const handleLinkedInClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!linkedInUrl) return;
+    window.open(linkedInUrl, "_blank", "noopener,noreferrer");
+  };
 
   return (
-    <button
-      type="button"
-      onClick={() => onOpenLead(lead)}
-      className="group flex w-full items-start gap-2 rounded-xl border border-[#d7e3f4] bg-white px-3 py-2.5 text-left shadow-[0_10px_18px_-18px_rgba(18,43,86,0.68)] transition hover:bg-[#f9fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
-      aria-label={`Ouvrir la fiche de ${displayName}`}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-[14px] font-medium leading-tight text-[#0b1c33]">{displayName}</p>
-          <span
-            className={[
-              "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
-              getStatusClassName(status),
-            ].join(" ")}
-          >
-            {statusLabel}
-          </span>
+    <article className="flex items-center gap-2 rounded-xl border border-[#d7e3f4] bg-white px-2.5 py-2 shadow-[0_10px_18px_-18px_rgba(18,43,86,0.68)] transition hover:bg-[#f9fbff]">
+      <button
+        type="button"
+        onClick={() => onOpenLead(lead)}
+        className="group flex min-w-0 flex-1 items-start justify-between gap-2 text-left focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+        aria-label={`Ouvrir la fiche de ${displayName}`}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-[14px] font-medium leading-tight text-[#0b1c33]">{displayName}</p>
+            <span
+              className={[
+                "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                getStatusClassName(status),
+              ].join(" ")}
+            >
+              {statusLabel}
+            </span>
+          </div>
+
+          <p className="mt-1 truncate text-[13px] text-[#5f7693]">{subtitle}</p>
+
+          {dateLabel ? <p className="mt-0.5 truncate text-[11px] text-[#7a8fa9]">{dateLabel}</p> : null}
         </div>
 
-        <p className="mt-1 truncate text-[13px] text-[#5f7693]">{subtitle}</p>
+        <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[#90a3bb] transition group-hover:text-[#536f96]">
+          <ChevronRight className="h-4 w-4" />
+        </span>
+      </button>
 
-        {dateLabel ? <p className="mt-0.5 truncate text-[11px] text-[#7a8fa9]">{dateLabel}</p> : null}
-      </div>
-
-      <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[#90a3bb] transition group-hover:text-[#536f96]">
-        <ChevronRight className="h-4 w-4" />
-      </span>
-    </button>
+      <button
+        type="button"
+        onClick={handleLinkedInClick}
+        disabled={!linkedInUrl}
+        className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-[#d7e3f4] bg-white px-2 text-[11px] text-[#4b647f] transition hover:bg-[#f5f9ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff] disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label="Se connecter sur LinkedIn"
+        title="Se connecter sur LinkedIn"
+      >
+        <Linkedin className="h-3.5 w-3.5 text-[#0A66C2]" />
+        <span>Se connecter</span>
+      </button>
+    </article>
   );
 }
 
