@@ -114,37 +114,85 @@ function getErrorMessage(payload: unknown): string | null {
 
 type ConversationFailure = {
   endpoint: string;
-  status: number;
+  status: number | null;
+  method: string;
+  data: unknown;
+  text: string;
   details: string | null;
+  requestBody?: Record<string, unknown>;
 };
 
-function buildConversationCreateUserMessage(rawDetails: string | null): string {
-  const defaultMessage = "Impossible d’envoyer : création de conversation LinkedIn échouée.";
-  if (!rawDetails) return defaultMessage;
+function safeStringify(value: unknown): string {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
 
-  const details = rawDetails.trim();
-  if (!details) return defaultMessage;
-  const normalized = details.toLowerCase();
+function extractUnipileFailureDetails(data: unknown, text: string): string | null {
+  const payloadMessage = getErrorMessage(data);
+  if (payloadMessage) return payloadMessage;
+  const cleanText = text.trim();
+  if (cleanText) return cleanText;
+  const serialized = safeStringify(data).trim();
+  return serialized || null;
+}
+
+function mapUnipileErrorToUserMessage(params: { status: number | null; rawDetails: string | null }): string {
+  const { status, rawDetails } = params;
+  const excerptRaw = String(rawDetails ?? "").replace(/\s+/g, " ").trim();
+  const excerpt = excerptRaw.length > 220 ? `${excerptRaw.slice(0, 220)}…` : excerptRaw;
+  const normalized = excerpt.toLowerCase();
+
+  if (status === 401 || status === 403) {
+    return "Compte LinkedIn non connecté ou autorisation refusée. Reconnecte ton LinkedIn.";
+  }
+
+  if (normalized.includes("not connected") || normalized.includes("forbidden")) {
+    return "Compte LinkedIn non connecté ou autorisation refusée. Reconnecte ton LinkedIn.";
+  }
+
+  if (normalized.includes("provider") || normalized.includes("invalid")) {
+    return "Profil LinkedIn du prospect invalide (provider_id manquant ou incorrect).";
+  }
 
   if (
-    normalized.includes("not connected") ||
-    normalized.includes("not a 1st degree") ||
+    normalized.includes("open profile") ||
     normalized.includes("invitation") ||
+    normalized.includes("cannot message") ||
+    normalized.includes("not a 1st degree") ||
     normalized.includes("relation") ||
     normalized.includes("connection")
   ) {
-    return "Impossible d’envoyer : le prospect doit d’abord accepter votre invitation LinkedIn.";
+    return "Impossible de créer une conversation (profil non accessible). Il faut d’abord se connecter ou utiliser InMail/Open Profile.";
   }
 
-  if (
-    normalized === "not found" ||
-    normalized.includes("not found") ||
-    normalized.includes("404")
-  ) {
-    return "Impossible d’envoyer : prospect introuvable côté messagerie LinkedIn (souvent pas encore connecté).";
+  if (!excerpt) return "Unipile refuse la création du chat: détail indisponible";
+  return `Unipile refuse la création du chat: ${excerpt}`;
+}
+
+function buildErrorResponse(params: {
+  status: string;
+  httpStatus: number;
+  errorCode: string;
+  errorMessage: string;
+  debug?: unknown;
+}) {
+  const payload: Record<string, unknown> = {
+    ok: false,
+    status: params.status,
+    error_code: params.errorCode,
+    error_message: params.errorMessage,
+    message: params.errorMessage,
+  };
+
+  if (process.env.NODE_ENV !== "production" && typeof params.debug !== "undefined") {
+    payload.debug = params.debug;
   }
 
-  return `Impossible d’envoyer : ${details}`;
+  return NextResponse.json(payload, { status: params.httpStatus });
 }
 
 function dedupeBodies(candidates: Record<string, unknown>[]): Record<string, unknown>[] {
@@ -333,20 +381,6 @@ async function resolveRecipientAttendeeId(params: {
   return null;
 }
 
-async function postFirstSuccessful(
-  urls: string[],
-  initBuilder: (url: string) => RequestInit
-): Promise<{ payload: unknown; url: string } | null> {
-  for (const url of urls) {
-    const res = await fetch(url, initBuilder(url));
-    const payload = await readResponseBody(res);
-    if (res.ok) {
-      return { payload, url };
-    }
-  }
-  return null;
-}
-
 async function resolveLead(
   supabase: SupabaseClient,
   clientId: string,
@@ -481,40 +515,74 @@ async function sendMessageToThread(params: {
   unipileAccountId: string;
   unipileThreadId: string;
   text: string;
-}): Promise<{ sentAt: string; unipileMessageId: string; payload: unknown; senderName: string | null; senderLinkedInUrl: string | null } | null> {
+}): Promise<
+  | {
+      ok: true;
+      sentAt: string;
+      unipileMessageId: string;
+      payload: unknown;
+      senderName: string | null;
+      senderLinkedInUrl: string | null;
+    }
+  | {
+      ok: false;
+      failures: ConversationFailure[];
+    }
+> {
   const { base, apiKey, unipileAccountId, unipileThreadId, text } = params;
+  const endpoints = [
+    `${base}/api/v1/chats/${encodeURIComponent(unipileThreadId)}/messages`,
+    `${base}/api/v1/conversations/${encodeURIComponent(unipileThreadId)}/messages`,
+    `${base}/api/v1/messages`,
+  ];
+  const failures: ConversationFailure[] = [];
 
-  const sendResult = await postFirstSuccessful(
-    [
-      `${base}/api/v1/chats/${encodeURIComponent(unipileThreadId)}/messages`,
-      `${base}/api/v1/conversations/${encodeURIComponent(unipileThreadId)}/messages`,
-      `${base}/api/v1/messages`,
-    ],
-    (url) => ({
+  for (const endpoint of endpoints) {
+    const requestBody = /\/api\/v1\/messages$/.test(endpoint)
+      ? {
+          account_id: unipileAccountId,
+          chat_id: unipileThreadId,
+          text,
+        }
+      : {
+          account_id: unipileAccountId,
+          text,
+        };
+
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "X-API-KEY": apiKey,
         accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(
-        /\/api\/v1\/messages$/.test(url)
-          ? {
-              account_id: unipileAccountId,
-              chat_id: unipileThreadId,
-              text,
-            }
-          : {
-              account_id: unipileAccountId,
-              text,
-            }
-      ),
-    })
-  );
+      body: JSON.stringify(requestBody),
+    });
 
-  if (!sendResult) return null;
+    const textBody = await res.text().catch(() => "");
+    let payload: unknown = null;
+    if (textBody) {
+      try {
+        payload = JSON.parse(textBody) as Record<string, unknown>;
+      } catch {
+        payload = textBody;
+      }
+    }
 
-  const responseObject = toJsonObject(sendResult.payload);
+    if (!res.ok) {
+      failures.push({
+        endpoint,
+        status: res.status,
+        method: "POST",
+        data: payload ?? { raw_text: textBody || "empty_response_body" },
+        text: textBody,
+        details: extractUnipileFailureDetails(payload, textBody),
+        requestBody,
+      });
+      continue;
+    }
+
+    const responseObject = toJsonObject(payload);
   const parsedMessage = parseUnipileMessage({
     ...responseObject,
     ...(toJsonObject(responseObject.data)),
@@ -524,15 +592,30 @@ async function sendMessageToThread(params: {
     text,
   });
 
-  if (!parsedMessage.unipileMessageId) return null;
+    if (!parsedMessage.unipileMessageId) {
+      failures.push({
+        endpoint,
+        status: res.status,
+        method: "POST",
+        data: payload,
+        text: textBody,
+        details: "message_id_missing_in_send_response",
+        requestBody,
+      });
+      continue;
+    }
 
-  return {
-    sentAt: parsedMessage.sentAtIso,
-    unipileMessageId: parsedMessage.unipileMessageId,
-    payload: sendResult.payload,
-    senderName: parsedMessage.senderName,
-    senderLinkedInUrl: parsedMessage.senderLinkedInUrl,
-  };
+    return {
+      ok: true,
+      sentAt: parsedMessage.sentAtIso,
+      unipileMessageId: parsedMessage.unipileMessageId,
+      payload,
+      senderName: parsedMessage.senderName,
+      senderLinkedInUrl: parsedMessage.senderLinkedInUrl,
+    };
+  }
+
+  return { ok: false, failures };
 }
 
 async function persistOutboundMessage(params: {
@@ -664,12 +747,26 @@ async function createConversationThreadId(params: {
         body: JSON.stringify(body),
       });
 
-      const payload = await readResponseBody(res);
+      const text = await res.text().catch(() => "");
+      let payload: unknown = null;
+      if (text) {
+        try {
+          payload = JSON.parse(text) as Record<string, unknown>;
+        } catch {
+          payload = text;
+        }
+      }
+
       if (!res.ok) {
+        const details = extractUnipileFailureDetails(payload, text);
         failures.push({
           endpoint,
           status: res.status,
-          details: getErrorMessage(payload),
+          method: "POST",
+          data: payload ?? { raw_text: text || "empty_response_body" },
+          text,
+          details,
+          requestBody: body,
         });
         continue;
       }
@@ -756,53 +853,61 @@ export async function POST(req: Request) {
 
     const clientId = await getClientIdFromClerkUser(supabase, userId);
     if (!clientId) {
-      return NextResponse.json({ ok: false, status: "client_not_found" }, { status: 404 });
+      return buildErrorResponse({
+        status: "client_not_found",
+        httpStatus: 404,
+        errorCode: "CLIENT_NOT_FOUND",
+        errorMessage: "Client introuvable.",
+      });
     }
 
     currentLockKey = lockKey(clientId, leadId);
     if (inFlightSends.has(currentLockKey)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          status: "already_in_progress",
-          message: "Envoi déjà en cours",
-        },
-        { status: 409 }
-      );
+      return buildErrorResponse({
+        status: "already_in_progress",
+        httpStatus: 409,
+        errorCode: "SEND_ALREADY_IN_PROGRESS",
+        errorMessage: "Envoi déjà en cours",
+      });
     }
     inFlightSends.add(currentLockKey);
 
+    console.log({
+      step: "load-lead:start",
+      leadId,
+      provider_id: null,
+      unipile_account_id: null,
+    });
+
     const lead = await resolveLead(supabase, clientId, leadId);
     if (!lead) {
-      return NextResponse.json(
-        { ok: false, status: "lead_not_found", message: "Prospect introuvable." },
-        { status: 404 }
-      );
+      return buildErrorResponse({
+        status: "lead_not_found",
+        httpStatus: 404,
+        errorCode: "LEAD_NOT_FOUND",
+        errorMessage: "Prospect introuvable.",
+      });
     }
 
     const normalizedLeadLinkedInUrl = normalizeLinkedInUrl(lead.LinkedInURL);
     const profileSlug = extractLinkedInProfileSlug(lead.LinkedInURL);
     if (!normalizedLeadLinkedInUrl || !profileSlug) {
-      return NextResponse.json(
-        {
-          ok: false,
-          status: "missing_linkedin_info",
-          message: "Impossible d’envoyer : informations LinkedIn du prospect manquantes.",
-        },
-        { status: 400 }
-      );
+      return buildErrorResponse({
+        status: "missing_linkedin_info",
+        httpStatus: 400,
+        errorCode: "MISSING_PROVIDER_ID",
+        errorMessage: "Profil LinkedIn du prospect invalide (provider_id manquant ou incorrect).",
+      });
     }
 
     const unipileAccountId = await getLinkedinUnipileAccountId(supabase, clientId);
     if (!unipileAccountId) {
-      return NextResponse.json(
-        {
-          ok: false,
-          status: "linkedin_account_not_connected",
-          message: "Compte LinkedIn non connecté.",
-        },
-        { status: 404 }
-      );
+      return buildErrorResponse({
+        status: "linkedin_account_not_connected",
+        httpStatus: 400,
+        errorCode: "LINKEDIN_ACCOUNT_NOT_CONNECTED",
+        errorMessage: "Compte LinkedIn non connecté ou autorisation refusée. Reconnecte ton LinkedIn.",
+      });
     }
 
     const base = normalizeUnipileBase(requireEnv("UNIPILE_DSN"));
@@ -856,15 +961,20 @@ export async function POST(req: Request) {
 
       const providerId = extractProviderId(profilePayload);
       if (!providerId) {
-        return NextResponse.json(
-          {
-            ok: false,
-            status: "provider_id_missing",
-            message: "Impossible d’envoyer : informations LinkedIn du prospect manquantes.",
-          },
-          { status: 502 }
-        );
+        return buildErrorResponse({
+          status: "provider_id_missing",
+          httpStatus: 400,
+          errorCode: "MISSING_PROVIDER_ID",
+          errorMessage: "Profil LinkedIn du prospect invalide (provider_id manquant ou incorrect).",
+        });
       }
+
+      console.log({
+        step: "load-lead",
+        leadId,
+        provider_id: providerId,
+        unipile_account_id: unipileAccountId,
+      });
 
       const resolvedAttendeeId = await resolveRecipientAttendeeId({
         base,
@@ -880,6 +990,13 @@ export async function POST(req: Request) {
         attendeeId: resolvedAttendeeId,
         profileSlug,
         normalizedLeadLinkedInUrl,
+      });
+
+      console.log({
+        step: "create-chat:start",
+        leadId,
+        providerId,
+        accountId: unipileAccountId,
       });
 
       const conversationCreate = await createConversationThreadId({
@@ -912,6 +1029,19 @@ export async function POST(req: Request) {
         unipileThreadId = createdThreadId;
         threadCreated = true;
       } else {
+        const primaryCreateFailure = conversationCreate.failures.find(
+          (failure) => Boolean(failure.details || failure.text)
+        );
+        console.error("UNIPILE_CREATE_CHAT_FAILED", {
+          leadId,
+          providerId,
+          accountId: unipileAccountId,
+          status: primaryCreateFailure?.status ?? null,
+          data: primaryCreateFailure?.data ?? null,
+          text: primaryCreateFailure?.text ?? null,
+          message: primaryCreateFailure?.details ?? "unipile_create_chat_failed",
+        });
+
         // Fallback: certains comptes Unipile créent implicitement la conversation à l'envoi.
         const directSendBodies = dedupeBodies([
           ...targetVariants.map((target) => ({
@@ -945,7 +1075,7 @@ export async function POST(req: Request) {
         ]);
 
         let directSend: { payload: unknown; url: string } | null = null;
-        const directSendFailures: Array<{ status: number; details: string | null }> = [];
+        const directSendFailures: Array<{ status: number; data: unknown; text: string; details: string | null }> = [];
         for (const requestBody of directSendBodies) {
           const res = await fetch(`${base}/api/v1/messages`, {
             method: "POST",
@@ -957,11 +1087,21 @@ export async function POST(req: Request) {
             body: JSON.stringify(requestBody),
           });
 
-          const payload = await readResponseBody(res);
+          const text = await res.text().catch(() => "");
+          let payload: unknown = null;
+          if (text) {
+            try {
+              payload = JSON.parse(text) as Record<string, unknown>;
+            } catch {
+              payload = text;
+            }
+          }
           if (!res.ok) {
             directSendFailures.push({
               status: res.status,
-              details: getErrorMessage(payload),
+              data: payload ?? { raw_text: text || "empty_response_body" },
+              text,
+              details: extractUnipileFailureDetails(payload, text),
             });
             continue;
           }
@@ -980,18 +1120,24 @@ export async function POST(req: Request) {
             ...directSendFailures.map((failure) => ({
               endpoint: `${base}/api/v1/messages`,
               status: failure.status,
+              method: "POST",
+              data: failure.data,
+              text: failure.text,
               details: failure.details,
             })),
           ];
-          const firstDetail = combinedFailures.find((failure) => failure.details)?.details ?? null;
-          return NextResponse.json(
-            {
-              ok: false,
-              status: "conversation_create_failed",
-              message: buildConversationCreateUserMessage(firstDetail),
-            },
-            { status: 502 }
-          );
+          const firstFailure = combinedFailures.find((failure) => Boolean(failure.details || failure.text)) ?? null;
+          const userMessage = mapUnipileErrorToUserMessage({
+            status: firstFailure?.status ?? null,
+            rawDetails: firstFailure?.details ?? firstFailure?.text ?? null,
+          });
+          return buildErrorResponse({
+            status: "conversation_create_failed",
+            httpStatus: 502,
+            errorCode: "UNIPILE_CREATE_CHAT_FAILED",
+            errorMessage: userMessage,
+            debug: combinedFailures,
+          });
         }
 
         const parsedDirectMessage = parseUnipileMessage({
@@ -1079,15 +1225,14 @@ export async function POST(req: Request) {
       text: content,
     });
 
-    if (!sent) {
-      return NextResponse.json(
-        {
-          ok: false,
-          status: "send_failed",
-          message: "Impossible d’envoyer le message LinkedIn pour le moment.",
-        },
-        { status: 502 }
-      );
+    if (!sent.ok) {
+      return buildErrorResponse({
+        status: "send_failed",
+        httpStatus: 502,
+        errorCode: "UNIPILE_SEND_MESSAGE_FAILED",
+        errorMessage: "Impossible d’envoyer le message LinkedIn pour le moment.",
+        debug: sent.failures,
+      });
     }
 
     const persisted = await persistOutboundMessage({
@@ -1123,11 +1268,14 @@ export async function POST(req: Request) {
       },
     });
   } catch (error: unknown) {
-    console.error("PROSPECTION_SEND_LINKEDIN_MESSAGE_ERROR", error);
-    return NextResponse.json(
-      { ok: false, status: "server_error", message: "Erreur serveur pendant l’envoi." },
-      { status: 500 }
-    );
+    console.error("SEND_LINKEDIN_ERROR", error);
+    return buildErrorResponse({
+      status: "server_error",
+      httpStatus: 500,
+      errorCode: "SEND_LINKEDIN_SERVER_ERROR",
+      errorMessage: error instanceof Error ? error.message : "Erreur serveur pendant l’envoi.",
+      debug: error,
+    });
   } finally {
     if (currentLockKey) inFlightSends.delete(currentLockKey);
   }
