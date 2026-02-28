@@ -8,8 +8,9 @@ import {
   getLinkedinUnipileAccountId,
 } from "@/lib/inbox-server";
 import {
+  assertValidLinkedinProviderId,
   ensureThreadAndSendMessage,
-  getProviderIdForLeadFromInvitations,
+  getAcceptedProviderIdForLead,
   findExistingThreadForLead,
 } from "@/lib/linkedin-messaging";
 
@@ -293,7 +294,7 @@ export async function POST(req: Request) {
     let providerId: string | null = extractLeadProviderId(lead);
 
     if (!providerId) {
-      const lookup = await getProviderIdForLeadFromInvitations({
+      const lookup = await getAcceptedProviderIdForLead({
         supabase,
         leadId,
         clientId,
@@ -343,7 +344,7 @@ export async function POST(req: Request) {
           httpStatus: 400,
           errorCode: "MISSING_PROVIDER_ID",
           errorMessage:
-            "Invitation pas encore acceptée ou provider_id absent.",
+            "Invitation pas acceptée ou provider_id absent dans linkedin_invitations.",
           debug: {
             invitation_id: lookup.invitationId,
             status: lookup.invitationStatus,
@@ -356,12 +357,29 @@ export async function POST(req: Request) {
       }
     }
 
+    if (!existingUnipileThreadId) {
+      try {
+        assertValidLinkedinProviderId(providerId);
+      } catch (validationError) {
+        return buildErrorResponse({
+          status: "provider_id_invalid",
+          httpStatus: 400,
+          errorCode: "INVALID_PROVIDER_ID",
+          errorMessage: getErrorMessage(validationError),
+          debug: {
+            leadId,
+            providerId,
+          },
+        });
+      }
+    }
+
     if (!existingUnipileThreadId && !providerId) {
       return buildErrorResponse({
         status: "provider_id_missing",
         httpStatus: 400,
         errorCode: "MISSING_PROVIDER_ID",
-        errorMessage: "Invitation pas encore acceptée ou provider_id absent.",
+        errorMessage: "Invitation pas acceptée ou provider_id absent dans linkedin_invitations.",
       });
     }
 
@@ -465,7 +483,10 @@ export async function POST(req: Request) {
     const lower = message.toLowerCase();
     const status =
       lower.includes("missing linkedin provider_id") ||
-      lower.includes("no linkedin account connected")
+      lower.includes("no linkedin account connected") ||
+      lower.includes("provider_id invalide") ||
+      lower.includes("provider id invalide") ||
+      lower.includes("provider_id manquant")
         ? 400
         : lower.includes("profil linkedin introuvable")
           ? 502

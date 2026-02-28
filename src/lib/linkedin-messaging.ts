@@ -184,6 +184,29 @@ export type FindProviderIdFromInvitationsResult = {
   usedDateFilter: boolean;
 };
 
+export function assertValidLinkedinProviderId(providerId: unknown): asserts providerId is string {
+  if (!providerId) {
+    throw new Error("provider_id manquant");
+  }
+  if (typeof providerId !== "string") {
+    throw new Error("provider_id invalide (type)");
+  }
+  const trimmed = providerId.trim();
+  if (!trimmed) {
+    throw new Error("provider_id manquant");
+  }
+  if (trimmed.length < 15) {
+    throw new Error(
+      `Provider ID invalide: ${trimmed} (tu utilises invitation_id au lieu de user_provider_id)`
+    );
+  }
+  if (!trimmed.startsWith("ACoA")) {
+    throw new Error(
+      `Provider ID invalide: ${trimmed} (tu utilises invitation_id au lieu de user_provider_id)`
+    );
+  }
+}
+
 export function extractLinkedinSlug(url: string | null | undefined): string | null {
   if (!url) return null;
   const match = String(url).match(/linkedin\.com\/in\/([^\/\?#]+)/i);
@@ -530,7 +553,7 @@ function extractProviderIdFromInvitationRaw(rawInput: unknown): {
   };
 }
 
-export async function getProviderIdForLeadFromInvitations(params: {
+export async function getAcceptedProviderIdForLead(params: {
   supabase: SupabaseClient;
   leadId: number;
   clientId?: string | null;
@@ -538,9 +561,9 @@ export async function getProviderIdForLeadFromInvitations(params: {
   const { supabase, leadId, clientId } = params;
 
   const selectCandidates = [
-    "id, status, accepted_at, sent_at, raw",
-    "id, status, sent_at, raw",
-    "id, status, raw",
+    "id, raw, accepted_at, sent_at, status",
+    "id, raw, sent_at, status",
+    "id, raw, status",
     "id, raw",
   ];
 
@@ -599,6 +622,7 @@ export async function getProviderIdForLeadFromInvitations(params: {
   const extracted = extractProviderIdFromInvitationRaw(invitation?.raw);
 
   console.log({
+    step: "provider-lookup:accepted-invitation",
     leadId,
     invitationId,
     status: invitationStatus,
@@ -634,6 +658,14 @@ export async function getProviderIdForLeadFromInvitations(params: {
     acceptanceKeys: extracted.acceptanceKeys,
     usedDateFilter: invitationAcceptedAt !== null,
   };
+}
+
+export async function getProviderIdForLeadFromInvitations(params: {
+  supabase: SupabaseClient;
+  leadId: number;
+  clientId?: string | null;
+}): Promise<FindProviderIdFromInvitationsResult> {
+  return getAcceptedProviderIdForLead(params);
 }
 
 export async function findProviderIdFromInvitations(params: {
@@ -736,15 +768,10 @@ async function createConversationThreadId(params: {
 
   const endpoints = [`${baseUrl}/api/v1/chats`, `${baseUrl}/api/v1/conversations`];
   const bodyCandidates = dedupeBodies([
-    { account_id: unipileAccountId, provider_id: providerId },
-    { account_id: unipileAccountId, recipient_provider_id: providerId },
-    { account_id: unipileAccountId, attendee_id: providerId },
-    { account_id: unipileAccountId, participant_id: providerId },
-    { account_id: unipileAccountId, provider_ids: [providerId] },
-    { account_id: unipileAccountId, attendee_ids: [providerId] },
-    { account_id: unipileAccountId, participant_ids: [providerId] },
+    { account_id: unipileAccountId, provider: "LINKEDIN", attendee_provider_id: providerId },
     { account_id: unipileAccountId, attendees: [{ provider_id: providerId }] },
     { account_id: unipileAccountId, participants: [{ provider_id: providerId }] },
+    { account_id: unipileAccountId, provider_id: providerId },
   ]);
 
   const failures: UnipileCallFailureDetail[] = [];
@@ -869,6 +896,16 @@ export async function sendOutboundMessageInThread(params: {
   }
 
   const primaryFailure = pickPrimaryFailureDetail(failures);
+  if (primaryFailure) {
+    console.error("UNIPILE_SEND_MESSAGE_FAILED", {
+      status: primaryFailure.status,
+      url: primaryFailure.url,
+      method: primaryFailure.method,
+      data: primaryFailure.data,
+      text: primaryFailure.text,
+      message: primaryFailure.message,
+    });
+  }
   return {
     ok: false,
     status: "send_failed",
@@ -1199,6 +1236,7 @@ export async function ensureThreadAndSendMessage(params: {
         unipileThreadId: null,
       };
     }
+    assertValidLinkedinProviderId(usableProviderId);
 
     console.log({
       step: "create-chat:start",
@@ -1206,6 +1244,11 @@ export async function ensureThreadAndSendMessage(params: {
       providerId: usableProviderId,
       accountId: unipileAccountId,
       clientId,
+    });
+    console.log("SEND_LINKEDIN_DEBUG", {
+      leadId,
+      account_id: unipileAccountId,
+      providerId: usableProviderId,
     });
 
     const created = await createConversationThreadId({
@@ -1291,7 +1334,7 @@ export async function ensureThreadAndSendMessage(params: {
     unipileThreadId,
     text,
   });
-  if (!sent.ok) {
+  if (sent.ok === false) {
     return {
       ok: false,
       status: sent.status,
@@ -1316,7 +1359,7 @@ export async function ensureThreadAndSendMessage(params: {
     senderLinkedInUrl: sent.senderLinkedInUrl,
   });
 
-  if (!persisted.ok) {
+  if (persisted.ok === false) {
     return {
       ok: false,
       status: "message_persist_failed",
@@ -1372,7 +1415,7 @@ export async function sendAndPersistMessageForThread(params: {
     text: params.text,
   });
 
-  if (!sent.ok) {
+  if (sent.ok === false) {
     return {
       ok: false,
       status: sent.status,
@@ -1395,7 +1438,7 @@ export async function sendAndPersistMessageForThread(params: {
     senderLinkedInUrl: sent.senderLinkedInUrl,
   });
 
-  if (!persisted.ok) {
+  if (persisted.ok === false) {
     return {
       ok: false,
       status: "message_persist_failed",
