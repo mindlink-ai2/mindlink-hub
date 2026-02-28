@@ -21,9 +21,12 @@ type ThreadLookupRow = {
 
 type InvitationLookupRow = {
   id: number | string;
+  status?: string | null;
   lead_id?: number | string | null;
   unipile_account_id?: string | null;
   created_at?: string | null;
+  accepted_at?: string | null;
+  sent_at?: string | null;
   raw?: unknown;
 };
 
@@ -115,6 +118,8 @@ export type ResolveProviderIdResult =
         | "acceptance.webhook_payload.user_public_identifier"
         | "acceptance.matching.normalized_linkedin_url"
         | "acceptance.webhook_payload.user_profile_url"
+        | "acceptance.webhook_payload.user_provider_id"
+        | "webhook_payload.user_provider_id"
         | null;
       candidatesCount: number;
     }
@@ -128,18 +133,25 @@ export type ResolveProviderIdResult =
 export type FindProviderIdFromInvitationsResult = {
   providerId: string | null;
   invitationId: string | null;
+  invitationStatus: string | null;
   invitationCreatedAt: string | null;
+  invitationAcceptedAt: string | null;
+  invitationSentAt: string | null;
   matchedBy:
     | "acceptance.matching.profile_slug"
     | "acceptance.webhook_payload.user_public_identifier"
     | "acceptance.matching.normalized_linkedin_url"
     | "acceptance.webhook_payload.user_profile_url"
+    | "acceptance.webhook_payload.user_provider_id"
+    | "webhook_payload.user_provider_id"
     | null;
   candidatesCount: number;
   inspectedCount: number;
   normalizedLeadUrl: string | null;
   slug: string | null;
   recentProfileUrls: string[];
+  rawKeys: string[];
+  acceptanceKeys: string[];
   usedDateFilter: boolean;
 };
 
@@ -436,168 +448,163 @@ function extractMissingColumnName(error: unknown): string | null {
   return null;
 }
 
-function normalizeSlugForMatching(value: string | null | undefined): string | null {
-  const raw = String(value ?? "").trim();
-  if (!raw) return null;
-  try {
-    return decodeURIComponent(raw).trim().toLowerCase();
-  } catch {
-    return raw.toLowerCase();
-  }
-}
-
 function isMissingColumnError(error: unknown, columnName: string): boolean {
   const missing = extractMissingColumnName(error);
   return missing === columnName;
 }
 
-async function listClientLinkedinAccountIds(params: {
-  supabase: SupabaseClient;
-  clientId: string;
-  preferredAccountId?: string | null;
-}): Promise<string[]> {
-  const accountIds = new Set<string>();
-  const push = (value: unknown) => {
-    const normalized = String(value ?? "").trim();
-    if (normalized) accountIds.add(normalized);
-  };
-
-  const { supabase, clientId, preferredAccountId } = params;
-  push(preferredAccountId);
-
-  const settings = await supabase
-    .from("client_linkedin_settings")
-    .select("unipile_account_id")
-    .eq("client_id", clientId)
-    .limit(20);
-
-  if (!settings.error && Array.isArray(settings.data)) {
-    for (const row of settings.data as Array<{ unipile_account_id?: string | null }>) {
-      push(row.unipile_account_id);
-    }
-  }
-
-  let accounts = await supabase
-    .from("unipile_accounts")
-    .select("account_id, unipile_account_id")
-    .eq("client_id", clientId)
-    .eq("provider", "linkedin")
-    .limit(50);
-
-  if (accounts.error && isMissingColumnError(accounts.error, "provider")) {
-    accounts = await supabase
-      .from("unipile_accounts")
-      .select("account_id, unipile_account_id")
-      .eq("client_id", clientId)
-      .limit(50);
-  }
-
-  if (!accounts.error && Array.isArray(accounts.data)) {
-    for (const row of accounts.data as Array<{
-      account_id?: string | null;
-      unipile_account_id?: string | null;
-    }>) {
-      push(row.account_id);
-      push(row.unipile_account_id);
-    }
-  }
-
-  return [...accountIds];
-}
-
-function getWebhookAccountId(rawInput: unknown, fallbackAccountId?: string | null): string | null {
+function extractProviderIdFromInvitationRaw(rawInput: unknown): {
+  providerId: string | null;
+  matchedBy:
+    | "acceptance.webhook_payload.user_provider_id"
+    | "webhook_payload.user_provider_id"
+    | null;
+  rawKeys: string[];
+  acceptanceKeys: string[];
+} {
   const raw = toJsonObject(rawInput);
   const acceptance = toJsonObject(raw.acceptance);
-  const payload = toJsonObject(acceptance.webhook_payload);
-  const fallback = String(fallbackAccountId ?? "").trim() || null;
-  return (
-    getFirstString(payload, [
-      ["account_id"],
-      ["accountId"],
-      ["account", "id"],
-      ["account", "account_id"],
-    ]) ??
-    getFirstString(raw, [
-      ["account_id"],
-      ["accountId"],
-    ]) ??
-    fallback
-  );
-}
+  const acceptancePayload = toJsonObject(acceptance.webhook_payload);
+  const webhookPayload = toJsonObject(raw.webhook_payload);
 
-function getWebhookProfileUrl(rawInput: unknown): string | null {
-  const raw = toJsonObject(rawInput);
-  const acceptance = toJsonObject(raw.acceptance);
-  const payload = toJsonObject(acceptance.webhook_payload);
-  const url = getFirstString(payload, [
-    ["user_profile_url"],
-    ["userProfileUrl"],
-    ["profile_url"],
-    ["profileUrl"],
-    ["linkedin_url"],
-    ["linkedinUrl"],
-    ["user", "profile_url"],
-    ["user", "profileUrl"],
-    ["user", "linkedin_url"],
-    ["user", "linkedinUrl"],
+  const providerIdFromAcceptance = getFirstString(acceptancePayload, [
+    ["user_provider_id"],
+    ["userProviderId"],
+    ["provider_id"],
+    ["providerId"],
+    ["user", "provider_id"],
+    ["user", "providerId"],
   ]);
-  return normalizeLinkedInUrl(url);
+  if (providerIdFromAcceptance) {
+    return {
+      providerId: providerIdFromAcceptance,
+      matchedBy: "acceptance.webhook_payload.user_provider_id",
+      rawKeys: Object.keys(raw),
+      acceptanceKeys: Object.keys(acceptance),
+    };
+  }
+
+  const providerIdFromWebhook = getFirstString(webhookPayload, [
+    ["user_provider_id"],
+    ["userProviderId"],
+    ["provider_id"],
+    ["providerId"],
+    ["user", "provider_id"],
+    ["user", "providerId"],
+  ]);
+
+  return {
+    providerId: providerIdFromWebhook,
+    matchedBy: providerIdFromWebhook ? "webhook_payload.user_provider_id" : null,
+    rawKeys: Object.keys(raw),
+    acceptanceKeys: Object.keys(acceptance),
+  };
 }
 
-function getMatchingNormalizedUrl(rawInput: unknown): string | null {
-  const raw = toJsonObject(rawInput);
-  const acceptance = toJsonObject(raw.acceptance);
-  const matching = toJsonObject(acceptance.matching);
-  return normalizeLinkedInUrl(
-    getFirstString(matching, [
-      ["normalized_linkedin_url"],
-      ["normalizedLinkedinUrl"],
-    ])
-  );
-}
+export async function getProviderIdForLeadFromInvitations(params: {
+  supabase: SupabaseClient;
+  leadId: number;
+  clientId?: string | null;
+}): Promise<FindProviderIdFromInvitationsResult> {
+  const { supabase, leadId, clientId } = params;
 
-function getWebhookPublicIdentifier(rawInput: unknown): string | null {
-  const raw = toJsonObject(rawInput);
-  const acceptance = toJsonObject(raw.acceptance);
-  const payload = toJsonObject(acceptance.webhook_payload);
-  return normalizeSlugForMatching(
-    getFirstString(payload, [
-      ["user_public_identifier"],
-      ["userPublicIdentifier"],
-      ["public_identifier"],
-      ["publicIdentifier"],
-      ["user", "public_identifier"],
-      ["user", "publicIdentifier"],
-    ])
-  );
-}
+  const selectCandidates = [
+    "id, status, accepted_at, sent_at, raw",
+    "id, status, sent_at, raw",
+    "id, status, raw",
+    "id, raw",
+  ];
 
-function getMatchingProfileSlug(rawInput: unknown): string | null {
-  const raw = toJsonObject(rawInput);
-  const acceptance = toJsonObject(raw.acceptance);
-  const matching = toJsonObject(acceptance.matching);
-  return normalizeSlugForMatching(
-    getFirstString(matching, [
-      ["profile_slug"],
-      ["profileSlug"],
-    ])
-  );
-}
+  let rows: InvitationLookupRow[] = [];
+  let lastError: unknown = null;
 
-function getWebhookProviderId(rawInput: unknown): string | null {
-  const raw = toJsonObject(rawInput);
-  const acceptance = toJsonObject(raw.acceptance);
-  const payload = toJsonObject(acceptance.webhook_payload);
-  return (
-    getFirstString(payload, [
-      ["user_provider_id"],
-      ["userProviderId"],
-      ["provider_id"],
-      ["providerId"],
-      ["user", "provider_id"],
-      ["user", "providerId"],
-    ]) ?? extractProviderId(raw)
-  );
+  for (const selectFields of selectCandidates) {
+    let query = supabase
+      .from("linkedin_invitations")
+      .select(selectFields)
+      .eq("lead_id", leadId)
+      .limit(1);
+
+    if (clientId) {
+      query = query.eq("client_id", clientId);
+    }
+    if (selectFields.includes("status")) {
+      query = query.eq("status", "accepted");
+    }
+    if (selectFields.includes("accepted_at")) {
+      query = query.order("accepted_at", { ascending: false, nullsFirst: false });
+    }
+    if (selectFields.includes("sent_at")) {
+      query = query.order("sent_at", { ascending: false, nullsFirst: false });
+    }
+    query = query.order("id", { ascending: false });
+
+    const { data, error } = await query;
+    if (error) {
+      lastError = error;
+      if (isMissingColumnError(error, "accepted_at")) continue;
+      if (isMissingColumnError(error, "sent_at")) continue;
+      if (isMissingColumnError(error, "status")) continue;
+      if (isMissingColumnError(error, "client_id")) continue;
+      break;
+    }
+
+    rows = Array.isArray(data) ? (data as InvitationLookupRow[]) : [];
+    break;
+  }
+
+  if (rows.length === 0 && lastError) {
+    console.error("PROVIDER_LOOKUP_INVITATIONS_QUERY_ERROR", {
+      leadId,
+      clientId,
+      error: lastError,
+    });
+  }
+
+  const invitation = rows[0] ?? null;
+  const invitationId = invitation ? String(invitation.id ?? "").trim() || null : null;
+  const invitationStatus = invitation ? String(invitation.status ?? "").trim() || null : null;
+  const invitationAcceptedAt = invitation ? String(invitation.accepted_at ?? "").trim() || null : null;
+  const invitationSentAt = invitation ? String(invitation.sent_at ?? "").trim() || null : null;
+  const invitationCreatedAt = invitation ? String(invitation.created_at ?? "").trim() || null : null;
+  const extracted = extractProviderIdFromInvitationRaw(invitation?.raw);
+
+  console.log({
+    leadId,
+    invitationId,
+    status: invitationStatus,
+    accepted_at: invitationAcceptedAt,
+    providerId: extracted.providerId,
+  });
+
+  if (!extracted.providerId) {
+    console.warn("PROVIDER_LOOKUP_NOT_FOUND", {
+      leadId,
+      invitation_id: invitationId,
+      status: invitationStatus,
+      accepted_at: invitationAcceptedAt,
+      raw_keys: extracted.rawKeys,
+      acceptance_keys: extracted.acceptanceKeys,
+    });
+  }
+
+  return {
+    providerId: extracted.providerId,
+    invitationId,
+    invitationStatus,
+    invitationCreatedAt,
+    invitationAcceptedAt,
+    invitationSentAt,
+    matchedBy: extracted.matchedBy,
+    candidatesCount: rows.length,
+    inspectedCount: rows.length,
+    normalizedLeadUrl: null,
+    slug: null,
+    recentProfileUrls: [],
+    rawKeys: extracted.rawKeys,
+    acceptanceKeys: extracted.acceptanceKeys,
+    usedDateFilter: invitationAcceptedAt !== null,
+  };
 }
 
 export async function findProviderIdFromInvitations(params: {
@@ -608,258 +615,31 @@ export async function findProviderIdFromInvitations(params: {
   unipileAccountId?: string | null;
   lookbackDays?: number;
 }): Promise<FindProviderIdFromInvitationsResult> {
-  const { supabase, clientId, leadId, linkedinUrl, unipileAccountId } = params;
-  const lookbackDays = Math.max(1, Math.min(Number(params.lookbackDays ?? 180), 365));
-  const normalizedLeadUrl = normalizeLinkedInUrl(linkedinUrl);
-  const slugLead = extractLinkedinSlug(linkedinUrl);
-
-  const accountIds = await listClientLinkedinAccountIds({
-    supabase,
-    clientId,
-    preferredAccountId: unipileAccountId ?? null,
-  });
-  const accountSet = new Set(accountIds);
-
-  console.log({
-    step: "provider-lookup:start",
-    leadId,
-    clientId,
-    normalized_lead_url: normalizedLeadUrl,
-    slug: slugLead,
-    account_ids_count: accountIds.length,
-  });
-
-  const cutoffIso = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
-  let usedDateFilter = true;
-
-  const queryWithDate = supabase
-    .from("linkedin_invitations")
-    .select("id, lead_id, unipile_account_id, created_at, raw")
-    .eq("client_id", clientId)
-    .not("raw->acceptance->webhook_payload->>user_provider_id", "is", null)
-    .order("created_at", { ascending: false, nullsFirst: false })
-    .limit(1200)
-    .gte("created_at", cutoffIso);
-
-  const rowsResultWithDate = await queryWithDate;
-  let rowsError: unknown = null;
-  let rows: InvitationLookupRow[] = [];
-
-  if (rowsResultWithDate.error && isMissingColumnError(rowsResultWithDate.error, "created_at")) {
-    usedDateFilter = false;
-    const fallbackQuery = supabase
-      .from("linkedin_invitations")
-      .select("id, lead_id, unipile_account_id, raw")
-      .eq("client_id", clientId)
-      .not("raw->acceptance->webhook_payload->>user_provider_id", "is", null)
-      .order("id", { ascending: false })
-      .limit(1200);
-
-    const fallbackResult = await fallbackQuery;
-    rowsError = fallbackResult.error;
-    rows = Array.isArray(fallbackResult.data)
-      ? (fallbackResult.data as InvitationLookupRow[])
-      : [];
-  } else {
-    rowsError = rowsResultWithDate.error;
-    rows = Array.isArray(rowsResultWithDate.data)
-      ? (rowsResultWithDate.data as InvitationLookupRow[])
-      : [];
-  }
-
-  if (rowsError) {
-    const fallbackNoProviderFilter = usedDateFilter
-      ? await supabase
-          .from("linkedin_invitations")
-          .select("id, lead_id, unipile_account_id, created_at, raw")
-          .eq("client_id", clientId)
-          .order("created_at", { ascending: false, nullsFirst: false })
-          .limit(1200)
-          .gte("created_at", cutoffIso)
-      : await supabase
-          .from("linkedin_invitations")
-          .select("id, lead_id, unipile_account_id, raw")
-          .eq("client_id", clientId)
-          .order("id", { ascending: false })
-          .limit(1200);
-
-    if (!fallbackNoProviderFilter.error) {
-      rowsError = null;
-      rows = Array.isArray(fallbackNoProviderFilter.data)
-        ? (fallbackNoProviderFilter.data as InvitationLookupRow[])
-        : [];
-    }
-  }
-
-  if (rowsError) {
-    console.error("PROVIDER_LOOKUP_INVITATIONS_QUERY_ERROR", {
-      leadId,
-      clientId,
-      normalized_lead_url: normalizedLeadUrl,
-      slug: slugLead,
-      error: rowsError,
-    });
+  if (!params.leadId || !Number.isFinite(Number(params.leadId))) {
     return {
       providerId: null,
       invitationId: null,
+      invitationStatus: null,
       invitationCreatedAt: null,
+      invitationAcceptedAt: null,
+      invitationSentAt: null,
       matchedBy: null,
       candidatesCount: 0,
       inspectedCount: 0,
-      normalizedLeadUrl,
-      slug: slugLead,
+      normalizedLeadUrl: normalizeLinkedInUrl(params.linkedinUrl),
+      slug: extractLinkedinSlug(params.linkedinUrl),
       recentProfileUrls: [],
-      usedDateFilter,
+      rawKeys: [],
+      acceptanceKeys: [],
+      usedDateFilter: false,
     };
   }
-  const recentProfileUrls: string[] = [];
-  const slugMatchedRows: Array<{
-    invitationId: string;
-    createdAt: string | null;
-    matchedBy:
-      | "acceptance.matching.profile_slug"
-      | "acceptance.webhook_payload.user_public_identifier";
-    providerId: string | null;
-  }> = [];
-  const urlMatchedRows: Array<{
-    invitationId: string;
-    createdAt: string | null;
-    matchedBy:
-      | "acceptance.matching.normalized_linkedin_url"
-      | "acceptance.webhook_payload.user_profile_url";
-    providerId: string | null;
-  }> = [];
 
-  for (const row of rows) {
-    const invitationRaw = row.raw;
-    const rowAccountId = String(row.unipile_account_id ?? "").trim() || null;
-    const webhookAccountId = getWebhookAccountId(invitationRaw, rowAccountId);
-    if (accountSet.size > 0 && (!webhookAccountId || !accountSet.has(webhookAccountId))) {
-      continue;
-    }
-
-    const invitationId = String(row.id ?? "").trim();
-    const createdAt = String(row.created_at ?? "").trim() || null;
-    const providerId = getWebhookProviderId(invitationRaw);
-    if (!providerId) continue;
-
-    const matchingNormalizedUrl = getMatchingNormalizedUrl(invitationRaw);
-    const webhookProfileUrl = getWebhookProfileUrl(invitationRaw);
-    const slugFromMatching = getMatchingProfileSlug(invitationRaw);
-    const slugFromPublicIdentifier = getWebhookPublicIdentifier(invitationRaw);
-    const slugWebhook = slugFromMatching ?? slugFromPublicIdentifier;
-    const slugSource =
-      slugFromMatching !== null
-        ? "acceptance.matching.profile_slug"
-        : slugFromPublicIdentifier !== null
-          ? "acceptance.webhook_payload.user_public_identifier"
-          : null;
-
-    const isSlugMatch = Boolean(slugLead && slugWebhook && slugLead === slugWebhook);
-    console.log({
-      leadId,
-      slugLead,
-      slugWebhook,
-      matched: isSlugMatch,
-      providerId,
-    });
-
-    if (webhookProfileUrl && recentProfileUrls.length < 5) {
-      recentProfileUrls.push(webhookProfileUrl);
-    }
-
-    if (isSlugMatch && slugSource) {
-      slugMatchedRows.push({
-        invitationId,
-        createdAt,
-        matchedBy: slugSource,
-        providerId,
-      });
-      continue;
-    }
-
-    if (normalizedLeadUrl && matchingNormalizedUrl && matchingNormalizedUrl === normalizedLeadUrl) {
-      urlMatchedRows.push({
-        invitationId,
-        createdAt,
-        matchedBy: "acceptance.matching.normalized_linkedin_url",
-        providerId,
-      });
-      continue;
-    }
-
-    if (normalizedLeadUrl && webhookProfileUrl && webhookProfileUrl === normalizedLeadUrl) {
-      urlMatchedRows.push({
-        invitationId,
-        createdAt,
-        matchedBy: "acceptance.webhook_payload.user_profile_url",
-        providerId,
-      });
-    }
-  }
-
-  const sortedSlugMatches = [...slugMatchedRows].sort((a, b) => {
-    const aDate = Date.parse(a.createdAt ?? "");
-    const bDate = Date.parse(b.createdAt ?? "");
-    if (Number.isFinite(aDate) && Number.isFinite(bDate) && aDate !== bDate) {
-      return bDate - aDate;
-    }
-    return b.invitationId.localeCompare(a.invitationId);
+  return getProviderIdForLeadFromInvitations({
+    supabase: params.supabase,
+    leadId: Number(params.leadId),
+    clientId: params.clientId,
   });
-  const sortedUrlMatches = [...urlMatchedRows].sort((a, b) => {
-    const aDate = Date.parse(a.createdAt ?? "");
-    const bDate = Date.parse(b.createdAt ?? "");
-    if (Number.isFinite(aDate) && Number.isFinite(bDate) && aDate !== bDate) {
-      return bDate - aDate;
-    }
-    return b.invitationId.localeCompare(a.invitationId);
-  });
-
-  const chosen =
-    sortedSlugMatches.find((row) => String(row.providerId ?? "").trim()) ??
-    sortedUrlMatches.find((row) => String(row.providerId ?? "").trim()) ??
-    null;
-  const candidatesCount = sortedSlugMatches.length + sortedUrlMatches.length;
-
-  console.log({
-    step: "provider-lookup:done",
-    leadId,
-    clientId,
-    normalized_lead_url: normalizedLeadUrl,
-    slug: slugLead,
-    candidates_count: candidatesCount,
-    slug_candidates_count: sortedSlugMatches.length,
-    url_candidates_count: sortedUrlMatches.length,
-    used_invitation_id: chosen?.invitationId ?? null,
-    used_invitation_created_at: chosen?.createdAt ?? null,
-    matched_by: chosen?.matchedBy ?? null,
-    provider_id_found: String(chosen?.providerId ?? "").trim() || null,
-  });
-
-  if (!chosen) {
-    console.warn("PROVIDER_LOOKUP_NOT_FOUND", {
-      leadId,
-      clientId,
-      normalized_lead_url: normalizedLeadUrl,
-      slug: slugLead,
-      candidates_count: candidatesCount,
-      debug_last_profile_urls: recentProfileUrls,
-      used_date_filter: usedDateFilter,
-    });
-  }
-
-  return {
-    providerId: String(chosen?.providerId ?? "").trim() || null,
-    invitationId: chosen?.invitationId ?? null,
-    invitationCreatedAt: chosen?.createdAt ?? null,
-    matchedBy: chosen?.matchedBy ?? null,
-    candidatesCount,
-    inspectedCount: rows.length,
-    normalizedLeadUrl,
-    slug: slugLead,
-    recentProfileUrls,
-    usedDateFilter,
-  };
 }
 
 async function upsertThreadRowWithOptionalColumns(params: {

@@ -9,7 +9,7 @@ import {
 } from "@/lib/inbox-server";
 import {
   ensureThreadAndSendMessage,
-  findProviderIdFromInvitations,
+  getProviderIdForLeadFromInvitations,
   findExistingThreadForLead,
 } from "@/lib/linkedin-messaging";
 
@@ -293,25 +293,21 @@ export async function POST(req: Request) {
     let providerId: string | null = extractLeadProviderId(lead);
 
     if (!providerId) {
-      const lookup = await findProviderIdFromInvitations({
+      const lookup = await getProviderIdForLeadFromInvitations({
         supabase,
-        clientId,
         leadId,
-        linkedinUrl: leadLinkedinUrl,
-        unipileAccountId,
-        lookbackDays: 180,
+        clientId,
       });
 
       console.log({
         step: "provider-lookup",
         leadId,
         clientId,
-        unipile_account_id: unipileAccountId,
-        normalized_lead_url: lookup.normalizedLeadUrl,
-        slug: lookup.slug,
+        invitation_id: lookup.invitationId,
+        status: lookup.invitationStatus,
+        accepted_at: lookup.invitationAcceptedAt,
+        sent_at: lookup.invitationSentAt,
         candidates_count: lookup.candidatesCount,
-        used_invitation_id: lookup.invitationId,
-        used_invitation_created_at: lookup.invitationCreatedAt,
         matched_by: lookup.matchedBy,
         provider_id: lookup.providerId,
       });
@@ -347,13 +343,14 @@ export async function POST(req: Request) {
           httpStatus: 400,
           errorCode: "MISSING_PROVIDER_ID",
           errorMessage:
-            "Impossible d’envoyer un message: provider_id introuvable dans les webhooks Unipile pour ce prospect.",
+            "Invitation pas encore acceptée ou provider_id absent.",
           debug: {
-            normalized_lead_url: lookup.normalizedLeadUrl,
-            slug: lookup.slug,
-            candidates_count: lookup.candidatesCount,
-            inspected_count: lookup.inspectedCount,
-            recent_profile_urls: lookup.recentProfileUrls,
+            invitation_id: lookup.invitationId,
+            status: lookup.invitationStatus,
+            accepted_at: lookup.invitationAcceptedAt,
+            sent_at: lookup.invitationSentAt,
+            raw_keys: lookup.rawKeys,
+            acceptance_keys: lookup.acceptanceKeys,
           },
         });
       }
@@ -364,8 +361,7 @@ export async function POST(req: Request) {
         status: "provider_id_missing",
         httpStatus: 400,
         errorCode: "MISSING_PROVIDER_ID",
-        errorMessage:
-          "Impossible d’envoyer un message: provider_id introuvable dans les webhooks Unipile pour ce prospect.",
+        errorMessage: "Invitation pas encore acceptée ou provider_id absent.",
       });
     }
 
