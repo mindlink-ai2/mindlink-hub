@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { normalizeLinkedInUrl } from "@/lib/linkedin-url";
+import { extractLinkedInProfileSlug, normalizeLinkedInUrl } from "@/lib/linkedin-url";
 import {
   createServiceSupabase,
   getClientIdFromClerkUser,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/inbox-server";
 import {
   ensureThreadAndSendMessage,
+  findProviderIdFromInvitations,
   findExistingThreadForLead,
 } from "@/lib/linkedin-messaging";
 
@@ -73,6 +74,45 @@ function extractLeadThreadId(lead: LeadRow): string | null {
 function extractLeadProviderId(lead: LeadRow): string | null {
   const value = String(lead.linkedin_provider_id ?? "").trim();
   return value || null;
+}
+
+function extractLeadLinkedinUrl(lead: LeadRow): string | null {
+  const uppercase = String(lead.LinkedInURL ?? "").trim();
+  if (uppercase) return uppercase;
+  const lowercase = String(lead.linkedin_url ?? "").trim();
+  return lowercase || null;
+}
+
+async function persistLeadProviderId(params: {
+  supabase: SupabaseClient;
+  clientId: string;
+  leadId: number;
+  providerId: string;
+}) {
+  const { supabase, clientId, leadId, providerId } = params;
+  const { error } = await supabase
+    .from("leads")
+    .update({ linkedin_provider_id: providerId })
+    .eq("id", leadId)
+    .eq("client_id", clientId);
+
+  return { error };
+}
+
+async function persistLeadChatId(params: {
+  supabase: SupabaseClient;
+  clientId: string;
+  leadId: number;
+  chatId: string;
+}) {
+  const { supabase, clientId, leadId, chatId } = params;
+  const { error } = await supabase
+    .from("leads")
+    .update({ unipile_chat_id: chatId })
+    .eq("id", leadId)
+    .eq("client_id", clientId);
+
+  return { error };
 }
 
 async function updateLeadSentMetadata(
@@ -235,7 +275,9 @@ export async function POST(req: Request) {
       });
     }
 
-    const normalizedLeadLinkedInUrl = normalizeLinkedInUrl(lead.LinkedInURL);
+    const leadLinkedinUrl = extractLeadLinkedinUrl(lead);
+    const normalizedLeadLinkedInUrl = normalizeLinkedInUrl(leadLinkedinUrl);
+    const leadSlug = extractLinkedInProfileSlug(leadLinkedinUrl);
     const existingThread = await findExistingThreadForLead({
       supabase,
       clientId,
@@ -248,7 +290,74 @@ export async function POST(req: Request) {
     const existingThreadDbId = existingThread?.threadDbId ?? null;
     const existingUnipileThreadId = existingThread?.unipileThreadId ?? leadThreadId;
 
-    const providerId: string | null = extractLeadProviderId(lead);
+    let providerId: string | null = extractLeadProviderId(lead);
+
+    if (!providerId) {
+      const lookup = await findProviderIdFromInvitations({
+        supabase,
+        clientId,
+        leadId,
+        linkedinUrl: leadLinkedinUrl,
+        unipileAccountId,
+        lookbackDays: 180,
+      });
+
+      console.log({
+        step: "provider-lookup",
+        leadId,
+        clientId,
+        unipile_account_id: unipileAccountId,
+        normalized_lead_url: lookup.normalizedLeadUrl,
+        slug: lookup.slug,
+        candidates_count: lookup.candidatesCount,
+        used_invitation_id: lookup.invitationId,
+        used_invitation_created_at: lookup.invitationCreatedAt,
+        matched_by: lookup.matchedBy,
+        provider_id: lookup.providerId,
+      });
+
+      if (lookup.providerId) {
+        providerId = lookup.providerId;
+        const providerUpdate = await persistLeadProviderId({
+          supabase,
+          clientId,
+          leadId,
+          providerId,
+        });
+
+        if (providerUpdate.error) {
+          console.error("PROSPECTION_PROVIDER_ID_PERSIST_ERROR", {
+            leadId,
+            clientId,
+            provider_id: providerId,
+            error: providerUpdate.error,
+          });
+          return buildErrorResponse({
+            status: "provider_id_persist_failed",
+            httpStatus: 500,
+            errorCode: "PROVIDER_ID_PERSIST_FAILED",
+            errorMessage:
+              "Le provider_id a été trouvé mais son enregistrement dans le lead a échoué.",
+            debug: providerUpdate.error,
+          });
+        }
+      } else if (!existingUnipileThreadId) {
+        return buildErrorResponse({
+          status: "provider_id_missing",
+          httpStatus: 400,
+          errorCode: "MISSING_PROVIDER_ID",
+          errorMessage:
+            "Impossible d’envoyer un message: provider_id introuvable dans les webhooks Unipile pour ce prospect.",
+          debug: {
+            normalized_lead_url: lookup.normalizedLeadUrl,
+            slug: lookup.slug,
+            candidates_count: lookup.candidatesCount,
+            inspected_count: lookup.inspectedCount,
+            recent_profile_urls: lookup.recentProfileUrls,
+          },
+        });
+      }
+    }
 
     if (!existingUnipileThreadId && !providerId) {
       return buildErrorResponse({
@@ -256,13 +365,15 @@ export async function POST(req: Request) {
         httpStatus: 400,
         errorCode: "MISSING_PROVIDER_ID",
         errorMessage:
-          "Impossible d’envoyer un message: le provider_id n’est pas encore connu. Il est récupéré automatiquement quand le prospect accepte la connexion (webhook new_relation).",
+          "Impossible d’envoyer un message: provider_id introuvable dans les webhooks Unipile pour ce prospect.",
       });
     }
 
     console.log({
       step: "load-lead",
       leadId,
+      normalized_lead_url: normalizedLeadLinkedInUrl,
+      slug: leadSlug,
       provider_id: providerId,
       unipile_account_id: unipileAccountId,
     });
@@ -280,7 +391,7 @@ export async function POST(req: Request) {
       clientId,
       leadId,
       text,
-      leadLinkedInUrl: lead.LinkedInURL,
+      leadLinkedInUrl: leadLinkedinUrl,
       contactName: getDisplayName(lead),
       unipileAccountId,
       providerId,
@@ -309,6 +420,20 @@ export async function POST(req: Request) {
     }
 
     const leadUpdate = await updateLeadSentMetadata(supabase, clientId, leadId);
+    const chatPersist = await persistLeadChatId({
+      supabase,
+      clientId,
+      leadId,
+      chatId: sendResult.unipileThreadId,
+    });
+    if (chatPersist.error) {
+      console.error("PROSPECTION_CHAT_ID_PERSIST_ERROR", {
+        leadId,
+        clientId,
+        chat_id: sendResult.unipileThreadId,
+        error: chatPersist.error,
+      });
+    }
 
     console.info("PROSPECTION_LINKEDIN_SEND_SUCCESS", {
       leadId,
