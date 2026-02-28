@@ -175,13 +175,6 @@ export default function InboxPage() {
   const [mobileThreadSheetOpen, setMobileThreadSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
-  const [plan, setPlan] = useState<"essential" | "full">("essential");
-  const [subscriptionStatus, setSubscriptionStatus] = useState<string>("inactive");
-  const [automationSettings, setAutomationSettings] =
-    useState<LinkedinAutomationSettings | null>(null);
-  const [automationSentToday, setAutomationSentToday] = useState(0);
-  const [automationAcceptedToday, setAutomationAcceptedToday] = useState(0);
-  const [loadingAutomationSettings, setLoadingAutomationSettings] = useState(true);
   const [sendingDraft, setSendingDraft] = useState(false);
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
   const pageContainerRef = useRef<HTMLDivElement | null>(null);
@@ -208,7 +201,6 @@ export default function InboxPage() {
       selectedThread?.lead_linkedin_url,
     ]
   );
-  const isFullActivePlan = plan === "full" && subscriptionStatus === "active";
   const selectedThreadHasDraft =
     selectedThread?.dm_draft_status === "draft" &&
     Boolean((selectedThread?.dm_draft_text ?? "").trim());
@@ -351,10 +343,6 @@ export default function InboxPage() {
   useEffect(() => {
     void loadThreads();
   }, [loadThreads]);
-
-  useEffect(() => {
-    void loadAutomationSettings();
-  }, [loadAutomationSettings]);
 
   useEffect(() => {
     (async () => {
