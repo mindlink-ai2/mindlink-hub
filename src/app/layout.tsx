@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
@@ -16,6 +16,11 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Lidmeo Hub",
   description: "Espace client",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 function PaywallOverlay() {
