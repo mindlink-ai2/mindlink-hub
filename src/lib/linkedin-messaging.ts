@@ -35,6 +35,8 @@ type SendInThreadResult =
       details: unknown;
     };
 
+type LinkedinSendContext = "create-chat" | "send-message";
+
 export type EnsureThreadAndSendMessageResult =
   | {
       ok: true;
@@ -127,8 +129,15 @@ function getErrorMessage(payload: unknown): string | null {
   return clean || null;
 }
 
-function buildLinkedinSendUserMessage(rawDetails: string | null): string {
-  const defaultMessage = "Impossible d’envoyer le message LinkedIn pour le moment.";
+function buildLinkedinSendUserMessage(params: {
+  rawDetails: string | null;
+  context: LinkedinSendContext;
+}): string {
+  const { rawDetails, context } = params;
+  const defaultMessage =
+    context === "create-chat"
+      ? "Échec création chat LinkedIn (aucun détail Unipile)."
+      : "Échec envoi message LinkedIn (aucun détail Unipile).";
   if (!rawDetails) return defaultMessage;
 
   const details = rawDetails.trim();
@@ -156,7 +165,10 @@ function buildLinkedinSendUserMessage(rawDetails: string | null): string {
     return "Impossible d’envoyer : conversation ou profil LinkedIn introuvable.";
   }
 
-  return `Impossible d’envoyer : ${details}`;
+  if (context === "create-chat") {
+    return `Échec création chat LinkedIn : ${details}`;
+  }
+  return `Échec envoi message LinkedIn : ${details}`;
 }
 
 function dedupeBodies(candidates: JsonObject[]): JsonObject[] {
@@ -384,7 +396,10 @@ export async function sendOutboundMessageInThread(params: {
   return {
     ok: false,
     status: "send_failed",
-    userMessage: buildLinkedinSendUserMessage(firstFailure),
+    userMessage: buildLinkedinSendUserMessage({
+      rawDetails: firstFailure,
+      context: "send-message",
+    }),
     details: failures,
   };
 }
@@ -640,6 +655,15 @@ async function persistOutboundMessage(params: {
   }
 
   if (!existingMessage?.id) {
+    console.log({
+      step: "db-insert-message",
+      clientId,
+      leadId,
+      chat_id: unipileThreadId,
+      unipile_account_id: unipileAccountId,
+      provider_message_id: unipileMessageId,
+    });
+
     const insertBasePayload: JsonObject = {
       client_id: clientId,
       provider: "linkedin",
@@ -672,6 +696,14 @@ async function persistOutboundMessage(params: {
     });
     if (messageInsertErr) return { ok: false, error: messageInsertErr };
   }
+
+  console.log({
+    step: "db-update-thread",
+    clientId,
+    leadId,
+    chat_id: unipileThreadId,
+    unipile_account_id: unipileAccountId,
+  });
 
   const { error: threadUpdateErr } = await supabase
     .from("inbox_threads")
@@ -719,6 +751,15 @@ export async function ensureThreadAndSendMessage(params: {
   let unipileThreadId = String(existingUnipileThreadId ?? "").trim() || null;
   let createdNow = false;
 
+  console.log({
+    step: "ensure-thread",
+    clientId,
+    leadId,
+    provider_id: providerId,
+    unipile_account_id: unipileAccountId,
+    chat_id: unipileThreadId,
+  });
+
   if (!unipileThreadId) {
     const usableProviderId = String(providerId ?? "").trim();
     if (!usableProviderId) {
@@ -730,6 +771,14 @@ export async function ensureThreadAndSendMessage(params: {
         unipileThreadId: null,
       };
     }
+
+    console.log({
+      step: "create-chat",
+      clientId,
+      leadId,
+      provider_id: usableProviderId,
+      unipile_account_id: unipileAccountId,
+    });
 
     const created = await createConversationThreadId({
       baseUrl,
@@ -745,7 +794,10 @@ export async function ensureThreadAndSendMessage(params: {
       return {
         ok: false,
         status: "conversation_create_failed",
-        userMessage: buildLinkedinSendUserMessage(firstFailure),
+        userMessage: buildLinkedinSendUserMessage({
+          rawDetails: firstFailure,
+          context: "create-chat",
+        }),
         details: created.details,
         providerId: usableProviderId,
         unipileThreadId: null,
@@ -779,6 +831,15 @@ export async function ensureThreadAndSendMessage(params: {
     }
     threadDbId = threadRow.threadDbId;
   }
+
+  console.log({
+    step: "send-message",
+    clientId,
+    leadId,
+    provider_id: providerId,
+    unipile_account_id: unipileAccountId,
+    chat_id: unipileThreadId,
+  });
 
   const sent = await sendOutboundMessageInThread({
     baseUrl,

@@ -122,13 +122,21 @@ function getHttpStatusForSendError(status: string): number {
   return 500;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return String(error || "unknown_error");
+}
+
 export async function POST(req: Request) {
   let currentLockKey: string | null = null;
 
   try {
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json({ ok: false, status: "unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, ok: false, status: "unauthorized", error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     const body = await req.json().catch(() => ({}));
@@ -138,13 +146,25 @@ export async function POST(req: Request) {
 
     if (!Number.isFinite(leadId)) {
       return NextResponse.json(
-        { ok: false, status: "invalid_lead_id", message: "Prospect invalide." },
+        {
+          success: false,
+          ok: false,
+          status: "invalid_lead_id",
+          error: "Prospect invalide.",
+          message: "Prospect invalide.",
+        },
         { status: 400 }
       );
     }
     if (!text) {
       return NextResponse.json(
-        { ok: false, status: "empty_content", message: "Le message LinkedIn est vide." },
+        {
+          success: false,
+          ok: false,
+          status: "empty_content",
+          error: "Le message LinkedIn est vide.",
+          message: "Le message LinkedIn est vide.",
+        },
         { status: 400 }
       );
     }
@@ -152,15 +172,20 @@ export async function POST(req: Request) {
     const supabase = createServiceSupabase();
     const clientId = await getClientIdFromClerkUser(supabase, userId);
     if (!clientId) {
-      return NextResponse.json({ ok: false, status: "client_not_found" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, ok: false, status: "client_not_found", error: "Client introuvable." },
+        { status: 404 }
+      );
     }
 
     currentLockKey = lockKey(clientId, leadId);
     if (inFlightSends.has(currentLockKey)) {
       return NextResponse.json(
         {
+          success: false,
           ok: false,
           status: "already_in_progress",
+          error: "Envoi déjà en cours.",
           message: "Envoi déjà en cours.",
         },
         { status: 409 }
@@ -168,24 +193,30 @@ export async function POST(req: Request) {
     }
     inFlightSends.add(currentLockKey);
 
+    console.log({
+      step: "load-lead",
+      leadId,
+      provider_id: null,
+      unipile_account_id: null,
+    });
+
     const lead = await resolveLead(supabase, clientId, leadId);
     if (!lead) {
       return NextResponse.json(
-        { ok: false, status: "lead_not_found", message: "Prospect introuvable." },
+        {
+          success: false,
+          ok: false,
+          status: "lead_not_found",
+          error: "Prospect introuvable.",
+          message: "Prospect introuvable.",
+        },
         { status: 404 }
       );
     }
 
     const unipileAccountId = await getLinkedinUnipileAccountId(supabase, clientId);
     if (!unipileAccountId) {
-      return NextResponse.json(
-        {
-          ok: false,
-          status: "linkedin_account_not_connected",
-          message: "Compte LinkedIn non connecté.",
-        },
-        { status: 404 }
-      );
+      throw new Error("No LinkedIn account connected for this client");
     }
 
     const normalizedLeadLinkedInUrl = normalizeLinkedInUrl(lead.LinkedInURL);
@@ -212,26 +243,22 @@ export async function POST(req: Request) {
       });
 
       if (!providerResolution.ok) {
-        return NextResponse.json(
-          {
-            ok: false,
-            status: providerResolution.status,
-            message: providerResolution.userMessage,
-          },
-          { status: providerResolution.status === "provider_id_missing" ? 400 : 502 }
-        );
+        throw new Error(providerResolution.userMessage);
       }
 
       providerId = providerResolution.providerId;
     }
 
-    console.info("PROSPECTION_LINKEDIN_SEND_START", {
+    if (!existingUnipileThreadId && !providerId) {
+      throw new Error("Missing LinkedIn provider_id on lead");
+    }
+
+    console.log({
+      step: "ensure-thread",
       leadId,
-      clientId,
-      unipile_account_id: unipileAccountId,
       provider_id: providerId,
+      unipile_account_id: unipileAccountId,
       chat_id: existingUnipileThreadId ?? null,
-      status: "start",
     });
 
     const sendResult = await ensureThreadAndSendMessage({
@@ -260,9 +287,12 @@ export async function POST(req: Request) {
 
       return NextResponse.json(
         {
+          success: false,
           ok: false,
           status: sendResult.status,
+          error: sendResult.userMessage,
           message: sendResult.userMessage,
+          details: sendResult.details ?? null,
         },
         { status: getHttpStatusForSendError(sendResult.status) }
       );
@@ -280,6 +310,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({
+      success: true,
       ok: true,
       status: "sent",
       threadCreated: sendResult.threadCreated,
@@ -298,10 +329,26 @@ export async function POST(req: Request) {
       },
     });
   } catch (error: unknown) {
-    console.error("PROSPECTION_SEND_LINKEDIN_MESSAGE_ERROR", error);
+    const message = getErrorMessage(error);
+    console.error("SEND_LINKEDIN_ERROR", error);
+    const lower = message.toLowerCase();
+    const status =
+      lower.includes("missing linkedin provider_id") ||
+      lower.includes("no linkedin account connected")
+        ? 400
+        : lower.includes("profil linkedin introuvable")
+          ? 502
+          : 500;
+
     return NextResponse.json(
-      { ok: false, status: "server_error", message: "Erreur serveur pendant l’envoi." },
-      { status: 500 }
+      {
+        success: false,
+        ok: false,
+        status: "server_error",
+        error: message,
+        message,
+      },
+      { status }
     );
   } finally {
     if (currentLockKey) inFlightSends.delete(currentLockKey);
