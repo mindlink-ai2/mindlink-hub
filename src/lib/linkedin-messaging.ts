@@ -175,6 +175,77 @@ function extractThreadId(payload: unknown): string | null {
   ]);
 }
 
+function extractLinkedinIdentity(payload: unknown): {
+  normalizedUrl: string | null;
+  slug: string | null;
+} {
+  const data = toJsonObject(payload);
+  const urlCandidate = getFirstString(data, [
+    ["matching", "normalized_linkedin_url"],
+    ["normalized_linkedin_url"],
+    ["user_profile_url"],
+    ["userProfileUrl"],
+    ["profile_url"],
+    ["profileUrl"],
+    ["linkedin_url"],
+    ["linkedinUrl"],
+    ["user", "profile_url"],
+    ["user", "profileUrl"],
+    ["user", "linkedin_url"],
+    ["user", "linkedinUrl"],
+    ["contact", "profile_url"],
+    ["contact", "linkedin_url"],
+    ["webhook_payload", "user_profile_url"],
+    ["webhook_payload", "userProfileUrl"],
+    ["webhook_payload", "profile_url"],
+    ["webhook_payload", "linkedin_url"],
+  ]);
+
+  const normalizedUrl = normalizeLinkedInUrl(urlCandidate);
+  const slugCandidate = getFirstString(data, [
+    ["matching", "profile_slug"],
+    ["profile_slug"],
+    ["profileSlug"],
+    ["user_public_identifier"],
+    ["userPublicIdentifier"],
+    ["public_identifier"],
+    ["publicIdentifier"],
+    ["user", "public_identifier"],
+    ["user", "publicIdentifier"],
+    ["contact", "public_identifier"],
+    ["webhook_payload", "user_public_identifier"],
+    ["webhook_payload", "userPublicIdentifier"],
+  ]);
+
+  const slugFromCandidate = extractLinkedInProfileSlug(slugCandidate);
+  const normalizedSlug = (
+    slugFromCandidate ??
+    String(slugCandidate ?? "")
+      .trim()
+      .toLowerCase()
+  ) || null;
+
+  return {
+    normalizedUrl,
+    slug: normalizedSlug ?? (normalizedUrl ? extractLinkedInProfileSlug(normalizedUrl) : null),
+  };
+}
+
+function buildInvitationCandidates(rawInput: unknown): JsonObject[] {
+  const raw = toJsonObject(rawInput);
+  return [
+    raw,
+    toJsonObject(raw.webhook_payload),
+    toJsonObject(raw.invitation),
+    toJsonObject(toJsonObject(raw.invitation).webhook_payload),
+    toJsonObject(raw.acceptance),
+    toJsonObject(toJsonObject(raw.acceptance).webhook_payload),
+    toJsonObject(raw.relation),
+    toJsonObject(toJsonObject(raw.relation).webhook_payload),
+    ...extractArrayCandidates(raw),
+  ];
+}
+
 function getErrorMessage(payload: unknown): string | null {
   if (typeof payload === "string") {
     const clean = payload.trim();
@@ -664,6 +735,8 @@ export async function resolveLinkedinProviderIdForLead(params: {
   leadLinkedInUrl: string | null;
 }): Promise<ResolveProviderIdResult> {
   const { supabase, clientId, leadId, unipileAccountId, leadLinkedInUrl } = params;
+  const targetLeadUrl = normalizeLinkedInUrl(leadLinkedInUrl);
+  const targetLeadSlug = extractLinkedInProfileSlug(leadLinkedInUrl);
 
   const { data: invitationsByAccount, error: invitationByAccountError } = await supabase
     .from("linkedin_invitations")
@@ -695,23 +768,41 @@ export async function resolveLinkedinProviderIdForLead(params: {
 
   if (!invitationByAccountError && Array.isArray(invitations)) {
     for (const invitation of invitations as Array<{ raw?: unknown }>) {
-      const raw = toJsonObject(invitation.raw);
-      const candidates = [
-        raw,
-        toJsonObject(raw.webhook_payload),
-        toJsonObject(raw.invitation),
-        toJsonObject(toJsonObject(raw.invitation).webhook_payload),
-        toJsonObject(raw.acceptance),
-        toJsonObject(toJsonObject(raw.acceptance).webhook_payload),
-        toJsonObject(raw.relation),
-        toJsonObject(toJsonObject(raw.relation).webhook_payload),
-        ...extractArrayCandidates(raw),
-      ];
+      const candidates = buildInvitationCandidates(invitation.raw);
 
       for (const candidate of candidates) {
         const providerId = extractProviderId(candidate);
         if (providerId) {
           return { ok: true, providerId, source: "invitation_raw" };
+        }
+      }
+    }
+  }
+
+  // Fallback robuste: même compte Unipile, mais lead_id potentiellement non lié
+  // dans linkedin_invitations. On matche alors sur URL/slug LinkedIn du lead.
+  if (targetLeadUrl || targetLeadSlug) {
+    const { data: invitationsByIdentity, error: invitationByIdentityError } = await supabase
+      .from("linkedin_invitations")
+      .select("id, raw")
+      .eq("client_id", clientId)
+      .eq("unipile_account_id", unipileAccountId)
+      .order("id", { ascending: false })
+      .limit(200);
+
+    if (!invitationByIdentityError && Array.isArray(invitationsByIdentity)) {
+      for (const invitation of invitationsByIdentity as Array<{ raw?: unknown }>) {
+        const candidates = buildInvitationCandidates(invitation.raw);
+        for (const candidate of candidates) {
+          const identity = extractLinkedinIdentity(candidate);
+          const sameUrl = Boolean(targetLeadUrl && identity.normalizedUrl && identity.normalizedUrl === targetLeadUrl);
+          const sameSlug = Boolean(targetLeadSlug && identity.slug && identity.slug === targetLeadSlug);
+          if (!sameUrl && !sameSlug) continue;
+
+          const providerId = extractProviderId(candidate);
+          if (providerId) {
+            return { ok: true, providerId, source: "invitation_raw" };
+          }
         }
       }
     }
