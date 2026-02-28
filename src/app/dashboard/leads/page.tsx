@@ -688,15 +688,13 @@ export default function LeadsPage() {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.ok === false || data?.success === false) {
-        const backendError =
-          typeof data?.error === "string" && data.error.trim()
-            ? data.error.trim()
-            : null;
+        const backendErrorCandidates = [data?.error_message, data?.error, data?.message];
+        const backendError = backendErrorCandidates.find(
+          (candidate): candidate is string =>
+            typeof candidate === "string" && candidate.trim().length > 0
+        );
         throw new Error(
-          backendError ??
-            (typeof data?.message === "string"
-              ? data.message
-              : "Erreur pendant l’envoi du message LinkedIn.")
+          backendError?.trim() ?? "Erreur pendant l’envoi du message LinkedIn."
         );
       }
 

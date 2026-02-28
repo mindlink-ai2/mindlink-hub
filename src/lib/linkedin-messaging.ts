@@ -37,6 +37,41 @@ type SendInThreadResult =
 
 type LinkedinSendContext = "create-chat" | "send-message";
 
+type UnipileCallFailureDetail = {
+  status: number | null;
+  method: string;
+  url: string;
+  data: unknown;
+  text: string;
+  message: string;
+  requestBody?: JsonObject;
+};
+
+class UnipileHttpError extends Error {
+  readonly status: number;
+  readonly method: string;
+  readonly url: string;
+  readonly data: unknown;
+  readonly text: string;
+
+  constructor(params: {
+    status: number;
+    method: string;
+    url: string;
+    data: unknown;
+    text: string;
+    message: string;
+  }) {
+    super(`[UNIPILE ${params.status}] ${params.message}`);
+    this.name = "UnipileHttpError";
+    this.status = params.status;
+    this.method = params.method;
+    this.url = params.url;
+    this.data = params.data;
+    this.text = params.text;
+  }
+}
+
 export type EnsureThreadAndSendMessageResult =
   | {
       ok: true;
@@ -129,46 +164,171 @@ function getErrorMessage(payload: unknown): string | null {
   return clean || null;
 }
 
-function buildLinkedinSendUserMessage(params: {
-  rawDetails: string | null;
+function safeStringify(value: unknown): string {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function extractUnipileErrorExcerpt(rawDetails: string | null): string {
+  const clean = String(rawDetails ?? "").replace(/\s+/g, " ").trim();
+  if (!clean) return "détail indisponible";
+  return clean.length > 220 ? `${clean.slice(0, 220)}…` : clean;
+}
+
+function getUnipileErrorText(data: unknown, text: string): string {
+  const payloadMessage = getErrorMessage(data);
+  if (payloadMessage) return payloadMessage;
+
+  const cleanText = text.trim();
+  if (cleanText) return cleanText;
+
+  const payloadText = safeStringify(data).trim();
+  if (payloadText && payloadText !== "{}" && payloadText !== "null") return payloadText;
+
+  return "empty_response_body";
+}
+
+function toUnipileFailureMessage(
+  error: unknown,
+  fallback: { method: string; url: string; requestBody?: JsonObject }
+): UnipileCallFailureDetail {
+  if (error instanceof UnipileHttpError) {
+    const data =
+      typeof error.data === "undefined" || error.data === null
+        ? { raw_text: error.text || "empty_response_body" }
+        : error.data;
+    const text = error.text || safeStringify(data);
+    return {
+      status: error.status,
+      method: error.method,
+      url: error.url,
+      data,
+      text,
+      message: getUnipileErrorText(data, text),
+      requestBody: fallback.requestBody,
+    };
+  }
+
+  const networkMessage = error instanceof Error ? error.message : String(error ?? "unknown_error");
+  return {
+    status: null,
+    method: fallback.method,
+    url: fallback.url,
+    data: { network_error: networkMessage },
+    text: networkMessage,
+    message: networkMessage,
+    requestBody: fallback.requestBody,
+  };
+}
+
+function pickPrimaryFailureDetail(details: unknown): UnipileCallFailureDetail | null {
+  if (!Array.isArray(details)) return null;
+
+  for (const entry of details) {
+    if (!entry || typeof entry !== "object") continue;
+    const row = entry as Partial<UnipileCallFailureDetail>;
+    const message = String(row.message ?? "").trim();
+    if (message) {
+      return {
+        status: typeof row.status === "number" ? row.status : null,
+        method: String(row.method ?? "POST"),
+        url: String(row.url ?? ""),
+        data: row.data ?? null,
+        text: String(row.text ?? ""),
+        message,
+        requestBody:
+          row.requestBody && typeof row.requestBody === "object"
+            ? (row.requestBody as JsonObject)
+            : undefined,
+      };
+    }
+  }
+
+  return null;
+}
+
+async function callUnipile(params: {
+  url: string;
+  method: string;
+  apiKey: string;
+  body?: JsonObject;
+}): Promise<{ status: number; payload: unknown; text: string }> {
+  const { url, method, apiKey, body } = params;
+  const response = await fetch(url, {
+    method,
+    headers: {
+      "X-API-KEY": apiKey,
+      accept: "application/json",
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+
+  const text = await response.text().catch(() => "");
+  let payload: unknown = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text) as JsonObject;
+    } catch {
+      payload = text;
+    }
+  }
+
+  if (!response.ok) {
+    const message = getUnipileErrorText(payload, text);
+    throw new UnipileHttpError({
+      status: response.status,
+      method,
+      url,
+      data: payload,
+      text,
+      message,
+    });
+  }
+
+  return { status: response.status, payload, text };
+}
+
+function mapUnipileErrorToUserMessage(params: {
+  status: number | null;
+  errText: string | null;
   context: LinkedinSendContext;
 }): string {
-  const { rawDetails, context } = params;
-  const defaultMessage =
-    context === "create-chat"
-      ? "Échec création chat LinkedIn (aucun détail Unipile)."
-      : "Échec envoi message LinkedIn (aucun détail Unipile).";
-  if (!rawDetails) return defaultMessage;
+  const { status, errText, context } = params;
+  const excerpt = extractUnipileErrorExcerpt(errText);
+  const normalized = excerpt.toLowerCase();
 
-  const details = rawDetails.trim();
-  if (!details) return defaultMessage;
-  const normalized = details.toLowerCase();
+  if (status === 401 || status === 403) {
+    return "Compte LinkedIn non connecté ou autorisation refusée. Reconnecte ton LinkedIn.";
+  }
 
-  if (
-    normalized.includes("not connected") ||
-    normalized.includes("forbidden") ||
-    normalized.includes("unauthorized")
-  ) {
-    return "Compte LinkedIn non connecté ou non autorisé.";
+  if (normalized.includes("not connected") || normalized.includes("forbidden")) {
+    return "Compte LinkedIn non connecté ou autorisation refusée. Reconnecte ton LinkedIn.";
+  }
+
+  if (normalized.includes("provider") || normalized.includes("invalid")) {
+    return "Profil LinkedIn du prospect invalide (provider_id manquant ou incorrect).";
   }
 
   if (
-    normalized.includes("not a 1st degree") ||
+    normalized.includes("open profile") ||
     normalized.includes("invitation") ||
+    normalized.includes("cannot message") ||
+    normalized.includes("not a 1st degree") ||
     normalized.includes("relation") ||
     normalized.includes("connection")
   ) {
-    return "Impossible d’envoyer : le prospect doit d’abord accepter votre invitation LinkedIn.";
-  }
-
-  if (normalized.includes("not found") || normalized.includes("404")) {
-    return "Impossible d’envoyer : conversation ou profil LinkedIn introuvable.";
+    return "Impossible de créer une conversation (profil non accessible). Il faut d’abord se connecter ou utiliser InMail/Open Profile.";
   }
 
   if (context === "create-chat") {
-    return `Échec création chat LinkedIn : ${details}`;
+    return `Unipile refuse la création du chat: ${excerpt}`;
   }
-  return `Échec envoi message LinkedIn : ${details}`;
+  return `Unipile refuse l’envoi du message: ${excerpt}`;
 }
 
 function dedupeBodies(candidates: JsonObject[]): JsonObject[] {
@@ -264,7 +424,7 @@ async function createConversationThreadId(params: {
   apiKey: string;
   unipileAccountId: string;
   providerId: string;
-}): Promise<{ threadId: string | null; details: unknown }> {
+}): Promise<{ threadId: string | null; details: UnipileCallFailureDetail[] }> {
   const { baseUrl, apiKey, unipileAccountId, providerId } = params;
 
   const endpoints = [`${baseUrl}/api/v1/chats`, `${baseUrl}/api/v1/conversations`];
@@ -280,37 +440,38 @@ async function createConversationThreadId(params: {
     { account_id: unipileAccountId, participants: [{ provider_id: providerId }] },
   ]);
 
-  const failures: Array<{ endpoint: string; status: number; details: string | null }> = [];
+  const failures: UnipileCallFailureDetail[] = [];
 
-  for (const endpoint of endpoints) {
+  for (const url of endpoints) {
     for (const body of bodyCandidates) {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "X-API-KEY": apiKey,
-          accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-
-      const payload = await readResponseBody(response);
-      if (!response.ok) {
-        failures.push({
-          endpoint,
-          status: response.status,
-          details: getErrorMessage(payload),
+      try {
+        const response = await callUnipile({
+          url,
+          method: "POST",
+          apiKey,
+          body,
         });
-        continue;
-      }
+        const threadId = extractThreadId(response.payload);
+        if (threadId) return { threadId, details: failures };
 
-      const threadId = extractThreadId(payload);
-      if (threadId) return { threadId, details: payload };
-      failures.push({
-        endpoint,
-        status: response.status,
-        details: "thread_id_missing_in_create_response",
-      });
+        failures.push({
+          status: response.status,
+          method: "POST",
+          url,
+          data: response.payload,
+          text: response.text,
+          message: "thread_id_missing_in_create_response",
+          requestBody: body,
+        });
+      } catch (error) {
+        failures.push(
+          toUnipileFailureMessage(error, {
+            method: "POST",
+            url,
+            requestBody: body,
+          })
+        );
+      }
     }
   }
 
@@ -331,37 +492,41 @@ export async function sendOutboundMessageInThread(params: {
     `${baseUrl}/api/v1/messages`,
   ];
 
-  const failures: Array<{ endpoint: string; status: number; details: string | null }> = [];
+  const failures: UnipileCallFailureDetail[] = [];
 
-  for (const endpoint of endpoints) {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "X-API-KEY": apiKey,
-        accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(
-        /\/api\/v1\/messages$/.test(endpoint)
-          ? {
-              account_id: unipileAccountId,
-              chat_id: unipileThreadId,
-              text,
-            }
-          : {
-              account_id: unipileAccountId,
-              text,
-            }
-      ),
-    });
+  for (const url of endpoints) {
+    const body = /\/api\/v1\/messages$/.test(url)
+      ? {
+          account_id: unipileAccountId,
+          chat_id: unipileThreadId,
+          text,
+        }
+      : {
+          account_id: unipileAccountId,
+          text,
+        };
 
-    const payload = await readResponseBody(response);
-    if (!response.ok) {
-      failures.push({
-        endpoint,
-        status: response.status,
-        details: getErrorMessage(payload),
+    let payload: unknown = null;
+    let responseStatus = 0;
+    let responseText = "";
+    try {
+      const response = await callUnipile({
+        url,
+        method: "POST",
+        apiKey,
+        body,
       });
+      payload = response.payload;
+      responseStatus = response.status;
+      responseText = response.text;
+    } catch (error) {
+      failures.push(
+        toUnipileFailureMessage(error, {
+          method: "POST",
+          url,
+          requestBody: body,
+        })
+      );
       continue;
     }
 
@@ -376,9 +541,13 @@ export async function sendOutboundMessageInThread(params: {
 
     if (!parsedMessage.unipileMessageId) {
       failures.push({
-        endpoint,
-        status: response.status,
-        details: "message_id_missing_in_send_response",
+        status: responseStatus,
+        method: "POST",
+        url,
+        data: payload,
+        text: responseText,
+        message: "message_id_missing_in_send_response",
+        requestBody: body,
       });
       continue;
     }
@@ -392,12 +561,13 @@ export async function sendOutboundMessageInThread(params: {
     };
   }
 
-  const firstFailure = failures.find((failure) => failure.details)?.details ?? null;
+  const primaryFailure = pickPrimaryFailureDetail(failures);
   return {
     ok: false,
     status: "send_failed",
-    userMessage: buildLinkedinSendUserMessage({
-      rawDetails: firstFailure,
+    userMessage: mapUnipileErrorToUserMessage({
+      status: primaryFailure?.status ?? null,
+      errText: primaryFailure?.message ?? null,
       context: "send-message",
     }),
     details: failures,
@@ -773,11 +943,11 @@ export async function ensureThreadAndSendMessage(params: {
     }
 
     console.log({
-      step: "create-chat",
-      clientId,
+      step: "create-chat:start",
       leadId,
-      provider_id: usableProviderId,
-      unipile_account_id: unipileAccountId,
+      providerId: usableProviderId,
+      accountId: unipileAccountId,
+      clientId,
     });
 
     const created = await createConversationThreadId({
@@ -787,15 +957,30 @@ export async function ensureThreadAndSendMessage(params: {
       providerId: usableProviderId,
     });
     if (!created.threadId) {
-      const firstFailure =
-        Array.isArray(created.details) && created.details.length > 0
-          ? getErrorMessage(created.details[0])
-          : getErrorMessage(created.details);
+      const primaryFailure = pickPrimaryFailureDetail(created.details);
+      const failureStatus = primaryFailure?.status ?? null;
+      const failureData = primaryFailure?.data ?? null;
+      const failureText = primaryFailure?.text ?? null;
+      const failureMessage = primaryFailure?.message ?? "unipile_create_chat_failed";
+
+      console.error("UNIPILE_CREATE_CHAT_FAILED", {
+        leadId,
+        providerId: usableProviderId,
+        accountId: unipileAccountId,
+        status: failureStatus,
+        data: failureData,
+        text: failureText,
+        method: primaryFailure?.method ?? "POST",
+        url: primaryFailure?.url ?? null,
+        message: failureMessage,
+      });
+
       return {
         ok: false,
         status: "conversation_create_failed",
-        userMessage: buildLinkedinSendUserMessage({
-          rawDetails: firstFailure,
+        userMessage: mapUnipileErrorToUserMessage({
+          status: failureStatus,
+          errText: failureMessage,
           context: "create-chat",
         }),
         details: created.details,

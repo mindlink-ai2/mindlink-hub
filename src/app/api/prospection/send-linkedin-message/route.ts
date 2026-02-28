@@ -122,9 +122,42 @@ function getHttpStatusForSendError(status: string): number {
   return 500;
 }
 
+function getErrorCodeForSendStatus(status: string): string {
+  if (status === "provider_id_missing") return "MISSING_PROVIDER_ID";
+  if (status === "conversation_create_failed") return "UNIPILE_CREATE_CHAT_FAILED";
+  if (status === "send_failed") return "UNIPILE_SEND_MESSAGE_FAILED";
+  if (status === "thread_upsert_failed") return "INBOX_THREAD_UPSERT_FAILED";
+  if (status === "message_persist_failed") return "INBOX_MESSAGE_INSERT_FAILED";
+  return "SEND_LINKEDIN_UNKNOWN_ERROR";
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return String(error || "unknown_error");
+}
+
+function buildErrorResponse(params: {
+  status: string;
+  httpStatus: number;
+  errorCode: string;
+  errorMessage: string;
+  debug?: unknown;
+}) {
+  const payload: Record<string, unknown> = {
+    success: false,
+    ok: false,
+    status: params.status,
+    error_code: params.errorCode,
+    error_message: params.errorMessage,
+    error: params.errorMessage,
+    message: params.errorMessage,
+  };
+
+  if (process.env.NODE_ENV !== "production" && typeof params.debug !== "undefined") {
+    payload.debug = params.debug;
+  }
+
+  return NextResponse.json(payload, { status: params.httpStatus });
 }
 
 export async function POST(req: Request) {
@@ -133,10 +166,12 @@ export async function POST(req: Request) {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json(
-        { success: false, ok: false, status: "unauthorized", error: "Unauthorized" },
-        { status: 401 }
-      );
+      return buildErrorResponse({
+        status: "unauthorized",
+        httpStatus: 401,
+        errorCode: "UNAUTHORIZED",
+        errorMessage: "Unauthorized",
+      });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -145,56 +180,46 @@ export async function POST(req: Request) {
     const text = String(body?.content ?? body?.text ?? "").trim();
 
     if (!Number.isFinite(leadId)) {
-      return NextResponse.json(
-        {
-          success: false,
-          ok: false,
-          status: "invalid_lead_id",
-          error: "Prospect invalide.",
-          message: "Prospect invalide.",
-        },
-        { status: 400 }
-      );
+      return buildErrorResponse({
+        status: "invalid_lead_id",
+        httpStatus: 400,
+        errorCode: "INVALID_LEAD_ID",
+        errorMessage: "Prospect invalide.",
+      });
     }
     if (!text) {
-      return NextResponse.json(
-        {
-          success: false,
-          ok: false,
-          status: "empty_content",
-          error: "Le message LinkedIn est vide.",
-          message: "Le message LinkedIn est vide.",
-        },
-        { status: 400 }
-      );
+      return buildErrorResponse({
+        status: "empty_content",
+        httpStatus: 400,
+        errorCode: "EMPTY_LINKEDIN_MESSAGE",
+        errorMessage: "Le message LinkedIn est vide.",
+      });
     }
 
     const supabase = createServiceSupabase();
     const clientId = await getClientIdFromClerkUser(supabase, userId);
     if (!clientId) {
-      return NextResponse.json(
-        { success: false, ok: false, status: "client_not_found", error: "Client introuvable." },
-        { status: 404 }
-      );
+      return buildErrorResponse({
+        status: "client_not_found",
+        httpStatus: 404,
+        errorCode: "CLIENT_NOT_FOUND",
+        errorMessage: "Client introuvable.",
+      });
     }
 
     currentLockKey = lockKey(clientId, leadId);
     if (inFlightSends.has(currentLockKey)) {
-      return NextResponse.json(
-        {
-          success: false,
-          ok: false,
-          status: "already_in_progress",
-          error: "Envoi déjà en cours.",
-          message: "Envoi déjà en cours.",
-        },
-        { status: 409 }
-      );
+      return buildErrorResponse({
+        status: "already_in_progress",
+        httpStatus: 409,
+        errorCode: "SEND_ALREADY_IN_PROGRESS",
+        errorMessage: "Envoi déjà en cours.",
+      });
     }
     inFlightSends.add(currentLockKey);
 
     console.log({
-      step: "load-lead",
+      step: "load-lead:start",
       leadId,
       provider_id: null,
       unipile_account_id: null,
@@ -202,21 +227,22 @@ export async function POST(req: Request) {
 
     const lead = await resolveLead(supabase, clientId, leadId);
     if (!lead) {
-      return NextResponse.json(
-        {
-          success: false,
-          ok: false,
-          status: "lead_not_found",
-          error: "Prospect introuvable.",
-          message: "Prospect introuvable.",
-        },
-        { status: 404 }
-      );
+      return buildErrorResponse({
+        status: "lead_not_found",
+        httpStatus: 404,
+        errorCode: "LEAD_NOT_FOUND",
+        errorMessage: "Prospect introuvable.",
+      });
     }
 
     const unipileAccountId = await getLinkedinUnipileAccountId(supabase, clientId);
     if (!unipileAccountId) {
-      throw new Error("No LinkedIn account connected for this client");
+      return buildErrorResponse({
+        status: "unipile_account_missing",
+        httpStatus: 400,
+        errorCode: "LINKEDIN_ACCOUNT_NOT_CONNECTED",
+        errorMessage: "Aucun compte LinkedIn connecté pour ce client.",
+      });
     }
 
     const normalizedLeadLinkedInUrl = normalizeLinkedInUrl(lead.LinkedInURL);
@@ -243,15 +269,36 @@ export async function POST(req: Request) {
       });
 
       if (!providerResolution.ok) {
-        throw new Error(providerResolution.userMessage);
+        return buildErrorResponse({
+          status: providerResolution.status,
+          httpStatus: providerResolution.status === "provider_id_missing" ? 400 : 502,
+          errorCode:
+            providerResolution.status === "provider_id_missing"
+              ? "MISSING_PROVIDER_ID"
+              : "UNIPILE_PROFILE_LOOKUP_FAILED",
+          errorMessage: providerResolution.userMessage,
+          debug: providerResolution.details ?? null,
+        });
       }
 
       providerId = providerResolution.providerId;
     }
 
     if (!existingUnipileThreadId && !providerId) {
-      throw new Error("Missing LinkedIn provider_id on lead");
+      return buildErrorResponse({
+        status: "provider_id_missing",
+        httpStatus: 400,
+        errorCode: "MISSING_PROVIDER_ID",
+        errorMessage: "provider_id manquant sur ce prospect.",
+      });
     }
+
+    console.log({
+      step: "load-lead",
+      leadId,
+      provider_id: providerId,
+      unipile_account_id: unipileAccountId,
+    });
 
     console.log({
       step: "ensure-thread",
@@ -285,17 +332,13 @@ export async function POST(req: Request) {
         details: sendResult.details ?? null,
       });
 
-      return NextResponse.json(
-        {
-          success: false,
-          ok: false,
-          status: sendResult.status,
-          error: sendResult.userMessage,
-          message: sendResult.userMessage,
-          details: sendResult.details ?? null,
-        },
-        { status: getHttpStatusForSendError(sendResult.status) }
-      );
+      return buildErrorResponse({
+        status: sendResult.status,
+        httpStatus: getHttpStatusForSendError(sendResult.status),
+        errorCode: getErrorCodeForSendStatus(sendResult.status),
+        errorMessage: sendResult.userMessage,
+        debug: sendResult.details ?? null,
+      });
     }
 
     const leadUpdate = await updateLeadSentMetadata(supabase, clientId, leadId);
@@ -340,16 +383,13 @@ export async function POST(req: Request) {
           ? 502
           : 500;
 
-    return NextResponse.json(
-      {
-        success: false,
-        ok: false,
-        status: "server_error",
-        error: message,
-        message,
-      },
-      { status }
-    );
+    return buildErrorResponse({
+      status: "server_error",
+      httpStatus: status,
+      errorCode: "SEND_LINKEDIN_SERVER_ERROR",
+      errorMessage: message,
+      debug: error,
+    });
   } finally {
     if (currentLockKey) inFlightSends.delete(currentLockKey);
   }
