@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "lidmeo_support_widget_open";
+const SUPPORT_WIDGET_OPEN_EVENT = "mindlink:support-widget-open";
 const MARK_READ_MIN_INTERVAL_MS = 1600;
 const FEATURE_REQUEST_MIN_LENGTH = 6;
 
@@ -149,7 +150,9 @@ export default function SupportWidget() {
   const lastMarkReadAtRef = useRef<number>(0);
   const pendingMarkReadRef = useRef<number | null>(null);
 
-  const shouldRenderOnPage = pathname ? !pathname.startsWith("/admin/support") : true;
+  const shouldRenderOnPage = pathname
+    ? !pathname.startsWith("/admin/support") && !pathname.startsWith("/dashboard/support")
+    : true;
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedConversationId) ?? null,
@@ -353,6 +356,18 @@ export default function SupportWidget() {
       // no-op
     }
   }, [isOpen, hasHydrated]);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+
+    const onOpenWidget = () => {
+      setIsOpen(true);
+      setError(null);
+    };
+
+    window.addEventListener(SUPPORT_WIDGET_OPEN_EVENT, onOpenWidget);
+    return () => window.removeEventListener(SUPPORT_WIDGET_OPEN_EVENT, onOpenWidget);
+  }, [hasHydrated]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -591,7 +606,7 @@ export default function SupportWidget() {
   if (pathname?.startsWith("/dashboard/leads") && isLeadsSidebarOpen) return null;
 
   return (
-    <>
+    <div className="hidden md:block">
       <div className="fixed bottom-5 right-5 z-[70] sm:bottom-6 sm:right-6">
         <button
           type="button"
@@ -917,6 +932,6 @@ export default function SupportWidget() {
           </section>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }

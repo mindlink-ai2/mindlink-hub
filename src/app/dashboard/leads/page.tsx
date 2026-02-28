@@ -3,9 +3,14 @@
 import { useEffect, useMemo, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
+import LeadsCards, { LeadsCardsSkeleton, type MobileLeadsViewMode } from "@/components/leads/LeadsCards";
+import { getLeadStatusKey } from "@/components/leads/LeadCard";
+import LeadsMobileFilters, {
+  type MobileLeadFilterKey,
+} from "@/components/leads/LeadsMobileFilters";
+import LeadDetailsOverlay from "@/components/leads/LeadDetailsOverlay";
 import { HubButton } from "@/components/ui/hub-button";
-import { trackFeatureUsed } from "@/lib/analytics/client";
-import { AlertTriangle, Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2 } from "lucide-react";
+import { AlertTriangle, Building2, LayoutGrid, Linkedin, List, Mail, MapPin, MoveRight, Phone, UserCircle2 } from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -139,6 +144,8 @@ function getLeadInvitationStatus(lead: Lead): "sent" | "accepted" | null {
 export default function LeadsPage() {
   const [safeLeads, setSafeLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [mobileStatusFilter, setMobileStatusFilter] = useState<MobileLeadFilterKey>("all");
+  const [mobileViewMode, setMobileViewMode] = useState<MobileLeadsViewMode>("compact");
   const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
@@ -156,6 +163,8 @@ export default function LeadsPage() {
   const [updatingStatusIds, setUpdatingStatusIds] = useState<Set<string>>(new Set());
   const [invitingLeadIds, setInvitingLeadIds] = useState<Set<string>>(new Set());
   const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
+  const [sendingLinkedInMessageLeadIds, setSendingLinkedInMessageLeadIds] = useState<Set<string>>(new Set());
+  const [linkedInMessageSendErrors, setLinkedInMessageSendErrors] = useState<Record<string, string>>({});
   const selectedCount = selectedIds.size;
 
   // ✅ open lead from query param (?open=ID)
@@ -165,6 +174,33 @@ export default function LeadsPage() {
   const filteredLeads = useMemo(() => {
     return filterLeads(safeLeads, searchTerm);
   }, [safeLeads, searchTerm]);
+
+  const mobileFilterOptions = useMemo(() => {
+    const counts: Record<Exclude<MobileLeadFilterKey, "all">, number> = {
+      todo: 0,
+      pending: 0,
+      connected: 0,
+      sent: 0,
+    };
+
+    filteredLeads.forEach((lead) => {
+      const key = getLeadStatusKey(lead);
+      counts[key] += 1;
+    });
+
+    return [
+      { key: "all", label: "Tous", count: filteredLeads.length },
+      { key: "todo", label: "A faire", count: counts.todo },
+      { key: "pending", label: "En attente", count: counts.pending },
+      { key: "connected", label: "Connecte", count: counts.connected },
+      { key: "sent", label: "Envoye", count: counts.sent },
+    ] satisfies Array<{ key: MobileLeadFilterKey; label: string; count: number }>;
+  }, [filteredLeads]);
+
+  const mobileFilteredLeads = useMemo(() => {
+    if (mobileStatusFilter === "all") return filteredLeads;
+    return filteredLeads.filter((lead) => getLeadStatusKey(lead) === mobileStatusFilter);
+  }, [filteredLeads, mobileStatusFilter]);
 
   // ✅ Column count for empty state colSpan
   const colCount = 8;
@@ -620,52 +656,110 @@ export default function LeadsPage() {
     return () => clearTimeout(delay);
   }, [openLead?.message_mail]);
 
-  // 🔵 Fonction pour marquer "Message envoyé"
-  const handleMessageSent = async () => {
+  const handleSendLinkedInMessage = async () => {
     if (!openLead) return;
-
-    const res = await fetch("/api/leads/message-sent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadId: openLead.id }),
-    });
-
-    const data = await res.json();
-
-    if (data.error) {
-      alert("Erreur lors de l'envoi.");
+    const leadId = Number(openLead.id);
+    const idStr = String(openLead.id);
+    if (!Number.isFinite(leadId)) {
+      setLinkedInMessageSendErrors((prev) => ({
+        ...prev,
+        [idStr]: "Identifiant de prospect invalide.",
+      }));
       return;
     }
 
-    setOpenLead((prev: Lead | null) =>
-      prev
-        ? {
-            ...prev,
-            message_sent: true,
-            message_sent_at: data.lead?.message_sent_at,
-            next_followup_at: data.lead?.next_followup_at,
-          }
-        : prev
-    );
+    if (openLead.message_sent || sendingLinkedInMessageLeadIds.has(idStr)) return;
 
-    setSafeLeads((prev: Lead[]) =>
-      prev.map((l) =>
-        l.id === openLead.id
-          ? {
-              ...l,
-              message_sent: true,
-              message_sent_at: data.lead?.message_sent_at,
-              next_followup_at: data.lead?.next_followup_at,
-            }
-          : l
-      )
-    );
+    const content = String(openLead.internal_message ?? "").trim();
+    if (!content) {
+      setLinkedInMessageSendErrors((prev) => ({
+        ...prev,
+        [idStr]: "Le message LinkedIn est vide.",
+      }));
+      return;
+    }
 
-    trackFeatureUsed("send_linkedin_message", {
-      source: "prospection",
-      mode: "manual_mark_sent",
+    setSendingLinkedInMessageLeadIds((prev: Set<string>) => {
+      const next = new Set(prev);
+      next.add(idStr);
+      return next;
     });
+
+    setLinkedInMessageSendErrors((prev) => {
+      if (!prev[idStr]) return prev;
+      const next = { ...prev };
+      delete next[idStr];
+      return next;
+    });
+
+    try {
+      const res = await fetch("/api/prospection/send-linkedin-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId,
+          content,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok === false) {
+        throw new Error(
+          typeof data?.message === "string"
+            ? data.message
+            : "Erreur pendant l’envoi du message LinkedIn."
+        );
+      }
+
+      setOpenLead((prev: Lead | null) =>
+        prev
+          ? {
+              ...prev,
+              message_sent: true,
+              message_sent_at: data?.lead?.message_sent_at ?? new Date().toISOString(),
+              next_followup_at: data?.lead?.next_followup_at ?? prev.next_followup_at ?? null,
+            }
+          : prev
+      );
+
+      setSafeLeads((prev: Lead[]) =>
+        prev.map((l) =>
+          l.id === openLead.id
+            ? {
+                ...l,
+                message_sent: true,
+                message_sent_at: data?.lead?.message_sent_at ?? new Date().toISOString(),
+                next_followup_at: data?.lead?.next_followup_at ?? l.next_followup_at ?? null,
+              }
+            : l
+        )
+      );
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Erreur pendant l’envoi du message LinkedIn.";
+      setLinkedInMessageSendErrors((prev) => ({
+        ...prev,
+        [idStr]: errorMessage,
+      }));
+    } finally {
+      setSendingLinkedInMessageLeadIds((prev: Set<string>) => {
+        if (!prev.has(idStr)) return prev;
+        const next = new Set(prev);
+        next.delete(idStr);
+        return next;
+      });
+    }
   };
+
+  const openLeadId = openLead ? String(openLead.id) : null;
+  const isSendingOpenLeadLinkedInMessage = openLeadId
+    ? sendingLinkedInMessageLeadIds.has(openLeadId)
+    : false;
+  const openLeadLinkedInMessageError = openLeadId
+    ? linkedInMessageSendErrors[openLeadId]
+    : null;
 
   // ✅ Email actions — now for everyone (no premium gating)
   const openPrefilledEmail = () => {
@@ -741,62 +835,56 @@ export default function LeadsPage() {
 
   const openLeadRawJobTitle = (openLead?.linkedinJobTitle ?? "").trim();
   const openLeadTranslatedJobTitle = translateLinkedInJobTitle(openLeadRawJobTitle);
-
-  const isSidebarOpen = Boolean(openLead);
-
-  // UX-only: Escape close + lock page scroll when sidebar is open
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenLead(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-
-    const html = document.documentElement;
-    const body = document.body;
-    const prevHtmlOverflow = html.style.overflow;
-    const prevBodyOverflow = body.style.overflow;
-    const prevBodyPaddingRight = body.style.paddingRight;
-
-    if (isSidebarOpen) {
-      const scrollbarWidth = window.innerWidth - html.clientWidth;
-      html.style.overflow = "hidden";
-      body.style.overflow = "hidden";
-      body.dataset.leadsSidebarOpen = "1";
-      if (scrollbarWidth > 0) {
-        body.style.paddingRight = `${scrollbarWidth}px`;
-      }
-    } else {
-      html.style.overflow = "";
-      body.style.overflow = "";
-      body.style.paddingRight = "";
-      delete body.dataset.leadsSidebarOpen;
-    }
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      html.style.overflow = prevHtmlOverflow;
-      body.style.overflow = prevBodyOverflow;
-      body.style.paddingRight = prevBodyPaddingRight;
-      delete body.dataset.leadsSidebarOpen;
-    };
-  }, [isSidebarOpen]);
+  const openLeadDisplayName = openLead
+    ? `${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim() || "Fiche prospect"
+    : "Fiche prospect";
+  const openLeadSubtitle = openLead
+    ? `${openLead.Company || "—"} • ${openLead.location || "—"}`
+    : undefined;
+  const openLeadStatusBadge = openLead ? (
+    openLead.message_sent ? (
+      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] text-emerald-700 whitespace-nowrap">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        Envoyé
+      </span>
+    ) : (
+      <span className="inline-flex items-center gap-2 rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" />
+        À faire
+      </span>
+    )
+  ) : null;
 
   if (!clientLoaded) {
     return (
       <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
         <div className="mx-auto w-full max-w-[1680px]">
-          <div className="hub-card-hero p-6 sm:p-7">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="h-6 w-44 animate-pulse rounded-xl bg-[#e5edf8]" />
-                <div className="mt-3 h-4 w-80 animate-pulse rounded-lg bg-[#edf3fb]" />
+          <div className="block md:hidden">
+            <div className="space-y-4">
+              <div className="hub-card-hero p-4">
+                <div className="h-5 w-36 animate-pulse rounded-lg bg-[#e5edf8]" />
+                <div className="mt-3 h-10 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
+                <div className="mt-3 h-8 w-32 animate-pulse rounded-full bg-[#edf3fb]" />
               </div>
-              <div className="h-10 w-28 animate-pulse rounded-xl bg-[#edf3fb]" />
+              <LeadsCardsSkeleton count={8} viewMode="compact" />
+              <div className="text-xs text-[#4B5563]">Chargement des leads...</div>
             </div>
+          </div>
 
-            <div className="mt-6 h-12 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
-            <div className="mt-4 h-72 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
-            <div className="mt-3 text-xs text-[#4B5563]">Chargement des leads…</div>
+          <div className="hidden md:block">
+            <div className="hub-card-hero p-6 sm:p-7">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="h-6 w-44 animate-pulse rounded-xl bg-[#e5edf8]" />
+                  <div className="mt-3 h-4 w-80 animate-pulse rounded-lg bg-[#edf3fb]" />
+                </div>
+                <div className="h-10 w-28 animate-pulse rounded-xl bg-[#edf3fb]" />
+              </div>
+
+              <div className="mt-6 h-12 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
+              <div className="mt-4 h-72 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
+              <div className="mt-3 text-xs text-[#4B5563]">Chargement des leads…</div>
+            </div>
           </div>
         </div>
       </div>
@@ -832,9 +920,109 @@ export default function LeadsPage() {
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <>
-        <div className="relative h-full min-h-0 w-full px-4 pb-24 pt-4 sm:px-6 sm:pt-5">
-          <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-5">
+      <div className="relative h-full min-h-0 w-full px-4 pb-24 pt-4 sm:px-6 sm:pt-5">
+          <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col">
+            <div className="block md:hidden">
+              <div className="flex min-h-0 flex-1 flex-col gap-3 pb-3">
+                <section className="hub-card-hero relative overflow-hidden p-4">
+                <div className="pointer-events-none absolute inset-0">
+                  <div className="absolute -left-14 top-[-120px] h-56 w-56 rounded-full bg-[#dce8ff]/70 blur-3xl" />
+                  <div className="absolute -right-16 top-[-120px] h-56 w-56 rounded-full bg-[#d8f4ff]/65 blur-3xl" />
+                </div>
+
+                <div className="relative">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
+                      Prospects
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 text-[11px] tabular-nums text-[#4f6784]">
+                        {mobileFilteredLeads.length}/{filteredLeads.length}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMobileViewMode((prev) => (prev === "compact" ? "comfort" : "compact"))
+                        }
+                        className="inline-flex h-8 items-center gap-1 rounded-full border border-[#d7e3f4] bg-white px-2.5 text-[11px] font-medium text-[#4f6784] transition hover:bg-[#f7fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                        aria-label={
+                          mobileViewMode === "compact"
+                            ? "Passer en affichage confort"
+                            : "Passer en affichage compact"
+                        }
+                        title={mobileViewMode === "compact" ? "Mode compact actif" : "Mode confort actif"}
+                      >
+                        {mobileViewMode === "compact" ? (
+                          <List className="h-3.5 w-3.5" />
+                        ) : (
+                          <LayoutGrid className="h-3.5 w-3.5" />
+                        )}
+                        {mobileViewMode === "compact" ? "Compact" : "Confort"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <h1 className="mt-2 text-[22px] font-semibold leading-tight text-[#0b1c33]">
+                    Pilotage mobile
+                  </h1>
+                  <p className="mt-1 text-[12px] text-[#5f7693]">
+                    Parcourez vos leads, filtrez vite et ouvrez chaque fiche en un tap.
+                  </p>
+
+                  <div className="mt-3 group flex items-center gap-2 rounded-xl border border-[#c8d6ea] bg-[#f5f9ff] px-3 py-2.5 transition focus-within:border-[#90b5ff] focus-within:ring-2 focus-within:ring-[#dce8ff]">
+                    <svg
+                      className="h-4 w-4 text-[#6a7f9f] transition group-focus-within:text-[#1f5eff]"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+                      />
+                    </svg>
+                    <input
+                      value={searchTerm}
+                      onChange={(e) => handleSearch(e.target.value)}
+                      placeholder="Rechercher un lead..."
+                      className="w-full bg-transparent text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:outline-none"
+                      aria-label="Rechercher un lead"
+                    />
+                  </div>
+                </div>
+                </section>
+
+                <LeadsMobileFilters
+                  options={mobileFilterOptions}
+                  activeKey={mobileStatusFilter}
+                  onChange={setMobileStatusFilter}
+                />
+
+                <div className="min-h-0 flex-1 overflow-y-auto pb-1">
+                  <LeadsCards
+                    leads={mobileFilteredLeads}
+                    hasActiveFilters={Boolean(searchTerm.trim()) || mobileStatusFilter !== "all"}
+                    viewMode={mobileViewMode}
+                    onOpenLead={(lead) => setOpenLead(lead as Lead)}
+                    onToggleStatus={(lead) => handleStatusBadgeClick(lead as Lead)}
+                    onInviteLinkedIn={(lead) => handleLinkedInInvite(lead as Lead)}
+                    updatingStatusIds={updatingStatusIds}
+                    invitingLeadIds={invitingLeadIds}
+                    inviteErrors={inviteErrors}
+                    onResetFilters={() => {
+                      setSearchTerm("");
+                      setMobileStatusFilter("all");
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="hidden md:block">
+              <div className="flex h-full min-h-0 flex-col space-y-5">
             <section className="hub-card-hero relative overflow-hidden p-4 sm:p-5">
               <div className="pointer-events-none absolute inset-0">
                 <div className="absolute -left-16 top-[-120px] h-64 w-64 rounded-full bg-[#dce8ff]/70 blur-3xl" />
@@ -1352,56 +1540,21 @@ export default function LeadsPage() {
                 </div>
               </div>
             </section>
+              </div>
           </div>
 
-          {openLead && (
-            <>
-              <div
-                className="fixed inset-0 z-[80] bg-[#0F172A]/38 backdrop-blur-[3px]"
-                aria-hidden="true"
-                onClick={() => setOpenLead(null)}
-              />
-
-              <div className="animate-slideLeft fixed inset-y-0 right-0 z-[90] flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
-                <div className="z-10 border-b border-[#e2e8f0] bg-white/95 p-6 pb-4 backdrop-blur-xl">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <HubButton type="button" variant="ghost" size="sm" onClick={() => setOpenLead(null)}>
-                        Fermer
-                      </HubButton>
-                    </div>
-                    <span className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
-                      {plan || "essential"}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="truncate text-2xl font-semibold leading-tight text-[#0F172A]">
-                        {(openLead.FirstName ?? "")} {(openLead.LastName ?? "")}
-                      </h2>
-                      <p className="mt-1 truncate text-[12px] text-[#4B5563]">
-                        {openLead.Company || "—"} • {openLead.location || "—"}
-                      </p>
-                    </div>
-
-                    <div className="shrink-0">
-                      {openLead.message_sent ? (
-                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] text-emerald-700 whitespace-nowrap">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          Envoyé
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-2 rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" />
-                          À faire
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain touch-pan-y p-6 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]">
+          <LeadDetailsOverlay
+            open={Boolean(openLead)}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) setOpenLead(null);
+            }}
+            title={openLeadDisplayName}
+            subtitle={openLeadSubtitle}
+            planLabel={plan || "essential"}
+            statusBadge={openLeadStatusBadge}
+          >
+            {openLead ? (
+              <div className="space-y-5">
                   <div className="hub-card-soft p-4">
                     <div className="text-[11px] uppercase tracking-wide text-[#4B5563]">Informations</div>
                     <div className="mt-3 grid grid-cols-1 gap-3">
@@ -1471,18 +1624,32 @@ export default function LeadsPage() {
                     <div className="mt-3">
                       <button
                         type="button"
-                        onClick={handleMessageSent}
-                        disabled={Boolean(openLead.message_sent)}
+                        onClick={handleSendLinkedInMessage}
+                        disabled={Boolean(openLead.message_sent) || isSendingOpenLeadLinkedInMessage}
                         className={[
                           "w-full rounded-xl px-4 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2",
                           openLead.message_sent
                             ? "cursor-default bg-emerald-600 text-white focus:ring-emerald-200"
+                            : openLeadLinkedInMessageError
+                              ? "bg-red-600 text-white hover:bg-red-700 focus:ring-red-200"
+                              : isSendingOpenLeadLinkedInMessage
+                                ? "cursor-wait bg-[#2563EB]/80 text-white focus:ring-[#bfdbfe]"
                             : "bg-[#2563EB] text-white hover:bg-[#1d4ed8] focus:ring-[#bfdbfe]",
                         ].join(" ")}
                       >
-                        {openLead.message_sent ? "Message envoyé ✓" : "Marquer comme envoyé"}
+                        {openLead.message_sent
+                          ? "Envoyé ✅"
+                          : isSendingOpenLeadLinkedInMessage
+                            ? "Envoi…"
+                            : openLeadLinkedInMessageError
+                              ? "Erreur — réessayer"
+                              : "Envoyer le message"}
                       </button>
                     </div>
+
+                    {openLeadLinkedInMessageError ? (
+                      <p className="mt-2 text-xs text-red-600">{openLeadLinkedInMessageError}</p>
+                    ) : null}
 
                     {openLead.next_followup_at && (
                       <p className="mt-2 text-xs text-[#4B5563]">
@@ -1558,13 +1725,11 @@ export default function LeadsPage() {
                       );
                     })()}
                   </div>
-                </div>
               </div>
-            </>
-          )}
+            ) : null}
+          </LeadDetailsOverlay>
         </div>
-
-      </>
+      </div>
     </SubscriptionGate>
   );
 }
