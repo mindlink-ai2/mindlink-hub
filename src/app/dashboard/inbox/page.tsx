@@ -1002,16 +1002,28 @@ export default function InboxPage() {
                 <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
-                    {selectedThreadLinkedInUrl ? (
-                      <button
-                        type="button"
-                        onClick={handleOpenSelectedThreadLinkedInProfile}
-                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
-                      >
-                        <Linkedin className="h-3.5 w-3.5" />
-                        Voir profil
-                      </button>
-                    ) : null}
+                    <div className="flex items-center gap-2">
+                      {selectedThread ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedThreadId(null)}
+                          className="inline-flex h-8 items-center justify-center rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                        >
+                          Fermer
+                        </button>
+                      ) : null}
+
+                      {selectedThreadLinkedInUrl ? (
+                        <button
+                          type="button"
+                          onClick={handleOpenSelectedThreadLinkedInProfile}
+                          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                        >
+                          <Linkedin className="h-3.5 w-3.5" />
+                          Voir profil
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 

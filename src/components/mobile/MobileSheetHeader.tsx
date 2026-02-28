@@ -27,10 +27,11 @@ export default function MobileSheetHeader({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#d7e3f4] bg-white text-[#4b647f] transition hover:bg-[#f7fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#d7e3f4] bg-white px-2.5 text-[12px] font-medium text-[#4b647f] transition hover:bg-[#f7fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
             aria-label="Fermer"
             title="Fermer"
           >
+            <span>Fermer</span>
             <X className="h-4 w-4" />
           </button>
         </div>
