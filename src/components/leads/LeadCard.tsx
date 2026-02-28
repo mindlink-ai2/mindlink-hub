@@ -185,8 +185,6 @@ function LeadCardComponent({
               <a
                 key={item.key}
                 href={item.href}
-                target={item.external ? "_blank" : undefined}
-                rel={item.external ? "noreferrer" : undefined}
                 className="inline-flex w-full items-center gap-2 rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-2.5 py-2 text-[12px] text-[#344b69]"
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" />
