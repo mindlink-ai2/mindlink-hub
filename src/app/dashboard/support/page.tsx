@@ -399,6 +399,7 @@ export default function SupportPage() {
                 ) : (
                   messages.map((message) => {
                     const isUser = message.sender_type === "user";
+                    const senderLabel = isUser ? "Vous" : "Lidmeo Support";
                     return (
                       <div
                         key={message.id}
@@ -409,6 +410,7 @@ export default function SupportPage() {
                             : "mr-auto border-[#dce5f5] bg-[#f8fbff] text-[#0F172A]"
                         )}
                       >
+                        <p className="mb-1 text-[11px] font-medium text-[#5f7693]">{senderLabel}</p>
                         <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{message.body}</p>
                         <p className="mt-1 text-right text-[10px] text-[#64748b]">
                           {formatDateLabel(message.created_at)}
