@@ -30,6 +30,35 @@ type InvitationLookupRow = {
   raw?: unknown;
 };
 
+function parseInvitationLookupRows(data: unknown): InvitationLookupRow[] {
+  if (!Array.isArray(data)) return [];
+
+  const rows: InvitationLookupRow[] = [];
+  for (const item of data) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const row = item as Record<string, unknown>;
+    const id = row.id;
+    if (typeof id !== "string" && typeof id !== "number") continue;
+
+    rows.push({
+      id,
+      status: typeof row.status === "string" ? row.status : null,
+      lead_id:
+        typeof row.lead_id === "string" || typeof row.lead_id === "number"
+          ? row.lead_id
+          : null,
+      unipile_account_id:
+        typeof row.unipile_account_id === "string" ? row.unipile_account_id : null,
+      created_at: typeof row.created_at === "string" ? row.created_at : null,
+      accepted_at: typeof row.accepted_at === "string" ? row.accepted_at : null,
+      sent_at: typeof row.sent_at === "string" ? row.sent_at : null,
+      raw: row.raw,
+    });
+  }
+
+  return rows;
+}
+
 type SendInThreadResult =
   | {
       ok: true;
@@ -549,7 +578,7 @@ export async function getProviderIdForLeadFromInvitations(params: {
       break;
     }
 
-    rows = Array.isArray(data) ? (data as InvitationLookupRow[]) : [];
+    rows = parseInvitationLookupRows(data);
     break;
   }
 
