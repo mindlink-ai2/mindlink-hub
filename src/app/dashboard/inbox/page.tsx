@@ -4,7 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
 import { supabase } from "@/lib/supabase";
-import { Linkedin } from "lucide-react";
+import { ChevronRight, Linkedin, Search } from "lucide-react";
+import MobileLayout from "@/components/mobile/MobileLayout";
+import MobilePageHeader from "@/components/mobile/MobilePageHeader";
+import MobileSheet from "@/components/mobile/MobileSheet";
+import MobileSheetHeader from "@/components/mobile/MobileSheetHeader";
+import MobileEmptyState from "@/components/mobile/MobileEmptyState";
+import MobileSkeleton from "@/components/mobile/MobileSkeleton";
 
 type InboxThread = {
   id: string;
@@ -160,6 +166,7 @@ export default function InboxPage() {
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
   const [threadSearch, setThreadSearch] = useState("");
+  const [mobileThreadSheetOpen, setMobileThreadSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
@@ -185,6 +192,12 @@ export default function InboxPage() {
       selectedThread?.lead_linkedin_url,
     ]
   );
+
+  useEffect(() => {
+    if (!selectedThreadId) {
+      setMobileThreadSheetOpen(false);
+    }
+  }, [selectedThreadId]);
 
   const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
     const viewport = messagesViewportRef.current;
@@ -265,7 +278,7 @@ export default function InboxPage() {
       const loadedMessages = Array.isArray(data?.messages)
         ? (data.messages as InboxMessage[])
         : [];
-      setMessages(loadedMessages);
+      setMessages(sortMessagesBySentAt(loadedMessages));
       loadedMessagesThreadIdRef.current = threadDbId;
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur de chargement des messages.");
@@ -400,6 +413,8 @@ export default function InboxPage() {
           if (!nextRow) return;
           const realtimeMessage = messageFromRealtimePayload(nextRow);
           if (!realtimeMessage) return;
+          loadedMessagesThreadIdRef.current = selectedThreadId;
+          shouldScrollToBottomRef.current = true;
 
           setMessages((prev) => {
             const exists = prev.some(
@@ -474,6 +489,7 @@ export default function InboxPage() {
 
         await loadThreads({ keepSelected: true });
         if (selectedThreadId) {
+          shouldScrollToBottomRef.current = true;
           await loadMessages(selectedThreadId);
         }
       } catch (e: unknown) {
@@ -596,241 +612,444 @@ export default function InboxPage() {
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <div className="h-full min-h-0 px-4 pb-14 pt-4 sm:px-6 sm:pt-5">
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-3">
-          <section className="hub-card-hero p-3 sm:p-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h1 className="hub-page-title mt-1 text-3xl md:text-4xl">
-                  Messagerie LinkedIn
-                </h1>
-                <p className="mt-1 text-xs text-[#51627b] sm:text-sm">
-                  Vos conversations sont centralisées et à jour en temps réel.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <HubButton
+      <div className="flex h-full min-h-0 flex-col px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
+        <div className="mx-auto flex min-h-0 w-full max-w-[1680px] flex-1 flex-col gap-3">
+          <MobileLayout>
+            <MobilePageHeader
+              title="Inbox LinkedIn"
+              subtitle={`${threads.length} conversation(s)`}
+              actions={
+                <button
                   type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleMarkAllRead}
-                  disabled={markingAllRead || syncing}
-                >
-                  {markingAllRead ? "Marquage..." : "Marquer tout comme lu"}
-                </HubButton>
-                <HubButton
-                  type="button"
-                  variant="primary"
                   onClick={handleSync}
-                  disabled={syncing || markingAllRead}
+                  disabled={syncing}
+                  className="inline-flex h-8 items-center rounded-lg border border-[#d7e3f4] bg-white px-2.5 text-[11px] font-medium text-[#4b647f] transition hover:bg-[#f7fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {syncing ? "Synchronisation..." : "Synchroniser"}
-                </HubButton>
-              </div>
+                  {syncing ? "Sync..." : "Sync"}
+                </button>
+              }
+            />
+
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8aa0bb]" />
+              <input
+                value={threadSearch}
+                onChange={(event) => setThreadSearch(event.target.value)}
+                placeholder="Rechercher un prénom..."
+                className="h-10 w-full rounded-xl border border-[#d7e3f4] bg-white pl-9 pr-3 text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:border-[#9cc0ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+              />
             </div>
 
             {error ? (
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
                 {error}
               </div>
             ) : null}
-          </section>
 
-          <section className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[330px_minmax(0,1fr)]">
-            <div className="hub-card flex min-h-0 flex-col overflow-hidden">
-              <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
-                <h2 className="text-sm font-semibold text-[#0b1c33]">Conversations</h2>
+            {loadingThreads ? (
+              <MobileSkeleton rows={8} />
+            ) : filteredThreads.length === 0 ? (
+              <MobileEmptyState
+                title="Aucune conversation"
+                description={
+                  threads.length === 0
+                    ? "La synchronisation n'a encore ramené aucun thread."
+                    : "Aucune conversation ne correspond à cette recherche."
+                }
+              />
+            ) : (
+              <div className="space-y-2">
+                {filteredThreads.map((thread) => {
+                  const unreadCount =
+                    typeof thread.unread_count === "number" ? thread.unread_count : 0;
+
+                  return (
+                    <button
+                      key={thread.id}
+                      type="button"
+                      onClick={() => {
+                        shouldScrollToBottomRef.current = true;
+                        setSelectedThreadId(thread.id);
+                        setMobileThreadSheetOpen(true);
+                      }}
+                      className="w-full rounded-xl border border-[#d7e3f4] bg-white px-3 py-2 text-left shadow-[0_10px_18px_-18px_rgba(18,43,86,0.68)] transition hover:bg-[#f9fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                    >
+                      <div className="flex items-center gap-2">
+                        {thread.contact_avatar_url ? (
+                          <img
+                            src={thread.contact_avatar_url}
+                            alt={thread.contact_name || "Contact LinkedIn"}
+                            className="h-9 w-9 shrink-0 rounded-full border border-[#d7e3f4] object-cover"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d7e3f4] bg-[#edf4ff] text-xs font-semibold text-[#325c95]">
+                            {getContactInitials(thread.contact_name)}
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-[14px] font-medium text-[#0b1c33]">
+                              {thread.contact_name || "Contact LinkedIn"}
+                            </p>
+                            {unreadCount > 0 ? (
+                              <span className="rounded-full border border-[#9cc0ff] bg-[#edf4ff] px-2 py-0.5 text-[10px] font-semibold text-[#1f5eff]">
+                                {formatUnreadCount(unreadCount)}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-0.5 truncate text-[12px] text-[#5f7693]">
+                            {thread.last_message_preview || "Aucun aperçu"}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-[#8093ad]">
+                            {formatDateTime(thread.last_message_at)}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-[#9bb0c8]" />
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
+            )}
+          </MobileLayout>
 
-              <div className="border-b border-[#d7e3f4] bg-[#f8fbff] p-3">
-                <input
-                  value={threadSearch}
-                  onChange={(event) => setThreadSearch(event.target.value)}
-                  placeholder="Rechercher un prénom..."
-                  className="h-9 w-full rounded-xl border border-[#c8d6ea] bg-white px-3 text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:border-[#9cc0ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+          <MobileSheet
+            open={mobileThreadSheetOpen && Boolean(selectedThread)}
+            onClose={() => setMobileThreadSheetOpen(false)}
+            panelClassName="top-0 rounded-none"
+          >
+            {selectedThread ? (
+              <>
+                <MobileSheetHeader
+                  title={selectedThread.contact_name || "Conversation"}
+                  subtitle="Fiche prospect"
+                  onClose={() => setMobileThreadSheetOpen(false)}
+                  rightSlot={
+                    selectedThreadLinkedInUrl ? (
+                      <button
+                        type="button"
+                        onClick={handleOpenSelectedThreadLinkedInProfile}
+                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#d7e3f4] bg-white px-2 text-[11px] font-medium text-[#4b647f] transition hover:bg-[#f7fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                      >
+                        <Linkedin className="h-3.5 w-3.5 text-[#0A66C2]" />
+                        Profil
+                      </button>
+                    ) : null
+                  }
                 />
-              </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto p-3">
-                {loadingThreads ? (
-                  <div className="p-3 text-sm text-[#51627b]">Chargement des threads…</div>
-                ) : threads.length === 0 ? (
-                  <div className="p-3 text-sm text-[#51627b]">
-                    Aucune conversation synchronisée pour le moment.
-                  </div>
-                ) : filteredThreads.length === 0 ? (
-                  <div className="p-3 text-sm text-[#51627b]">
-                    Aucune conversation trouvée pour cette recherche.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredThreads.map((thread) => {
-                      const active = thread.id === selectedThreadId;
-                      const unreadCount =
-                        typeof thread.unread_count === "number" ? thread.unread_count : 0;
+                <div ref={messagesViewportRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+                  {loadingMessages ? (
+                    <div className="text-sm text-[#51627b]">Chargement des messages…</div>
+                  ) : messages.length === 0 ? (
+                    <MobileEmptyState
+                      title="Aucun message"
+                      description="Ce thread ne contient pas encore d'échange."
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {messages.map((message) => {
+                        const raw = asObject(message.raw);
+                        const isDeleted = raw.deleted === true;
+                        const deliveryStatus =
+                          typeof raw.delivery_status === "string"
+                            ? raw.delivery_status.toLowerCase()
+                            : null;
+                        const statusLabel =
+                          deliveryStatus === "read"
+                            ? "Lu"
+                            : deliveryStatus === "delivered"
+                              ? "Délivré"
+                              : null;
+                        const outbound = String(message.direction).toLowerCase() === "outbound";
 
-                      return (
-                        <button
-                          key={thread.id}
-                          type="button"
-                          onClick={() => {
-                            shouldScrollToBottomRef.current = true;
-                            setSelectedThreadId(thread.id);
-                          }}
-                          className={[
-                            "w-full rounded-xl border px-3 py-3 text-left transition-colors duration-150",
-                            active ? "border-[#9cc0ff]" : "border-[#d7e3f4] hover:border-[#b9d0f2]",
-                            unreadCount > 0
-                              ? "bg-blue-50 hover:bg-blue-100"
-                              : "bg-transparent hover:bg-gray-50",
-                          ].join(" ")}
-                        >
-                          <div className="flex items-start gap-3">
-                            {thread.contact_avatar_url ? (
-                              <img
-                                src={thread.contact_avatar_url}
-                                alt={thread.contact_name || "Contact LinkedIn"}
-                                className="h-9 w-9 shrink-0 rounded-full border border-[#d7e3f4] object-cover"
-                                loading="lazy"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d7e3f4] bg-[#edf4ff] text-xs font-semibold text-[#325c95]">
-                                {getContactInitials(thread.contact_name)}
-                              </div>
-                            )}
-
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="truncate text-sm font-medium text-[#0b1c33]">
-                                  {thread.contact_name || "Contact LinkedIn"}
-                                </p>
-                                {unreadCount > 0 ? (
-                                  <span className="rounded-full border border-[#9cc0ff] bg-white px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#1f5eff]">
-                                    {formatUnreadCount(unreadCount)}
-                                  </span>
-                                ) : null}
-                              </div>
-
-                              <p className="mt-1 truncate text-xs text-[#51627b]">
-                                {thread.last_message_preview || "Aucun aperçu"}
-                              </p>
-
-                              <p className="mt-1 text-[11px] text-[#8093ad]">
-                                {formatDateTime(thread.last_message_at)}
-                              </p>
+                        return (
+                          <div
+                            key={message.id}
+                            className={[
+                              "max-w-[88%] rounded-2xl border px-3 py-2 text-sm",
+                              outbound
+                                ? "ml-auto border-[#9cc0ff] bg-[#edf5ff] text-[#14345e]"
+                                : "mr-auto border-[#d7e3f4] bg-[#f7fbff] text-[#1e3551]",
+                            ].join(" ")}
+                          >
+                            <div className="mb-1 text-[11px] text-[#6a7f9f]">
+                              {message.sender_name || (outbound ? "Vous" : "Prospect")}
+                            </div>
+                            <div className="whitespace-pre-wrap">
+                              {isDeleted ? "Message supprimé" : message.text || "—"}
+                            </div>
+                            <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-[#7a8ea9]">
+                              <span>{formatDateTime(message.sent_at)}</span>
+                              <span>{statusLabel ?? ""}</span>
                             </div>
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
-            <div className="hub-card flex min-h-0 flex-col overflow-hidden">
-              <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
-                  {selectedThreadLinkedInUrl ? (
-                    <button
+                <div className="border-t border-[#d7e3f4] bg-white px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      placeholder="Écrire une réponse..."
+                      className="min-h-[72px] w-full rounded-xl border border-[#c8d6ea] bg-[#f8fbff] px-3 py-2 text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:border-[#9cc0ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                    />
+                    <HubButton
                       type="button"
-                      onClick={handleOpenSelectedThreadLinkedInProfile}
-                      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                      variant="primary"
+                      onClick={handleSend}
+                      disabled={sending || !draft.trim()}
                     >
-                      <Linkedin className="h-3.5 w-3.5" />
-                      Voir profil
-                    </button>
-                  ) : null}
+                      {sending ? "Envoi..." : "Envoyer"}
+                    </HubButton>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </MobileSheet>
+
+          <div className="hidden md:block">
+            <section className="hub-card-hero p-3 sm:p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h1 className="hub-page-title mt-1 text-3xl md:text-4xl">
+                    Messagerie LinkedIn
+                  </h1>
+                  <p className="mt-1 text-xs text-[#51627b] sm:text-sm">
+                    Vos conversations sont centralisées et à jour en temps réel.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <HubButton
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleMarkAllRead}
+                    disabled={markingAllRead || syncing}
+                  >
+                    {markingAllRead ? "Marquage..." : "Marquer tout comme lu"}
+                  </HubButton>
+                  <HubButton
+                    type="button"
+                    variant="primary"
+                    onClick={handleSync}
+                    disabled={syncing || markingAllRead}
+                  >
+                    {syncing ? "Synchronisation..." : "Synchroniser"}
+                  </HubButton>
                 </div>
               </div>
 
-              {!selectedThread ? (
-                <div className="p-6 text-sm text-[#51627b]">
-                  Sélectionne une conversation pour afficher l’historique.
+              {error ? (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
                 </div>
-              ) : (
-                <>
-                  <div
-                    ref={messagesViewportRef}
-                    className="min-h-0 flex-1 overflow-y-auto p-4"
-                  >
-                    {loadingMessages ? (
-                      <div className="text-sm text-[#51627b]">Chargement des messages…</div>
-                    ) : messages.length === 0 ? (
-                      <div className="text-sm text-[#51627b]">
-                        Aucun message dans ce thread.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {messages.map((message) => {
-                          const raw = asObject(message.raw);
-                          const isDeleted = raw.deleted === true;
-                          const deliveryStatus =
-                            typeof raw.delivery_status === "string"
-                              ? raw.delivery_status.toLowerCase()
-                              : null;
-                          const statusLabel =
-                            deliveryStatus === "read"
-                              ? "Lu"
-                              : deliveryStatus === "delivered"
-                                ? "Délivré"
-                                : null;
-                          const outbound = String(message.direction).toLowerCase() === "outbound";
+              ) : null}
+            </section>
 
-                          return (
-                            <div
-                              key={message.id}
-                              className={[
-                                "max-w-[82%] rounded-2xl border px-3 py-2 text-sm",
-                                outbound
-                                  ? "ml-auto border-[#9cc0ff] bg-[#edf5ff] text-[#14345e]"
-                                  : "mr-auto border-[#d7e3f4] bg-[#f7fbff] text-[#1e3551]",
-                              ].join(" ")}
-                            >
-                              <div className="mb-1 text-[11px] text-[#6a7f9f]">
-                                {message.sender_name || (outbound ? "Vous" : "Prospect")}
-                              </div>
+            <section className="mt-3 grid min-h-0 flex-1 gap-3 md:grid-cols-[330px_minmax(0,1fr)]">
+              <div className="hub-card flex min-h-0 flex-col overflow-hidden">
+                <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
+                  <h2 className="text-sm font-semibold text-[#0b1c33]">Conversations</h2>
+                </div>
 
-                              <div className="whitespace-pre-wrap">
-                                {isDeleted ? "Message supprimé" : message.text || "—"}
-                              </div>
+                <div className="border-b border-[#d7e3f4] bg-[#f8fbff] p-3">
+                  <input
+                    value={threadSearch}
+                    onChange={(event) => setThreadSearch(event.target.value)}
+                    placeholder="Rechercher un prénom..."
+                    className="h-9 w-full rounded-xl border border-[#c8d6ea] bg-white px-3 text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:border-[#9cc0ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                  />
+                </div>
 
-                              <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-[#7a8ea9]">
-                                <span>{formatDateTime(message.sent_at)}</span>
-                                <span>{statusLabel ?? ""}</span>
+                <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                  {loadingThreads ? (
+                    <div className="p-3 text-sm text-[#51627b]">Chargement des threads…</div>
+                  ) : threads.length === 0 ? (
+                    <div className="p-3 text-sm text-[#51627b]">
+                      Aucune conversation synchronisée pour le moment.
+                    </div>
+                  ) : filteredThreads.length === 0 ? (
+                    <div className="p-3 text-sm text-[#51627b]">
+                      Aucune conversation trouvée pour cette recherche.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredThreads.map((thread) => {
+                        const active = thread.id === selectedThreadId;
+                        const unreadCount =
+                          typeof thread.unread_count === "number" ? thread.unread_count : 0;
+
+                        return (
+                          <button
+                            key={thread.id}
+                            type="button"
+                            onClick={() => {
+                              shouldScrollToBottomRef.current = true;
+                              setSelectedThreadId(thread.id);
+                            }}
+                            className={[
+                              "w-full rounded-xl border px-3 py-3 text-left transition-colors duration-150",
+                              active ? "border-[#9cc0ff]" : "border-[#d7e3f4] hover:border-[#b9d0f2]",
+                              unreadCount > 0
+                                ? "bg-blue-50 hover:bg-blue-100"
+                                : "bg-transparent hover:bg-gray-50",
+                            ].join(" ")}
+                          >
+                            <div className="flex items-start gap-3">
+                              {thread.contact_avatar_url ? (
+                                <img
+                                  src={thread.contact_avatar_url}
+                                  alt={thread.contact_name || "Contact LinkedIn"}
+                                  className="h-9 w-9 shrink-0 rounded-full border border-[#d7e3f4] object-cover"
+                                  loading="lazy"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d7e3f4] bg-[#edf4ff] text-xs font-semibold text-[#325c95]">
+                                  {getContactInitials(thread.contact_name)}
+                                </div>
+                              )}
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="truncate text-sm font-medium text-[#0b1c33]">
+                                    {thread.contact_name || "Contact LinkedIn"}
+                                  </p>
+                                  {unreadCount > 0 ? (
+                                    <span className="rounded-full border border-[#9cc0ff] bg-white px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#1f5eff]">
+                                      {formatUnreadCount(unreadCount)}
+                                    </span>
+                                  ) : null}
+                                </div>
+
+                                <p className="mt-1 truncate text-xs text-[#51627b]">
+                                  {thread.last_message_preview || "Aucun aperçu"}
+                                </p>
+
+                                <p className="mt-1 text-[11px] text-[#8093ad]">
+                                  {formatDateTime(thread.last_message_at)}
+                                </p>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="border-t border-[#d7e3f4] bg-[#f8fbff] p-3">
-                    <div className="flex items-end gap-2">
-                      <textarea
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        placeholder="Écrire une réponse..."
-                        className="min-h-[72px] w-full rounded-xl border border-[#c8d6ea] bg-white px-3 py-2 text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:border-[#9cc0ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
-                      />
-                      <HubButton
-                        type="button"
-                        variant="primary"
-                        onClick={handleSend}
-                        disabled={sending || !draft.trim()}
-                      >
-                        {sending ? "Envoi..." : "Envoyer"}
-                      </HubButton>
+                          </button>
+                        );
+                      })}
                     </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="hub-card flex min-h-0 flex-col overflow-hidden">
+                <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
+                    {selectedThreadLinkedInUrl ? (
+                      <button
+                        type="button"
+                        onClick={handleOpenSelectedThreadLinkedInProfile}
+                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                      >
+                        <Linkedin className="h-3.5 w-3.5" />
+                        Voir profil
+                      </button>
+                    ) : null}
                   </div>
-                </>
-              )}
-            </div>
-          </section>
+                </div>
+
+                {!selectedThread ? (
+                  <div className="p-6 text-sm text-[#51627b]">
+                    Sélectionne une conversation pour afficher l’historique.
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      ref={messagesViewportRef}
+                      className="min-h-0 flex-1 overflow-y-auto p-4"
+                    >
+                      {loadingMessages ? (
+                        <div className="text-sm text-[#51627b]">Chargement des messages…</div>
+                      ) : messages.length === 0 ? (
+                        <div className="text-sm text-[#51627b]">
+                          Aucun message dans ce thread.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {messages.map((message) => {
+                            const raw = asObject(message.raw);
+                            const isDeleted = raw.deleted === true;
+                            const deliveryStatus =
+                              typeof raw.delivery_status === "string"
+                                ? raw.delivery_status.toLowerCase()
+                                : null;
+                            const statusLabel =
+                              deliveryStatus === "read"
+                                ? "Lu"
+                                : deliveryStatus === "delivered"
+                                  ? "Délivré"
+                                  : null;
+                            const outbound = String(message.direction).toLowerCase() === "outbound";
+
+                            return (
+                              <div
+                                key={message.id}
+                                className={[
+                                  "max-w-[82%] rounded-2xl border px-3 py-2 text-sm",
+                                  outbound
+                                    ? "ml-auto border-[#9cc0ff] bg-[#edf5ff] text-[#14345e]"
+                                    : "mr-auto border-[#d7e3f4] bg-[#f7fbff] text-[#1e3551]",
+                                ].join(" ")}
+                              >
+                                <div className="mb-1 text-[11px] text-[#6a7f9f]">
+                                  {message.sender_name || (outbound ? "Vous" : "Prospect")}
+                                </div>
+
+                                <div className="whitespace-pre-wrap">
+                                  {isDeleted ? "Message supprimé" : message.text || "—"}
+                                </div>
+
+                                <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-[#7a8ea9]">
+                                  <span>{formatDateTime(message.sent_at)}</span>
+                                  <span>{statusLabel ?? ""}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border-t border-[#d7e3f4] bg-[#f8fbff] p-3">
+                      <div className="flex items-end gap-2">
+                        <textarea
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                          placeholder="Écrire une réponse..."
+                          className="min-h-[72px] w-full rounded-xl border border-[#c8d6ea] bg-white px-3 py-2 text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:border-[#9cc0ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                        />
+                        <HubButton
+                          type="button"
+                          variant="primary"
+                          onClick={handleSend}
+                          disabled={sending || !draft.trim()}
+                        >
+                          {sending ? "Envoi..." : "Envoyer"}
+                        </HubButton>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
+          </div>
         </div>
       </div>
     </SubscriptionGate>

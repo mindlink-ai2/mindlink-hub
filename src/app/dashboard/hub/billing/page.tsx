@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
+import MobileLayout from "@/components/mobile/MobileLayout";
+import MobilePageHeader from "@/components/mobile/MobilePageHeader";
 
 type BillingStatus = {
   plan: string | null; // "essential" | "premium" | "automated" | ...
@@ -176,7 +178,108 @@ export default function BillingPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-      <section className="relative overflow-hidden rounded-[32px] border border-[#dbe7ff] bg-white/90 p-6 shadow-[0_30px_70px_-44px_rgba(59,110,213,0.5)] backdrop-blur-sm sm:p-8">
+      <MobileLayout className="gap-4">
+        <MobilePageHeader
+          title="Facturation"
+          subtitle={
+            statusLoading
+              ? "Chargement de votre abonnement..."
+              : `${prettyPlan(billing.plan)} · ${prettyStatus(billing.subscription_status)}`
+          }
+        />
+
+        {error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        <section className="rounded-2xl border border-[#d7e3f4] bg-white p-4 shadow-[0_16px_26px_-22px_rgba(18,43,86,0.7)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-[16px] font-semibold text-[#15355f]">Essential</h2>
+              <p className="mt-1 text-[12px] text-[#5e769c]">10, 20 ou 30 prospects/jour.</p>
+            </div>
+            <span className="rounded-full border border-[#d7e3f4] bg-[#f8fbff] px-2.5 py-1 text-[11px] text-[#51627b]">
+              {essentialPrice}€/mois
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {essentialQuotaOptions.map((opt) => {
+              const active = selectedEssentialQuota === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setSelectedEssentialQuota(opt.value)}
+                  disabled={essentialCtasDisabled}
+                  className={[
+                    "rounded-xl border px-2 py-2 text-center text-[12px] font-medium transition disabled:cursor-not-allowed disabled:opacity-60",
+                    active
+                      ? "border-[#a6c1f4] bg-[#edf4ff] text-[#1f4f96]"
+                      : "border-[#d7e3f4] bg-white text-[#4b647f] hover:bg-[#f7fbff]",
+                  ].join(" ")}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={startEssentialCheckout}
+            disabled={essentialCtasDisabled}
+            className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#1f5eff] bg-[#1f5eff] px-4 text-sm font-medium text-white transition hover:bg-[#174dd4] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading === "essential" ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Redirection...
+              </>
+            ) : (
+              <>
+                Choisir Essential {selectedEssentialQuota}/jour
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </button>
+        </section>
+
+        <section className="rounded-2xl border border-[#d7e3f4] bg-white p-4 shadow-[0_16px_26px_-22px_rgba(18,43,86,0.7)]">
+          <h2 className="text-[16px] font-semibold text-[#15355f]">Full automatisé</h2>
+          <p className="mt-1 text-[12px] text-[#5e769c]">450 prospects/mois, sans intervention.</p>
+          <ul className="mt-3 space-y-2 text-[12px] text-[#496288]">
+            {[
+              "Demandes de connexion automatiques",
+              "Relances automatiques",
+              "Envoi en heures de bureau",
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-2">
+                <Check className="mt-0.5 h-3.5 w-3.5 text-[#2f65d7]" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={openPortal}
+            disabled={portalDisabled}
+            className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-4 text-sm font-medium text-[#274676] transition hover:bg-[#eef4fd] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading === "portal" ? "Ouverture..." : "Gérer mon abonnement"}
+          </button>
+        </section>
+
+        <div className="rounded-xl border border-[#d7e5ff] bg-[#f6f9ff] px-3 py-2 text-[12px] text-[#4f678f]">
+          {statusLoading
+            ? "Chargement…"
+            : `${prettyPlan(billing.plan)} · ${prettyStatus(billing.subscription_status)}`}
+          {currentPaceLabel !== "—" ? <span> · {currentPaceLabel}</span> : null}
+          {renewalLabel ? <div className="mt-1 text-[#6982a9]">{renewalLabel}</div> : null}
+        </div>
+      </MobileLayout>
+
+      <section className="relative hidden overflow-hidden rounded-[32px] border border-[#dbe7ff] bg-white/90 p-6 shadow-[0_30px_70px_-44px_rgba(59,110,213,0.5)] backdrop-blur-sm md:block sm:p-8">
         <div className="pointer-events-none absolute -top-40 right-[-120px] h-80 w-80 rounded-full bg-[#dbe8ff] blur-3xl" />
         <div className="pointer-events-none absolute -bottom-40 left-[-100px] h-80 w-80 rounded-full bg-[#e9f2ff] blur-3xl" />
 

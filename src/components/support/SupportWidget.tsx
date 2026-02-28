@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "lidmeo_support_widget_open";
+const SUPPORT_WIDGET_OPEN_EVENT = "mindlink:support-widget-open";
 const MARK_READ_MIN_INTERVAL_MS = 1600;
 const FEATURE_REQUEST_MIN_LENGTH = 6;
 
@@ -353,6 +354,18 @@ export default function SupportWidget() {
       // no-op
     }
   }, [isOpen, hasHydrated]);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+
+    const onOpenWidget = () => {
+      setIsOpen(true);
+      setError(null);
+    };
+
+    window.addEventListener(SUPPORT_WIDGET_OPEN_EVENT, onOpenWidget);
+    return () => window.removeEventListener(SUPPORT_WIDGET_OPEN_EVENT, onOpenWidget);
+  }, [hasHydrated]);
 
   useEffect(() => {
     if (!isLoaded) return;
