@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { extractLinkedInProfileSlug, normalizeLinkedInUrl } from "@/lib/linkedin-url";
+import { normalizeLinkedInUrl } from "@/lib/linkedin-url";
 import { normalizeUnipileBase, requireEnv } from "@/lib/inbox-server";
 import {
   getFirstString,
@@ -111,10 +111,10 @@ export type ResolveProviderIdResult =
       source: "invitation_lookup";
       invitationId: string | null;
       matchedBy:
-        | "matching.normalized_linkedin_url"
-        | "webhook_payload.user_profile_url"
-        | "webhook_payload.user_public_identifier"
-        | "matching.profile_slug"
+        | "acceptance.matching.profile_slug"
+        | "acceptance.webhook_payload.user_public_identifier"
+        | "acceptance.matching.normalized_linkedin_url"
+        | "acceptance.webhook_payload.user_profile_url"
         | null;
       candidatesCount: number;
     }
@@ -130,10 +130,10 @@ export type FindProviderIdFromInvitationsResult = {
   invitationId: string | null;
   invitationCreatedAt: string | null;
   matchedBy:
-    | "matching.normalized_linkedin_url"
-    | "webhook_payload.user_profile_url"
-    | "webhook_payload.user_public_identifier"
-    | "matching.profile_slug"
+    | "acceptance.matching.profile_slug"
+    | "acceptance.webhook_payload.user_public_identifier"
+    | "acceptance.matching.normalized_linkedin_url"
+    | "acceptance.webhook_payload.user_profile_url"
     | null;
   candidatesCount: number;
   inspectedCount: number;
@@ -142,6 +142,17 @@ export type FindProviderIdFromInvitationsResult = {
   recentProfileUrls: string[];
   usedDateFilter: boolean;
 };
+
+export function extractLinkedinSlug(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const match = String(url).match(/linkedin\.com\/in\/([^\/\?#]+)/i);
+  if (!match?.[1]) return null;
+  try {
+    return decodeURIComponent(match[1]).trim().toLowerCase();
+  } catch {
+    return match[1].trim().toLowerCase();
+  }
+}
 
 export function extractProviderId(payload: unknown): string | null {
   const data = toJsonObject(payload);
@@ -496,7 +507,8 @@ async function listClientLinkedinAccountIds(params: {
 
 function getWebhookAccountId(rawInput: unknown, fallbackAccountId?: string | null): string | null {
   const raw = toJsonObject(rawInput);
-  const payload = toJsonObject(raw.webhook_payload);
+  const acceptance = toJsonObject(raw.acceptance);
+  const payload = toJsonObject(acceptance.webhook_payload);
   const fallback = String(fallbackAccountId ?? "").trim() || null;
   return (
     getFirstString(payload, [
@@ -515,7 +527,8 @@ function getWebhookAccountId(rawInput: unknown, fallbackAccountId?: string | nul
 
 function getWebhookProfileUrl(rawInput: unknown): string | null {
   const raw = toJsonObject(rawInput);
-  const payload = toJsonObject(raw.webhook_payload);
+  const acceptance = toJsonObject(raw.acceptance);
+  const payload = toJsonObject(acceptance.webhook_payload);
   const url = getFirstString(payload, [
     ["user_profile_url"],
     ["userProfileUrl"],
@@ -533,7 +546,8 @@ function getWebhookProfileUrl(rawInput: unknown): string | null {
 
 function getMatchingNormalizedUrl(rawInput: unknown): string | null {
   const raw = toJsonObject(rawInput);
-  const matching = toJsonObject(raw.matching);
+  const acceptance = toJsonObject(raw.acceptance);
+  const matching = toJsonObject(acceptance.matching);
   return normalizeLinkedInUrl(
     getFirstString(matching, [
       ["normalized_linkedin_url"],
@@ -544,7 +558,8 @@ function getMatchingNormalizedUrl(rawInput: unknown): string | null {
 
 function getWebhookPublicIdentifier(rawInput: unknown): string | null {
   const raw = toJsonObject(rawInput);
-  const payload = toJsonObject(raw.webhook_payload);
+  const acceptance = toJsonObject(raw.acceptance);
+  const payload = toJsonObject(acceptance.webhook_payload);
   return normalizeSlugForMatching(
     getFirstString(payload, [
       ["user_public_identifier"],
@@ -559,7 +574,8 @@ function getWebhookPublicIdentifier(rawInput: unknown): string | null {
 
 function getMatchingProfileSlug(rawInput: unknown): string | null {
   const raw = toJsonObject(rawInput);
-  const matching = toJsonObject(raw.matching);
+  const acceptance = toJsonObject(raw.acceptance);
+  const matching = toJsonObject(acceptance.matching);
   return normalizeSlugForMatching(
     getFirstString(matching, [
       ["profile_slug"],
@@ -570,7 +586,8 @@ function getMatchingProfileSlug(rawInput: unknown): string | null {
 
 function getWebhookProviderId(rawInput: unknown): string | null {
   const raw = toJsonObject(rawInput);
-  const payload = toJsonObject(raw.webhook_payload);
+  const acceptance = toJsonObject(raw.acceptance);
+  const payload = toJsonObject(acceptance.webhook_payload);
   return (
     getFirstString(payload, [
       ["user_provider_id"],
@@ -594,7 +611,7 @@ export async function findProviderIdFromInvitations(params: {
   const { supabase, clientId, leadId, linkedinUrl, unipileAccountId } = params;
   const lookbackDays = Math.max(1, Math.min(Number(params.lookbackDays ?? 180), 365));
   const normalizedLeadUrl = normalizeLinkedInUrl(linkedinUrl);
-  const slug = extractLinkedInProfileSlug(linkedinUrl);
+  const slugLead = extractLinkedinSlug(linkedinUrl);
 
   const accountIds = await listClientLinkedinAccountIds({
     supabase,
@@ -608,7 +625,7 @@ export async function findProviderIdFromInvitations(params: {
     leadId,
     clientId,
     normalized_lead_url: normalizedLeadUrl,
-    slug,
+    slug: slugLead,
     account_ids_count: accountIds.length,
   });
 
@@ -619,6 +636,7 @@ export async function findProviderIdFromInvitations(params: {
     .from("linkedin_invitations")
     .select("id, lead_id, unipile_account_id, created_at, raw")
     .eq("client_id", clientId)
+    .not("raw->acceptance->webhook_payload->>user_provider_id", "is", null)
     .order("created_at", { ascending: false, nullsFirst: false })
     .limit(1200)
     .gte("created_at", cutoffIso);
@@ -633,6 +651,7 @@ export async function findProviderIdFromInvitations(params: {
       .from("linkedin_invitations")
       .select("id, lead_id, unipile_account_id, raw")
       .eq("client_id", clientId)
+      .not("raw->acceptance->webhook_payload->>user_provider_id", "is", null)
       .order("id", { ascending: false })
       .limit(1200);
 
@@ -649,11 +668,35 @@ export async function findProviderIdFromInvitations(params: {
   }
 
   if (rowsError) {
+    const fallbackNoProviderFilter = usedDateFilter
+      ? await supabase
+          .from("linkedin_invitations")
+          .select("id, lead_id, unipile_account_id, created_at, raw")
+          .eq("client_id", clientId)
+          .order("created_at", { ascending: false, nullsFirst: false })
+          .limit(1200)
+          .gte("created_at", cutoffIso)
+      : await supabase
+          .from("linkedin_invitations")
+          .select("id, lead_id, unipile_account_id, raw")
+          .eq("client_id", clientId)
+          .order("id", { ascending: false })
+          .limit(1200);
+
+    if (!fallbackNoProviderFilter.error) {
+      rowsError = null;
+      rows = Array.isArray(fallbackNoProviderFilter.data)
+        ? (fallbackNoProviderFilter.data as InvitationLookupRow[])
+        : [];
+    }
+  }
+
+  if (rowsError) {
     console.error("PROVIDER_LOOKUP_INVITATIONS_QUERY_ERROR", {
       leadId,
       clientId,
       normalized_lead_url: normalizedLeadUrl,
-      slug,
+      slug: slugLead,
       error: rowsError,
     });
     return {
@@ -664,20 +707,26 @@ export async function findProviderIdFromInvitations(params: {
       candidatesCount: 0,
       inspectedCount: 0,
       normalizedLeadUrl,
-      slug,
+      slug: slugLead,
       recentProfileUrls: [],
       usedDateFilter,
     };
   }
   const recentProfileUrls: string[] = [];
-  const matchedRows: Array<{
+  const slugMatchedRows: Array<{
     invitationId: string;
     createdAt: string | null;
     matchedBy:
-      | "matching.normalized_linkedin_url"
-      | "webhook_payload.user_profile_url"
-      | "webhook_payload.user_public_identifier"
-      | "matching.profile_slug";
+      | "acceptance.matching.profile_slug"
+      | "acceptance.webhook_payload.user_public_identifier";
+    providerId: string | null;
+  }> = [];
+  const urlMatchedRows: Array<{
+    invitationId: string;
+    createdAt: string | null;
+    matchedBy:
+      | "acceptance.matching.normalized_linkedin_url"
+      | "acceptance.webhook_payload.user_profile_url";
     providerId: string | null;
   }> = [];
 
@@ -691,57 +740,73 @@ export async function findProviderIdFromInvitations(params: {
 
     const invitationId = String(row.id ?? "").trim();
     const createdAt = String(row.created_at ?? "").trim() || null;
+    const providerId = getWebhookProviderId(invitationRaw);
+    if (!providerId) continue;
+
     const matchingNormalizedUrl = getMatchingNormalizedUrl(invitationRaw);
     const webhookProfileUrl = getWebhookProfileUrl(invitationRaw);
-    const webhookPublicIdentifier = getWebhookPublicIdentifier(invitationRaw);
-    const matchingProfileSlug = getMatchingProfileSlug(invitationRaw);
-    const providerId = getWebhookProviderId(invitationRaw);
+    const slugFromMatching = getMatchingProfileSlug(invitationRaw);
+    const slugFromPublicIdentifier = getWebhookPublicIdentifier(invitationRaw);
+    const slugWebhook = slugFromMatching ?? slugFromPublicIdentifier;
+    const slugSource =
+      slugFromMatching !== null
+        ? "acceptance.matching.profile_slug"
+        : slugFromPublicIdentifier !== null
+          ? "acceptance.webhook_payload.user_public_identifier"
+          : null;
+
+    const isSlugMatch = Boolean(slugLead && slugWebhook && slugLead === slugWebhook);
+    console.log({
+      leadId,
+      slugLead,
+      slugWebhook,
+      matched: isSlugMatch,
+      providerId,
+    });
 
     if (webhookProfileUrl && recentProfileUrls.length < 5) {
       recentProfileUrls.push(webhookProfileUrl);
     }
 
-    if (normalizedLeadUrl && matchingNormalizedUrl && matchingNormalizedUrl === normalizedLeadUrl) {
-      matchedRows.push({
+    if (isSlugMatch && slugSource) {
+      slugMatchedRows.push({
         invitationId,
         createdAt,
-        matchedBy: "matching.normalized_linkedin_url",
+        matchedBy: slugSource,
+        providerId,
+      });
+      continue;
+    }
+
+    if (normalizedLeadUrl && matchingNormalizedUrl && matchingNormalizedUrl === normalizedLeadUrl) {
+      urlMatchedRows.push({
+        invitationId,
+        createdAt,
+        matchedBy: "acceptance.matching.normalized_linkedin_url",
         providerId,
       });
       continue;
     }
 
     if (normalizedLeadUrl && webhookProfileUrl && webhookProfileUrl === normalizedLeadUrl) {
-      matchedRows.push({
+      urlMatchedRows.push({
         invitationId,
         createdAt,
-        matchedBy: "webhook_payload.user_profile_url",
-        providerId,
-      });
-      continue;
-    }
-
-    if (slug && webhookPublicIdentifier && webhookPublicIdentifier === slug) {
-      matchedRows.push({
-        invitationId,
-        createdAt,
-        matchedBy: "webhook_payload.user_public_identifier",
-        providerId,
-      });
-      continue;
-    }
-
-    if (slug && matchingProfileSlug && matchingProfileSlug === slug) {
-      matchedRows.push({
-        invitationId,
-        createdAt,
-        matchedBy: "matching.profile_slug",
+        matchedBy: "acceptance.webhook_payload.user_profile_url",
         providerId,
       });
     }
   }
 
-  const sortedMatches = [...matchedRows].sort((a, b) => {
+  const sortedSlugMatches = [...slugMatchedRows].sort((a, b) => {
+    const aDate = Date.parse(a.createdAt ?? "");
+    const bDate = Date.parse(b.createdAt ?? "");
+    if (Number.isFinite(aDate) && Number.isFinite(bDate) && aDate !== bDate) {
+      return bDate - aDate;
+    }
+    return b.invitationId.localeCompare(a.invitationId);
+  });
+  const sortedUrlMatches = [...urlMatchedRows].sort((a, b) => {
     const aDate = Date.parse(a.createdAt ?? "");
     const bDate = Date.parse(b.createdAt ?? "");
     if (Number.isFinite(aDate) && Number.isFinite(bDate) && aDate !== bDate) {
@@ -750,15 +815,21 @@ export async function findProviderIdFromInvitations(params: {
     return b.invitationId.localeCompare(a.invitationId);
   });
 
-  const chosen = sortedMatches.find((row) => String(row.providerId ?? "").trim()) ?? null;
+  const chosen =
+    sortedSlugMatches.find((row) => String(row.providerId ?? "").trim()) ??
+    sortedUrlMatches.find((row) => String(row.providerId ?? "").trim()) ??
+    null;
+  const candidatesCount = sortedSlugMatches.length + sortedUrlMatches.length;
 
   console.log({
     step: "provider-lookup:done",
     leadId,
     clientId,
     normalized_lead_url: normalizedLeadUrl,
-    slug,
-    candidates_count: sortedMatches.length,
+    slug: slugLead,
+    candidates_count: candidatesCount,
+    slug_candidates_count: sortedSlugMatches.length,
+    url_candidates_count: sortedUrlMatches.length,
     used_invitation_id: chosen?.invitationId ?? null,
     used_invitation_created_at: chosen?.createdAt ?? null,
     matched_by: chosen?.matchedBy ?? null,
@@ -770,8 +841,8 @@ export async function findProviderIdFromInvitations(params: {
       leadId,
       clientId,
       normalized_lead_url: normalizedLeadUrl,
-      slug,
-      candidates_count: sortedMatches.length,
+      slug: slugLead,
+      candidates_count: candidatesCount,
       debug_last_profile_urls: recentProfileUrls,
       used_date_filter: usedDateFilter,
     });
@@ -782,10 +853,10 @@ export async function findProviderIdFromInvitations(params: {
     invitationId: chosen?.invitationId ?? null,
     invitationCreatedAt: chosen?.createdAt ?? null,
     matchedBy: chosen?.matchedBy ?? null,
-    candidatesCount: sortedMatches.length,
+    candidatesCount,
     inspectedCount: rows.length,
     normalizedLeadUrl,
-    slug,
+    slug: slugLead,
     recentProfileUrls,
     usedDateFilter,
   };
