@@ -111,6 +111,28 @@ class UnipileHttpError extends Error {
   }
 }
 
+class UnipileCreateChatFailedError extends Error {
+  readonly status: number | null;
+  readonly data: unknown;
+  readonly text: string;
+  readonly details: UnipileCallFailureDetail[];
+
+  constructor(params: {
+    status: number | null;
+    data: unknown;
+    text: string;
+    details: UnipileCallFailureDetail[];
+    message: string;
+  }) {
+    super(params.message);
+    this.name = "UnipileCreateChatFailedError";
+    this.status = params.status;
+    this.data = params.data;
+    this.text = params.text;
+    this.details = params.details;
+  }
+}
+
 export type EnsureThreadAndSendMessageResult =
   | {
       ok: true;
@@ -394,6 +416,7 @@ async function callUnipile(params: {
   body?: JsonObject;
 }): Promise<{ status: number; payload: unknown; text: string }> {
   const { url, method, apiKey, body } = params;
+  console.log("UNIPILE_REQ", { url, method, body: body ?? null });
   console.log("UNIPILE_HTTP_REQUEST", {
     method,
     url,
@@ -425,6 +448,10 @@ async function callUnipile(params: {
     ok: response.ok,
     response_body: payload,
     response_text: text,
+  });
+  console.log("UNIPILE_RES", {
+    status: response.status,
+    data: payload ?? text,
   });
 
   if (!response.ok) {
@@ -776,7 +803,7 @@ async function createConversationThreadId(params: {
   apiKey: string;
   unipileAccountId: string;
   providerId: string;
-}): Promise<{ threadId: string | null; details: UnipileCallFailureDetail[] }> {
+}): Promise<{ threadId: string; details: UnipileCallFailureDetail[] }> {
   const { baseUrl, apiKey, unipileAccountId, providerId } = params;
 
   const endpoints = [`${baseUrl}/api/v1/chats`, `${baseUrl}/api/v1/conversations`];
@@ -794,7 +821,7 @@ async function createConversationThreadId(params: {
     {
       account_id: unipileAccountId,
       provider: "LINKEDIN",
-      participant_provider_ids: [providerId],
+      participants: [{ provider_id: providerId }],
     },
   ]);
   const attemptNames = ["A", "B", "C"];
@@ -861,8 +888,20 @@ async function createConversationThreadId(params: {
       }
     }
   }
-
-  return { threadId: null, details: failures };
+  const primaryFailure = pickPrimaryFailureDetail(failures);
+  const failureStatus = primaryFailure?.status ?? null;
+  const failureData = primaryFailure?.data ?? null;
+  const failureText = primaryFailure?.text ?? null;
+  const failureMessage = `UNIPILE_CREATE_CHAT_FAILED status=${String(failureStatus ?? "unknown")} body=${safeStringify(
+    failureData ?? failureText ?? "empty_response_body"
+  )}`;
+  throw new UnipileCreateChatFailedError({
+    status: failureStatus,
+    data: failureData,
+    text: failureText ?? "",
+    details: failures,
+    message: failureMessage,
+  });
 }
 
 export async function sendOutboundMessageInThread(params: {
@@ -1323,19 +1362,33 @@ export async function ensureThreadAndSendMessage(params: {
       account_id: unipileAccountId,
       providerId: usableProviderId,
     });
+    console.log("PROVIDER_ID_USED", usableProviderId);
 
-    const created = await createConversationThreadId({
-      baseUrl,
-      apiKey,
-      unipileAccountId,
-      providerId: usableProviderId,
-    });
-    if (!created.threadId) {
-      const primaryFailure = pickPrimaryFailureDetail(created.details);
-      const failureStatus = primaryFailure?.status ?? null;
-      const failureData = primaryFailure?.data ?? null;
-      const failureText = primaryFailure?.text ?? null;
-      const failureMessage = primaryFailure?.message ?? "unipile_create_chat_failed";
+    try {
+      const created = await createConversationThreadId({
+        baseUrl,
+        apiKey,
+        unipileAccountId,
+        providerId: usableProviderId,
+      });
+      unipileThreadId = created.threadId;
+    } catch (error) {
+      let failureStatus: number | null = null;
+      let failureData: unknown = null;
+      let failureText: string | null = null;
+      let failureMessage = error instanceof Error ? error.message : String(error ?? "unipile_create_chat_failed");
+      let failureDetails: unknown = null;
+
+      if (error instanceof UnipileCreateChatFailedError) {
+        failureStatus = error.status;
+        failureData = error.data;
+        failureText = error.text;
+        failureDetails = error.details;
+      } else if (error instanceof UnipileHttpError) {
+        failureStatus = error.status;
+        failureData = error.data;
+        failureText = error.text;
+      }
 
       console.error("UNIPILE_CREATE_CHAT_FAILED", {
         leadId,
@@ -1344,8 +1397,6 @@ export async function ensureThreadAndSendMessage(params: {
         status: failureStatus,
         data: failureData,
         text: failureText,
-        method: primaryFailure?.method ?? "POST",
-        url: primaryFailure?.url ?? null,
         message: failureMessage,
       });
 
@@ -1357,13 +1408,12 @@ export async function ensureThreadAndSendMessage(params: {
           errText: failureMessage,
           context: "create-chat",
         }),
-        details: created.details,
+        details: failureDetails ?? failureData ?? failureText ?? failureMessage,
         providerId: usableProviderId,
         unipileThreadId: null,
       };
     }
 
-    unipileThreadId = created.threadId;
     createdNow = true;
   }
 
