@@ -671,15 +671,6 @@ export default function LeadsPage() {
 
     if (openLead.message_sent || sendingLinkedInMessageLeadIds.has(idStr)) return;
 
-    const content = String(openLead.internal_message ?? "").trim();
-    if (!content) {
-      setLinkedInMessageSendErrors((prev) => ({
-        ...prev,
-        [idStr]: "Le message LinkedIn est vide.",
-      }));
-      return;
-    }
-
     setSendingLinkedInMessageLeadIds((prev: Set<string>) => {
       const next = new Set(prev);
       next.add(idStr);
@@ -694,12 +685,11 @@ export default function LeadsPage() {
     });
 
     try {
-      const res = await fetch("/api/prospection/send-linkedin-message", {
+      const res = await fetch("/api/leads/message-sent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           leadId,
-          content,
         }),
       });
 
@@ -1641,10 +1631,10 @@ export default function LeadsPage() {
                         {openLead.message_sent
                           ? "Envoyé ✅"
                           : isSendingOpenLeadLinkedInMessage
-                            ? "Envoi…"
+                            ? "Marquage…"
                             : openLeadLinkedInMessageError
                               ? "Erreur — réessayer"
-                              : "Envoyer le message"}
+                              : "Marquer comme envoyé"}
                       </button>
                     </div>
 
