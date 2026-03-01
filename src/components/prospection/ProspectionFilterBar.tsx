@@ -24,7 +24,7 @@ export type ProspectionStatusKey = "todo" | "pending" | "connected" | "sent"
 export type ProspectionSegmentKey = "all" | ProspectionStatusKey
 export type ProspectionInvitationKey = "accepted" | "sent" | "none"
 export type ProspectionContactKey = "email" | "phone"
-export type ProspectionDatePreset = "all" | "7d" | "30d" | "90d"
+export type ProspectionDatePreset = "all" | "7d" | "30d" | "90d" | "custom"
 
 export type ProspectionDesktopFilters = {
   segment: ProspectionSegmentKey
@@ -32,6 +32,7 @@ export type ProspectionDesktopFilters = {
   invitations: ProspectionInvitationKey[]
   contacts: ProspectionContactKey[]
   datePreset: ProspectionDatePreset
+  customDate: string | null
 }
 
 type SegmentOption = {
@@ -76,6 +77,7 @@ const DATE_OPTIONS: Array<{ value: ProspectionDatePreset; label: string }> = [
   { value: "7d", label: "7 derniers jours" },
   { value: "30d", label: "30 derniers jours" },
   { value: "90d", label: "90 derniers jours" },
+  { value: "custom", label: "Jusqu'à une date" },
 ]
 
 function toggleSelection<T extends string>(values: T[], value: T): T[] {
@@ -89,9 +91,30 @@ function getChipLabel(baseLabel: string, labels: string[]): string {
   return `${baseLabel}: ${labels[0]} (${labels.length})`
 }
 
-function labelForDatePreset(value: ProspectionDatePreset): string {
-  const option = DATE_OPTIONS.find((entry) => entry.value === value)
-  return option?.label ?? "Toutes les dates"
+function formatDateForLabel(inputDate: string): string {
+  const parsed = new Date(`${inputDate}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return inputDate
+  return parsed.toLocaleDateString("fr-FR")
+}
+
+function getTodayDateInputValue(): string {
+  const now = new Date()
+  const year = `${now.getFullYear()}`
+  const month = `${now.getMonth() + 1}`.padStart(2, "0")
+  const day = `${now.getDate()}`.padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function getDateChipLabel(filters: ProspectionDesktopFilters): string {
+  if (filters.datePreset === "all") return "Date"
+
+  if (filters.datePreset === "custom") {
+    if (!filters.customDate) return "Date: personnalisée"
+    return `Date: jusqu'au ${formatDateForLabel(filters.customDate)}`
+  }
+
+  const option = DATE_OPTIONS.find((entry) => entry.value === filters.datePreset)
+  return option ? `Date: ${option.label}` : "Date"
 }
 
 function FilterOptionRow({
@@ -121,35 +144,6 @@ function FilterOptionRow({
       </span>
       {checked ? <Check className="h-3.5 w-3.5 text-[#1f5eff]" aria-hidden="true" /> : null}
     </label>
-  )
-}
-
-function ChipTriggerButton({
-  label,
-  expanded,
-  controlsId,
-  active,
-}: {
-  label: string
-  expanded: boolean
-  controlsId: string
-  active: boolean
-}) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      aria-expanded={expanded}
-      aria-controls={controlsId}
-      className={cn(
-        "h-9 rounded-full border-[#c8d6ea] bg-[#f9fcff] px-3 text-xs text-[#2f4a6d] transition-colors hover:bg-[#eef5ff]",
-        active ? "border-[#91b6f8] bg-[#edf4ff] text-[#1f4f96]" : ""
-      )}
-    >
-      {label}
-      <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-    </Button>
   )
 }
 
@@ -186,9 +180,9 @@ export default function ProspectionFilterBar({
   )
   const invitationLabels = useMemo(
     () =>
-      INVITATION_OPTIONS.filter((option) =>
-        currentFilters.invitations.includes(option.value)
-      ).map((option) => option.label),
+      INVITATION_OPTIONS.filter((option) => currentFilters.invitations.includes(option.value)).map(
+        (option) => option.label
+      ),
     [currentFilters.invitations]
   )
   const contactLabels = useMemo(
@@ -200,13 +194,24 @@ export default function ProspectionFilterBar({
   )
 
   const hasActiveFilters = activeFiltersCount > 0
+  const todayValue = useMemo(() => getTodayDateInputValue(), [])
+
+  const applyDatePreset = (nextPreset: ProspectionDatePreset) => {
+    const nextCustomDate =
+      nextPreset === "custom"
+        ? currentFilters.customDate ?? todayValue
+        : currentFilters.customDate
+
+    onChange({
+      ...currentFilters,
+      datePreset: nextPreset,
+      customDate: nextCustomDate,
+    })
+  }
 
   return (
     <section
-      className={cn(
-        "sticky top-[66px] z-30 hidden md:block",
-        className
-      )}
+      className={cn("sticky top-[66px] z-30 hidden md:block", className)}
       aria-label="Barre de filtres desktop prospection"
     >
       <div className="rounded-2xl border border-[#c8d6ea] bg-[#f7fbff]/95 p-3 shadow-[0_14px_32px_-30px_rgba(15,23,42,0.55)] backdrop-blur-sm">
@@ -281,12 +286,20 @@ export default function ProspectionFilterBar({
             <Popover modal open={statusOpen} onOpenChange={setStatusOpen}>
               <div className="inline-flex items-center gap-1">
                 <PopoverTrigger asChild>
-                  <ChipTriggerButton
-                    label={getChipLabel("Statut", statusLabels)}
-                    active={statusLabels.length > 0}
-                    expanded={statusOpen}
-                    controlsId={statusContentId}
-                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-expanded={statusOpen}
+                    aria-controls={statusContentId}
+                    className={cn(
+                      "h-9 rounded-full border-[#c8d6ea] bg-[#f9fcff] px-3 text-xs text-[#2f4a6d] hover:bg-[#eef5ff]",
+                      statusLabels.length > 0 ? "border-[#91b6f8] bg-[#edf4ff] text-[#1f4f96]" : ""
+                    )}
+                  >
+                    {getChipLabel("Statut", statusLabels)}
+                    <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                  </Button>
                 </PopoverTrigger>
                 {statusLabels.length > 0 ? (
                   <Button
@@ -358,17 +371,22 @@ export default function ProspectionFilterBar({
             <Popover modal open={dateOpen} onOpenChange={setDateOpen}>
               <div className="inline-flex items-center gap-1">
                 <PopoverTrigger asChild>
-                  <ChipTriggerButton
-                    label={getChipLabel(
-                      "Date",
-                      currentFilters.datePreset === "all"
-                        ? []
-                        : [labelForDatePreset(currentFilters.datePreset)]
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-expanded={dateOpen}
+                    aria-controls={dateContentId}
+                    className={cn(
+                      "h-9 rounded-full border-[#c8d6ea] bg-[#f9fcff] px-3 text-xs text-[#2f4a6d] hover:bg-[#eef5ff]",
+                      currentFilters.datePreset !== "all"
+                        ? "border-[#91b6f8] bg-[#edf4ff] text-[#1f4f96]"
+                        : ""
                     )}
-                    active={currentFilters.datePreset !== "all"}
-                    expanded={dateOpen}
-                    controlsId={dateContentId}
-                  />
+                  >
+                    {getDateChipLabel(currentFilters)}
+                    <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                  </Button>
                 </PopoverTrigger>
                 {currentFilters.datePreset !== "all" ? (
                   <Button
@@ -383,7 +401,7 @@ export default function ProspectionFilterBar({
                     onClick={(event) => {
                       event.preventDefault()
                       event.stopPropagation()
-                      onChange({ ...currentFilters, datePreset: "all" })
+                      onChange({ ...currentFilters, datePreset: "all", customDate: null })
                     }}
                     className="rounded-full border border-[#c8d6ea] bg-white text-[#51627b] hover:bg-[#f3f7ff]"
                   >
@@ -391,7 +409,7 @@ export default function ProspectionFilterBar({
                   </Button>
                 ) : null}
               </div>
-              <PopoverContent id={dateContentId} align="end" aria-label="Filtrer par date">
+              <PopoverContent id={dateContentId} align="end" aria-label="Filtrer par date" className="w-[320px]">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#58708f]">
                   Date de création
                 </p>
@@ -403,16 +421,43 @@ export default function ProspectionFilterBar({
                       name={dateRadioName}
                       checked={currentFilters.datePreset === option.value}
                       label={option.label}
-                      onChange={() =>
-                        onChange({
-                          ...currentFilters,
-                          datePreset: option.value,
-                        })
-                      }
+                      onChange={() => applyDatePreset(option.value)}
                     />
                   ))}
                 </div>
-                <div className="mt-3 flex justify-end">
+
+                {currentFilters.datePreset === "custom" ? (
+                  <div className="mt-3 rounded-md border border-[#d7e3f4] bg-white p-2.5">
+                    <label htmlFor={`${dateContentId}-input`} className="mb-1.5 block text-xs text-[#58708f]">
+                      Afficher jusqu&apos;au
+                    </label>
+                    <Input
+                      id={`${dateContentId}-input`}
+                      type="date"
+                      value={currentFilters.customDate ?? ""}
+                      max={todayValue}
+                      onChange={(event) =>
+                        onChange({
+                          ...currentFilters,
+                          datePreset: "custom",
+                          customDate: event.target.value || null,
+                        })
+                      }
+                      className="h-9"
+                    />
+                  </div>
+                ) : null}
+
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onChange({ ...currentFilters, datePreset: "all", customDate: null })}
+                    className="h-8 rounded-full px-3 text-xs"
+                  >
+                    Effacer
+                  </Button>
                   <Button
                     type="button"
                     size="sm"
@@ -428,12 +473,22 @@ export default function ProspectionFilterBar({
             <Popover modal open={invitationOpen} onOpenChange={setInvitationOpen}>
               <div className="inline-flex items-center gap-1">
                 <PopoverTrigger asChild>
-                  <ChipTriggerButton
-                    label={getChipLabel("LinkedIn", invitationLabels)}
-                    active={invitationLabels.length > 0}
-                    expanded={invitationOpen}
-                    controlsId={invitationContentId}
-                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-expanded={invitationOpen}
+                    aria-controls={invitationContentId}
+                    className={cn(
+                      "h-9 rounded-full border-[#c8d6ea] bg-[#f9fcff] px-3 text-xs text-[#2f4a6d] hover:bg-[#eef5ff]",
+                      invitationLabels.length > 0
+                        ? "border-[#91b6f8] bg-[#edf4ff] text-[#1f4f96]"
+                        : ""
+                    )}
+                  >
+                    {getChipLabel("LinkedIn", invitationLabels)}
+                    <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                  </Button>
                 </PopoverTrigger>
                 {invitationLabels.length > 0 ? (
                   <Button
@@ -473,10 +528,7 @@ export default function ProspectionFilterBar({
                       onChange={() =>
                         onChange({
                           ...currentFilters,
-                          invitations: toggleSelection(
-                            currentFilters.invitations,
-                            option.value
-                          ),
+                          invitations: toggleSelection(currentFilters.invitations, option.value),
                         })
                       }
                     />
@@ -507,12 +559,20 @@ export default function ProspectionFilterBar({
             <Popover modal open={contactOpen} onOpenChange={setContactOpen}>
               <div className="inline-flex items-center gap-1">
                 <PopoverTrigger asChild>
-                  <ChipTriggerButton
-                    label={getChipLabel("Contact", contactLabels)}
-                    active={contactLabels.length > 0}
-                    expanded={contactOpen}
-                    controlsId={contactContentId}
-                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-expanded={contactOpen}
+                    aria-controls={contactContentId}
+                    className={cn(
+                      "h-9 rounded-full border-[#c8d6ea] bg-[#f9fcff] px-3 text-xs text-[#2f4a6d] hover:bg-[#eef5ff]",
+                      contactLabels.length > 0 ? "border-[#91b6f8] bg-[#edf4ff] text-[#1f4f96]" : ""
+                    )}
+                  >
+                    {getChipLabel("Contact", contactLabels)}
+                    <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                  </Button>
                 </PopoverTrigger>
                 {contactLabels.length > 0 ? (
                   <Button
@@ -588,7 +648,7 @@ export default function ProspectionFilterBar({
                   Tous les filtres
                 </Button>
               </SheetTrigger>
-              <SheetContent>
+              <SheetContent className="flex h-full flex-col">
                 <SheetHeader>
                   <SheetTitle>Filtres avancés</SheetTitle>
                   <SheetDescription>
@@ -596,7 +656,7 @@ export default function ProspectionFilterBar({
                   </SheetDescription>
                 </SheetHeader>
 
-                <div className="mt-5 space-y-6">
+                <div className="mt-5 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
                   <div>
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#58708f]">
                       Statut
@@ -620,6 +680,46 @@ export default function ProspectionFilterBar({
 
                   <div>
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#58708f]">
+                      Date
+                    </p>
+                    <div className="space-y-1">
+                      {DATE_OPTIONS.map((option) => (
+                        <FilterOptionRow
+                          key={`sheet-date-${option.value}`}
+                          type="radio"
+                          name={`${dateRadioName}-sheet`}
+                          checked={currentFilters.datePreset === option.value}
+                          label={option.label}
+                          onChange={() => applyDatePreset(option.value)}
+                        />
+                      ))}
+                    </div>
+
+                    {currentFilters.datePreset === "custom" ? (
+                      <div className="mt-2 rounded-md border border-[#d7e3f4] bg-white p-2.5">
+                        <label htmlFor={`${dateContentId}-sheet-input`} className="mb-1.5 block text-xs text-[#58708f]">
+                          Afficher jusqu&apos;au
+                        </label>
+                        <Input
+                          id={`${dateContentId}-sheet-input`}
+                          type="date"
+                          value={currentFilters.customDate ?? ""}
+                          max={todayValue}
+                          onChange={(event) =>
+                            onChange({
+                              ...currentFilters,
+                              datePreset: "custom",
+                              customDate: event.target.value || null,
+                            })
+                          }
+                          className="h-9"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#58708f]">
                       Connexion LinkedIn
                     </p>
                     <div className="space-y-1">
@@ -631,10 +731,7 @@ export default function ProspectionFilterBar({
                           onChange={() =>
                             onChange({
                               ...currentFilters,
-                              invitations: toggleSelection(
-                                currentFilters.invitations,
-                                option.value
-                              ),
+                              invitations: toggleSelection(currentFilters.invitations, option.value),
                             })
                           }
                         />
@@ -662,32 +759,9 @@ export default function ProspectionFilterBar({
                       ))}
                     </div>
                   </div>
-
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#58708f]">
-                      Date
-                    </p>
-                    <div className="space-y-1">
-                      {DATE_OPTIONS.map((option) => (
-                        <FilterOptionRow
-                          key={`sheet-date-${option.value}`}
-                          type="radio"
-                          name={`${dateRadioName}-sheet`}
-                          checked={currentFilters.datePreset === option.value}
-                          label={option.label}
-                          onChange={() =>
-                            onChange({
-                              ...currentFilters,
-                              datePreset: option.value,
-                            })
-                          }
-                        />
-                      ))}
-                    </div>
-                  </div>
                 </div>
 
-                <SheetFooter>
+                <SheetFooter className="shrink-0 border-t border-[#dbe5f3] bg-[#fbfdff] pt-3">
                   {hasActiveFilters ? (
                     <Button type="button" variant="ghost" onClick={onReset}>
                       Reset

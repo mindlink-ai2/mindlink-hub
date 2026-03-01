@@ -155,12 +155,23 @@ function getLeadPipelineStatus(lead: Lead): ProspectionStatusKey {
   return "todo";
 }
 
-function matchesDatePreset(createdAt: string | null | undefined, preset: ProspectionDatePreset): boolean {
+function matchesDatePreset(
+  createdAt: string | null | undefined,
+  preset: ProspectionDatePreset,
+  customDate: string | null | undefined
+): boolean {
   if (preset === "all") return true;
   if (!createdAt) return false;
 
   const createdDate = new Date(createdAt);
   if (Number.isNaN(createdDate.getTime())) return false;
+
+  if (preset === "custom") {
+    if (!customDate) return true;
+    const endDate = new Date(`${customDate}T23:59:59.999`);
+    if (Number.isNaN(endDate.getTime())) return true;
+    return createdDate <= endDate;
+  }
 
   const days = preset === "7d" ? 7 : preset === "30d" ? 30 : 90;
   const threshold = new Date();
@@ -190,7 +201,7 @@ function applyDesktopFilters(leads: Lead[], filters: ProspectionDesktopFilters):
       if (!matchesEmail && !matchesPhone) return false;
     }
 
-    if (!matchesDatePreset(lead.created_at, filters.datePreset)) return false;
+    if (!matchesDatePreset(lead.created_at, filters.datePreset, filters.customDate)) return false;
 
     return true;
   });
@@ -230,6 +241,7 @@ export default function LeadsPage() {
     invitations: [],
     contacts: [],
     datePreset: "all",
+    customDate: null,
   });
 
   const [safeLeads, setSafeLeads] = useState<Lead[]>([]);
@@ -1012,17 +1024,6 @@ export default function LeadsPage() {
   ).length;
   const remainingToTreat = total - treatedCount;
 
-  // Next import (Paris)
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-  const nextImport = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-  nextImport.setHours(8, 0, 0, 0);
-  if (now > nextImport) nextImport.setDate(nextImport.getDate() + 1);
-  const diffMs = nextImport.getTime() - now.getTime();
-  const diffMinutes = Math.floor(diffMs / 1000 / 60);
-  const hours = Math.floor(diffMinutes / 60);
-  const minutes = diffMinutes % 60;
-  const nextImportText = hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
-
   const allFilteredSelected =
     filteredLeads.length > 0 && filteredLeads.every((l) => selectedIds.has(String(l.id)));
 
@@ -1045,155 +1046,71 @@ export default function LeadsPage() {
                 <div className="absolute -right-20 top-[-140px] h-72 w-72 rounded-full bg-[#d8f4ff]/65 blur-3xl" />
               </div>
 
-              <div className="relative grid gap-4 lg:grid-cols-[1.42fr_0.78fr]">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#1f5eff]" />
-                      Espace client Lidmeo
-                    </span>
+              <div className="relative min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#1f5eff]" />
+                    Espace client Lidmeo
+                  </span>
 
-                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] tabular-nums">
-                      {filteredLeads.length} affichés
-                    </span>
+                  <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] tabular-nums">
+                    {filteredLeads.length} affichés
+                  </span>
 
-                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] whitespace-nowrap">
-                      {plan || "essential"}
-                    </span>
-                  </div>
-
-                  <h1 className="hub-page-title mt-2">
-                    Pilotage de la prospection
-                  </h1>
-                  <p className="mt-2 max-w-2xl text-xs text-[#51627b] sm:text-sm">
-                    Centralisez vos leads, priorisez vos actions et suivez votre pipeline
-                    de manière structurée, avec une vue opérationnelle.
-                  </p>
-                  <div className="mt-3 inline-flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[11px] text-amber-800 sm:text-xs">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span>
-                      Rappel sécurité: évitez les connexions trop rapides et ne dépassez pas 30
-                      invitations LinkedIn par jour.
-                    </span>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-                    <Metric title="Total leads" value={total} tone="default" />
-                    <Metric title="Traités" value={treatedCount} tone="success" />
-                    <Metric title="En attente" value={pendingCount} tone="info" />
-                    <Metric title="À traiter" value={remainingToTreat} tone="warning" />
-                  </div>
-
-                  <div className="mt-3 md:hidden">
-                    <div className="group flex items-center gap-2.5 rounded-xl border border-[#c8d6ea] bg-[#f5f9ff] px-3 py-2.5 shadow-[0_16px_28px_-26px_rgba(18,43,86,0.8)] transition focus-within:border-[#90b5ff] focus-within:ring-2 focus-within:ring-[#dce8ff]">
-                      <svg
-                        className="h-4 w-4 text-[#6a7f9f] transition group-focus-within:text-[#1f5eff]"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
-                        />
-                      </svg>
-                      <input
-                        value={searchTerm}
-                        onChange={(e) => handleSearch(e.target.value)}
-                        placeholder="Rechercher (nom, entreprise, poste, ville, email, téléphone)…"
-                        className="w-full bg-transparent text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:outline-none"
-                        aria-label="Rechercher un lead"
-                      />
-                    </div>
-
-                    <div className="mt-1.5 text-[11px] text-[#51627b]">
-                      {filteredLeads.length} résultat(s) • {pendingCount} en attente • {selectedCount} sélectionné(s)
-                    </div>
-                  </div>
+                  <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] whitespace-nowrap">
+                    {plan || "essential"}
+                  </span>
                 </div>
 
-                <div className="hub-card-soft relative overflow-hidden p-3 sm:p-4">
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(31,94,255,0.12),transparent_48%)]" />
+                <h1 className="hub-page-title mt-2">
+                  Pilotage de la prospection
+                </h1>
+                <p className="mt-2 max-w-3xl text-xs text-[#51627b] sm:text-sm">
+                  Centralisez vos leads, priorisez vos actions et suivez votre pipeline
+                  de manière structurée, avec une vue opérationnelle compacte.
+                </p>
+                <div className="mt-3 inline-flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[11px] text-amber-800 sm:text-xs">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Rappel sécurité: évitez les connexions trop rapides et ne dépassez pas 30
+                    invitations LinkedIn par jour.
+                  </span>
+                </div>
 
-                  <div className="relative">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-[#c8d6ea] bg-[#f7fbff] text-[#51627b]">
-                          <svg
-                            className="h-3.5 w-3.5"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            aria-hidden="true"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M10 6H5a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M14 4h6m0 0v6m0-6L10 14"
-                            />
-                          </svg>
-                        </div>
-                        <h2 className="mt-2 text-sm font-semibold text-[#0b1c33]">Centre d’actions</h2>
-                        <p className="mt-0.5 text-[11px] text-[#51627b]">Actions rapides.</p>
-                      </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                  <Metric title="Total leads" value={total} tone="default" />
+                  <Metric title="Traités" value={treatedCount} tone="success" />
+                  <Metric title="En attente" value={pendingCount} tone="info" />
+                  <Metric title="À traiter" value={remainingToTreat} tone="warning" />
+                </div>
 
-                      <div className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-2.5 py-1 text-[10px] text-[#51627b] tabular-nums">
-                        Import {nextImportText}
-                      </div>
-                    </div>
+                <div className="mt-3 md:hidden">
+                  <div className="group flex items-center gap-2.5 rounded-xl border border-[#c8d6ea] bg-[#f5f9ff] px-3 py-2.5 shadow-[0_16px_28px_-26px_rgba(18,43,86,0.8)] transition focus-within:border-[#90b5ff] focus-within:ring-2 focus-within:ring-[#dce8ff]">
+                    <svg
+                      className="h-4 w-4 text-[#6a7f9f] transition group-focus-within:text-[#1f5eff]"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+                      />
+                    </svg>
+                    <input
+                      value={searchTerm}
+                      onChange={(e) => handleSearch(e.target.value)}
+                      placeholder="Rechercher (nom, entreprise, poste, ville, email, téléphone)…"
+                      className="w-full bg-transparent text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:outline-none"
+                      aria-label="Rechercher un lead"
+                    />
+                  </div>
 
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <div className="rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-2.5 py-2">
-                        <p className="text-[10px] uppercase tracking-wide text-[#68809d]">En attente</p>
-                        <p className="mt-1 text-base font-semibold leading-none text-[#0b1c33] tabular-nums">
-                          {pendingCount}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-2.5 py-2">
-                        <p className="text-[10px] uppercase tracking-wide text-[#68809d]">À traiter</p>
-                        <p className="mt-1 text-base font-semibold leading-none text-[#0b1c33] tabular-nums">
-                          {remainingToTreat}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3">
-                      <HubButton asChild variant="secondary" size="sm" className="w-full">
-                        <a href="/dashboard/leads/export">Exporter tout en CSV</a>
-                      </HubButton>
-                    </div>
-
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      <HubButton type="button" variant="ghost" size="sm" onClick={toggleSelectAllFiltered}>
-                        {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
-                      </HubButton>
-
-                      <HubButton
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleExportSelected}
-                        disabled={selectedCount === 0 || exportingSelected}
-                      >
-                        {exportingSelected ? "Export..." : `Exporter (${selectedCount})`}
-                      </HubButton>
-                      <HubButton
-                        type="button"
-                        variant="danger"
-                        size="sm"
-                        onClick={handleBulkDelete}
-                        disabled={selectedCount === 0}
-                      >
-                        Supprimer ({selectedCount})
-                      </HubButton>
-                      <span className="inline-flex items-center justify-center rounded-full border border-[#d7e3f4] bg-[#f8fbff] px-2.5 py-1 text-[11px] text-[#51627b] tabular-nums">
-                        {selectedCount} sélectionné(s)
-                      </span>
-                    </div>
+                  <div className="mt-1.5 text-[11px] text-[#51627b]">
+                    {filteredLeads.length} résultat(s) • {pendingCount} en attente • {selectedCount} sélectionné(s)
                   </div>
                 </div>
               </div>
@@ -1226,7 +1143,7 @@ export default function LeadsPage() {
                     className="h-8 rounded-full border-[#c8d6ea] bg-white px-3 text-xs text-[#3f587a] hover:bg-[#f3f8ff]"
                     asChild
                   >
-                    <a href="/dashboard/leads/export">Exporter CSV</a>
+                    <a href="/dashboard/leads/export">Tout exporter en CSV</a>
                   </Button>
                   <Button
                     type="button"
@@ -1236,6 +1153,16 @@ export default function LeadsPage() {
                     className="h-8 rounded-full px-3 text-xs"
                   >
                     {exportingSelected ? "Export..." : `Exporter (${selectedCount})`}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleBulkDelete}
+                    disabled={selectedCount === 0}
+                    className="h-8 rounded-full px-3 text-xs"
+                  >
+                    Supprimer ({selectedCount})
                   </Button>
                 </>
               }
