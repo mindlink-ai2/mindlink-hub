@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
+import LeadsCards, { type MobileLeadsViewMode } from "@/components/leads/LeadsCards";
+import { getLeadStatusKey } from "@/components/leads/LeadCard";
+import LeadsMobileFilters, {
+  type MobileLeadFilterKey,
+} from "@/components/leads/LeadsMobileFilters";
 import ProspectionFilterBar, {
   type ProspectionDatePreset,
   type ProspectionDesktopFilters,
@@ -12,7 +17,7 @@ import ProspectionFilterBar, {
 } from "@/components/prospection/ProspectionFilterBar";
 import { Button } from "@/components/ui/button";
 import { HubButton } from "@/components/ui/hub-button";
-import { AlertTriangle, Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2, X } from "lucide-react";
+import { AlertTriangle, Building2, LayoutGrid, Linkedin, List, Mail, MapPin, MoveRight, Phone, UserCircle2, X } from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -235,6 +240,8 @@ export default function LeadsPage() {
 
   const [safeLeads, setSafeLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [mobileStatusFilter, setMobileStatusFilter] = useState<MobileLeadFilterKey>("all");
+  const [mobileViewMode, setMobileViewMode] = useState<MobileLeadsViewMode>("compact");
   const [desktopFilters, setDesktopFilters] = useState<ProspectionDesktopFilters>(defaultDesktopFilters);
   const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
@@ -269,6 +276,33 @@ export default function LeadsPage() {
   const filteredLeads = useMemo(() => {
     return applyDesktopFilters(searchedLeads, desktopFilters);
   }, [searchedLeads, desktopFilters]);
+
+  const mobileFilterOptions = useMemo(() => {
+    const counts: Record<Exclude<MobileLeadFilterKey, "all">, number> = {
+      todo: 0,
+      pending: 0,
+      connected: 0,
+      sent: 0,
+    };
+
+    searchedLeads.forEach((lead) => {
+      const key = getLeadStatusKey(lead);
+      counts[key] += 1;
+    });
+
+    return [
+      { key: "all", label: "Tous", count: searchedLeads.length },
+      { key: "todo", label: "A faire", count: counts.todo },
+      { key: "pending", label: "En attente", count: counts.pending },
+      { key: "connected", label: "Connecte", count: counts.connected },
+      { key: "sent", label: "Envoye", count: counts.sent },
+    ] satisfies Array<{ key: MobileLeadFilterKey; label: string; count: number }>;
+  }, [searchedLeads]);
+
+  const mobileFilteredLeads = useMemo(() => {
+    if (mobileStatusFilter === "all") return searchedLeads;
+    return searchedLeads.filter((lead) => getLeadStatusKey(lead) === mobileStatusFilter);
+  }, [searchedLeads, mobileStatusFilter]);
 
   const segmentScopeLeads = useMemo(() => {
     return applyDesktopFilters(searchedLeads, { ...desktopFilters, segment: "all" });
@@ -1029,6 +1063,104 @@ export default function LeadsPage() {
       <>
         <div className="relative h-full min-h-0 w-full px-4 pb-24 pt-4 sm:px-6 sm:pt-5">
           <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-5">
+            <div className="block md:hidden">
+              <div className="flex min-h-0 flex-1 flex-col gap-3 pb-3">
+                <section className="hub-card-hero relative overflow-hidden p-4">
+                  <div className="pointer-events-none absolute inset-0">
+                    <div className="absolute -left-14 top-[-120px] h-56 w-56 rounded-full bg-[#dce8ff]/70 blur-3xl" />
+                    <div className="absolute -right-16 top-[-120px] h-56 w-56 rounded-full bg-[#d8f4ff]/65 blur-3xl" />
+                  </div>
+
+                  <div className="relative">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">Prospects</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 text-[11px] tabular-nums text-[#4f6784]">
+                          {mobileFilteredLeads.length}/{searchedLeads.length}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMobileViewMode((prev) => (prev === "compact" ? "comfort" : "compact"))
+                          }
+                          className="inline-flex h-8 items-center gap-1 rounded-full border border-[#d7e3f4] bg-white px-2.5 text-[11px] font-medium text-[#4f6784] transition hover:bg-[#f7fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                          aria-label={
+                            mobileViewMode === "compact"
+                              ? "Passer en affichage confort"
+                              : "Passer en affichage compact"
+                          }
+                          title={mobileViewMode === "compact" ? "Mode compact actif" : "Mode confort actif"}
+                        >
+                          {mobileViewMode === "compact" ? (
+                            <List className="h-3.5 w-3.5" />
+                          ) : (
+                            <LayoutGrid className="h-3.5 w-3.5" />
+                          )}
+                          {mobileViewMode === "compact" ? "Compact" : "Confort"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <h1 className="mt-2 text-[22px] font-semibold leading-tight text-[#0b1c33]">
+                      Pilotage mobile
+                    </h1>
+                    <p className="mt-1 text-[12px] text-[#5f7693]">
+                      Parcourez vos leads, filtrez vite et ouvrez chaque fiche en un tap.
+                    </p>
+
+                    <div className="mt-3 group flex items-center gap-2 rounded-xl border border-[#c8d6ea] bg-[#f5f9ff] px-3 py-2.5 transition focus-within:border-[#90b5ff] focus-within:ring-2 focus-within:ring-[#dce8ff]">
+                      <svg
+                        className="h-4 w-4 text-[#6a7f9f] transition group-focus-within:text-[#1f5eff]"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
+                        />
+                      </svg>
+                      <input
+                        value={searchTerm}
+                        onChange={(e) => handleSearch(e.target.value)}
+                        placeholder="Rechercher un lead..."
+                        className="w-full bg-transparent text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:outline-none"
+                        aria-label="Rechercher un lead"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <LeadsMobileFilters
+                  options={mobileFilterOptions}
+                  activeKey={mobileStatusFilter}
+                  onChange={setMobileStatusFilter}
+                />
+
+                <div className="min-h-0 flex-1 overflow-y-auto pb-1">
+                  <LeadsCards
+                    leads={mobileFilteredLeads}
+                    hasActiveFilters={Boolean(searchTerm.trim()) || mobileStatusFilter !== "all"}
+                    viewMode={mobileViewMode}
+                    onOpenLead={(lead) => setOpenLead(lead as Lead)}
+                    onToggleStatus={(lead) => handleStatusBadgeClick(lead as Lead)}
+                    onInviteLinkedIn={(lead) => handleLinkedInInvite(lead as Lead)}
+                    updatingStatusIds={updatingStatusIds}
+                    invitingLeadIds={invitingLeadIds}
+                    inviteErrors={inviteErrors}
+                    onResetFilters={() => {
+                      setSearchTerm("");
+                      setMobileStatusFilter("all");
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="hidden md:flex md:min-h-0 md:flex-1 md:flex-col md:space-y-5">
             <section className="hub-card-hero relative overflow-hidden p-4 sm:p-5">
               <div className="pointer-events-none absolute inset-0">
                 <div className="absolute -left-16 top-[-120px] h-64 w-64 rounded-full bg-[#dce8ff]/70 blur-3xl" />
@@ -1741,6 +1873,7 @@ export default function LeadsPage() {
               {sidebarToast.message}
             </div>
           ) : null}
+        </div>
         </div>
 
       </>
