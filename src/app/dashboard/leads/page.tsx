@@ -3,6 +3,14 @@
 import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
+import ProspectionFilterBar, {
+  type ProspectionDatePreset,
+  type ProspectionDesktopFilters,
+  type ProspectionInvitationKey,
+  type ProspectionSegmentKey,
+  type ProspectionStatusKey,
+} from "@/components/prospection/ProspectionFilterBar";
+import { Button } from "@/components/ui/button";
 import { HubButton } from "@/components/ui/hub-button";
 import { AlertTriangle, Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2, X } from "lucide-react";
 
@@ -134,9 +142,99 @@ function filterLeads(leads: Lead[], term: string) {
   });
 }
 
+function getLeadInvitationFilterStatus(lead: Lead): ProspectionInvitationKey {
+  if (lead.linkedin_invitation_status === "accepted") return "accepted";
+  if (lead.linkedin_invitation_status === "sent" || lead.linkedin_invitation_sent) return "sent";
+  return "none";
+}
+
+function getLeadPipelineStatus(lead: Lead): ProspectionStatusKey {
+  if (lead.message_sent) return "sent";
+  if (getLeadInvitationFilterStatus(lead) === "accepted") return "connected";
+  if (lead.traite) return "pending";
+  return "todo";
+}
+
+function matchesDatePreset(createdAt: string | null | undefined, preset: ProspectionDatePreset): boolean {
+  if (preset === "all") return true;
+  if (!createdAt) return false;
+
+  const createdDate = new Date(createdAt);
+  if (Number.isNaN(createdDate.getTime())) return false;
+
+  const days = preset === "7d" ? 7 : preset === "30d" ? 30 : 90;
+  const threshold = new Date();
+  threshold.setDate(threshold.getDate() - days);
+
+  return createdDate >= threshold;
+}
+
+function applyDesktopFilters(leads: Lead[], filters: ProspectionDesktopFilters): Lead[] {
+  return leads.filter((lead) => {
+    const status = getLeadPipelineStatus(lead);
+    const invitationStatus = getLeadInvitationFilterStatus(lead);
+
+    if (filters.segment !== "all" && status !== filters.segment) return false;
+
+    if (filters.statuses.length > 0 && !filters.statuses.includes(status)) return false;
+
+    if (filters.invitations.length > 0 && !filters.invitations.includes(invitationStatus)) {
+      return false;
+    }
+
+    if (filters.contacts.length > 0) {
+      const hasEmail = Boolean((lead.email ?? "").trim());
+      const hasPhone = Boolean((lead.phone ?? "").trim());
+      const matchesEmail = filters.contacts.includes("email") && hasEmail;
+      const matchesPhone = filters.contacts.includes("phone") && hasPhone;
+      if (!matchesEmail && !matchesPhone) return false;
+    }
+
+    if (!matchesDatePreset(lead.created_at, filters.datePreset)) return false;
+
+    return true;
+  });
+}
+
+function countActiveDesktopFilters(filters: ProspectionDesktopFilters): number {
+  let count = 0;
+  if (filters.segment !== "all") count += 1;
+  if (filters.statuses.length > 0) count += 1;
+  if (filters.invitations.length > 0) count += 1;
+  if (filters.contacts.length > 0) count += 1;
+  if (filters.datePreset !== "all") count += 1;
+  return count;
+}
+
+function getSegmentCounts(leads: Lead[]): Record<ProspectionSegmentKey, number> {
+  const counts: Record<ProspectionSegmentKey, number> = {
+    all: leads.length,
+    todo: 0,
+    pending: 0,
+    connected: 0,
+    sent: 0,
+  };
+
+  leads.forEach((lead) => {
+    const key = getLeadPipelineStatus(lead);
+    counts[key] += 1;
+  });
+
+  return counts;
+}
+
 export default function LeadsPage() {
+  const defaultDesktopFilters = (): ProspectionDesktopFilters => ({
+    segment: "all",
+    statuses: [],
+    invitations: [],
+    contacts: [],
+    datePreset: "all",
+  });
+
   const [safeLeads, setSafeLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [desktopFilters, setDesktopFilters] = useState<ProspectionDesktopFilters>(defaultDesktopFilters);
   const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
@@ -163,9 +261,25 @@ export default function LeadsPage() {
   const [openFromQuery, setOpenFromQuery] = useState<string | null>(null);
 
   // ✅ DERIVED filtered list (no state = no desync)
-  const filteredLeads = useMemo(() => {
+  const searchedLeads = useMemo(() => {
     return filterLeads(safeLeads, searchTerm);
   }, [safeLeads, searchTerm]);
+
+  const filteredLeads = useMemo(() => {
+    return applyDesktopFilters(searchedLeads, desktopFilters);
+  }, [searchedLeads, desktopFilters]);
+
+  const segmentScopeLeads = useMemo(() => {
+    return applyDesktopFilters(searchedLeads, { ...desktopFilters, segment: "all" });
+  }, [searchedLeads, desktopFilters]);
+
+  const desktopActiveFiltersCount = useMemo(() => {
+    return countActiveDesktopFilters(desktopFilters);
+  }, [desktopFilters]);
+
+  const segmentCounts = useMemo(() => {
+    return getSegmentCounts(segmentScopeLeads);
+  }, [segmentScopeLeads]);
 
   // ✅ Column count for empty state colSpan
   const colCount = 8;
@@ -269,6 +383,10 @@ export default function LeadsPage() {
   // SEARCH FUNCTION
   const handleSearch = (value: string) => {
     setSearchTerm(value);
+  };
+
+  const resetDesktopFilters = () => {
+    setDesktopFilters(defaultDesktopFilters());
   };
 
   const toggleSelected = (leadId: string) => {
@@ -908,6 +1026,14 @@ export default function LeadsPage() {
   const allFilteredSelected =
     filteredLeads.length > 0 && filteredLeads.every((l) => selectedIds.has(String(l.id)));
 
+  const segmentOptions: Array<{ key: ProspectionSegmentKey; label: string; count: number }> = [
+    { key: "all", label: "Tous", count: segmentCounts.all },
+    { key: "todo", label: "À faire", count: segmentCounts.todo },
+    { key: "pending", label: "En attente", count: segmentCounts.pending },
+    { key: "connected", label: "Connecté", count: segmentCounts.connected },
+    { key: "sent", label: "Envoyé", count: segmentCounts.sent },
+  ];
+
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
@@ -958,7 +1084,7 @@ export default function LeadsPage() {
                     <Metric title="À traiter" value={remainingToTreat} tone="warning" />
                   </div>
 
-                  <div className="mt-3">
+                  <div className="mt-3 md:hidden">
                     <div className="group flex items-center gap-2.5 rounded-xl border border-[#c8d6ea] bg-[#f5f9ff] px-3 py-2.5 shadow-[0_16px_28px_-26px_rgba(18,43,86,0.8)] transition focus-within:border-[#90b5ff] focus-within:ring-2 focus-within:ring-[#dce8ff]">
                       <svg
                         className="h-4 w-4 text-[#6a7f9f] transition group-focus-within:text-[#1f5eff]"
@@ -1072,6 +1198,48 @@ export default function LeadsPage() {
                 </div>
               </div>
             </section>
+
+            <ProspectionFilterBar
+              searchValue={searchTerm}
+              onSearchChange={handleSearch}
+              resultsCount={filteredLeads.length}
+              activeFiltersCount={desktopActiveFiltersCount}
+              currentFilters={desktopFilters}
+              onChange={setDesktopFilters}
+              onReset={resetDesktopFilters}
+              segmentOptions={segmentOptions}
+              actions={
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleSelectAllFiltered}
+                    className="h-8 rounded-full border-[#c8d6ea] bg-white px-3 text-xs text-[#3f587a] hover:bg-[#f3f8ff]"
+                  >
+                    {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-full border-[#c8d6ea] bg-white px-3 text-xs text-[#3f587a] hover:bg-[#f3f8ff]"
+                    asChild
+                  >
+                    <a href="/dashboard/leads/export">Exporter CSV</a>
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleExportSelected}
+                    disabled={selectedCount === 0 || exportingSelected}
+                    className="h-8 rounded-full px-3 text-xs"
+                  >
+                    {exportingSelected ? "Export..." : `Exporter (${selectedCount})`}
+                  </Button>
+                </>
+              }
+            />
 
             <section className="hub-card flex min-h-0 flex-1 flex-col overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d7e3f4] bg-[#f8fbff] px-6 py-4">
