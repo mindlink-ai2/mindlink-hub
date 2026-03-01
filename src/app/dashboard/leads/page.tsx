@@ -807,15 +807,6 @@ export default function LeadsPage() {
 
     if (openLead.message_sent || sendingLinkedInMessageLeadIds.has(idStr)) return;
 
-    const content = String(openLead.internal_message ?? "").trim();
-    if (!content) {
-      setLinkedInMessageSendErrors((prev) => ({
-        ...prev,
-        [idStr]: "Le message LinkedIn est vide.",
-      }));
-      return;
-    }
-
     setSendingLinkedInMessageLeadIds((prev: Set<string>) => {
       const next = new Set(prev);
       next.add(idStr);
@@ -830,25 +821,21 @@ export default function LeadsPage() {
     });
 
     try {
-      const res = await fetch("/api/prospection/send-linkedin-message", {
+      const res = await fetch("/api/leads/message-sent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           leadId,
-          content,
         }),
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.ok === false || data?.success === false) {
-        const backendErrorCandidates = [data?.error_message, data?.error, data?.message];
-        const backendError = backendErrorCandidates.find(
-          (candidate): candidate is string =>
-            typeof candidate === "string" && candidate.trim().length > 0
-        );
-        throw new Error(
-          backendError?.trim() ?? "Erreur pendant l’envoi du message LinkedIn."
-        );
+      if (!res.ok || data?.success === false) {
+        const backendError =
+          typeof data?.error === "string" && data.error.trim().length > 0
+            ? data.error.trim()
+            : "Impossible de marquer ce lead comme envoyé.";
+        throw new Error(backendError);
       }
 
       setOpenLead((prev: Lead | null) =>
@@ -874,13 +861,12 @@ export default function LeadsPage() {
             : l
         )
       );
-      showSidebarToast("success", "Message envoyé");
-      void fetch("/api/inbox/threads", { cache: "no-store" }).catch(() => undefined);
+      showSidebarToast("success", "Lead marqué comme envoyé");
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Erreur pendant l’envoi du message LinkedIn.";
+          : "Erreur pendant le marquage du lead.";
       setLinkedInMessageSendErrors((prev) => ({
         ...prev,
         [idStr]: errorMessage,
