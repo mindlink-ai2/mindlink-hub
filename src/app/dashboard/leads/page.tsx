@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState, ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
-import LeadsCards, { LeadsCardsSkeleton, type MobileLeadsViewMode } from "@/components/leads/LeadsCards";
-import { getLeadStatusKey } from "@/components/leads/LeadCard";
-import LeadsMobileFilters, {
-  type MobileLeadFilterKey,
-} from "@/components/leads/LeadsMobileFilters";
-import LeadDetailsOverlay from "@/components/leads/LeadDetailsOverlay";
-import { trackFeatureUsed } from "@/lib/analytics/client";
+import ProspectionFilterBar, {
+  type ProspectionDatePreset,
+  type ProspectionDesktopFilters,
+  type ProspectionInvitationKey,
+  type ProspectionSegmentKey,
+  type ProspectionStatusKey,
+} from "@/components/prospection/ProspectionFilterBar";
+import { Button } from "@/components/ui/button";
 import { HubButton } from "@/components/ui/hub-button";
-import { AlertTriangle, Building2, LayoutGrid, Linkedin, List, Mail, MapPin, MoveRight, Phone, UserCircle2 } from "lucide-react";
+import { AlertTriangle, Building2, Linkedin, Mail, MapPin, MoveRight, Phone, UserCircle2, X } from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -34,6 +35,12 @@ type Lead = {
   linkedin_invitation_status?: "sent" | "accepted" | null;
   linkedin_invitation_sent?: boolean | null;
   [key: string]: unknown;
+};
+
+type SidebarToast = {
+  id: number;
+  tone: "success" | "error";
+  message: string;
 };
 
 const JOB_TITLE_EXACT_TRANSLATIONS: Record<string, string> = {
@@ -135,18 +142,100 @@ function filterLeads(leads: Lead[], term: string) {
   });
 }
 
-function getLeadInvitationStatus(lead: Lead): "sent" | "accepted" | null {
+function getLeadInvitationFilterStatus(lead: Lead): ProspectionInvitationKey {
   if (lead.linkedin_invitation_status === "accepted") return "accepted";
-  if (lead.linkedin_invitation_status === "sent") return "sent";
-  if (lead.linkedin_invitation_sent) return "sent";
-  return null;
+  if (lead.linkedin_invitation_status === "sent" || lead.linkedin_invitation_sent) return "sent";
+  return "none";
+}
+
+function getLeadPipelineStatus(lead: Lead): ProspectionStatusKey {
+  if (lead.message_sent) return "sent";
+  if (getLeadInvitationFilterStatus(lead) === "accepted") return "connected";
+  if (lead.traite) return "pending";
+  return "todo";
+}
+
+function matchesDatePreset(
+  createdAt: string | null | undefined,
+  preset: ProspectionDatePreset,
+  customDate: string | null | undefined
+): boolean {
+  if (preset === "all") return true;
+  if (!createdAt) return false;
+
+  const createdDate = new Date(createdAt);
+  if (Number.isNaN(createdDate.getTime())) return false;
+
+  if (preset === "custom") {
+    if (!customDate) return true;
+    const endDate = new Date(`${customDate}T23:59:59.999`);
+    if (Number.isNaN(endDate.getTime())) return true;
+    return createdDate <= endDate;
+  }
+
+  const days = preset === "7d" ? 7 : preset === "30d" ? 30 : 90;
+  const threshold = new Date();
+  threshold.setDate(threshold.getDate() - days);
+
+  return createdDate >= threshold;
+}
+
+function applyDesktopFilters(leads: Lead[], filters: ProspectionDesktopFilters): Lead[] {
+  return leads.filter((lead) => {
+    const status = getLeadPipelineStatus(lead);
+
+    if (filters.segment !== "all" && status !== filters.segment) return false;
+
+    if (filters.contacts.length > 0) {
+      const hasEmail = Boolean((lead.email ?? "").trim());
+      const hasPhone = Boolean((lead.phone ?? "").trim());
+      const matchesEmail = filters.contacts.includes("email") && hasEmail;
+      const matchesPhone = filters.contacts.includes("phone") && hasPhone;
+      if (!matchesEmail && !matchesPhone) return false;
+    }
+
+    if (!matchesDatePreset(lead.created_at, filters.datePreset, filters.customDate)) return false;
+
+    return true;
+  });
+}
+
+function countActiveDesktopFilters(filters: ProspectionDesktopFilters): number {
+  let count = 0;
+  if (filters.segment !== "all") count += 1;
+  if (filters.contacts.length > 0) count += 1;
+  if (filters.datePreset !== "all") count += 1;
+  return count;
+}
+
+function getSegmentCounts(leads: Lead[]): Record<ProspectionSegmentKey, number> {
+  const counts: Record<ProspectionSegmentKey, number> = {
+    all: leads.length,
+    todo: 0,
+    pending: 0,
+    connected: 0,
+    sent: 0,
+  };
+
+  leads.forEach((lead) => {
+    const key = getLeadPipelineStatus(lead);
+    counts[key] += 1;
+  });
+
+  return counts;
 }
 
 export default function LeadsPage() {
+  const defaultDesktopFilters = (): ProspectionDesktopFilters => ({
+    segment: "all",
+    contacts: [],
+    datePreset: "all",
+    customDate: null,
+  });
+
   const [safeLeads, setSafeLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [mobileStatusFilter, setMobileStatusFilter] = useState<MobileLeadFilterKey>("all");
-  const [mobileViewMode, setMobileViewMode] = useState<MobileLeadsViewMode>("compact");
+  const [desktopFilters, setDesktopFilters] = useState<ProspectionDesktopFilters>(defaultDesktopFilters);
   const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [clientLoaded, setClientLoaded] = useState(false);
 
@@ -157,7 +246,6 @@ export default function LeadsPage() {
 
   // ✅ plan (on garde la logique existante côté API, mais plus de premium gating)
   const [plan, setPlan] = useState<string>("essential");
-  const [subscriptionStatus, setSubscriptionStatus] = useState<string>("inactive");
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exportingSelected, setExportingSelected] = useState(false);
@@ -166,42 +254,33 @@ export default function LeadsPage() {
   const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
   const [sendingLinkedInMessageLeadIds, setSendingLinkedInMessageLeadIds] = useState<Set<string>>(new Set());
   const [linkedInMessageSendErrors, setLinkedInMessageSendErrors] = useState<Record<string, string>>({});
+  const [sidebarToast, setSidebarToast] = useState<SidebarToast | null>(null);
+  const sidebarToastTimeoutRef = useRef<number | null>(null);
   const selectedCount = selectedIds.size;
 
   // ✅ open lead from query param (?open=ID)
   const [openFromQuery, setOpenFromQuery] = useState<string | null>(null);
 
   // ✅ DERIVED filtered list (no state = no desync)
-  const filteredLeads = useMemo(() => {
+  const searchedLeads = useMemo(() => {
     return filterLeads(safeLeads, searchTerm);
   }, [safeLeads, searchTerm]);
 
-  const mobileFilterOptions = useMemo(() => {
-    const counts: Record<Exclude<MobileLeadFilterKey, "all">, number> = {
-      todo: 0,
-      pending: 0,
-      connected: 0,
-      sent: 0,
-    };
+  const filteredLeads = useMemo(() => {
+    return applyDesktopFilters(searchedLeads, desktopFilters);
+  }, [searchedLeads, desktopFilters]);
 
-    filteredLeads.forEach((lead) => {
-      const key = getLeadStatusKey(lead);
-      counts[key] += 1;
-    });
+  const segmentScopeLeads = useMemo(() => {
+    return applyDesktopFilters(searchedLeads, { ...desktopFilters, segment: "all" });
+  }, [searchedLeads, desktopFilters]);
 
-    return [
-      { key: "all", label: "Tous", count: filteredLeads.length },
-      { key: "todo", label: "A faire", count: counts.todo },
-      { key: "pending", label: "En attente", count: counts.pending },
-      { key: "connected", label: "Connecte", count: counts.connected },
-      { key: "sent", label: "Envoye", count: counts.sent },
-    ] satisfies Array<{ key: MobileLeadFilterKey; label: string; count: number }>;
-  }, [filteredLeads]);
+  const desktopActiveFiltersCount = useMemo(() => {
+    return countActiveDesktopFilters(desktopFilters);
+  }, [desktopFilters]);
 
-  const mobileFilteredLeads = useMemo(() => {
-    if (mobileStatusFilter === "all") return filteredLeads;
-    return filteredLeads.filter((lead) => getLeadStatusKey(lead) === mobileStatusFilter);
-  }, [filteredLeads, mobileStatusFilter]);
+  const segmentCounts = useMemo(() => {
+    return getSegmentCounts(segmentScopeLeads);
+  }, [segmentScopeLeads]);
 
   // ✅ Column count for empty state colSpan
   const colCount = 8;
@@ -215,6 +294,34 @@ export default function LeadsPage() {
     } catch (e) {
       console.error(e);
     }
+  }, []);
+
+  const showSidebarToast = (tone: "success" | "error", message: string) => {
+    if (sidebarToastTimeoutRef.current) {
+      window.clearTimeout(sidebarToastTimeoutRef.current);
+      sidebarToastTimeoutRef.current = null;
+    }
+
+    const nextToast: SidebarToast = {
+      id: Date.now(),
+      tone,
+      message,
+    };
+    setSidebarToast(nextToast);
+
+    sidebarToastTimeoutRef.current = window.setTimeout(() => {
+      setSidebarToast((current) => (current?.id === nextToast.id ? null : current));
+      sidebarToastTimeoutRef.current = null;
+    }, 3200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (sidebarToastTimeoutRef.current) {
+        window.clearTimeout(sidebarToastTimeoutRef.current);
+        sidebarToastTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   // Load leads + options + plan
@@ -231,7 +338,6 @@ export default function LeadsPage() {
 
       // ✅ plan (fallback essential)
       setPlan(String(client?.plan ?? "essential").toLowerCase());
-      setSubscriptionStatus(String(client?.subscription_status ?? "inactive").toLowerCase());
 
       // ✅ Tout le monde a email + phone
       setEmailOption(true);
@@ -278,6 +384,10 @@ export default function LeadsPage() {
   // SEARCH FUNCTION
   const handleSearch = (value: string) => {
     setSearchTerm(value);
+  };
+
+  const resetDesktopFilters = () => {
+    setDesktopFilters(defaultDesktopFilters());
   };
 
   const toggleSelected = (leadId: string) => {
@@ -378,12 +488,6 @@ export default function LeadsPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-
-      trackFeatureUsed("create_leads_export", {
-        source: "prospection",
-        mode: "selected",
-        count: ids.length,
-      });
     } catch (e) {
       console.error(e);
       alert("Erreur réseau pendant l'export.");
@@ -472,8 +576,6 @@ export default function LeadsPage() {
   };
 
   const handleLinkedInInvite = async (lead: Lead) => {
-    if (plan === "full" && subscriptionStatus === "active") return;
-
     const idStr = String(lead.id);
 
     if (invitingLeadIds.has(idStr) || lead.linkedin_invitation_sent) return;
@@ -671,6 +773,15 @@ export default function LeadsPage() {
 
     if (openLead.message_sent || sendingLinkedInMessageLeadIds.has(idStr)) return;
 
+    const content = String(openLead.internal_message ?? "").trim();
+    if (!content) {
+      setLinkedInMessageSendErrors((prev) => ({
+        ...prev,
+        [idStr]: "Le message LinkedIn est vide.",
+      }));
+      return;
+    }
+
     setSendingLinkedInMessageLeadIds((prev: Set<string>) => {
       const next = new Set(prev);
       next.add(idStr);
@@ -685,20 +796,24 @@ export default function LeadsPage() {
     });
 
     try {
-      const res = await fetch("/api/leads/message-sent", {
+      const res = await fetch("/api/prospection/send-linkedin-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           leadId,
+          content,
         }),
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.ok === false) {
+      if (!res.ok || data?.ok === false || data?.success === false) {
+        const backendErrorCandidates = [data?.error_message, data?.error, data?.message];
+        const backendError = backendErrorCandidates.find(
+          (candidate): candidate is string =>
+            typeof candidate === "string" && candidate.trim().length > 0
+        );
         throw new Error(
-          typeof data?.message === "string"
-            ? data.message
-            : "Erreur pendant l’envoi du message LinkedIn."
+          backendError?.trim() ?? "Erreur pendant l’envoi du message LinkedIn."
         );
       }
 
@@ -725,6 +840,8 @@ export default function LeadsPage() {
             : l
         )
       );
+      showSidebarToast("success", "Message envoyé");
+      void fetch("/api/inbox/threads", { cache: "no-store" }).catch(() => undefined);
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
@@ -734,6 +851,7 @@ export default function LeadsPage() {
         ...prev,
         [idStr]: errorMessage,
       }));
+      showSidebarToast("error", errorMessage);
     } finally {
       setSendingLinkedInMessageLeadIds((prev: Set<string>) => {
         if (!prev.has(idStr)) return prev;
@@ -826,56 +944,62 @@ export default function LeadsPage() {
 
   const openLeadRawJobTitle = (openLead?.linkedinJobTitle ?? "").trim();
   const openLeadTranslatedJobTitle = translateLinkedInJobTitle(openLeadRawJobTitle);
-  const openLeadDisplayName = openLead
-    ? `${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim() || "Fiche prospect"
-    : "Fiche prospect";
-  const openLeadSubtitle = openLead
-    ? `${openLead.Company || "—"} • ${openLead.location || "—"}`
-    : undefined;
-  const openLeadStatusBadge = openLead ? (
-    openLead.message_sent ? (
-      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] text-emerald-700 whitespace-nowrap">
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        Envoyé
-      </span>
-    ) : (
-      <span className="inline-flex items-center gap-2 rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" />
-        À faire
-      </span>
-    )
-  ) : null;
+
+  const isSidebarOpen = Boolean(openLead);
+
+  // UX-only: Escape close + lock page scroll when sidebar is open
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenLead(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyPaddingRight = body.style.paddingRight;
+
+    if (isSidebarOpen) {
+      const scrollbarWidth = window.innerWidth - html.clientWidth;
+      html.style.overflow = "hidden";
+      body.style.overflow = "hidden";
+      body.dataset.leadsSidebarOpen = "1";
+      if (scrollbarWidth > 0) {
+        body.style.paddingRight = `${scrollbarWidth}px`;
+      }
+    } else {
+      html.style.overflow = "";
+      body.style.overflow = "";
+      body.style.paddingRight = "";
+      delete body.dataset.leadsSidebarOpen;
+    }
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.paddingRight = prevBodyPaddingRight;
+      delete body.dataset.leadsSidebarOpen;
+    };
+  }, [isSidebarOpen]);
 
   if (!clientLoaded) {
     return (
       <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
         <div className="mx-auto w-full max-w-[1680px]">
-          <div className="block md:hidden">
-            <div className="space-y-4">
-              <div className="hub-card-hero p-4">
-                <div className="h-5 w-36 animate-pulse rounded-lg bg-[#e5edf8]" />
-                <div className="mt-3 h-10 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
-                <div className="mt-3 h-8 w-32 animate-pulse rounded-full bg-[#edf3fb]" />
+          <div className="hub-card-hero p-6 sm:p-7">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="h-6 w-44 animate-pulse rounded-xl bg-[#e5edf8]" />
+                <div className="mt-3 h-4 w-80 animate-pulse rounded-lg bg-[#edf3fb]" />
               </div>
-              <LeadsCardsSkeleton count={8} viewMode="compact" />
-              <div className="text-xs text-[#4B5563]">Chargement des leads...</div>
+              <div className="h-10 w-28 animate-pulse rounded-xl bg-[#edf3fb]" />
             </div>
-          </div>
 
-          <div className="hidden md:block">
-            <div className="hub-card-hero p-6 sm:p-7">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="h-6 w-44 animate-pulse rounded-xl bg-[#e5edf8]" />
-                  <div className="mt-3 h-4 w-80 animate-pulse rounded-lg bg-[#edf3fb]" />
-                </div>
-                <div className="h-10 w-28 animate-pulse rounded-xl bg-[#edf3fb]" />
-              </div>
-
-              <div className="mt-6 h-12 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
-              <div className="mt-4 h-72 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
-              <div className="mt-3 text-xs text-[#4B5563]">Chargement des leads…</div>
-            </div>
+            <div className="mt-6 h-12 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
+            <div className="mt-4 h-72 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
+            <div className="mt-3 text-xs text-[#4B5563]">Chargement des leads…</div>
           </div>
         </div>
       </div>
@@ -888,79 +1012,69 @@ export default function LeadsPage() {
     (l) => Boolean(l.traite) && !Boolean(l.message_sent)
   ).length;
   const remainingToTreat = total - treatedCount;
-  const isFullActivePlan = plan === "full" && subscriptionStatus === "active";
-  const invitationsSentCount = safeLeads.filter((lead) => getLeadInvitationStatus(lead) !== null).length;
-  const invitationsConnectedCount = safeLeads.filter(
-    (lead) => getLeadInvitationStatus(lead) === "accepted"
-  ).length;
-  const messagesSentCount = safeLeads.filter((lead) => Boolean(lead.message_sent)).length;
-
-  // Next import (Paris)
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-  const nextImport = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-  nextImport.setHours(8, 0, 0, 0);
-  if (now > nextImport) nextImport.setDate(nextImport.getDate() + 1);
-  const diffMs = nextImport.getTime() - now.getTime();
-  const diffMinutes = Math.floor(diffMs / 1000 / 60);
-  const hours = Math.floor(diffMinutes / 60);
-  const minutes = diffMinutes % 60;
-  const nextImportText = hours <= 0 ? `Dans ${minutes} min` : `Dans ${hours}h ${minutes}min`;
 
   const allFilteredSelected =
     filteredLeads.length > 0 && filteredLeads.every((l) => selectedIds.has(String(l.id)));
 
+  const segmentOptions: Array<{ key: ProspectionSegmentKey; label: string; count: number }> = [
+    { key: "all", label: "Tous", count: segmentCounts.all },
+    { key: "todo", label: "À faire", count: segmentCounts.todo },
+    { key: "pending", label: "En attente", count: segmentCounts.pending },
+    { key: "connected", label: "Connecté", count: segmentCounts.connected },
+    { key: "sent", label: "Envoyé", count: segmentCounts.sent },
+  ];
+
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <div className="relative h-full min-h-0 w-full px-4 pb-24 pt-4 sm:px-6 sm:pt-5">
-          <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col">
-            <div className="block md:hidden">
-              <div className="flex min-h-0 flex-1 flex-col gap-3 pb-3">
-                <section className="hub-card-hero relative overflow-hidden p-4">
-                <div className="pointer-events-none absolute inset-0">
-                  <div className="absolute -left-14 top-[-120px] h-56 w-56 rounded-full bg-[#dce8ff]/70 blur-3xl" />
-                  <div className="absolute -right-16 top-[-120px] h-56 w-56 rounded-full bg-[#d8f4ff]/65 blur-3xl" />
+      <>
+        <div className="relative h-full min-h-0 w-full px-4 pb-24 pt-4 sm:px-6 sm:pt-5">
+          <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-5">
+            <section className="hub-card-hero relative overflow-hidden p-4 sm:p-5">
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute -left-16 top-[-120px] h-64 w-64 rounded-full bg-[#dce8ff]/70 blur-3xl" />
+                <div className="absolute -right-20 top-[-140px] h-72 w-72 rounded-full bg-[#d8f4ff]/65 blur-3xl" />
+              </div>
+
+              <div className="relative min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#1f5eff]" />
+                    Espace client Lidmeo
+                  </span>
+
+                  <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] tabular-nums">
+                    {filteredLeads.length} affichés
+                  </span>
+
+                  <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] whitespace-nowrap">
+                    {plan || "essential"}
+                  </span>
                 </div>
 
-                <div className="relative">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
-                      Prospects
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 text-[11px] tabular-nums text-[#4f6784]">
-                        {mobileFilteredLeads.length}/{filteredLeads.length}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setMobileViewMode((prev) => (prev === "compact" ? "comfort" : "compact"))
-                        }
-                        className="inline-flex h-8 items-center gap-1 rounded-full border border-[#d7e3f4] bg-white px-2.5 text-[11px] font-medium text-[#4f6784] transition hover:bg-[#f7fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
-                        aria-label={
-                          mobileViewMode === "compact"
-                            ? "Passer en affichage confort"
-                            : "Passer en affichage compact"
-                        }
-                        title={mobileViewMode === "compact" ? "Mode compact actif" : "Mode confort actif"}
-                      >
-                        {mobileViewMode === "compact" ? (
-                          <List className="h-3.5 w-3.5" />
-                        ) : (
-                          <LayoutGrid className="h-3.5 w-3.5" />
-                        )}
-                        {mobileViewMode === "compact" ? "Compact" : "Confort"}
-                      </button>
-                    </div>
-                  </div>
+                <h1 className="hub-page-title mt-2">
+                  Pilotage de la prospection
+                </h1>
+                <p className="mt-2 max-w-3xl text-xs text-[#51627b] sm:text-sm">
+                  Centralisez vos leads, priorisez vos actions et suivez votre pipeline
+                  de manière structurée, avec une vue opérationnelle compacte.
+                </p>
+                <div className="mt-3 inline-flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[11px] text-amber-800 sm:text-xs">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Rappel sécurité: évitez les connexions trop rapides et ne dépassez pas 30
+                    invitations LinkedIn par jour.
+                  </span>
+                </div>
 
-                  <h1 className="mt-2 text-[22px] font-semibold leading-tight text-[#0b1c33]">
-                    Pilotage mobile
-                  </h1>
-                  <p className="mt-1 text-[12px] text-[#5f7693]">
-                    Parcourez vos leads, filtrez vite et ouvrez chaque fiche en un tap.
-                  </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                  <Metric title="Total leads" value={total} tone="default" />
+                  <Metric title="Traités" value={treatedCount} tone="success" />
+                  <Metric title="En attente" value={pendingCount} tone="info" />
+                  <Metric title="À traiter" value={remainingToTreat} tone="warning" />
+                </div>
 
-                  <div className="mt-3 group flex items-center gap-2 rounded-xl border border-[#c8d6ea] bg-[#f5f9ff] px-3 py-2.5 transition focus-within:border-[#90b5ff] focus-within:ring-2 focus-within:ring-[#dce8ff]">
+                <div className="mt-3 md:hidden">
+                  <div className="group flex items-center gap-2.5 rounded-xl border border-[#c8d6ea] bg-[#f5f9ff] px-3 py-2.5 shadow-[0_16px_28px_-26px_rgba(18,43,86,0.8)] transition focus-within:border-[#90b5ff] focus-within:ring-2 focus-within:ring-[#dce8ff]">
                     <svg
                       className="h-4 w-4 text-[#6a7f9f] transition group-focus-within:text-[#1f5eff]"
                       fill="none"
@@ -978,217 +1092,70 @@ export default function LeadsPage() {
                     <input
                       value={searchTerm}
                       onChange={(e) => handleSearch(e.target.value)}
-                      placeholder="Rechercher un lead..."
+                      placeholder="Rechercher (nom, entreprise, poste, ville, email, téléphone)…"
                       className="w-full bg-transparent text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:outline-none"
                       aria-label="Rechercher un lead"
                     />
                   </div>
-                </div>
-                </section>
 
-                <LeadsMobileFilters
-                  options={mobileFilterOptions}
-                  activeKey={mobileStatusFilter}
-                  onChange={setMobileStatusFilter}
-                />
-
-                <div className="min-h-0 flex-1 overflow-y-auto pb-1">
-                  <LeadsCards
-                    leads={mobileFilteredLeads}
-                    hasActiveFilters={Boolean(searchTerm.trim()) || mobileStatusFilter !== "all"}
-                    viewMode={mobileViewMode}
-                    onOpenLead={(lead) => setOpenLead(lead as Lead)}
-                    onToggleStatus={(lead) => handleStatusBadgeClick(lead as Lead)}
-                    onInviteLinkedIn={(lead) => handleLinkedInInvite(lead as Lead)}
-                    updatingStatusIds={updatingStatusIds}
-                    invitingLeadIds={invitingLeadIds}
-                    inviteErrors={inviteErrors}
-                    onResetFilters={() => {
-                      setSearchTerm("");
-                      setMobileStatusFilter("all");
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="hidden md:block">
-              <div className="flex h-full min-h-0 flex-col space-y-5">
-            <section className="hub-card-hero relative overflow-hidden p-4 sm:p-5">
-              <div className="pointer-events-none absolute inset-0">
-                <div className="absolute -left-16 top-[-120px] h-64 w-64 rounded-full bg-[#dce8ff]/70 blur-3xl" />
-                <div className="absolute -right-20 top-[-140px] h-72 w-72 rounded-full bg-[#d8f4ff]/65 blur-3xl" />
-              </div>
-
-              <div className="relative grid gap-4 lg:grid-cols-[1.42fr_0.78fr]">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#1f5eff]" />
-                      Espace client Lidmeo
-                    </span>
-
-                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] tabular-nums">
-                      {filteredLeads.length} affichés
-                    </span>
-
-                    <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] whitespace-nowrap">
-                      {plan || "essential"}
-                    </span>
-                  </div>
-
-                  <h1 className="hub-page-title mt-2">
-                    Pilotage de la prospection
-                  </h1>
-                  <p className="mt-2 max-w-2xl text-xs text-[#51627b] sm:text-sm">
-                    Centralisez vos leads, priorisez vos actions et suivez votre pipeline
-                    de manière structurée, avec une vue opérationnelle.
-                  </p>
-                  <div className="mt-3 inline-flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[11px] text-amber-800 sm:text-xs">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span>
-                      Rappel sécurité: évitez les connexions trop rapides et ne dépassez pas 30
-                      invitations LinkedIn par jour.
-                    </span>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-                    <Metric title="Total leads" value={total} tone="default" />
-                    <Metric title="Traités" value={treatedCount} tone="success" />
-                    <Metric title="En attente" value={pendingCount} tone="info" />
-                    <Metric title="À traiter" value={remainingToTreat} tone="warning" />
-                  </div>
-
-                  <div className="mt-3">
-                    <div className="group flex items-center gap-2.5 rounded-xl border border-[#c8d6ea] bg-[#f5f9ff] px-3 py-2.5 shadow-[0_16px_28px_-26px_rgba(18,43,86,0.8)] transition focus-within:border-[#90b5ff] focus-within:ring-2 focus-within:ring-[#dce8ff]">
-                      <svg
-                        className="h-4 w-4 text-[#6a7f9f] transition group-focus-within:text-[#1f5eff]"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z"
-                        />
-                      </svg>
-                      <input
-                        value={searchTerm}
-                        onChange={(e) => handleSearch(e.target.value)}
-                        placeholder="Rechercher (nom, entreprise, poste, ville, email, téléphone)…"
-                        className="w-full bg-transparent text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:outline-none"
-                        aria-label="Rechercher un lead"
-                      />
-                    </div>
-
-                    <div className="mt-1.5 text-[11px] text-[#51627b]">
-                      {filteredLeads.length} résultat(s) • {pendingCount} en attente • {selectedCount} sélectionné(s)
-                    </div>
-                  </div>
-                </div>
-
-                <div className="hub-card-soft relative overflow-hidden p-3 sm:p-4">
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(31,94,255,0.12),transparent_48%)]" />
-
-                  <div className="relative">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-[#c8d6ea] bg-[#f7fbff] text-[#51627b]">
-                          <svg
-                            className="h-3.5 w-3.5"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            aria-hidden="true"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M10 6H5a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M14 4h6m0 0v6m0-6L10 14"
-                            />
-                          </svg>
-                        </div>
-                        <h2 className="mt-2 text-sm font-semibold text-[#0b1c33]">Centre d’actions</h2>
-                        <p className="mt-0.5 text-[11px] text-[#51627b]">Actions rapides.</p>
-                      </div>
-
-                      <div className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-2.5 py-1 text-[10px] text-[#51627b] tabular-nums">
-                        Import {nextImportText}
-                      </div>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-3 gap-2">
-                      <div className="rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-2.5 py-2">
-                        <p className="text-[10px] uppercase tracking-wide text-[#68809d]">Invitation envoyée</p>
-                        <p className="mt-1 text-base font-semibold leading-none text-[#0b1c33] tabular-nums">
-                          {invitationsSentCount}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-2.5 py-2">
-                        <p className="text-[10px] uppercase tracking-wide text-[#68809d]">Invitation connectée</p>
-                        <p className="mt-1 text-base font-semibold leading-none text-[#0b1c33] tabular-nums">
-                          {invitationsConnectedCount}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-[#c8d6ea] bg-[#f7fbff] px-2.5 py-2">
-                        <p className="text-[10px] uppercase tracking-wide text-[#68809d]">Message envoyé</p>
-                        <p className="mt-1 text-base font-semibold leading-none text-[#0b1c33] tabular-nums">
-                          {messagesSentCount}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-3">
-                      <HubButton asChild variant="secondary" size="sm" className="w-full">
-                        <a
-                          href="/dashboard/leads/export"
-                          onClick={() =>
-                            trackFeatureUsed("create_leads_export", {
-                              source: "prospection",
-                              mode: "all",
-                            })
-                          }
-                        >
-                          Exporter tout en CSV
-                        </a>
-                      </HubButton>
-                    </div>
-
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      <HubButton type="button" variant="ghost" size="sm" onClick={toggleSelectAllFiltered}>
-                        {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
-                      </HubButton>
-
-                      <HubButton
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleExportSelected}
-                        disabled={selectedCount === 0 || exportingSelected}
-                      >
-                        {exportingSelected ? "Export..." : `Exporter (${selectedCount})`}
-                      </HubButton>
-                      <HubButton
-                        type="button"
-                        variant="danger"
-                        size="sm"
-                        onClick={handleBulkDelete}
-                        disabled={selectedCount === 0}
-                      >
-                        Supprimer ({selectedCount})
-                      </HubButton>
-                      <span className="inline-flex items-center justify-center rounded-full border border-[#d7e3f4] bg-[#f8fbff] px-2.5 py-1 text-[11px] text-[#51627b] tabular-nums">
-                        {selectedCount} sélectionné(s)
-                      </span>
-                    </div>
+                  <div className="mt-1.5 text-[11px] text-[#51627b]">
+                    {filteredLeads.length} résultat(s) • {pendingCount} en attente • {selectedCount} sélectionné(s)
                   </div>
                 </div>
               </div>
             </section>
+
+            <ProspectionFilterBar
+              searchValue={searchTerm}
+              onSearchChange={handleSearch}
+              resultsCount={filteredLeads.length}
+              activeFiltersCount={desktopActiveFiltersCount}
+              currentFilters={desktopFilters}
+              onChange={setDesktopFilters}
+              onReset={resetDesktopFilters}
+              segmentOptions={segmentOptions}
+              actions={
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleSelectAllFiltered}
+                    className="h-8 rounded-full border-[#c8d6ea] bg-white px-3 text-xs text-[#3f587a] hover:bg-[#f3f8ff]"
+                  >
+                    {allFilteredSelected ? "Tout désélectionner" : "Tout sélectionner"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-full border-[#c8d6ea] bg-white px-3 text-xs text-[#3f587a] hover:bg-[#f3f8ff]"
+                    asChild
+                  >
+                    <a href="/dashboard/leads/export">Tout exporter en CSV</a>
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleExportSelected}
+                    disabled={selectedCount === 0 || exportingSelected}
+                    className="h-8 rounded-full px-3 text-xs"
+                  >
+                    {exportingSelected ? "Export..." : `Exporter (${selectedCount})`}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleBulkDelete}
+                    disabled={selectedCount === 0}
+                    className="h-8 rounded-full px-3 text-xs"
+                  >
+                    Supprimer ({selectedCount})
+                  </Button>
+                </>
+              }
+            />
 
             <section className="hub-card flex min-h-0 flex-1 flex-col overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d7e3f4] bg-[#f8fbff] px-6 py-4">
@@ -1270,10 +1237,16 @@ export default function LeadsPage() {
                         const isSelected = selectedIds.has(idStr);
                         const isStatusUpdating = updatingStatusIds.has(idStr);
                         const isInviteLoading = invitingLeadIds.has(idStr);
-                        const invitationStatus = getLeadInvitationStatus(lead);
+                        const invitationStatus =
+                          lead.linkedin_invitation_status === "accepted"
+                            ? "accepted"
+                            : lead.linkedin_invitation_status === "sent"
+                              ? "sent"
+                              : lead.linkedin_invitation_sent
+                                ? "sent"
+                                : null;
                         const isInviteAccepted = invitationStatus === "accepted";
                         const isInviteSent = invitationStatus === "sent";
-                        const isInviteAutoManaged = isFullActivePlan;
                         const inviteError = inviteErrors[idStr];
                         const isSent = Boolean(lead.message_sent);
                         const isPending = !isSent && Boolean(lead.traite);
@@ -1465,13 +1438,8 @@ export default function LeadsPage() {
 
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    if (!isInviteAutoManaged) {
-                                      void handleLinkedInInvite(lead);
-                                    }
-                                  }}
+                                  onClick={() => handleLinkedInInvite(lead)}
                                   disabled={
-                                    isInviteAutoManaged ||
                                     !lead.LinkedInURL ||
                                     isInviteAccepted ||
                                     isInviteSent ||
@@ -1481,10 +1449,8 @@ export default function LeadsPage() {
                                     "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
                                     isInviteAccepted
                                       ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
-                                    : isInviteSent
+                                      : isInviteSent
                                       ? "cursor-default border-amber-200 bg-amber-50 text-amber-700 focus:ring-amber-200"
-                                      : isInviteAutoManaged
-                                        ? "cursor-not-allowed border-[#d7e3f4] bg-[#f8fbff] text-[#6b7f9b] focus:ring-[#dce8ff]"
                                       : inviteError
                                         ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
                                         : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
@@ -1496,14 +1462,12 @@ export default function LeadsPage() {
                                     ? "Connecté"
                                     : isInviteSent
                                     ? "Connexion envoyée"
-                                    : isInviteAutoManaged
-                                      ? "Automatique"
                                     : isInviteLoading
                                       ? "Envoi..."
                                       : "Se connecter"}
                                 </button>
 
-                                {inviteError && !isInviteAutoManaged ? (
+                                {inviteError ? (
                                   <span className="text-[10px] text-red-600">
                                     {inviteError}
                                   </span>
@@ -1531,21 +1495,63 @@ export default function LeadsPage() {
                 </div>
               </div>
             </section>
-              </div>
           </div>
 
-          <LeadDetailsOverlay
-            open={Boolean(openLead)}
-            onOpenChange={(nextOpen) => {
-              if (!nextOpen) setOpenLead(null);
-            }}
-            title={openLeadDisplayName}
-            subtitle={openLeadSubtitle}
-            planLabel={plan || "essential"}
-            statusBadge={openLeadStatusBadge}
-          >
-            {openLead ? (
-              <div className="space-y-5">
+          {openLead && (
+            <>
+              <div
+                className="pointer-events-none fixed inset-0 z-[80] bg-[#0F172A]/38 backdrop-blur-[3px]"
+                aria-hidden="true"
+              />
+
+              <div className="animate-slideLeft fixed inset-y-0 right-0 z-[90] flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
+                <div className="z-10 border-b border-[#e2e8f0] bg-white/95 p-6 pb-4 backdrop-blur-xl">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <HubButton type="button" variant="ghost" size="sm" onClick={() => setOpenLead(null)}>
+                        Fermer
+                      </HubButton>
+                      <button
+                        type="button"
+                        onClick={() => setOpenLead(null)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#dbe5f3] bg-white text-[#4B5563] transition hover:bg-[#f8fbff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                        aria-label="Fermer le panneau"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <span className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
+                      {plan || "essential"}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="truncate text-2xl font-semibold leading-tight text-[#0F172A]">
+                        {(openLead.FirstName ?? "")} {(openLead.LastName ?? "")}
+                      </h2>
+                      <p className="mt-1 truncate text-[12px] text-[#4B5563]">
+                        {openLead.Company || "—"} • {openLead.location || "—"}
+                      </p>
+                    </div>
+
+                    <div className="shrink-0">
+                      {openLead.message_sent ? (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] text-emerald-700 whitespace-nowrap">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          Envoyé
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" />
+                          À faire
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain touch-pan-y p-6 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]">
                   <div className="hub-card-soft p-4">
                     <div className="text-[11px] uppercase tracking-wide text-[#4B5563]">Informations</div>
                     <div className="mt-3 grid grid-cols-1 gap-3">
@@ -1631,10 +1637,10 @@ export default function LeadsPage() {
                         {openLead.message_sent
                           ? "Envoyé ✅"
                           : isSendingOpenLeadLinkedInMessage
-                            ? "Marquage…"
+                            ? "Envoi…"
                             : openLeadLinkedInMessageError
                               ? "Erreur — réessayer"
-                              : "Marquer comme envoyé"}
+                              : "Envoyer un message"}
                       </button>
                     </div>
 
@@ -1716,11 +1722,28 @@ export default function LeadsPage() {
                       );
                     })()}
                   </div>
+                </div>
               </div>
-            ) : null}
-          </LeadDetailsOverlay>
+            </>
+          )}
+
+          {sidebarToast ? (
+            <div
+              className={[
+                "fixed bottom-5 right-5 z-[120] max-w-[min(90vw,360px)] rounded-xl border px-4 py-3 text-sm shadow-[0_20px_45px_-25px_rgba(2,6,23,0.55)]",
+                sidebarToast.tone === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-red-200 bg-red-50 text-red-800",
+              ].join(" ")}
+              role="status"
+              aria-live="polite"
+            >
+              {sidebarToast.message}
+            </div>
+          ) : null}
         </div>
-      </div>
+
+      </>
     </SubscriptionGate>
   );
 }

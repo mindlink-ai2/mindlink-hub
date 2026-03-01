@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
@@ -8,10 +8,8 @@ import InboxBackgroundSync from "@/components/InboxBackgroundSync";
 import RightHitboxDebug from "@/components/dev/RightHitboxDebug";
 import InboxNavLink from "@/components/InboxNavLink";
 import SupportWidgetLoader from "@/components/support/SupportWidgetLoader";
-import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
-import MobileBottomNav from "@/components/mobile/MobileBottomNav";
-import { getSupportAdminContext } from "@/lib/support-admin-auth";
 import { getAnalyticsAdminContext } from "@/lib/analytics/server";
+import { getSupportAdminContext } from "@/lib/support-admin-auth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -19,11 +17,6 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Lidmeo Hub",
   description: "Espace client",
-};
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
 };
 
 function PaywallOverlay() {
@@ -113,12 +106,9 @@ export default async function RootLayout({
   if (user) {
     const adminContext = await getSupportAdminContext();
     showSupportAdminLink = Boolean(adminContext);
-
-    const analyticsAdminContext = await getAnalyticsAdminContext();
-    showAnalyticsAdminLink = Boolean(analyticsAdminContext);
+    const analyticsContext = await getAnalyticsAdminContext();
+    showAnalyticsAdminLink = Boolean(analyticsContext);
   }
-
-  const analyticsEnabled = process.env.ANALYTICS_ENABLED === "true";
 
   return (
     <ClerkProvider>
@@ -176,12 +166,6 @@ export default async function RootLayout({
                       </Link>
                       <InboxNavLink />
                       <Link
-                        href="/dashboard/automation"
-                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
-                      >
-                        Automation
-                      </Link>
-                      <Link
                         href="/dashboard/hub/billing"
                         className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                       >
@@ -200,7 +184,7 @@ export default async function RootLayout({
                           href="/admin/analytics"
                           className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                         >
-                          Analytics Admin
+                          Admin Analytics
                         </Link>
                       ) : null}
                     </nav>
@@ -247,14 +231,12 @@ export default async function RootLayout({
               <DashboardContainer>{children}</DashboardContainer>
             </main>
 
-            <MobileBottomNav />
             <InboxBackgroundSync />
             <SupportWidgetLoader />
-            <AnalyticsBootstrap enabled={analyticsEnabled} />
             {process.env.NODE_ENV === "development" ? <RightHitboxDebug /> : null}
 
             {/* 🔵 FOOTER */}
-            <footer className="hidden border-t border-[#c8d6ea] bg-[#f4f8ff]/75 text-xs text-[#3f5470] md:block">
+            <footer className="border-t border-[#c8d6ea] bg-[#f4f8ff]/75 text-xs text-[#3f5470]">
               {/* ✅ aligné avec le header */}
               <div className="mx-auto flex max-w-[1480px] items-center justify-between px-4 py-4">
                 <span>© Lidmeo</span>

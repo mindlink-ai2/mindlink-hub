@@ -25,16 +25,21 @@ export function isSupportAdminClientId(clientId: number | null): boolean {
 export async function resolveClientIdForClerkUserId(userId: string): Promise<number | null> {
   const supabase = createServiceSupabase();
 
-  const { data: byClerk } = await supabase
+  const { data: byClerkRows } = await supabase
     .from("clients")
     .select("id")
     .eq("clerk_user_id", userId)
-    .maybeSingle();
+    .order("id", { ascending: true })
+    .limit(1);
 
-  const clerkClientId = normalizeClientId(byClerk?.id);
+  const clerkClientId = normalizeClientId(byClerkRows?.[0]?.id);
   if (clerkClientId !== null) return clerkClientId;
 
   const user = await currentUser();
+  const metadata = (user?.publicMetadata ?? {}) as Record<string, unknown>;
+  const metadataClientId = normalizeClientId(metadata.client_id ?? metadata.clientId);
+  if (metadataClientId !== null) return metadataClientId;
+
   const email =
     user?.emailAddresses?.find((entry) => entry.id === user.primaryEmailAddressId)
       ?.emailAddress ??
@@ -43,13 +48,14 @@ export async function resolveClientIdForClerkUserId(userId: string): Promise<num
 
   if (!email) return null;
 
-  const { data: byEmail } = await supabase
+  const { data: byEmailRows } = await supabase
     .from("clients")
     .select("id")
     .eq("email", email)
-    .maybeSingle();
+    .order("id", { ascending: true })
+    .limit(1);
 
-  return normalizeClientId(byEmail?.id);
+  return normalizeClientId(byEmailRows?.[0]?.id);
 }
 
 export async function getSupportAdminContext(): Promise<SupportAdminContext | null> {
