@@ -16,6 +16,9 @@ type MobileNavItem = {
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
+  const isDashboardRoute = pathname.startsWith("/dashboard");
+
+  if (!isDashboardRoute) return null;
 
   const items: MobileNavItem[] = [
     {

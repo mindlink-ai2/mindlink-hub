@@ -7,6 +7,7 @@ import DashboardContainer from "@/components/DashboardContainer";
 import InboxBackgroundSync from "@/components/InboxBackgroundSync";
 import RightHitboxDebug from "@/components/dev/RightHitboxDebug";
 import InboxNavLink from "@/components/InboxNavLink";
+import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import SupportWidgetLoader from "@/components/support/SupportWidgetLoader";
 import { getAnalyticsAdminContext } from "@/lib/analytics/server";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
@@ -231,12 +232,13 @@ export default async function RootLayout({
               <DashboardContainer>{children}</DashboardContainer>
             </main>
 
+            <MobileBottomNav />
             <InboxBackgroundSync />
             <SupportWidgetLoader />
             {process.env.NODE_ENV === "development" ? <RightHitboxDebug /> : null}
 
             {/* 🔵 FOOTER */}
-            <footer className="border-t border-[#c8d6ea] bg-[#f4f8ff]/75 text-xs text-[#3f5470]">
+            <footer className="hidden border-t border-[#c8d6ea] bg-[#f4f8ff]/75 text-xs text-[#3f5470] md:block">
               {/* ✅ aligné avec le header */}
               <div className="mx-auto flex max-w-[1480px] items-center justify-between px-4 py-4">
                 <span>© Lidmeo</span>
