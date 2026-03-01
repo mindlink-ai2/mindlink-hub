@@ -236,14 +236,21 @@ export default function ProspectionFilterBar({
                   size="sm"
                   onClick={() => onChange({ ...currentFilters, segment: segment.key })}
                   className={cn(
-                    "h-8 rounded-full px-3 text-xs transition-colors",
+                    "h-9 rounded-xl border px-3.5 text-xs font-semibold transition-all",
                     active
-                      ? "bg-[#1f5eff] text-white hover:bg-[#1a4fd6]"
-                      : "text-[#3f587a] hover:bg-[#edf4ff]"
+                      ? "border-[#1f5eff] bg-[#1f5eff] text-white shadow-[0_10px_20px_-14px_rgba(31,94,255,0.9)] hover:bg-[#1a4fd6]"
+                      : "border-[#bfd0e8] bg-white text-[#264566] hover:border-[#9bb7dd] hover:bg-[#eef5ff]"
                   )}
                 >
                   {segment.label}
-                  <span className="tabular-nums opacity-80">{segment.count}</span>
+                  <span
+                    className={cn(
+                      "tabular-nums rounded-full px-1.5 py-0.5 text-[10px]",
+                      active ? "bg-white/20 text-white" : "bg-[#ecf3ff] text-[#4f6784]"
+                    )}
+                  >
+                    {segment.count}
+                  </span>
                 </Button>
               )
             })}
