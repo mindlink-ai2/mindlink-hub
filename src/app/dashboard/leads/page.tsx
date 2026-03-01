@@ -183,15 +183,8 @@ function matchesDatePreset(
 function applyDesktopFilters(leads: Lead[], filters: ProspectionDesktopFilters): Lead[] {
   return leads.filter((lead) => {
     const status = getLeadPipelineStatus(lead);
-    const invitationStatus = getLeadInvitationFilterStatus(lead);
 
     if (filters.segment !== "all" && status !== filters.segment) return false;
-
-    if (filters.statuses.length > 0 && !filters.statuses.includes(status)) return false;
-
-    if (filters.invitations.length > 0 && !filters.invitations.includes(invitationStatus)) {
-      return false;
-    }
 
     if (filters.contacts.length > 0) {
       const hasEmail = Boolean((lead.email ?? "").trim());
@@ -210,8 +203,6 @@ function applyDesktopFilters(leads: Lead[], filters: ProspectionDesktopFilters):
 function countActiveDesktopFilters(filters: ProspectionDesktopFilters): number {
   let count = 0;
   if (filters.segment !== "all") count += 1;
-  if (filters.statuses.length > 0) count += 1;
-  if (filters.invitations.length > 0) count += 1;
   if (filters.contacts.length > 0) count += 1;
   if (filters.datePreset !== "all") count += 1;
   return count;
@@ -237,8 +228,6 @@ function getSegmentCounts(leads: Lead[]): Record<ProspectionSegmentKey, number> 
 export default function LeadsPage() {
   const defaultDesktopFilters = (): ProspectionDesktopFilters => ({
     segment: "all",
-    statuses: [],
-    invitations: [],
     contacts: [],
     datePreset: "all",
     customDate: null,

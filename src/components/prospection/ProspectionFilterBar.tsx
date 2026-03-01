@@ -28,8 +28,6 @@ export type ProspectionDatePreset = "all" | "7d" | "30d" | "90d" | "custom"
 
 export type ProspectionDesktopFilters = {
   segment: ProspectionSegmentKey
-  statuses: ProspectionStatusKey[]
-  invitations: ProspectionInvitationKey[]
   contacts: ProspectionContactKey[]
   datePreset: ProspectionDatePreset
   customDate: string | null
@@ -53,19 +51,6 @@ type ProspectionFilterBarProps = {
   segmentOptions: SegmentOption[]
   actions?: ReactNode
 }
-
-const STATUS_OPTIONS: Array<{ value: ProspectionStatusKey; label: string }> = [
-  { value: "todo", label: "À faire" },
-  { value: "pending", label: "En attente" },
-  { value: "connected", label: "Connecté" },
-  { value: "sent", label: "Envoyé" },
-]
-
-const INVITATION_OPTIONS: Array<{ value: ProspectionInvitationKey; label: string }> = [
-  { value: "accepted", label: "Connecté" },
-  { value: "sent", label: "Invitation envoyée" },
-  { value: "none", label: "Sans invitation" },
-]
 
 const CONTACT_OPTIONS: Array<{ value: ProspectionContactKey; label: string }> = [
   { value: "email", label: "Avec email" },
@@ -159,32 +144,14 @@ export default function ProspectionFilterBar({
   segmentOptions,
   actions,
 }: ProspectionFilterBarProps) {
-  const [statusOpen, setStatusOpen] = useState(false)
   const [dateOpen, setDateOpen] = useState(false)
-  const [invitationOpen, setInvitationOpen] = useState(false)
   const [contactOpen, setContactOpen] = useState(false)
 
   const searchInputId = useId()
-  const statusContentId = useId()
   const dateContentId = useId()
-  const invitationContentId = useId()
   const contactContentId = useId()
   const dateRadioName = useId()
 
-  const statusLabels = useMemo(
-    () =>
-      STATUS_OPTIONS.filter((option) => currentFilters.statuses.includes(option.value)).map(
-        (option) => option.label
-      ),
-    [currentFilters.statuses]
-  )
-  const invitationLabels = useMemo(
-    () =>
-      INVITATION_OPTIONS.filter((option) => currentFilters.invitations.includes(option.value)).map(
-        (option) => option.label
-      ),
-    [currentFilters.invitations]
-  )
   const contactLabels = useMemo(
     () =>
       CONTACT_OPTIONS.filter((option) => currentFilters.contacts.includes(option.value)).map(
@@ -283,91 +250,6 @@ export default function ProspectionFilterBar({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Popover modal open={statusOpen} onOpenChange={setStatusOpen}>
-              <div className="inline-flex items-center gap-1">
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    aria-expanded={statusOpen}
-                    aria-controls={statusContentId}
-                    className={cn(
-                      "h-9 rounded-full border-[#c8d6ea] bg-[#f9fcff] px-3 text-xs text-[#2f4a6d] hover:bg-[#eef5ff]",
-                      statusLabels.length > 0 ? "border-[#91b6f8] bg-[#edf4ff] text-[#1f4f96]" : ""
-                    )}
-                  >
-                    {getChipLabel("Statut", statusLabels)}
-                    <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-                  </Button>
-                </PopoverTrigger>
-                {statusLabels.length > 0 ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Effacer le filtre de statut"
-                    onPointerDown={(event) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                    }}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      onChange({ ...currentFilters, statuses: [] })
-                    }}
-                    className="rounded-full border border-[#c8d6ea] bg-white text-[#51627b] hover:bg-[#f3f7ff]"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                ) : null}
-              </div>
-              <PopoverContent
-                id={statusContentId}
-                align="end"
-                className="w-[300px]"
-                aria-label="Filtrer par statut"
-              >
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#58708f]">
-                  Statut
-                </p>
-                <div className="space-y-1">
-                  {STATUS_OPTIONS.map((option) => (
-                    <FilterOptionRow
-                      key={option.value}
-                      checked={currentFilters.statuses.includes(option.value)}
-                      label={option.label}
-                      onChange={() =>
-                        onChange({
-                          ...currentFilters,
-                          statuses: toggleSelection(currentFilters.statuses, option.value),
-                        })
-                      }
-                    />
-                  ))}
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onChange({ ...currentFilters, statuses: [] })}
-                    className="h-8 rounded-full px-3 text-xs"
-                  >
-                    Effacer
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setStatusOpen(false)}
-                    className="h-8 rounded-full px-3 text-xs"
-                  >
-                    Appliquer
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-
             <Popover modal open={dateOpen} onOpenChange={setDateOpen}>
               <div className="inline-flex items-center gap-1">
                 <PopoverTrigger asChild>
@@ -462,92 +344,6 @@ export default function ProspectionFilterBar({
                     type="button"
                     size="sm"
                     onClick={() => setDateOpen(false)}
-                    className="h-8 rounded-full px-3 text-xs"
-                  >
-                    Appliquer
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            <Popover modal open={invitationOpen} onOpenChange={setInvitationOpen}>
-              <div className="inline-flex items-center gap-1">
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    aria-expanded={invitationOpen}
-                    aria-controls={invitationContentId}
-                    className={cn(
-                      "h-9 rounded-full border-[#c8d6ea] bg-[#f9fcff] px-3 text-xs text-[#2f4a6d] hover:bg-[#eef5ff]",
-                      invitationLabels.length > 0
-                        ? "border-[#91b6f8] bg-[#edf4ff] text-[#1f4f96]"
-                        : ""
-                    )}
-                  >
-                    {getChipLabel("LinkedIn", invitationLabels)}
-                    <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-                  </Button>
-                </PopoverTrigger>
-                {invitationLabels.length > 0 ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Effacer le filtre LinkedIn"
-                    onPointerDown={(event) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                    }}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      onChange({ ...currentFilters, invitations: [] })
-                    }}
-                    className="rounded-full border border-[#c8d6ea] bg-white text-[#51627b] hover:bg-[#f3f7ff]"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                ) : null}
-              </div>
-              <PopoverContent
-                id={invitationContentId}
-                align="end"
-                aria-label="Filtrer par connexion LinkedIn"
-              >
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#58708f]">
-                  Connexion LinkedIn
-                </p>
-                <div className="space-y-1">
-                  {INVITATION_OPTIONS.map((option) => (
-                    <FilterOptionRow
-                      key={option.value}
-                      checked={currentFilters.invitations.includes(option.value)}
-                      label={option.label}
-                      onChange={() =>
-                        onChange({
-                          ...currentFilters,
-                          invitations: toggleSelection(currentFilters.invitations, option.value),
-                        })
-                      }
-                    />
-                  ))}
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onChange({ ...currentFilters, invitations: [] })}
-                    className="h-8 rounded-full px-3 text-xs"
-                  >
-                    Effacer
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setInvitationOpen(false)}
                     className="h-8 rounded-full px-3 text-xs"
                   >
                     Appliquer
@@ -659,27 +455,6 @@ export default function ProspectionFilterBar({
                 <div className="mt-5 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
                   <div>
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#58708f]">
-                      Statut
-                    </p>
-                    <div className="space-y-1">
-                      {STATUS_OPTIONS.map((option) => (
-                        <FilterOptionRow
-                          key={`sheet-status-${option.value}`}
-                          checked={currentFilters.statuses.includes(option.value)}
-                          label={option.label}
-                          onChange={() =>
-                            onChange({
-                              ...currentFilters,
-                              statuses: toggleSelection(currentFilters.statuses, option.value),
-                            })
-                          }
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#58708f]">
                       Date
                     </p>
                     <div className="space-y-1">
@@ -716,27 +491,6 @@ export default function ProspectionFilterBar({
                         />
                       </div>
                     ) : null}
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#58708f]">
-                      Connexion LinkedIn
-                    </p>
-                    <div className="space-y-1">
-                      {INVITATION_OPTIONS.map((option) => (
-                        <FilterOptionRow
-                          key={`sheet-linkedin-${option.value}`}
-                          checked={currentFilters.invitations.includes(option.value)}
-                          label={option.label}
-                          onChange={() =>
-                            onChange({
-                              ...currentFilters,
-                              invitations: toggleSelection(currentFilters.invitations, option.value),
-                            })
-                          }
-                        />
-                      ))}
-                    </div>
                   </div>
 
                   <div>

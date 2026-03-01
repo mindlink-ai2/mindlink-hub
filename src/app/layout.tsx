@@ -8,6 +8,7 @@ import InboxBackgroundSync from "@/components/InboxBackgroundSync";
 import RightHitboxDebug from "@/components/dev/RightHitboxDebug";
 import InboxNavLink from "@/components/InboxNavLink";
 import SupportWidgetLoader from "@/components/support/SupportWidgetLoader";
+import { getAnalyticsAdminContext } from "@/lib/analytics/server";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -90,6 +91,7 @@ export default async function RootLayout({
 
   let hasAccess = false;
   let showSupportAdminLink = false;
+  let showAnalyticsAdminLink = false;
 
   if (user && email) {
     const { data, error } = await supabaseAdmin
@@ -104,6 +106,8 @@ export default async function RootLayout({
   if (user) {
     const adminContext = await getSupportAdminContext();
     showSupportAdminLink = Boolean(adminContext);
+    const analyticsContext = await getAnalyticsAdminContext();
+    showAnalyticsAdminLink = Boolean(analyticsContext);
   }
 
   return (
@@ -173,6 +177,14 @@ export default async function RootLayout({
                           className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                         >
                           Support Admin
+                        </Link>
+                      ) : null}
+                      {showAnalyticsAdminLink ? (
+                        <Link
+                          href="/admin/analytics"
+                          className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
+                        >
+                          Admin Analytics
                         </Link>
                       ) : null}
                     </nav>
