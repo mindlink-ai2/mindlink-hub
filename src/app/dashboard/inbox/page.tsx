@@ -176,9 +176,9 @@ export default function InboxPage() {
   const [error, setError] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const [sendingDraft, setSendingDraft] = useState(false);
-  const [availableHeight, setAvailableHeight] = useState<number | null>(null);
-  const pageContainerRef = useRef<HTMLDivElement | null>(null);
-  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const desktopMessagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const mobileMessagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const mobileComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const shouldScrollToBottomRef = useRef(false);
   const loadedMessagesThreadIdRef = useRef<string | null>(null);
   const syncInFlightRef = useRef(false);
@@ -211,21 +211,20 @@ export default function InboxPage() {
     }
   }, [selectedThreadId]);
 
+  const getActiveMessagesViewport = useCallback(() => {
+    const isMobileViewport =
+      typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+    if (isMobileViewport && mobileThreadSheetOpen) {
+      return mobileMessagesViewportRef.current;
+    }
+    return desktopMessagesViewportRef.current ?? mobileMessagesViewportRef.current;
+  }, [mobileThreadSheetOpen]);
+
   const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
-    const viewport = messagesViewportRef.current;
+    const viewport = getActiveMessagesViewport();
     if (!viewport) return;
     viewport.scrollTo({ top: viewport.scrollHeight, behavior });
-  }, []);
-
-  const updateAvailableHeight = useCallback(() => {
-    const container = pageContainerRef.current;
-    if (!container) return;
-
-    const top = container.getBoundingClientRect().top;
-    const nextHeight = Math.max(360, Math.floor(window.innerHeight - top - 8));
-
-    setAvailableHeight((prev) => (prev === nextHeight ? prev : nextHeight));
-  }, []);
+  }, [getActiveMessagesViewport]);
 
   const handleOpenSelectedThreadLinkedInProfile = useCallback(() => {
     const url = selectedThreadLinkedInUrl;
@@ -378,16 +377,32 @@ export default function InboxPage() {
   }, [selectedThreadId, loadingMessages, messages, scrollMessagesToBottom]);
 
   useEffect(() => {
-    updateAvailableHeight();
+    if (!mobileThreadSheetOpen || !selectedThreadId || loadingMessages) return;
+    if (loadedMessagesThreadIdRef.current !== selectedThreadId) return;
 
-    window.addEventListener("resize", updateAvailableHeight);
-    window.addEventListener("orientationchange", updateAvailableHeight);
+    window.requestAnimationFrame(() => {
+      scrollMessagesToBottom("auto");
+      window.setTimeout(() => scrollMessagesToBottom("auto"), 60);
+    });
+  }, [mobileThreadSheetOpen, selectedThreadId, loadingMessages, scrollMessagesToBottom]);
 
-    return () => {
-      window.removeEventListener("resize", updateAvailableHeight);
-      window.removeEventListener("orientationchange", updateAvailableHeight);
-    };
-  }, [updateAvailableHeight]);
+  useEffect(() => {
+    if (!mobileThreadSheetOpen || !selectedThreadId) return;
+
+    const isMobileViewport =
+      typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+    if (!isMobileViewport) return;
+
+    window.requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        const textarea = mobileComposerRef.current;
+        if (!textarea) return;
+        textarea.focus({ preventScroll: true });
+        const length = textarea.value.length;
+        textarea.setSelectionRange(length, length);
+      }, 80);
+    });
+  }, [mobileThreadSheetOpen, selectedThreadId]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -880,7 +895,10 @@ export default function InboxPage() {
                   }
                 />
 
-                <div ref={messagesViewportRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+                <div
+                  ref={mobileMessagesViewportRef}
+                  className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
+                >
                   {loadingMessages ? (
                     <div className="text-sm text-[#51627b]">Chargement des messages…</div>
                   ) : messages.length === 0 ? (
@@ -932,9 +950,10 @@ export default function InboxPage() {
                   )}
                 </div>
 
-                <div className="border-t border-[#d7e3f4] bg-white px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+                <div className="sticky bottom-0 z-20 border-t border-[#d7e3f4] bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]">
                   <div className="flex items-end gap-2">
                     <textarea
+                      ref={mobileComposerRef}
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
                       placeholder="Écrire une réponse..."
@@ -945,6 +964,7 @@ export default function InboxPage() {
                       variant="primary"
                       onClick={handleSend}
                       disabled={sending || !draft.trim()}
+                      className="shrink-0"
                     >
                       {sending ? "Envoi..." : "Envoyer"}
                     </HubButton>
@@ -1123,7 +1143,7 @@ export default function InboxPage() {
                 ) : (
                   <>
                     <div
-                      ref={messagesViewportRef}
+                      ref={desktopMessagesViewportRef}
                       className="min-h-0 flex-1 overflow-y-auto p-4"
                     >
                       {loadingMessages ? (
@@ -1178,7 +1198,7 @@ export default function InboxPage() {
                       )}
                     </div>
 
-                    <div className="border-t border-[#d7e3f4] bg-[#f8fbff] p-3">
+                    <div className="sticky bottom-0 z-10 border-t border-[#d7e3f4] bg-[#f8fbff] p-3">
                       <div className="flex items-end gap-2">
                         <textarea
                           value={draft}
@@ -1191,6 +1211,7 @@ export default function InboxPage() {
                           variant="primary"
                           onClick={handleSend}
                           disabled={sending || !draft.trim()}
+                          className="shrink-0"
                         >
                           {sending ? "Envoi..." : "Envoyer"}
                         </HubButton>
