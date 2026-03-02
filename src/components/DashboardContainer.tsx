@@ -9,6 +9,7 @@ export default function DashboardContainer({ children }: { children: React.React
   const router = useRouter();
   const pathname = usePathname();
   const { user, isLoaded, isSignedIn } = useUser();
+  const hasMobileBottomNav = pathname.startsWith("/dashboard");
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -53,7 +54,14 @@ export default function DashboardContainer({ children }: { children: React.React
   }, [isLoaded, isSignedIn, pathname, router, user]);
 
   return (
-    <div className="relative z-[1] mx-auto flex min-h-0 w-full max-w-[1560px] flex-1 flex-col px-4 py-6 sm:px-6 sm:py-8">
+    <div
+      className={[
+        "relative z-[1] mx-auto flex min-h-0 w-full max-w-[1560px] flex-1 flex-col px-4 pt-6 sm:px-6 sm:pt-8",
+        hasMobileBottomNav
+          ? "pb-[calc(env(safe-area-inset-bottom)+5.75rem)] sm:pb-8"
+          : "pb-6 sm:pb-8",
+      ].join(" ")}
+    >
       {children}
     </div>
   );

@@ -7,6 +7,7 @@ import DashboardContainer from "@/components/DashboardContainer";
 import InboxBackgroundSync from "@/components/InboxBackgroundSync";
 import RightHitboxDebug from "@/components/dev/RightHitboxDebug";
 import InboxNavLink from "@/components/InboxNavLink";
+import MobileBottomNav from "@/components/MobileBottomNav";
 import SupportWidgetLoader from "@/components/support/SupportWidgetLoader";
 import { getAnalyticsAdminContext } from "@/lib/analytics/server";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
@@ -233,6 +234,7 @@ export default async function RootLayout({
 
             <InboxBackgroundSync />
             <SupportWidgetLoader />
+            <MobileBottomNav />
             {process.env.NODE_ENV === "development" ? <RightHitboxDebug /> : null}
 
             {/* 🔵 FOOTER */}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
 import { supabase } from "@/lib/supabase";
-import { Linkedin } from "lucide-react";
+import { ArrowLeft, Linkedin } from "lucide-react";
 
 type InboxThread = {
   id: string;
@@ -153,6 +153,7 @@ export default function InboxPage() {
   const [threads, setThreads] = useState<InboxThread[]>([]);
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [mobilePanel, setMobilePanel] = useState<"threads" | "messages">("threads");
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -313,6 +314,12 @@ export default function InboxPage() {
     shouldScrollToBottomRef.current = true;
     void loadMessages(selectedThreadId);
     void markThreadRead(selectedThreadId);
+  }, [selectedThreadId]);
+
+  useEffect(() => {
+    if (!selectedThreadId) {
+      setMobilePanel("threads");
+    }
   }, [selectedThreadId]);
 
   useEffect(() => {
@@ -596,7 +603,7 @@ export default function InboxPage() {
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <div className="h-full min-h-0 px-4 pb-14 pt-4 sm:px-6 sm:pt-5">
+      <div className="h-full min-h-0 px-4 pb-6 pt-4 sm:px-6 sm:pb-14 sm:pt-5">
         <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-3">
           <section className="hub-card-hero p-3 sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -638,7 +645,12 @@ export default function InboxPage() {
           </section>
 
           <section className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[330px_minmax(0,1fr)]">
-            <div className="hub-card flex min-h-0 flex-col overflow-hidden">
+            <div
+              className={[
+                "hub-card min-h-0 flex-col overflow-hidden",
+                mobilePanel === "messages" ? "hidden lg:flex" : "flex",
+              ].join(" ")}
+            >
               <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
                 <h2 className="text-sm font-semibold text-[#0b1c33]">Conversations</h2>
               </div>
@@ -677,6 +689,7 @@ export default function InboxPage() {
                           onClick={() => {
                             shouldScrollToBottomRef.current = true;
                             setSelectedThreadId(thread.id);
+                            setMobilePanel("messages");
                           }}
                           className={[
                             "w-full rounded-xl border px-3 py-3 text-left transition-colors duration-150",
@@ -730,20 +743,37 @@ export default function InboxPage() {
               </div>
             </div>
 
-            <div className="hub-card flex min-h-0 flex-col overflow-hidden">
+            <div
+              className={[
+                "hub-card min-h-0 flex-col overflow-hidden",
+                mobilePanel === "threads" ? "hidden lg:flex" : "flex",
+              ].join(" ")}
+            >
               <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
-                  {selectedThreadLinkedInUrl ? (
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={handleOpenSelectedThreadLinkedInProfile}
-                      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                      onClick={() => setMobilePanel("threads")}
+                      className="inline-flex h-8 items-center justify-center rounded-xl border border-[#d7e3f4] bg-white px-2.5 text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff] lg:hidden"
+                      aria-label="Retour aux conversations"
                     >
-                      <Linkedin className="h-3.5 w-3.5" />
-                      Voir profil
+                      <ArrowLeft className="h-4 w-4" />
                     </button>
-                  ) : null}
+                    <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedThreadLinkedInUrl ? (
+                      <button
+                        type="button"
+                        onClick={handleOpenSelectedThreadLinkedInProfile}
+                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                      >
+                        <Linkedin className="h-3.5 w-3.5" />
+                        Voir profil
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
@@ -809,7 +839,7 @@ export default function InboxPage() {
                     )}
                   </div>
 
-                  <div className="border-t border-[#d7e3f4] bg-[#f8fbff] p-3">
+                  <div className="border-t border-[#d7e3f4] bg-[#f8fbff] p-3 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] lg:pb-3">
                     <div className="flex items-end gap-2">
                       <textarea
                         value={draft}
