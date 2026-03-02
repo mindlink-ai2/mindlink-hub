@@ -164,6 +164,7 @@ export default function InboxPage() {
   const [error, setError] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const shouldScrollToBottomRef = useRef(false);
   const loadedMessagesThreadIdRef = useRef<string | null>(null);
   const syncInFlightRef = useRef(false);
@@ -266,7 +267,7 @@ export default function InboxPage() {
       const loadedMessages = Array.isArray(data?.messages)
         ? (data.messages as InboxMessage[])
         : [];
-      setMessages(loadedMessages);
+      setMessages(sortMessagesBySentAt(loadedMessages));
       loadedMessagesThreadIdRef.current = threadDbId;
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur de chargement des messages.");
@@ -354,6 +355,24 @@ export default function InboxPage() {
       window.clearTimeout(secondTick);
     };
   }, [mobilePanel, selectedThreadId, messages.length, scrollMessagesToBottom]);
+
+  useEffect(() => {
+    if (!selectedThreadId || loadingMessages) return;
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(min-width: 1024px)").matches) return;
+
+    const scrollTick = window.setTimeout(() => {
+      scrollMessagesToBottom("auto");
+    }, 40);
+    const focusTick = window.setTimeout(() => {
+      composerTextareaRef.current?.focus();
+    }, 80);
+
+    return () => {
+      window.clearTimeout(scrollTick);
+      window.clearTimeout(focusTick);
+    };
+  }, [selectedThreadId, loadingMessages, messages.length, scrollMessagesToBottom]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -878,6 +897,7 @@ export default function InboxPage() {
                   <div className="sticky bottom-0 border-t border-[#d7e3f4] bg-[#f8fbff] p-3 pb-[calc(env(safe-area-inset-bottom)+0.65rem)] lg:pb-3">
                     <div className="flex items-end gap-2">
                       <textarea
+                        ref={composerTextareaRef}
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
                         placeholder="Écrire une réponse..."
