@@ -1318,11 +1318,6 @@ async function fallbackAcceptLastSent(params: {
     draftText,
   });
 
-  if (error) {
-    console.error("UNIPILE_WEBHOOK_RELATION_FALLBACK_UPDATE_ERROR:", error);
-    return { leadId: null, invitationId: null };
-  }
-
   return {
     leadId: lastSent.lead_id,
     invitationId: String(lastSent.id),
