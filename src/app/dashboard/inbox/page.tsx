@@ -342,6 +342,20 @@ export default function InboxPage() {
   }, [mobilePanel, selectedThreadId, loadingMessages, scrollMessagesToBottom]);
 
   useEffect(() => {
+    if (mobilePanel !== "messages" || !selectedThreadId) return;
+    const firstTick = window.setTimeout(() => {
+      scrollMessagesToBottom("auto");
+    }, 0);
+    const secondTick = window.setTimeout(() => {
+      scrollMessagesToBottom("auto");
+    }, 120);
+    return () => {
+      window.clearTimeout(firstTick);
+      window.clearTimeout(secondTick);
+    };
+  }, [mobilePanel, selectedThreadId, messages.length, scrollMessagesToBottom]);
+
+  useEffect(() => {
     if (!clientId) return;
 
     const channel = supabase
@@ -658,7 +672,12 @@ export default function InboxPage() {
             ) : null}
           </section>
 
-          <section className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[330px_minmax(0,1fr)]">
+          <section
+            className={[
+              "grid min-h-0 flex-1 gap-3 lg:grid-cols-[330px_minmax(0,1fr)]",
+              mobileMessagesOpen ? "overflow-hidden lg:overflow-visible" : "",
+            ].join(" ")}
+          >
             <div
               className={[
                 "hub-card min-h-0 flex-col overflow-hidden",
@@ -761,6 +780,9 @@ export default function InboxPage() {
               className={[
                 "hub-card min-h-0 flex-col overflow-hidden",
                 mobilePanel === "threads" ? "hidden lg:flex" : "flex",
+                mobileMessagesOpen
+                  ? "fixed inset-x-0 top-16 bottom-[calc(env(safe-area-inset-bottom)+5.55rem)] z-40 rounded-none border-x-0 border-b-0 shadow-none lg:static lg:inset-auto lg:top-auto lg:bottom-auto lg:z-auto lg:rounded-2xl lg:border-x lg:border-b lg:shadow-[0_18px_40px_-24px_rgba(18,43,86,0.45)]"
+                  : "",
               ].join(" ")}
             >
               <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
@@ -853,7 +875,7 @@ export default function InboxPage() {
                     )}
                   </div>
 
-                  <div className="sticky bottom-0 border-t border-[#d7e3f4] bg-[#f8fbff] p-3 pb-[calc(env(safe-area-inset-bottom)+5.15rem)] lg:pb-3">
+                  <div className="sticky bottom-0 border-t border-[#d7e3f4] bg-[#f8fbff] p-3 pb-[calc(env(safe-area-inset-bottom)+0.65rem)] lg:pb-3">
                     <div className="flex items-end gap-2">
                       <textarea
                         value={draft}

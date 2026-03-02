@@ -31,7 +31,7 @@ const MOBILE_NAV_ITEMS: MobileNavItem[] = [
   },
   {
     href: "/dashboard/inbox",
-    label: "Inbox",
+    label: "Messagerie",
     icon: Inbox,
     isActive: (pathname) => pathname.startsWith("/dashboard/inbox"),
   },
