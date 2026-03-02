@@ -2,6 +2,22 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceSupabase, getClientIdFromClerkUser } from "@/lib/inbox-server";
 
+type PostgrestErrorLike = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+
+function isMissingColumnError(error: unknown, columnName: string): boolean {
+  if (!error || typeof error !== "object") return false;
+  const pgError = error as PostgrestErrorLike;
+  if (String(pgError.code ?? "") !== "42703") return false;
+  const details = `${pgError.message ?? ""} ${pgError.details ?? ""} ${pgError.hint ?? ""}`
+    .toLowerCase();
+  return details.includes(columnName.toLowerCase());
+}
+
 export async function GET() {
   try {
     const { userId } = await auth();
@@ -52,16 +68,71 @@ export async function GET() {
       }
     }
 
+    const invitationDraftByLeadId = new Map<
+      string,
+      { invitation_id: string; dm_draft_status: "draft" | "sent"; dm_draft_text: string | null }
+    >();
+
+    if (leadIds.length > 0) {
+      const { data: invitationDrafts, error: invitationErr } = await supabase
+        .from("linkedin_invitations")
+        .select("id, lead_id, dm_draft_status, dm_draft_text, accepted_at, dm_sent_at, sent_at")
+        .eq("client_id", clientId)
+        .in("lead_id", leadIds)
+        .in("dm_draft_status", ["draft", "sent"])
+        .order("accepted_at", { ascending: false, nullsFirst: false })
+        .order("dm_sent_at", { ascending: false, nullsFirst: false })
+        .order("sent_at", { ascending: false, nullsFirst: false });
+
+      if (invitationErr) {
+        if (
+          !isMissingColumnError(invitationErr, "dm_draft_status") &&
+          !isMissingColumnError(invitationErr, "dm_draft_text") &&
+          !isMissingColumnError(invitationErr, "dm_sent_at")
+        ) {
+          console.error("INBOX_THREADS_DRAFT_FETCH_ERROR:", invitationErr);
+        }
+      } else {
+        for (const invitation of invitationDrafts ?? []) {
+          const leadId = invitation?.lead_id;
+          const rawStatus = String(invitation?.dm_draft_status ?? "").toLowerCase();
+          if (leadId === null || leadId === undefined) continue;
+          if (rawStatus !== "draft" && rawStatus !== "sent") continue;
+
+          const key = String(leadId);
+          const existing = invitationDraftByLeadId.get(key);
+          if (existing?.dm_draft_status === "draft" && rawStatus !== "draft") continue;
+          if (existing) continue;
+
+          invitationDraftByLeadId.set(key, {
+            invitation_id: String(invitation?.id ?? ""),
+            dm_draft_status: rawStatus,
+            dm_draft_text:
+              typeof invitation?.dm_draft_text === "string"
+                ? invitation.dm_draft_text
+                : null,
+          });
+        }
+      }
+    }
+
     const threadsWithLeadPresence = threadRows.map((thread) => {
       const leadId = thread?.lead_id;
       const leadExists =
         leadId !== null &&
         leadId !== undefined &&
         existingLeadIdSet.has(String(leadId));
+      const draftMeta =
+        leadId !== null && leadId !== undefined
+          ? invitationDraftByLeadId.get(String(leadId))
+          : undefined;
 
       return {
         ...thread,
         lead_exists: leadExists,
+        dm_draft_invitation_id: draftMeta?.invitation_id ?? null,
+        dm_draft_status: draftMeta?.dm_draft_status ?? "none",
+        dm_draft_text: draftMeta?.dm_draft_text ?? null,
       };
     });
 

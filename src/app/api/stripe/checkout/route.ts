@@ -6,7 +6,10 @@ import Stripe from "stripe";
 export const runtime = "nodejs";
 
 function normalizePlan(p?: unknown) {
-  return typeof p === "string" ? p.toLowerCase().trim() : null;
+  const value = typeof p === "string" ? p.toLowerCase().trim() : "";
+  if (value === "essential") return "essential";
+  if (value === "full" || value === "automated" || value === "premium") return "full";
+  return null;
 }
 
 function normalizeQuota(q?: unknown): number | null {
@@ -16,18 +19,16 @@ function normalizeQuota(q?: unknown): number | null {
 }
 
 // ✅ Price IDs Stripe (Essential 10/20/30 fournis)
-// + Automated à renseigner
 const PRICE_ESSENTIAL_BY_QUOTA: Record<number, string> = {
   10: "price_1SvQu71rJNZjWmG5D9MtzZn4",
   20: "price_1SvQuX1rJNZjWmG54cjd0AFb",
   30: "price_1SvQut1rJNZjWmG5NJEMlvyZ",
 };
 
-// ⚠️ À compléter dès que tu me le donnes
-const STRIPE_PRICE_AUTOMATED = process.env.STRIPE_PRICE_AUTOMATED;
-
-// Legacy (si tu veux le garder temporairement)
-const STRIPE_PRICE_PREMIUM = process.env.STRIPE_PRICE_PREMIUM;
+const STRIPE_PRICE_FULL =
+  process.env.STRIPE_PRICE_FULL ??
+  process.env.STRIPE_PRICE_AUTOMATED ??
+  process.env.STRIPE_PRICE_PREMIUM;
 
 export async function POST(req: Request) {
   // 1️⃣ Stripe
@@ -64,24 +65,15 @@ export async function POST(req: Request) {
     }
     priceId = PRICE_ESSENTIAL_BY_QUOTA[q];
     finalQuota = q;
-  } else if (plan === "automated") {
-    if (!STRIPE_PRICE_AUTOMATED) {
+  } else if (plan === "full") {
+    if (!STRIPE_PRICE_FULL) {
       return NextResponse.json(
-        { error: "Missing STRIPE_PRICE_AUTOMATED env" },
+        { error: "Missing STRIPE_PRICE_FULL env" },
         { status: 500 }
       );
     }
-    priceId = STRIPE_PRICE_AUTOMATED;
+    priceId = STRIPE_PRICE_FULL;
     finalQuota = 15;
-  } else if (plan === "premium") {
-    if (!STRIPE_PRICE_PREMIUM) {
-      return NextResponse.json(
-        { error: "Missing STRIPE_PRICE_PREMIUM env" },
-        { status: 500 }
-      );
-    }
-    priceId = STRIPE_PRICE_PREMIUM;
-    finalQuota = null;
   } else {
     return NextResponse.json({ error: `Invalid plan: ${rawPlan}` }, { status: 400 });
   }

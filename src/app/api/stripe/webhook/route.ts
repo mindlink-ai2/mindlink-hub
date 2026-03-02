@@ -12,8 +12,10 @@ function priceToPlanAndQuota(priceId: string | null) {
   if (priceId === process.env.STRIPE_PRICE_ESSENTIAL_20) return { plan: "essential", quota: "20" };
   if (priceId === process.env.STRIPE_PRICE_ESSENTIAL_30) return { plan: "essential", quota: "30" };
 
-  // Legacy (si tu en as encore)
-  if (priceId === process.env.STRIPE_PRICE_PREMIUM) return { plan: "premium", quota: null };
+  // Full (nouveau plan)
+  if (priceId === process.env.STRIPE_PRICE_FULL) return { plan: "full", quota: "15" };
+  if (priceId === process.env.STRIPE_PRICE_AUTOMATED) return { plan: "full", quota: "15" };
+  if (priceId === process.env.STRIPE_PRICE_PREMIUM) return { plan: "full", quota: "15" };
 
   // Ancien essential unique (si tu l’avais avant)
   if (priceId === process.env.STRIPE_PRICE_ESSENTIAL) return { plan: "essential", quota: null };
@@ -45,8 +47,9 @@ export async function POST(req: Request) {
 
   try {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
-  } catch (err: any) {
-    return new Response(`Webhook Error: ${err.message}`, { status: 400 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return new Response(`Webhook Error: ${message}`, { status: 400 });
   }
 
   const supabase = createClient(
@@ -77,7 +80,7 @@ export async function POST(req: Request) {
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
-        const sub = event.data.object as any;
+        const sub = event.data.object as Stripe.Subscription;
 
         const stripeCustomerId = sub?.customer ? String(sub.customer) : null;
         if (!stripeCustomerId) break;
@@ -86,10 +89,12 @@ export async function POST(req: Request) {
 
         // 👉 Plan/quota depuis le priceId (source de vérité)
         const { plan, quota } = priceToPlanAndQuota(priceId);
+        const safePlan = plan === "full" || plan === "essential" ? plan : "essential";
 
-        // Dates
-        const periodEndIso = sub.current_period_end
-          ? new Date(sub.current_period_end * 1000).toISOString()
+        // Stripe SDK (API récente) expose la période sur les items d'abonnement.
+        const itemPeriodEnd = sub.items?.data?.[0]?.current_period_end ?? null;
+        const periodEndIso = itemPeriodEnd
+          ? new Date(itemPeriodEnd * 1000).toISOString()
           : null;
 
         // Si deleted, Stripe envoie sub.status mais parfois “canceled” / “incomplete_expired”
@@ -100,7 +105,7 @@ export async function POST(req: Request) {
           .update({
             stripe_subscription_id: sub.id,
             subscription_status: subscriptionStatus,
-            plan,
+            plan: safePlan,
             quota, // ✅ nouveauté : on stocke 10/20/30 (text OK)
             current_period_end: periodEndIso,
             cancel_at_period_end: sub.cancel_at_period_end ?? false,
@@ -113,10 +118,11 @@ export async function POST(req: Request) {
       default:
         // pas d'action
         break;
-    }
+  }
 
     return new Response("ok", { status: 200 });
-  } catch (e: any) {
-    return new Response(`Webhook handler failed: ${e.message}`, { status: 500 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return new Response(`Webhook handler failed: ${message}`, { status: 500 });
   }
 }

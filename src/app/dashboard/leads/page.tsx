@@ -807,15 +807,6 @@ export default function LeadsPage() {
 
     if (openLead.message_sent || sendingLinkedInMessageLeadIds.has(idStr)) return;
 
-    const content = String(openLead.internal_message ?? "").trim();
-    if (!content) {
-      setLinkedInMessageSendErrors((prev) => ({
-        ...prev,
-        [idStr]: "Le message LinkedIn est vide.",
-      }));
-      return;
-    }
-
     setSendingLinkedInMessageLeadIds((prev: Set<string>) => {
       const next = new Set(prev);
       next.add(idStr);
@@ -830,12 +821,11 @@ export default function LeadsPage() {
     });
 
     try {
-      const res = await fetch("/api/prospection/send-linkedin-message", {
+      const res = await fetch("/api/leads/message-sent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           leadId,
-          content,
         }),
       });
 
@@ -880,7 +870,7 @@ export default function LeadsPage() {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Erreur pendant l’envoi du message LinkedIn.";
+          : "Erreur pendant le marquage du lead.";
       setLinkedInMessageSendErrors((prev) => ({
         ...prev,
         [idStr]: errorMessage,
@@ -1631,12 +1621,14 @@ export default function LeadsPage() {
 
           {openLead && (
             <>
-              <div
-                className="pointer-events-none fixed inset-0 z-[80] bg-[#0F172A]/38 backdrop-blur-[3px]"
-                aria-hidden="true"
+              <button
+                type="button"
+                onClick={() => setOpenLead(null)}
+                className="fixed inset-0 z-[200] bg-[#0F172A]/42 backdrop-blur-[4px]"
+                aria-label="Fermer le panneau lead"
               />
 
-              <div className="animate-slideLeft fixed inset-y-0 right-0 z-[90] flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
+              <div className="animate-slideLeft fixed inset-y-0 right-0 z-[210] flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
                 <div className="z-10 border-b border-[#e2e8f0] bg-white/95 p-6 pb-4 backdrop-blur-xl">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -1769,7 +1761,7 @@ export default function LeadsPage() {
                         {openLead.message_sent
                           ? "Envoyé ✅"
                           : isSendingOpenLeadLinkedInMessage
-                            ? "Envoi…"
+                            ? "Marquage…"
                             : openLeadLinkedInMessageError
                               ? "Erreur — réessayer"
                               : "Envoyer un message"}

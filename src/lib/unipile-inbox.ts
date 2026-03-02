@@ -182,20 +182,15 @@ function extractTimestamp(payload: JsonObject): string {
   return date.toISOString();
 }
 
-function extractSenderLinkedInUrl(payload: JsonObject): string | null {
-  const url = getFirstString(payload, [
+function extractSenderLinkedInUrl(
+  payload: JsonObject,
+  direction: "inbound" | "outbound"
+): string | null {
+  const strictSenderUrl = getFirstString(payload, [
     ["data", "sender", "profile_url"],
     ["data", "sender", "profileUrl"],
     ["data", "sender", "linkedin_url"],
     ["data", "sender", "linkedinUrl"],
-    ["data", "attendee", "profile_url"],
-    ["data", "attendee", "profileUrl"],
-    ["data", "attendee", "linkedin_url"],
-    ["data", "attendee", "linkedinUrl"],
-    ["data", "contact", "profile_url"],
-    ["data", "contact", "profileUrl"],
-    ["data", "contact", "linkedin_url"],
-    ["data", "contact", "linkedinUrl"],
     ["sender_linkedin_url"],
     ["senderLinkedInUrl"],
     ["sender", "linkedin_url"],
@@ -206,17 +201,32 @@ function extractSenderLinkedInUrl(payload: JsonObject): string | null {
     ["author", "profile_url"],
     ["from", "linkedin_url"],
     ["from", "profile_url"],
+  ]);
+
+  if (strictSenderUrl) return normalizeLinkedInUrl(strictSenderUrl);
+  if (direction === "outbound") return null;
+
+  const inboundFallbackUrl = getFirstString(payload, [
+    ["data", "attendee", "profile_url"],
+    ["data", "attendee", "profileUrl"],
+    ["data", "attendee", "linkedin_url"],
+    ["data", "attendee", "linkedinUrl"],
+    ["data", "contact", "profile_url"],
+    ["data", "contact", "profileUrl"],
+    ["data", "contact", "linkedin_url"],
+    ["data", "contact", "linkedinUrl"],
     ["contact", "linkedin_url"],
     ["contact", "profile_url"],
     ["participant", "linkedin_url"],
     ["participant", "profile_url"],
   ]);
 
-  return normalizeLinkedInUrl(url);
+  return normalizeLinkedInUrl(inboundFallbackUrl);
 }
 
 export function parseUnipileMessage(payloadInput: unknown): ParsedUnipileMessage {
   const payload = toJsonObject(payloadInput);
+  const direction = extractDirection(payload);
 
   const text =
     getFirstString(payload, [
@@ -259,28 +269,32 @@ export function parseUnipileMessage(payloadInput: unknown): ParsedUnipileMessage
     ]),
     sentAtIso: extractTimestamp(payload),
     text,
-    direction: extractDirection(payload),
+    direction,
     senderName:
-      getFirstString(payload, [
-        ["data", "sender", "name"],
-        ["data", "sender", "full_name"],
-        ["data", "sender", "fullName"],
-        ["data", "sender", "display_name"],
-        ["data", "sender", "displayName"],
-        ["data", "attendee", "name"],
-        ["data", "attendee", "full_name"],
-        ["data", "attendee", "fullName"],
-        ["data", "contact", "name"],
-        ["data", "contact", "full_name"],
-        ["data", "contact", "fullName"],
-        ["sender_name"],
-        ["senderName"],
-        ["sender", "name"],
-        ["author", "name"],
-        ["from", "name"],
-        ["contact", "name"],
-      ]) ?? null,
-    senderLinkedInUrl: extractSenderLinkedInUrl(payload),
+      direction === "outbound"
+        ? null
+        : (getFirstString(payload, [
+            ["data", "sender", "name"],
+            ["data", "sender", "full_name"],
+            ["data", "sender", "fullName"],
+            ["data", "sender", "display_name"],
+            ["data", "sender", "displayName"],
+            ["sender_name"],
+            ["senderName"],
+            ["sender", "name"],
+            ["author", "name"],
+            ["from", "name"],
+          ]) ??
+          (getFirstString(payload, [
+            ["data", "attendee", "name"],
+            ["data", "attendee", "full_name"],
+            ["data", "attendee", "fullName"],
+            ["data", "contact", "name"],
+            ["data", "contact", "full_name"],
+            ["data", "contact", "fullName"],
+            ["contact", "name"],
+          ]) ?? null)),
+    senderLinkedInUrl: extractSenderLinkedInUrl(payload, direction),
   };
 }
 

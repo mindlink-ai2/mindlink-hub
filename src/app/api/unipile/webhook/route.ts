@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { extractLinkedInProfileSlug, normalizeLinkedInUrl } from "@/lib/linkedin-url";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import { saveAttendeeAvatarToStorage } from "@/lib/unipile-avatar-storage";
+import { ensureThreadAndSendMessage } from "@/lib/inbox-send";
 import {
   extractSenderAttendeeId,
   resolveAttendeeForMessage,
@@ -27,6 +28,11 @@ type MatchResult = {
   uncertain: boolean;
   matchedLinkedInUrl: string | null;
   matchedSlug: string | null;
+};
+
+type AcceptedResolution = {
+  invitationId: string | null;
+  leadId: number | string;
 };
 
 type InboxThreadRow = {
@@ -317,6 +323,147 @@ async function resolveClientId(
     supabase,
     unipileAccountId,
   });
+}
+
+async function isClientFullActivePlan(
+  supabase: SupabaseClient,
+  clientId: string
+): Promise<boolean> {
+  const { data: client, error } = await supabase
+    .from("clients")
+    .select("plan, subscription_status")
+    .eq("id", clientId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !client) {
+    if (error) console.error("UNIPILE_WEBHOOK_CLIENT_PLAN_LOOKUP_ERROR:", error);
+    return false;
+  }
+
+  const plan = String(client.plan ?? "").trim().toLowerCase();
+  const subscriptionStatus = String(client.subscription_status ?? "")
+    .trim()
+    .toLowerCase();
+  return plan === "full" && subscriptionStatus === "active";
+}
+
+async function autoSendDraftAfterAccepted(params: {
+  supabase: SupabaseClient;
+  clientId: string;
+  invitationId: string;
+  leadId: number | string;
+  unipileAccountId: string;
+  payload: JsonObject;
+}) {
+  const { supabase, clientId, invitationId, leadId, unipileAccountId, payload } = params;
+
+  const isFullActive = await isClientFullActivePlan(supabase, clientId);
+  if (!isFullActive) return;
+
+  const provisionalSentAt = new Date().toISOString();
+  const { data: claimedInvitation, error: claimErr } = await supabase
+    .from("linkedin_invitations")
+    .update({
+      dm_draft_status: "sent",
+      dm_sent_at: provisionalSentAt,
+      last_error: null,
+    })
+    .eq("id", invitationId)
+    .eq("client_id", clientId)
+    .eq("dm_draft_status", "draft")
+    .is("dm_sent_at", null)
+    .select("id, dm_draft_text")
+    .limit(1)
+    .maybeSingle();
+
+  if (claimErr) {
+    console.error("UNIPILE_WEBHOOK_AUTO_SEND_CLAIM_ERROR:", claimErr);
+    return;
+  }
+
+  if (!claimedInvitation?.id) {
+    return;
+  }
+
+  const draftText =
+    typeof claimedInvitation.dm_draft_text === "string"
+      ? claimedInvitation.dm_draft_text.trim()
+      : "";
+  if (!draftText) {
+    await supabase
+      .from("linkedin_invitations")
+      .update({
+        dm_draft_status: "none",
+        dm_sent_at: null,
+        last_error: "draft_text_empty",
+      })
+      .eq("id", invitationId)
+      .eq("client_id", clientId);
+    return;
+  }
+
+  const linkedinProviderId = getFirstString(payload, [
+    ["provider_id"],
+    ["providerId"],
+    ["attendee", "provider_id"],
+    ["attendee", "providerId"],
+    ["sender", "provider_id"],
+    ["sender", "providerId"],
+    ["data", "provider_id"],
+    ["data", "providerId"],
+    ["data", "attendee", "provider_id"],
+    ["data", "attendee", "providerId"],
+    ["data", "sender", "provider_id"],
+    ["data", "sender", "providerId"],
+  ]);
+
+  const sendResult = await ensureThreadAndSendMessage({
+    supabase,
+    clientId,
+    leadId: String(leadId),
+    accountId: unipileAccountId,
+    linkedinProviderId,
+    text: draftText,
+  });
+
+  if (!sendResult.ok) {
+    const lastError =
+      sendResult.mode === "blocked"
+        ? "NOT_CONNECTED_OR_NOT_MESSAGEABLE"
+        : String(sendResult.error ?? "auto_send_failed");
+
+    await supabase
+      .from("linkedin_invitations")
+      .update({
+        dm_draft_status: "draft",
+        dm_sent_at: null,
+        last_error: lastError,
+      })
+      .eq("id", invitationId)
+      .eq("client_id", clientId);
+    return;
+  }
+
+  const finalSentAt = sendResult.message?.sent_at || provisionalSentAt;
+  await supabase
+    .from("linkedin_invitations")
+    .update({
+      dm_draft_status: "sent",
+      dm_sent_at: finalSentAt,
+      last_error: null,
+    })
+    .eq("id", invitationId)
+    .eq("client_id", clientId);
+
+  await supabase
+    .from("leads")
+    .update({
+      message_sent: true,
+      message_sent_at: finalSentAt,
+    })
+    .eq("id", leadId)
+    .eq("client_id", clientId);
 }
 
 async function logUnipileEvent(params: {
@@ -970,6 +1117,77 @@ async function findLeadForRelation(params: {
   };
 }
 
+async function getLeadInternalMessage(params: {
+  supabase: SupabaseClient;
+  clientId: string;
+  leadId: number | string;
+}): Promise<string | null> {
+  const { supabase, clientId, leadId } = params;
+  const { data: lead } = await supabase
+    .from("leads")
+    .select("internal_message")
+    .eq("client_id", clientId)
+    .eq("id", leadId)
+    .limit(1)
+    .maybeSingle();
+
+  const draftText =
+    typeof lead?.internal_message === "string" ? lead.internal_message.trim() : "";
+  return draftText || null;
+}
+
+async function updateInvitationAcceptedWithDraft(params: {
+  supabase: SupabaseClient;
+  clientId: string;
+  invitationId: string;
+  acceptedAtIso: string;
+  raw: Record<string, unknown>;
+  draftText: string | null;
+}) {
+  const { supabase, clientId, invitationId, acceptedAtIso, raw, draftText } = params;
+
+  const draftAwarePayload: Record<string, unknown> = {
+    status: "accepted",
+    accepted_at: acceptedAtIso,
+    raw,
+    dm_draft_text: draftText,
+    dm_draft_status: draftText ? "draft" : "none",
+    last_error: null,
+  };
+
+  const { error } = await supabase
+    .from("linkedin_invitations")
+    .update(draftAwarePayload)
+    .eq("id", invitationId)
+    .eq("client_id", clientId);
+
+  if (
+    error &&
+    (isMissingColumnError(error, "dm_draft_text") ||
+      isMissingColumnError(error, "dm_draft_status") ||
+      isMissingColumnError(error, "last_error"))
+  ) {
+    const { error: fallbackErr } = await supabase
+      .from("linkedin_invitations")
+      .update({
+        status: "accepted",
+        accepted_at: acceptedAtIso,
+        raw,
+      })
+      .eq("id", invitationId)
+      .eq("client_id", clientId);
+
+    if (fallbackErr) {
+      console.error("UNIPILE_WEBHOOK_RELATION_UPDATE_FALLBACK_ERROR:", fallbackErr);
+    }
+    return;
+  }
+
+  if (error) {
+    console.error("UNIPILE_WEBHOOK_RELATION_UPDATE_DRAFT_ERROR:", error);
+  }
+}
+
 async function markInvitationAccepted(params: {
   supabase: SupabaseClient;
   clientId: string;
@@ -980,6 +1198,7 @@ async function markInvitationAccepted(params: {
 }): Promise<string | null> {
   const { supabase, clientId, leadId, unipileAccountId, payload, match } = params;
   const now = new Date().toISOString();
+  const draftText = await getLeadInternalMessage({ supabase, clientId, leadId });
   const acceptanceRaw = {
     webhook_payload: payload,
     matching: {
@@ -996,7 +1215,7 @@ async function markInvitationAccepted(params: {
     .eq("client_id", clientId)
     .eq("lead_id", leadId)
     .eq("unipile_account_id", unipileAccountId)
-    .in("status", ["sent", "pending"])
+    .in("status", ["queued", "sent", "pending"])
     .order("sent_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -1064,7 +1283,7 @@ async function fallbackAcceptLastSent(params: {
     .select("id, lead_id, raw")
     .eq("client_id", clientId)
     .eq("unipile_account_id", unipileAccountId)
-    .in("status", ["sent", "pending"])
+    .in("status", ["queued", "sent", "pending"])
     .order("sent_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -1073,26 +1292,31 @@ async function fallbackAcceptLastSent(params: {
     return { leadId: null, invitationId: null };
   }
 
-  const { error } = await supabase
-    .from("linkedin_invitations")
-    .update({
-      status: "accepted",
-      accepted_at: now,
-      raw: {
-        invitation: lastSent.raw ?? null,
-        acceptance: {
-          webhook_payload: payload,
-          matching: {
-            strategy: "fallback_last_sent",
-            uncertain: true,
-            normalized_linkedin_url: match.matchedLinkedInUrl,
-            profile_slug: match.matchedSlug,
-          },
+  const draftText = await getLeadInternalMessage({
+    supabase,
+    clientId,
+    leadId: lastSent.lead_id,
+  });
+
+  await updateInvitationAcceptedWithDraft({
+    supabase,
+    clientId,
+    invitationId: String(lastSent.id),
+    acceptedAtIso: now,
+    raw: {
+      invitation: lastSent.raw ?? null,
+      acceptance: {
+        webhook_payload: payload,
+        matching: {
+          strategy: "fallback_last_sent",
+          uncertain: true,
+          normalized_linkedin_url: match.matchedLinkedInUrl,
+          profile_slug: match.matchedSlug,
         },
       },
-    })
-    .eq("id", lastSent.id)
-    .eq("client_id", clientId);
+    },
+    draftText,
+  });
 
   if (error) {
     console.error("UNIPILE_WEBHOOK_RELATION_FALLBACK_UPDATE_ERROR:", error);

@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarDays, CheckCircle2, ChevronRight } from "lucide-react";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
+import MobileLayout from "@/components/mobile/MobileLayout";
+import MobilePageHeader from "@/components/mobile/MobilePageHeader";
+import MobileChipsFilters from "@/components/mobile/MobileChipsFilters";
+import MobileSheet from "@/components/mobile/MobileSheet";
+import MobileSheetHeader from "@/components/mobile/MobileSheetHeader";
+import MobileEmptyState from "@/components/mobile/MobileEmptyState";
+import MobileSkeleton from "@/components/mobile/MobileSkeleton";
 
 type TabKey = "overdue" | "today" | "upcoming";
 
@@ -27,6 +35,11 @@ export default function FollowupsPage() {
 
   // UI state (UX only)
   const [tab, setTab] = useState<TabKey>("overdue");
+  const [mobileDateFilterSheetOpen, setMobileDateFilterSheetOpen] = useState(false);
+  const [mobileDateFilter, setMobileDateFilter] = useState("");
+  const [reprogramDate, setReprogramDate] = useState("");
+  const [reprogramming, setReprogramming] = useState(false);
+  const [reprogramError, setReprogramError] = useState<string | null>(null);
 
   // Fetch all leads with followups
   useEffect(() => {
@@ -88,6 +101,23 @@ export default function FollowupsPage() {
       ? "Relances prévues pour la journée."
       : "Relances planifiées pour les prochains jours.";
 
+  const mobileFilterOptions = useMemo(
+    () => [
+      { key: "overdue" as const, label: "En retard", count: overdue.length },
+      { key: "today" as const, label: "Aujourd'hui", count: todayList.length },
+      { key: "upcoming" as const, label: "À venir", count: upcoming.length },
+    ],
+    [overdue.length, todayList.length, upcoming.length]
+  );
+
+  const mobileActiveData = useMemo(() => {
+    if (!mobileDateFilter) return activeData;
+    const selectedDate = cleanDate(`${mobileDateFilter}T00:00:00.000Z`).getTime();
+    return activeData.filter(
+      (lead) => cleanDate(lead.next_followup_at).getTime() === selectedDate
+    );
+  }, [activeData, mobileDateFilter]);
+
   // 🔵 Fonction : marquer comme répondu (LinkedIn OU Maps)
   const markAsResponded = async (leadId: string | number) => {
     // 🔧 FIX 2 : éviter crash si openLead est null
@@ -106,6 +136,51 @@ export default function FollowupsPage() {
     if (res.ok) {
       setLeads((prev) => prev.filter((l) => l.id !== leadId));
       setOpenLead(null);
+    }
+  };
+
+  const handleReprogramFollowup = async () => {
+    if (!openLead || !reprogramDate || reprogramming) return;
+
+    setReprogramming(true);
+    setReprogramError(null);
+
+    try {
+      const res = await fetch("/api/followups/reprogram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: openLead.id,
+          source: openLead.placeUrl ? "maps" : "linkedin",
+          nextFollowupDate: reprogramDate,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.error ?? "Impossible de reprogrammer la relance.");
+      }
+
+      const nextIso = typeof data?.next_followup_at === "string"
+        ? data.next_followup_at
+        : `${reprogramDate}T08:00:00.000Z`;
+
+      setLeads((prev) =>
+        prev.map((lead) =>
+          String(lead.id) === String(openLead.id)
+            ? { ...lead, next_followup_at: nextIso }
+            : lead
+        )
+      );
+
+      setOpenLead((prev) => (prev ? { ...prev, next_followup_at: nextIso } : prev));
+      setReprogramDate("");
+    } catch (error: unknown) {
+      setReprogramError(
+        error instanceof Error ? error.message : "Impossible de reprogrammer la relance."
+      );
+    } finally {
+      setReprogramming(false);
     }
   };
 
@@ -128,6 +203,24 @@ export default function FollowupsPage() {
     };
   }, [openLead]);
 
+  useEffect(() => {
+    if (!openLead?.next_followup_at) {
+      setReprogramDate("");
+      return;
+    }
+
+    const parsed = new Date(openLead.next_followup_at);
+    if (Number.isNaN(parsed.getTime())) {
+      setReprogramDate("");
+      return;
+    }
+
+    const yyyy = parsed.getFullYear();
+    const mm = `${parsed.getMonth() + 1}`.padStart(2, "0");
+    const dd = `${parsed.getDate()}`.padStart(2, "0");
+    setReprogramDate(`${yyyy}-${mm}-${dd}`);
+  }, [openLead?.id, openLead?.next_followup_at]);
+
   const formatDateFR = (d: unknown) => {
     if (!(typeof d === "string" || typeof d === "number" || d instanceof Date)) {
       return "—";
@@ -140,6 +233,25 @@ export default function FollowupsPage() {
 
   const leadDisplayName = (lead: FollowupLead) =>
     `${lead.FirstName || lead.title || "—"} ${lead.LastName || ""}`.trim();
+
+  const formatFollowupRecency = (d: unknown) => {
+    if (!(typeof d === "string" || typeof d === "number" || d instanceof Date)) return null;
+
+    const target = new Date(d);
+    if (Number.isNaN(target.getTime())) return null;
+
+    const todayStart = cleanDate(today.toISOString());
+    const targetStart = cleanDate(target.toISOString());
+    const diffDays = Math.floor(
+      (targetStart.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (diffDays === 0) return "Aujourd'hui";
+    if (diffDays === 1) return "Demain";
+    if (diffDays > 1) return `Dans ${diffDays}j`;
+    if (diffDays === -1) return "Hier";
+    return `Il y a ${Math.abs(diffDays)}j`;
+  };
 
   const renderLeadCard = (lead: FollowupLead, tone: TabKey) => {
     const toneRing =
@@ -361,9 +473,103 @@ export default function FollowupsPage() {
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <>
-        <div className="relative h-full min-h-0">
+      <div className="relative h-full min-h-0">
+        <MobileLayout>
+          {loaded ? (
+            <>
+              <MobilePageHeader
+                title="Relances"
+                subtitle={`${totalFollowups} relance(s) à suivre`}
+                actions={
+                  <button
+                    type="button"
+                    onClick={() => setMobileDateFilterSheetOpen(true)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#d7e3f4] bg-white px-2.5 text-[11px] font-medium text-[#4b647f] transition hover:bg-[#f7fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                    aria-label="Filtrer par date"
+                  >
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    Date
+                  </button>
+                }
+              />
 
+              <MobileChipsFilters
+                options={mobileFilterOptions}
+                activeKey={tab}
+                onChange={(key) => setTab(key)}
+                ariaLabel="Filtres relances"
+              />
+
+              <div className="rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 py-2 text-[12px] text-[#5f7693]">
+                {activeTitle} · {mobileActiveData.length} résultat(s)
+                {mobileDateFilter ? (
+                  <span className="ml-1">
+                    · {new Date(`${mobileDateFilter}T00:00:00`).toLocaleDateString("fr-FR")}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                {mobileActiveData.length === 0 ? (
+                  <MobileEmptyState
+                    title="Aucune relance"
+                    description="Ajustez vos filtres ou changez de période."
+                    action={
+                      mobileDateFilter ? (
+                        <button
+                          type="button"
+                          onClick={() => setMobileDateFilter("")}
+                          className="inline-flex items-center justify-center rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 py-2 text-[12px] font-medium text-[#35547a] transition hover:bg-[#eef4fd] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                        >
+                          Effacer la date
+                        </button>
+                      ) : null
+                    }
+                  />
+                ) : (
+                  mobileActiveData.map((lead) => {
+                    const followupDate = formatDateFR(lead.next_followup_at);
+                    const recency = formatFollowupRecency(lead.next_followup_at);
+
+                    return (
+                      <button
+                        key={lead.id}
+                        type="button"
+                        onClick={() => setOpenLead(lead)}
+                        className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#d7e3f4] bg-white px-3 py-2 text-left shadow-[0_10px_18px_-18px_rgba(18,43,86,0.68)] transition hover:bg-[#f9fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-[14px] font-medium leading-tight text-[#0b1c33]">
+                              {leadDisplayName(lead)}
+                            </p>
+                            <span className="rounded-full border border-[#d7e3f4] bg-[#f5f9ff] px-2 py-0.5 text-[10px] text-[#4b647f]">
+                              {followupDate}
+                            </span>
+                          </div>
+                          <p className="mt-1 truncate text-[12px] text-[#5f7693]">
+                            {(lead.Company ?? "").trim() || "Entreprise non renseignée"}
+                          </p>
+                          {recency ? (
+                            <p className="mt-0.5 text-[11px] text-[#7a8fa9]">{recency}</p>
+                          ) : null}
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-[#9bb0c8]" />
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <MobilePageHeader title="Relances" subtitle="Chargement des relances..." />
+              <MobileSkeleton rows={8} />
+            </>
+          )}
+        </MobileLayout>
+
+        <div className="hidden md:block">
           <div className="mx-auto h-full min-h-0 w-full max-w-[1680px] px-4 py-6 sm:px-6 sm:py-7">
             {!loaded ? (
               renderSkeleton()
@@ -431,163 +637,280 @@ export default function FollowupsPage() {
               </div>
             )}
           </div>
+        </div>
 
-          {/* Overlay (visual/UX only) */}
-          {openLead && (
-            <div
-              onClick={() => setOpenLead(null)}
-              className="fixed inset-0 z-40 bg-[#081123]/38 backdrop-blur-[2px]"
-            />
-          )}
+        {/* Overlay (visual/UX only) */}
+        {openLead && (
+          <div
+            onClick={() => setOpenLead(null)}
+            className="fixed inset-0 z-40 hidden bg-[#081123]/38 backdrop-blur-[2px] md:block"
+          />
+        )}
 
-          {/* SIDEBAR */}
-          {openLead && (
-            <div
-              className="
-                fixed right-0 top-0 h-full w-full sm:w-[420px]
-                bg-white z-50
-                border-l border-[#d7e3f4]
-                shadow-[0_18px_42px_-22px_rgba(18,43,86,0.45)]
-                animate-slideLeft
-              "
-              role="dialog"
-              aria-modal="true"
-            >
-              <div className="h-full flex flex-col">
-                {/* Top bar */}
-                <div className="border-b border-[#d7e3f4] bg-[#f8fbff] p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs text-[#51627b]">
-                        Détail de la relance
-                      </p>
-                      <h2 className="mt-1 truncate text-xl font-semibold text-[#0b1c33]">
-                        {openLead.FirstName || openLead.title}{" "}
-                        {openLead.LastName || ""}
-                      </h2>
-                      <p className="mt-1 text-sm text-[#51627b]">
-                        Prochaine relance :{" "}
-                        <span className="font-medium text-[#0b1c33]">
-                          {formatDateFR(openLead.next_followup_at)}
-                        </span>
-                      </p>
-                    </div>
-
-                    <HubButton variant="ghost" size="sm" onClick={() => setOpenLead(null)}>
-                      Fermer
-                    </HubButton>
+        {/* Desktop sidebar */}
+        {openLead && (
+          <div
+            className="
+              fixed right-0 top-0 z-50 hidden h-full w-full
+              border-l border-[#d7e3f4] bg-white shadow-[0_18px_42px_-22px_rgba(18,43,86,0.45)]
+              animate-slideLeft md:block sm:w-[420px]
+            "
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="h-full flex flex-col">
+              {/* Top bar */}
+              <div className="border-b border-[#d7e3f4] bg-[#f8fbff] p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-[#51627b]">
+                      Détail de la relance
+                    </p>
+                    <h2 className="mt-1 truncate text-xl font-semibold text-[#0b1c33]">
+                      {openLead.FirstName || openLead.title}{" "}
+                      {openLead.LastName || ""}
+                    </h2>
+                    <p className="mt-1 text-sm text-[#51627b]">
+                      Prochaine relance :{" "}
+                      <span className="font-medium text-[#0b1c33]">
+                        {formatDateFR(openLead.next_followup_at)}
+                      </span>
+                    </p>
                   </div>
 
-                  {/* Primary CTA */}
-                  <HubButton
-                    onClick={() => markAsResponded(openLead.id)}
-                    variant="primary"
-                    size="lg"
-                    className="mt-4 w-full"
-                  >
-                    Marquer comme répondu ✓
+                  <HubButton variant="ghost" size="sm" onClick={() => setOpenLead(null)}>
+                    Fermer
                   </HubButton>
-
-                  <p className="mt-2 text-[11px] text-[#51627b]">
-                    Astuce : appuyez sur{" "}
-                    <span className="text-[#1f5eff]">Échap</span> pour fermer.
-                  </p>
                 </div>
 
-                {/* Content */}
-                <div className="p-5 overflow-y-auto">
-                  <div className="hub-card-soft p-4">
-                    <div className="space-y-3 text-sm text-[#0b1c33]">
-                      {openLead.Company && (
-                        <p className="text-[#0b1c33]">
-                          <span className="text-[#51627b]">Entreprise</span>
-                          <br />
-                          <strong className="font-semibold text-[#0b1c33]">
-                            {openLead.Company}
-                          </strong>
-                        </p>
-                      )}
+                {/* Primary CTA */}
+                <HubButton
+                  onClick={() => markAsResponded(openLead.id)}
+                  variant="primary"
+                  size="lg"
+                  className="mt-4 w-full"
+                >
+                  Marquer comme répondu ✓
+                </HubButton>
 
-                      {openLead.email && (
-                        <p>
-                          <span className="text-[#51627b]">Email</span>
-                          <br />
-                          <span className="text-[#0b1c33]">{openLead.email}</span>
-                        </p>
-                      )}
+                <p className="mt-2 text-[11px] text-[#51627b]">
+                  Astuce : appuyez sur{" "}
+                  <span className="text-[#1f5eff]">Échap</span> pour fermer.
+                </p>
+              </div>
 
-                      {openLead.phoneNumber && (
-                        <p>
-                          <span className="text-[#51627b]">Téléphone</span>
-                          <br />
-                          <span className="text-[#0b1c33]">
-                            {openLead.phoneNumber}
-                          </span>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-1 gap-3">
-                    {openLead.LinkedInURL && (
-                      <a
-                        href={openLead.LinkedInURL}
-                        className="
-                          group rounded-xl border border-[#c8d6ea]
-                          bg-[#f7fbff] px-4 py-3
-                          hover:border-[#9cc0ff] hover:bg-[#f3f8ff]
-                          transition
-                        "
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs text-[#51627b]">Lien</p>
-                            <p className="text-sm font-semibold text-[#0b1c33]">
-                              LinkedIn
-                            </p>
-                          </div>
-                          <span className="text-[#6a7f9f] transition group-hover:text-[#36598a]">
-                            Voir →
-                          </span>
-                        </div>
-                      </a>
+              {/* Content */}
+              <div className="overflow-y-auto p-5">
+                <div className="hub-card-soft p-4">
+                  <div className="space-y-3 text-sm text-[#0b1c33]">
+                    {openLead.Company && (
+                      <p className="text-[#0b1c33]">
+                        <span className="text-[#51627b]">Entreprise</span>
+                        <br />
+                        <strong className="font-semibold text-[#0b1c33]">
+                          {openLead.Company}
+                        </strong>
+                      </p>
                     )}
 
-                    {openLead.placeUrl && (
-                      <a
-                        href={openLead.placeUrl}
-                        className="
-                          group rounded-xl border border-[#c8d6ea]
-                          bg-[#f7fbff] px-4 py-3
-                          hover:border-[#9cc0ff] hover:bg-[#f3f8ff]
-                          transition
-                        "
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs text-[#51627b]">Lien</p>
-                            <p className="text-sm font-semibold text-[#0b1c33]">
-                              Google Maps
-                            </p>
-                          </div>
-                          <span className="text-[#6a7f9f] transition group-hover:text-[#36598a]">
-                            Ouvrir →
-                          </span>
-                        </div>
-                      </a>
+                    {openLead.email && (
+                      <p>
+                        <span className="text-[#51627b]">Email</span>
+                        <br />
+                        <span className="text-[#0b1c33]">{openLead.email}</span>
+                      </p>
+                    )}
+
+                    {openLead.phoneNumber && (
+                      <p>
+                        <span className="text-[#51627b]">Téléphone</span>
+                        <br />
+                        <span className="text-[#0b1c33]">
+                          {openLead.phoneNumber}
+                        </span>
+                      </p>
                     )}
                   </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3">
+                  {openLead.LinkedInURL && (
+                    <a
+                      href={openLead.LinkedInURL}
+                      className="
+                        group rounded-xl border border-[#c8d6ea]
+                        bg-[#f7fbff] px-4 py-3
+                        hover:border-[#9cc0ff] hover:bg-[#f3f8ff]
+                        transition
+                      "
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-[#51627b]">Lien</p>
+                          <p className="text-sm font-semibold text-[#0b1c33]">
+                            LinkedIn
+                          </p>
+                        </div>
+                        <span className="text-[#6a7f9f] transition group-hover:text-[#36598a]">
+                          Voir →
+                        </span>
+                      </div>
+                    </a>
+                  )}
+
+                  {openLead.placeUrl && (
+                    <a
+                      href={openLead.placeUrl}
+                      className="
+                        group rounded-xl border border-[#c8d6ea]
+                        bg-[#f7fbff] px-4 py-3
+                        hover:border-[#9cc0ff] hover:bg-[#f3f8ff]
+                        transition
+                      "
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-[#51627b]">Lien</p>
+                          <p className="text-sm font-semibold text-[#0b1c33]">
+                            Google Maps
+                          </p>
+                        </div>
+                        <span className="text-[#6a7f9f] transition group-hover:text-[#36598a]">
+                          Ouvrir →
+                        </span>
+                      </div>
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-      </>
+        <MobileSheet open={Boolean(openLead)} onClose={() => setOpenLead(null)}>
+          {openLead ? (
+            <>
+              <MobileSheetHeader
+                title={leadDisplayName(openLead)}
+                subtitle="Fiche prospect"
+                onClose={() => setOpenLead(null)}
+              />
+              <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+                <div className="rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 py-3">
+                  <p className="text-[12px] text-[#607894]">Prochaine relance</p>
+                  <p className="mt-1 text-[14px] font-medium text-[#0b1c33]">
+                    {formatDateFR(openLead.next_followup_at)}
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#7a8fa9]">
+                    {formatFollowupRecency(openLead.next_followup_at) ?? "Date à confirmer"}
+                  </p>
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-[#d7e3f4] bg-white px-3 py-3">
+                  <p className="text-[12px] text-[#607894]">Coordonnées</p>
+                  <p className="text-[13px] text-[#0b1c33]">
+                    {(openLead.Company ?? "").trim() || "Entreprise non renseignée"}
+                  </p>
+                  {openLead.email ? (
+                    <a className="block truncate text-[13px] text-[#1f5eff]" href={`mailto:${openLead.email}`}>
+                      {openLead.email}
+                    </a>
+                  ) : null}
+                  {openLead.phoneNumber ? (
+                    <a className="block text-[13px] text-[#1f5eff]" href={`tel:${openLead.phoneNumber}`}>
+                      {openLead.phoneNumber}
+                    </a>
+                  ) : null}
+                  {openLead.LinkedInURL ? (
+                    <a
+                      href={openLead.LinkedInURL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex text-[12px] font-medium text-[#1f5eff]"
+                    >
+                      Ouvrir LinkedIn
+                    </a>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-[#d7e3f4] bg-white px-3 py-3">
+                  <p className="text-[12px] text-[#607894]">Reprogrammer</p>
+                  <input
+                    type="date"
+                    value={reprogramDate}
+                    onChange={(event) => setReprogramDate(event.target.value)}
+                    className="h-10 w-full rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 text-[13px] text-[#0b1c33] outline-none transition focus:border-[#9ec0ff] focus:ring-2 focus:ring-[#dce8ff]"
+                  />
+                  {reprogramError ? (
+                    <p className="text-[11px] text-red-600">{reprogramError}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="sticky bottom-0 border-t border-[#d7e3f4] bg-white px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleReprogramFollowup}
+                    disabled={!reprogramDate || reprogramming}
+                    className="inline-flex h-10 flex-1 items-center justify-center rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 text-[13px] font-medium text-[#34527a] transition hover:bg-[#eef4fd] focus:outline-none focus:ring-2 focus:ring-[#dce8ff] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {reprogramming ? "Reprogrammation..." : "Reprogrammer"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void markAsResponded(openLead.id)}
+                    className="inline-flex h-10 flex-1 items-center justify-center gap-1 rounded-xl border border-[#1f5eff] bg-[#1f5eff] px-3 text-[13px] font-medium text-white transition hover:bg-[#174dd4] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Marquer fait
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </MobileSheet>
+
+        <MobileSheet
+          open={mobileDateFilterSheetOpen}
+          onClose={() => setMobileDateFilterSheetOpen(false)}
+          panelClassName="top-[40svh]"
+        >
+          <MobileSheetHeader
+            title="Filtrer par date"
+            subtitle="Affinez la liste des relances"
+            onClose={() => setMobileDateFilterSheetOpen(false)}
+          />
+          <div className="flex-1 space-y-3 px-4 py-4">
+            <input
+              type="date"
+              value={mobileDateFilter}
+              onChange={(event) => setMobileDateFilter(event.target.value)}
+              className="h-10 w-full rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 text-[13px] text-[#0b1c33] outline-none transition focus:border-[#9ec0ff] focus:ring-2 focus:ring-[#dce8ff]"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMobileDateFilter("")}
+                className="inline-flex h-9 flex-1 items-center justify-center rounded-xl border border-[#d7e3f4] bg-white text-[12px] font-medium text-[#4b647f] transition hover:bg-[#f7fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+              >
+                Réinitialiser
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileDateFilterSheetOpen(false)}
+                className="inline-flex h-9 flex-1 items-center justify-center rounded-xl border border-[#1f5eff] bg-[#1f5eff] text-[12px] font-medium text-white transition hover:bg-[#174dd4] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+              >
+                Appliquer
+              </button>
+            </div>
+          </div>
+        </MobileSheet>
+      </div>
     </SubscriptionGate>
   );
 }

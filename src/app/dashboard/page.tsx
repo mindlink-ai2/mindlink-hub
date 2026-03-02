@@ -422,124 +422,174 @@ export default function DashboardPage() {
               ) : filteredItems.length === 0 ? (
                 <div className="px-5 py-10 text-sm text-[#51627b]">Aucun élément.</div>
               ) : (
-                <div className="overflow-x-auto">
-                  {!isFollowupsView ? (
-                    <table className="w-full border-separate border-spacing-0 text-sm">
-                      <thead>
-                        <tr className="bg-[#f8fbff] text-[11px] uppercase tracking-wide text-[#51627b]">
-                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">Source</th>
-                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">Nom</th>
-                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">
-                            Informations
-                          </th>
-                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-center">Traité</th>
-                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-center">Date</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredItems.map((it) => {
-                          const src = it?.source === "maps" ? "maps" : "linkedin";
-                          const sourceLabel = src === "maps" ? "Maps" : "LinkedIn";
+                <div>
+                  <div className="hidden overflow-x-auto md:block">
+                    {!isFollowupsView ? (
+                      <table className="w-full border-separate border-spacing-0 text-sm">
+                        <thead>
+                          <tr className="bg-[#f8fbff] text-[11px] uppercase tracking-wide text-[#51627b]">
+                            <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">Source</th>
+                            <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">Nom</th>
+                            <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">
+                              Informations
+                            </th>
+                            <th className="border-b border-[#d7e3f4] px-4 py-3 text-center">Traité</th>
+                            <th className="border-b border-[#d7e3f4] px-4 py-3 text-center">Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredItems.map((it) => {
+                            const src = it?.source === "maps" ? "maps" : "linkedin";
+                            const sourceLabel = src === "maps" ? "Maps" : "LinkedIn";
 
-                          const name =
-                            src === "maps"
-                              ? it?.title || "—"
-                              : (
-                                  `${it?.FirstName ?? ""} ${it?.LastName ?? ""}`.trim() ||
-                                  it?.Name ||
-                                  "—"
-                                );
+                            const name =
+                              src === "maps"
+                                ? it?.title || "—"
+                                : (
+                                    `${it?.FirstName ?? ""} ${it?.LastName ?? ""}`.trim() ||
+                                    it?.Name ||
+                                    "—"
+                                  );
 
-                          const details =
-                            src === "maps"
-                              ? it?.phoneNumber || it?.website || "—"
-                              : it?.Company || it?.location || "—";
+                            const details =
+                              src === "maps"
+                                ? it?.phoneNumber || it?.website || "—"
+                                : it?.Company || it?.location || "—";
 
-                          return (
-                            <tr
-                              key={`${it?.source ?? "x"}-${it?.id}`}
-                              onClick={() => openFromRow(it)}
-                              className="cursor-pointer border-b border-[#e4edf8] transition hover:bg-[#f8fbff]"
-                            >
-                              <td className="px-4 py-3 text-[#51627b]">
+                            return (
+                              <tr
+                                key={`${it?.source ?? "x"}-${it?.id}`}
+                                onClick={() => openFromRow(it)}
+                                className="cursor-pointer border-b border-[#e4edf8] transition hover:bg-[#f8fbff]"
+                              >
+                                <td className="px-4 py-3 text-[#51627b]">
+                                  <SourceBadge value={sourceLabel} variant={src} />
+                                </td>
+                                <td className="px-4 py-3 text-[#0b1c33]">
+                                  {name}
+                                  <div className="mt-0.5 text-[11px] text-[#51627b]">Ouvrir →</div>
+                                </td>
+                                <td className="px-4 py-3 text-[#51627b]">{details}</td>
+                                <td className="px-4 py-3 text-center text-[#51627b]">
+                                  {it?.traite ? "Oui" : "Non"}
+                                </td>
+                                <td className="px-4 py-3 text-center text-[#51627b]">
+                                  {it?.created_at
+                                    ? new Date(it.created_at).toLocaleDateString("fr-FR")
+                                    : "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <table className="w-full border-separate border-spacing-0 text-sm">
+                        <thead>
+                          <tr className="bg-[#f8fbff] text-[11px] uppercase tracking-wide text-[#51627b]">
+                            <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">Source</th>
+                            <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">Nom</th>
+                            <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">
+                              Informations
+                            </th>
+                            <th className="border-b border-[#d7e3f4] px-4 py-3 text-center">
+                              Prochaine relance
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredItems.map((it) => {
+                            const src = it?.source === "maps" ? "maps" : "linkedin";
+                            const sourceLabel = src === "maps" ? "Maps" : "LinkedIn";
+
+                            const name =
+                              src === "maps"
+                                ? it?.title || "—"
+                                : (
+                                    `${it?.FirstName ?? ""} ${it?.LastName ?? ""}`.trim() ||
+                                    it?.Name ||
+                                    "—"
+                                  );
+
+                            const details =
+                              src === "maps"
+                                ? it?.phoneNumber || it?.website || "—"
+                                : it?.Company || it?.location || "—";
+
+                            return (
+                              <tr
+                                key={`${it?.source ?? "x"}-${it?.id}`}
+                                onClick={() => openFromRow(it)}
+                                className="cursor-pointer border-b border-[#e4edf8] transition hover:bg-[#f8fbff]"
+                              >
+                                <td className="px-4 py-3 text-[#51627b]">
+                                  <SourceBadge value={sourceLabel} variant={src} />
+                                </td>
+                                <td className="px-4 py-3 text-[#0b1c33]">
+                                  {name}
+                                  <div className="mt-0.5 text-[11px] text-[#51627b]">Ouvrir →</div>
+                                </td>
+                                <td className="px-4 py-3 text-[#51627b]">{details}</td>
+                                <td className="px-4 py-3 text-center text-[#51627b]">
+                                  {it?.next_followup_at
+                                    ? new Date(it.next_followup_at).toLocaleDateString("fr-FR")
+                                    : "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 p-3 md:hidden">
+                    {filteredItems.map((it) => {
+                      const src = it?.source === "maps" ? "maps" : "linkedin";
+                      const sourceLabel = src === "maps" ? "Maps" : "LinkedIn";
+                      const name =
+                        src === "maps"
+                          ? it?.title || "—"
+                          : (`${it?.FirstName ?? ""} ${it?.LastName ?? ""}`.trim() || it?.Name || "—");
+                      const details =
+                        src === "maps"
+                          ? it?.phoneNumber || it?.website || "—"
+                          : it?.Company || it?.location || "—";
+
+                      return (
+                        <button
+                          key={`${it?.source ?? "x"}-${it?.id}-mobile`}
+                          type="button"
+                          onClick={() => openFromRow(it)}
+                          className="w-full rounded-xl border border-[#d7e3f4] bg-white px-3 py-2 text-left shadow-[0_10px_18px_-18px_rgba(18,43,86,0.68)] transition hover:bg-[#f9fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
                                 <SourceBadge value={sourceLabel} variant={src} />
-                              </td>
-                              <td className="px-4 py-3 text-[#0b1c33]">
-                                {name}
-                                <div className="mt-0.5 text-[11px] text-[#51627b]">Ouvrir →</div>
-                              </td>
-                              <td className="px-4 py-3 text-[#51627b]">{details}</td>
-                              <td className="px-4 py-3 text-center text-[#51627b]">
-                                {it?.traite ? "Oui" : "Non"}
-                              </td>
-                              <td className="px-4 py-3 text-center text-[#51627b]">
-                                {it?.created_at
-                                  ? new Date(it.created_at).toLocaleDateString("fr-FR")
-                                  : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <table className="w-full border-separate border-spacing-0 text-sm">
-                      <thead>
-                        <tr className="bg-[#f8fbff] text-[11px] uppercase tracking-wide text-[#51627b]">
-                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">Source</th>
-                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">Nom</th>
-                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-left">
-                            Informations
-                          </th>
-                          <th className="border-b border-[#d7e3f4] px-4 py-3 text-center">
-                            Prochaine relance
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredItems.map((it) => {
-                          const src = it?.source === "maps" ? "maps" : "linkedin";
-                          const sourceLabel = src === "maps" ? "Maps" : "LinkedIn";
-
-                          const name =
-                            src === "maps"
-                              ? it?.title || "—"
-                              : (
-                                  `${it?.FirstName ?? ""} ${it?.LastName ?? ""}`.trim() ||
-                                  it?.Name ||
-                                  "—"
-                                );
-
-                          const details =
-                            src === "maps"
-                              ? it?.phoneNumber || it?.website || "—"
-                              : it?.Company || it?.location || "—";
-
-                          return (
-                            <tr
-                              key={`${it?.source ?? "x"}-${it?.id}`}
-                              onClick={() => openFromRow(it)}
-                              className="cursor-pointer border-b border-[#e4edf8] transition hover:bg-[#f8fbff]"
-                            >
-                              <td className="px-4 py-3 text-[#51627b]">
-                                <SourceBadge value={sourceLabel} variant={src} />
-                              </td>
-                              <td className="px-4 py-3 text-[#0b1c33]">
-                                {name}
-                                <div className="mt-0.5 text-[11px] text-[#51627b]">Ouvrir →</div>
-                              </td>
-                              <td className="px-4 py-3 text-[#51627b]">{details}</td>
-                              <td className="px-4 py-3 text-center text-[#51627b]">
-                                {it?.next_followup_at
-                                  ? new Date(it.next_followup_at).toLocaleDateString("fr-FR")
-                                  : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
+                                <p className="truncate text-[13px] font-medium text-[#0b1c33]">{name}</p>
+                              </div>
+                              <p className="mt-1 truncate text-[12px] text-[#51627b]">{details}</p>
+                              <p className="mt-1 text-[11px] text-[#8093ad]">
+                                {isFollowupsView
+                                  ? `Relance: ${
+                                      it?.next_followup_at
+                                        ? new Date(it.next_followup_at).toLocaleDateString("fr-FR")
+                                        : "—"
+                                    }`
+                                  : `Créé le ${
+                                      it?.created_at
+                                        ? new Date(it.created_at).toLocaleDateString("fr-FR")
+                                        : "—"
+                                    }`}
+                              </p>
+                            </div>
+                            <span className="text-[12px] text-[#7a8fa9]">Ouvrir</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
