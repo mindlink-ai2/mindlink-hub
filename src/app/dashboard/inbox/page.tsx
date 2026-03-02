@@ -4,7 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Linkedin } from "lucide-react";
+import { ChevronRight, Linkedin, Search } from "lucide-react";
+import MobileLayout from "@/components/mobile/MobileLayout";
+import MobilePageHeader from "@/components/mobile/MobilePageHeader";
+import MobileSheet from "@/components/mobile/MobileSheet";
+import MobileSheetHeader from "@/components/mobile/MobileSheetHeader";
+import MobileEmptyState from "@/components/mobile/MobileEmptyState";
+import MobileSkeleton from "@/components/mobile/MobileSkeleton";
 
 type InboxThread = {
   id: string;
@@ -158,7 +164,6 @@ export default function InboxPage() {
   const [threads, setThreads] = useState<InboxThread[]>([]);
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
-  const [mobilePanel, setMobilePanel] = useState<"threads" | "messages">("threads");
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -170,8 +175,10 @@ export default function InboxPage() {
   const [mobileThreadSheetOpen, setMobileThreadSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
-  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
-  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [sendingDraft, setSendingDraft] = useState(false);
+  const desktopMessagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const mobileMessagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const mobileComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const shouldScrollToBottomRef = useRef(false);
   const loadedMessagesThreadIdRef = useRef<string | null>(null);
   const syncInFlightRef = useRef(false);
@@ -358,12 +365,6 @@ export default function InboxPage() {
   }, [selectedThreadId]);
 
   useEffect(() => {
-    if (!selectedThreadId) {
-      setMobilePanel("threads");
-    }
-  }, [selectedThreadId]);
-
-  useEffect(() => {
     if (!selectedThreadId || loadingMessages) return;
     if (!shouldScrollToBottomRef.current) return;
     if (loadedMessagesThreadIdRef.current !== selectedThreadId) return;
@@ -376,43 +377,32 @@ export default function InboxPage() {
   }, [selectedThreadId, loadingMessages, messages, scrollMessagesToBottom]);
 
   useEffect(() => {
-    if (mobilePanel !== "messages" || !selectedThreadId || loadingMessages) return;
+    if (!mobileThreadSheetOpen || !selectedThreadId || loadingMessages) return;
+    if (loadedMessagesThreadIdRef.current !== selectedThreadId) return;
+
     window.requestAnimationFrame(() => {
       scrollMessagesToBottom("auto");
+      window.setTimeout(() => scrollMessagesToBottom("auto"), 60);
     });
-  }, [mobilePanel, selectedThreadId, loadingMessages, scrollMessagesToBottom]);
+  }, [mobileThreadSheetOpen, selectedThreadId, loadingMessages, scrollMessagesToBottom]);
 
   useEffect(() => {
-    if (mobilePanel !== "messages" || !selectedThreadId) return;
-    const firstTick = window.setTimeout(() => {
-      scrollMessagesToBottom("auto");
-    }, 0);
-    const secondTick = window.setTimeout(() => {
-      scrollMessagesToBottom("auto");
-    }, 120);
-    return () => {
-      window.clearTimeout(firstTick);
-      window.clearTimeout(secondTick);
-    };
-  }, [mobilePanel, selectedThreadId, messages.length, scrollMessagesToBottom]);
+    if (!mobileThreadSheetOpen || !selectedThreadId) return;
 
-  useEffect(() => {
-    if (!selectedThreadId || loadingMessages) return;
-    if (typeof window === "undefined") return;
-    if (!window.matchMedia("(min-width: 1024px)").matches) return;
+    const isMobileViewport =
+      typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+    if (!isMobileViewport) return;
 
-    const scrollTick = window.setTimeout(() => {
-      scrollMessagesToBottom("auto");
-    }, 40);
-    const focusTick = window.setTimeout(() => {
-      composerTextareaRef.current?.focus();
-    }, 80);
-
-    return () => {
-      window.clearTimeout(scrollTick);
-      window.clearTimeout(focusTick);
-    };
-  }, [selectedThreadId, loadingMessages, messages.length, scrollMessagesToBottom]);
+    window.requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        const textarea = mobileComposerRef.current;
+        if (!textarea) return;
+        textarea.focus({ preventScroll: true });
+        const length = textarea.value.length;
+        textarea.setSelectionRange(length, length);
+      }, 80);
+    });
+  }, [mobileThreadSheetOpen, selectedThreadId]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -684,30 +674,74 @@ export default function InboxPage() {
     }
   };
 
-  const mobileMessagesOpen = mobilePanel === "messages";
+  const handleSendDraft = async () => {
+    if (!selectedThreadId || !selectedThreadHasDraft || sendingDraft) return;
+    setSendingDraft(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/inbox/send-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threadDbId: selectedThreadId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success !== true) {
+        throw new Error(data?.error ?? "send_draft_failed");
+      }
+
+      const sentAt = String(data?.message?.sent_at ?? new Date().toISOString());
+      const text = String(data?.message?.text ?? selectedThread?.dm_draft_text ?? "").trim();
+
+      if (text) {
+        loadedMessagesThreadIdRef.current = selectedThreadId;
+        shouldScrollToBottomRef.current = true;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `local-draft-${Date.now()}`,
+            unipile_message_id: String(data?.message?.unipile_message_id ?? ""),
+            direction: "outbound",
+            sender_name: null,
+            sender_linkedin_url: null,
+            text,
+            sent_at: sentAt,
+            raw: { delivery_status: "delivered", source: "draft_send" },
+          },
+        ]);
+      }
+
+      setThreads((prev) =>
+        sortThreadsByLastMessage(
+          prev.map((thread) =>
+            thread.id === selectedThreadId
+              ? {
+                  ...thread,
+                  last_message_at: sentAt,
+                  last_message_preview: text || thread.last_message_preview,
+                  dm_draft_status: "sent",
+                }
+              : thread
+          )
+        )
+      );
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erreur pendant l'envoi du draft.");
+    } finally {
+      setSendingDraft(false);
+    }
+  };
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
-      <div className="h-full min-h-0 px-4 pb-6 pt-4 sm:px-6 sm:pb-14 sm:pt-5">
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-3">
-          <section
-            className={[
-              "hub-card-hero p-3 sm:p-4",
-              mobileMessagesOpen ? "hidden lg:block" : "",
-            ].join(" ")}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h1 className="hub-page-title mt-1 text-3xl md:text-4xl">
-                  Messagerie LinkedIn
-                </h1>
-                <p className="mt-1 text-xs text-[#51627b] sm:text-sm">
-                  Vos conversations sont centralisées et à jour en temps réel.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <HubButton
+      <div className="flex h-full min-h-0 flex-col px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
+        <div className="mx-auto flex min-h-0 w-full max-w-[1680px] flex-1 flex-col gap-3">
+          <MobileLayout>
+            <MobilePageHeader
+              title="Messagerie LinkedIn"
+              subtitle={`${threads.length} conversation(s) · ${unreadThreadsCount} non lue(s)`}
+              actions={
+                <button
                   type="button"
                   onClick={handleSync}
                   disabled={syncing}
@@ -764,20 +798,74 @@ export default function InboxPage() {
               </div>
             ) : null}
 
-          <section
-            className={[
-              "grid min-h-0 flex-1 gap-3 lg:grid-cols-[330px_minmax(0,1fr)]",
-              mobileMessagesOpen ? "overflow-hidden lg:overflow-visible" : "",
-            ].join(" ")}
-          >
-            <div
-              className={[
-                "hub-card min-h-0 flex-col overflow-hidden",
-                mobilePanel === "messages" ? "hidden lg:flex" : "flex",
-              ].join(" ")}
-            >
-              <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
-                <h2 className="text-sm font-semibold text-[#0b1c33]">Conversations</h2>
+            {loadingThreads ? (
+              <MobileSkeleton rows={8} />
+            ) : mobileFilteredThreads.length === 0 ? (
+              <MobileEmptyState
+                title="Aucune conversation"
+                description={
+                  threads.length === 0
+                    ? "La synchronisation n'a encore ramené aucun thread."
+                    : mobileThreadFilter === "unread"
+                      ? "Aucune conversation non lue pour ce filtre."
+                      : "Aucune conversation ne correspond à cette recherche."
+                }
+              />
+            ) : (
+              <div className="space-y-2">
+                {mobileFilteredThreads.map((thread) => {
+                  const unreadCount =
+                    typeof thread.unread_count === "number" ? thread.unread_count : 0;
+
+                  return (
+                    <button
+                      key={thread.id}
+                      type="button"
+                      onClick={() => {
+                        shouldScrollToBottomRef.current = true;
+                        setSelectedThreadId(thread.id);
+                        setMobileThreadSheetOpen(true);
+                      }}
+                      className="w-full rounded-xl border border-[#d7e3f4] bg-white px-3 py-2 text-left shadow-[0_10px_18px_-18px_rgba(18,43,86,0.68)] transition hover:bg-[#f9fbff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                    >
+                      <div className="flex items-center gap-2">
+                        {thread.contact_avatar_url ? (
+                          <img
+                            src={thread.contact_avatar_url}
+                            alt={thread.contact_name || "Contact LinkedIn"}
+                            className="h-9 w-9 shrink-0 rounded-full border border-[#d7e3f4] object-cover"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d7e3f4] bg-[#edf4ff] text-xs font-semibold text-[#325c95]">
+                            {getContactInitials(thread.contact_name)}
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-[14px] font-medium text-[#0b1c33]">
+                              {thread.contact_name || "Contact LinkedIn"}
+                            </p>
+                            {unreadCount > 0 ? (
+                              <span className="rounded-full border border-[#9cc0ff] bg-[#edf4ff] px-2 py-0.5 text-[10px] font-semibold text-[#1f5eff]">
+                                {formatUnreadCount(unreadCount)}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-0.5 truncate text-[12px] text-[#5f7693]">
+                            {thread.last_message_preview || "Aucun aperçu"}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-[#8093ad]">
+                            {formatDateTime(thread.last_message_at)}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-[#9bb0c8]" />
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </MobileLayout>
@@ -835,57 +923,25 @@ export default function InboxPage() {
                               : null;
                         const outbound = String(message.direction).toLowerCase() === "outbound";
 
-                      return (
-                        <button
-                          key={thread.id}
-                          type="button"
-                          onClick={() => {
-                            shouldScrollToBottomRef.current = true;
-                            setSelectedThreadId(thread.id);
-                            setMobilePanel("messages");
-                          }}
-                          className={[
-                            "w-full rounded-xl border px-3 py-3 text-left transition-colors duration-150",
-                            active ? "border-[#9cc0ff]" : "border-[#d7e3f4] hover:border-[#b9d0f2]",
-                            unreadCount > 0
-                              ? "bg-blue-50 hover:bg-blue-100"
-                              : "bg-transparent hover:bg-gray-50",
-                          ].join(" ")}
-                        >
-                          <div className="flex items-start gap-3">
-                            {thread.contact_avatar_url ? (
-                              <img
-                                src={thread.contact_avatar_url}
-                                alt={thread.contact_name || "Contact LinkedIn"}
-                                className="h-9 w-9 shrink-0 rounded-full border border-[#d7e3f4] object-cover"
-                                loading="lazy"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d7e3f4] bg-[#edf4ff] text-xs font-semibold text-[#325c95]">
-                                {getContactInitials(thread.contact_name)}
-                              </div>
-                            )}
-
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="truncate text-sm font-medium text-[#0b1c33]">
-                                  {thread.contact_name || "Contact LinkedIn"}
-                                </p>
-                                {unreadCount > 0 ? (
-                                  <span className="rounded-full border border-[#9cc0ff] bg-white px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#1f5eff]">
-                                    {formatUnreadCount(unreadCount)}
-                                  </span>
-                                ) : null}
-                              </div>
-
-                              <p className="mt-1 truncate text-xs text-[#51627b]">
-                                {thread.last_message_preview || "Aucun aperçu"}
-                              </p>
-
-                              <p className="mt-1 text-[11px] text-[#8093ad]">
-                                {formatDateTime(thread.last_message_at)}
-                              </p>
+                        return (
+                          <div
+                            key={message.id}
+                            className={[
+                              "max-w-[88%] rounded-2xl border px-3 py-2 text-sm",
+                              outbound
+                                ? "ml-auto border-[#9cc0ff] bg-[#edf5ff] text-[#14345e]"
+                                : "mr-auto border-[#d7e3f4] bg-[#f7fbff] text-[#1e3551]",
+                            ].join(" ")}
+                          >
+                            <div className="mb-1 text-[11px] text-[#6a7f9f]">
+                              {message.sender_name || (outbound ? "Vous" : "Prospect")}
+                            </div>
+                            <div className="whitespace-pre-wrap">
+                              {isDeleted ? "Message supprimé" : message.text || "—"}
+                            </div>
+                            <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-[#7a8ea9]">
+                              <span>{formatDateTime(message.sent_at)}</span>
+                              <span>{statusLabel ?? ""}</span>
                             </div>
                           </div>
                         );
@@ -894,40 +950,60 @@ export default function InboxPage() {
                   )}
                 </div>
 
-            <div
-              className={[
-                "hub-card min-h-0 flex-col overflow-hidden",
-                mobilePanel === "threads" ? "hidden lg:flex" : "flex",
-                mobileMessagesOpen
-                  ? "fixed inset-x-0 top-16 bottom-[calc(env(safe-area-inset-bottom)+5.55rem)] z-40 rounded-none border-x-0 border-b-0 shadow-none lg:static lg:inset-auto lg:top-auto lg:bottom-auto lg:z-auto lg:rounded-2xl lg:border-x lg:border-b lg:shadow-[0_18px_40px_-24px_rgba(18,43,86,0.45)]"
-                  : "",
-              ].join(" ")}
-            >
-              <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <button
+                <div className="sticky bottom-0 z-20 border-t border-[#d7e3f4] bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]">
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      ref={mobileComposerRef}
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      placeholder="Écrire une réponse..."
+                      className="min-h-[72px] w-full rounded-xl border border-[#c8d6ea] bg-[#f8fbff] px-3 py-2 text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:border-[#9cc0ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                    />
+                    <HubButton
                       type="button"
-                      onClick={() => setMobilePanel("threads")}
-                      className="inline-flex h-8 items-center justify-center rounded-xl border border-[#d7e3f4] bg-white px-2.5 text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff] lg:hidden"
-                      aria-label="Retour aux conversations"
+                      variant="primary"
+                      onClick={handleSend}
+                      disabled={sending || !draft.trim()}
+                      className="shrink-0"
                     >
-                      <ArrowLeft className="h-4 w-4" />
-                    </button>
-                    <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
+                      {sending ? "Envoi..." : "Envoyer"}
+                    </HubButton>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {selectedThreadLinkedInUrl ? (
-                      <button
-                        type="button"
-                        onClick={handleOpenSelectedThreadLinkedInProfile}
-                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
-                      >
-                        <Linkedin className="h-3.5 w-3.5" />
-                        Voir profil
-                      </button>
-                    ) : null}
-                  </div>
+                </div>
+              </>
+            ) : null}
+          </MobileSheet>
+
+          <div className="hidden md:block">
+            <section className="hub-card-hero p-3 sm:p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h1 className="hub-page-title mt-1 text-3xl md:text-4xl">
+                    Messagerie LinkedIn
+                  </h1>
+                  <p className="mt-1 text-xs text-[#51627b] sm:text-sm">
+                    Vos conversations sont centralisées et à jour en temps réel.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <HubButton
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleMarkAllRead}
+                    disabled={markingAllRead || syncing}
+                  >
+                    {markingAllRead ? "Marquage..." : "Marquer tout comme lu"}
+                  </HubButton>
+                  <HubButton
+                    type="button"
+                    variant="primary"
+                    onClick={handleSync}
+                    disabled={syncing || markingAllRead}
+                  >
+                    {syncing ? "Synchronisation..." : "Synchroniser"}
+                  </HubButton>
                 </div>
               </div>
 
@@ -935,34 +1011,8 @@ export default function InboxPage() {
                 <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {error}
                 </div>
-              ) : (
-                <>
-                  <div
-                    ref={messagesViewportRef}
-                    className="min-h-0 flex-1 overflow-y-auto p-4 pb-5"
-                  >
-                    {loadingMessages ? (
-                      <div className="text-sm text-[#51627b]">Chargement des messages…</div>
-                    ) : messages.length === 0 ? (
-                      <div className="text-sm text-[#51627b]">
-                        Aucun message dans ce thread.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {messages.map((message) => {
-                          const raw = asObject(message.raw);
-                          const isDeleted = raw.deleted === true;
-                          const deliveryStatus =
-                            typeof raw.delivery_status === "string"
-                              ? raw.delivery_status.toLowerCase()
-                              : null;
-                          const statusLabel =
-                            deliveryStatus === "read"
-                              ? "Lu"
-                              : deliveryStatus === "delivered"
-                                ? "Délivré"
-                                : null;
-                          const outbound = String(message.direction).toLowerCase() === "outbound";
+              ) : null}
+            </section>
 
             <section className="mt-3 grid min-h-0 flex-1 gap-3 md:grid-cols-[330px_minmax(0,1fr)]">
               <div className="hub-card flex min-h-0 flex-col overflow-hidden">
@@ -1057,23 +1107,31 @@ export default function InboxPage() {
                 </div>
               </div>
 
-                  <div className="sticky bottom-0 border-t border-[#d7e3f4] bg-[#f8fbff] p-3 pb-[calc(env(safe-area-inset-bottom)+0.65rem)] lg:pb-3">
-                    <div className="flex items-end gap-2">
-                      <textarea
-                        ref={composerTextareaRef}
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        placeholder="Écrire une réponse..."
-                        className="min-h-[72px] w-full rounded-xl border border-[#c8d6ea] bg-white px-3 py-2 text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:border-[#9cc0ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
-                      />
-                      <HubButton
-                        type="button"
-                        variant="primary"
-                        onClick={handleSend}
-                        disabled={sending || !draft.trim()}
-                      >
-                        {sending ? "Envoi..." : "Envoyer"}
-                      </HubButton>
+              <div className="hub-card flex min-h-0 flex-col overflow-hidden">
+                <div className="border-b border-[#d7e3f4] bg-[#f8fbff] px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-semibold text-[#0b1c33]">Messages</h2>
+                    <div className="flex items-center gap-2">
+                      {selectedThread ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedThreadId(null)}
+                          className="inline-flex h-8 items-center justify-center rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                        >
+                          Fermer
+                        </button>
+                      ) : null}
+
+                      {selectedThreadLinkedInUrl ? (
+                        <button
+                          type="button"
+                          onClick={handleOpenSelectedThreadLinkedInProfile}
+                          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-[#d7e3f4] bg-white px-3 text-[12px] font-medium text-[#334155] transition hover:border-[#9cc0ff] hover:bg-[#f3f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                        >
+                          <Linkedin className="h-3.5 w-3.5" />
+                          Voir profil
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
