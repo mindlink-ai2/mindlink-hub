@@ -947,6 +947,6 @@ export default function SupportWidget() {
           </section>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }
