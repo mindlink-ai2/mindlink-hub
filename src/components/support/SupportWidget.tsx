@@ -151,6 +151,7 @@ export default function SupportWidget() {
 
   const shouldRenderOnPage = pathname ? !pathname.startsWith("/admin/support") : true;
   const hasMobileBottomNav = pathname ? pathname === "/" || pathname.startsWith("/dashboard") : false;
+  const isInboxPage = pathname ? pathname.startsWith("/dashboard/inbox") : false;
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedConversationId) ?? null,
@@ -595,7 +596,8 @@ export default function SupportWidget() {
     <>
       <div
         className={cn(
-          "fixed right-5 z-[70] sm:right-6",
+          "fixed z-[70] sm:right-6",
+          isInboxPage ? "left-4 right-auto sm:left-auto" : "right-5",
           hasMobileBottomNav
             ? "bottom-[calc(env(safe-area-inset-bottom)+5.8rem)] sm:bottom-6"
             : "bottom-5 sm:bottom-6"
