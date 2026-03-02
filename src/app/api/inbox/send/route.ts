@@ -38,7 +38,13 @@ export async function POST(req: Request) {
       .limit(1)
       .maybeSingle();
 
-    if (!sendResult.ok) {
+    if (threadErr || !thread?.id) {
+      return NextResponse.json({ error: "thread_not_found" }, { status: 404 });
+    }
+
+    const unipileAccountId = String(thread.unipile_account_id ?? "").trim();
+    const unipileThreadId = String(thread.unipile_thread_id ?? "").trim();
+    if (!unipileAccountId || !unipileThreadId) {
       return NextResponse.json(
         { error: "invalid_thread_unipile_identifiers" },
         { status: 400 }
