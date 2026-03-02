@@ -950,7 +950,7 @@ export default function InboxPage() {
                   )}
                 </div>
 
-                <div className="sticky bottom-0 z-20 border-t border-[#d7e3f4] bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]">
+                <div className="sticky bottom-0 z-20 border-t border-[#d7e3f4] bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom,0px)+5.9rem)]">
                   <div className="flex items-end gap-2">
                     <textarea
                       ref={mobileComposerRef}
@@ -974,7 +974,7 @@ export default function InboxPage() {
             ) : null}
           </MobileSheet>
 
-          <div className="hidden md:block">
+          <div className="hidden md:flex md:min-h-0 md:flex-1 md:flex-col">
             <section className="hub-card-hero p-3 sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
