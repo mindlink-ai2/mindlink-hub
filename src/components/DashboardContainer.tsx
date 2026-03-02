@@ -9,7 +9,7 @@ export default function DashboardContainer({ children }: { children: React.React
   const router = useRouter();
   const pathname = usePathname();
   const { user, isLoaded, isSignedIn } = useUser();
-  const hasMobileBottomNav = pathname.startsWith("/dashboard");
+  const hasMobileBottomNav = pathname === "/" || pathname.startsWith("/dashboard");
 
   useEffect(() => {
     if (!isSignedIn) return;

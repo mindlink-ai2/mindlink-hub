@@ -335,6 +335,13 @@ export default function InboxPage() {
   }, [selectedThreadId, loadingMessages, messages, scrollMessagesToBottom]);
 
   useEffect(() => {
+    if (mobilePanel !== "messages" || !selectedThreadId || loadingMessages) return;
+    window.requestAnimationFrame(() => {
+      scrollMessagesToBottom("auto");
+    });
+  }, [mobilePanel, selectedThreadId, loadingMessages, scrollMessagesToBottom]);
+
+  useEffect(() => {
     if (!clientId) return;
 
     const channel = supabase
@@ -601,11 +608,18 @@ export default function InboxPage() {
     }
   };
 
+  const mobileMessagesOpen = mobilePanel === "messages";
+
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <div className="h-full min-h-0 px-4 pb-6 pt-4 sm:px-6 sm:pb-14 sm:pt-5">
         <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-3">
-          <section className="hub-card-hero p-3 sm:p-4">
+          <section
+            className={[
+              "hub-card-hero p-3 sm:p-4",
+              mobileMessagesOpen ? "hidden lg:block" : "",
+            ].join(" ")}
+          >
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h1 className="hub-page-title mt-1 text-3xl md:text-4xl">
@@ -785,7 +799,7 @@ export default function InboxPage() {
                 <>
                   <div
                     ref={messagesViewportRef}
-                    className="min-h-0 flex-1 overflow-y-auto p-4"
+                    className="min-h-0 flex-1 overflow-y-auto p-4 pb-5"
                   >
                     {loadingMessages ? (
                       <div className="text-sm text-[#51627b]">Chargement des messages…</div>
@@ -839,7 +853,7 @@ export default function InboxPage() {
                     )}
                   </div>
 
-                  <div className="border-t border-[#d7e3f4] bg-[#f8fbff] p-3 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] lg:pb-3">
+                  <div className="sticky bottom-0 border-t border-[#d7e3f4] bg-[#f8fbff] p-3 pb-[calc(env(safe-area-inset-bottom)+5.15rem)] lg:pb-3">
                     <div className="flex items-end gap-2">
                       <textarea
                         value={draft}

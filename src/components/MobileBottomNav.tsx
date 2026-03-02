@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { BellRing, CreditCard, Home, Inbox, Users } from "lucide-react";
@@ -17,7 +18,7 @@ const MOBILE_NAV_ITEMS: MobileNavItem[] = [
     href: "/dashboard",
     label: "Accueil",
     icon: Home,
-    isActive: (pathname) => pathname === "/dashboard",
+    isActive: (pathname) => pathname === "/" || pathname === "/dashboard",
   },
   {
     href: "/dashboard/leads",
@@ -50,8 +51,12 @@ const MOBILE_NAV_ITEMS: MobileNavItem[] = [
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
+  const { isLoaded, isSignedIn } = useUser();
 
-  if (!pathname.startsWith("/dashboard")) return null;
+  if (!isLoaded || !isSignedIn) return null;
+
+  const showOnPath = pathname === "/" || pathname.startsWith("/dashboard");
+  if (!showOnPath) return null;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-[65] border-t border-[#c8d6ea] bg-[#f4f8ff]/98 backdrop-blur-xl sm:hidden">

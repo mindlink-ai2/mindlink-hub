@@ -150,6 +150,7 @@ export default function SupportWidget() {
   const pendingMarkReadRef = useRef<number | null>(null);
 
   const shouldRenderOnPage = pathname ? !pathname.startsWith("/admin/support") : true;
+  const hasMobileBottomNav = pathname ? pathname === "/" || pathname.startsWith("/dashboard") : false;
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedConversationId) ?? null,
@@ -592,7 +593,14 @@ export default function SupportWidget() {
 
   return (
     <>
-      <div className="fixed bottom-5 right-5 z-[70] sm:bottom-6 sm:right-6">
+      <div
+        className={cn(
+          "fixed right-5 z-[70] sm:right-6",
+          hasMobileBottomNav
+            ? "bottom-[calc(env(safe-area-inset-bottom)+5.8rem)] sm:bottom-6"
+            : "bottom-5 sm:bottom-6"
+        )}
+      >
         <button
           type="button"
           onClick={handleToggle}
@@ -613,7 +621,14 @@ export default function SupportWidget() {
       </div>
 
       {isOpen ? (
-        <div className="fixed bottom-[5.25rem] left-3 right-3 z-[71] w-auto translate-y-0 opacity-100 sm:bottom-24 sm:left-auto sm:right-6 sm:w-[min(420px,calc(100vw-1.5rem))]">
+        <div
+          className={cn(
+            "fixed left-3 right-3 z-[71] w-auto translate-y-0 opacity-100 sm:left-auto sm:right-6 sm:w-[min(420px,calc(100vw-1.5rem))]",
+            hasMobileBottomNav
+              ? "bottom-[calc(env(safe-area-inset-bottom)+6.45rem)] sm:bottom-24"
+              : "bottom-[5.25rem] sm:bottom-24"
+          )}
+        >
           <section
             role="dialog"
             aria-label="Messagerie support Lidmeo"
