@@ -1764,7 +1764,7 @@ export default function LeadsPage() {
                             ? "Marquage…"
                             : openLeadLinkedInMessageError
                               ? "Erreur — réessayer"
-                              : "Envoyer un message"}
+                              : "Marquer comme envoyé"}
                       </button>
                     </div>
 
