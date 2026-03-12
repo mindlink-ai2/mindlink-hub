@@ -36,11 +36,13 @@ export async function GET(req: Request) {
     const { data: messages, error } = await supabase
       .from("inbox_messages")
       .select(
-        "id, provider, thread_db_id, unipile_account_id, unipile_thread_id, unipile_message_id, direction, sender_name, sender_linkedin_url, text, sent_at, raw"
+        "id, provider, thread_db_id, unipile_account_id, unipile_thread_id, unipile_message_id, direction, sender_name, sender_linkedin_url, text, sent_at, created_at, raw"
       )
       .eq("client_id", clientId)
       .eq("thread_db_id", threadDbId)
-      .order("sent_at", { ascending: true, nullsFirst: true });
+      .order("sent_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false, nullsFirst: false })
+      .limit(1000);
 
     if (error) {
       return NextResponse.json({ error: "messages_fetch_failed" }, { status: 500 });

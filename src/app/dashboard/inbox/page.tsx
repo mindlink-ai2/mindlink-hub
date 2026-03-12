@@ -37,6 +37,7 @@ type InboxMessage = {
   sender_linkedin_url: string | null;
   text: string | null;
   sent_at: string | null;
+  created_at?: string | null;
   raw: unknown;
 };
 
@@ -68,9 +69,17 @@ function sortThreadsByLastMessage(threads: InboxThread[]) {
 }
 
 function sortMessagesBySentAt(messages: InboxMessage[]) {
+  const resolveSortTimestamp = (message: InboxMessage) => {
+    const sentAtTime = message.sent_at ? new Date(message.sent_at).getTime() : Number.NaN;
+    if (!Number.isNaN(sentAtTime)) return sentAtTime;
+    const createdAtTime = message.created_at ? new Date(message.created_at).getTime() : Number.NaN;
+    if (!Number.isNaN(createdAtTime)) return createdAtTime;
+    return 0;
+  };
+
   return [...messages].sort((a, b) => {
-    const aTime = a.sent_at ? new Date(a.sent_at).getTime() : 0;
-    const bTime = b.sent_at ? new Date(b.sent_at).getTime() : 0;
+    const aTime = resolveSortTimestamp(a);
+    const bTime = resolveSortTimestamp(b);
     return aTime - bTime;
   });
 }
@@ -156,6 +165,7 @@ function messageFromRealtimePayload(payloadNew: Record<string, unknown>): InboxM
         : null,
     text: typeof payloadNew.text === "string" ? payloadNew.text : null,
     sent_at: typeof payloadNew.sent_at === "string" ? payloadNew.sent_at : null,
+    created_at: typeof payloadNew.created_at === "string" ? payloadNew.created_at : null,
     raw: payloadNew.raw ?? null,
   };
 }
