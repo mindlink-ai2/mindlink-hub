@@ -177,6 +177,7 @@ export default function InboxPage() {
   const [clientId, setClientId] = useState<string | null>(null);
   const [sendingDraft, setSendingDraft] = useState(false);
   const desktopMessagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const desktopComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const mobileMessagesViewportRef = useRef<HTMLDivElement | null>(null);
   const mobileComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const shouldScrollToBottomRef = useRef(false);
@@ -403,6 +404,22 @@ export default function InboxPage() {
       }, 80);
     });
   }, [mobileThreadSheetOpen, selectedThreadId]);
+
+  useEffect(() => {
+    if (!selectedThreadId) return;
+
+    const isDesktopViewport =
+      typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
+    if (!isDesktopViewport) return;
+
+    window.requestAnimationFrame(() => {
+      const textarea = desktopComposerRef.current;
+      if (!textarea) return;
+      textarea.focus({ preventScroll: true });
+      const length = textarea.value.length;
+      textarea.setSelectionRange(length, length);
+    });
+  }, [selectedThreadId]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -732,6 +749,26 @@ export default function InboxPage() {
     }
   };
 
+  const handleDesktopThreadOpen = (threadId: string) => {
+    shouldScrollToBottomRef.current = true;
+
+    if (selectedThreadId === threadId) {
+      if (loadedMessagesThreadIdRef.current === threadId && !loadingMessages) {
+        window.requestAnimationFrame(() => {
+          scrollMessagesToBottom("auto");
+          window.setTimeout(() => scrollMessagesToBottom("auto"), 60);
+        });
+      } else if (!loadingMessages) {
+        void loadMessages(threadId);
+      }
+
+      void markThreadRead(threadId);
+      return;
+    }
+
+    setSelectedThreadId(threadId);
+  };
+
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <div className="flex h-full min-h-0 flex-col px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
@@ -1051,10 +1088,7 @@ export default function InboxPage() {
                           <button
                             key={thread.id}
                             type="button"
-                            onClick={() => {
-                              shouldScrollToBottomRef.current = true;
-                              setSelectedThreadId(thread.id);
-                            }}
+                            onClick={() => handleDesktopThreadOpen(thread.id)}
                             className={[
                               "w-full rounded-xl border px-3 py-3 text-left transition-colors duration-150",
                               active ? "border-[#9cc0ff]" : "border-[#d7e3f4] hover:border-[#b9d0f2]",
@@ -1136,89 +1170,91 @@ export default function InboxPage() {
                   </div>
                 </div>
 
-                {!selectedThread ? (
-                  <div className="p-6 text-sm text-[#51627b]">
-                    Sélectionne une conversation pour afficher l’historique.
-                  </div>
-                ) : (
-                  <>
-                    <div
-                      ref={desktopMessagesViewportRef}
-                      className="min-h-0 flex-1 overflow-y-auto p-4"
+                <div
+                  ref={desktopMessagesViewportRef}
+                  className="min-h-0 flex-1 overflow-y-auto p-4"
+                >
+                  {!selectedThread ? (
+                    <div className="text-sm text-[#51627b]">
+                      Sélectionne une conversation pour afficher l’historique.
+                    </div>
+                  ) : loadingMessages ? (
+                    <div className="text-sm text-[#51627b]">Chargement des messages…</div>
+                  ) : messages.length === 0 ? (
+                    <div className="text-sm text-[#51627b]">
+                      Aucun message dans ce thread.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {messages.map((message) => {
+                        const raw = asObject(message.raw);
+                        const isDeleted = raw.deleted === true;
+                        const deliveryStatus =
+                          typeof raw.delivery_status === "string"
+                            ? raw.delivery_status.toLowerCase()
+                            : null;
+                        const statusLabel =
+                          deliveryStatus === "read"
+                            ? "Lu"
+                            : deliveryStatus === "delivered"
+                              ? "Délivré"
+                              : null;
+                        const outbound = String(message.direction).toLowerCase() === "outbound";
+
+                        return (
+                          <div
+                            key={message.id}
+                            className={[
+                              "max-w-[82%] rounded-2xl border px-3 py-2 text-sm",
+                              outbound
+                                ? "ml-auto border-[#9cc0ff] bg-[#edf5ff] text-[#14345e]"
+                                : "mr-auto border-[#d7e3f4] bg-[#f7fbff] text-[#1e3551]",
+                            ].join(" ")}
+                          >
+                            <div className="mb-1 text-[11px] text-[#6a7f9f]">
+                              {message.sender_name || (outbound ? "Vous" : "Prospect")}
+                            </div>
+
+                            <div className="whitespace-pre-wrap">
+                              {isDeleted ? "Message supprimé" : message.text || "—"}
+                            </div>
+
+                            <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-[#7a8ea9]">
+                              <span>{formatDateTime(message.sent_at)}</span>
+                              <span>{statusLabel ?? ""}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="sticky bottom-0 z-10 border-t border-[#d7e3f4] bg-[#f8fbff] p-3">
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      ref={desktopComposerRef}
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      disabled={!selectedThread}
+                      placeholder={
+                        selectedThread
+                          ? "Écrire une réponse..."
+                          : "Sélectionne une conversation pour écrire un message..."
+                      }
+                      className="min-h-[72px] w-full rounded-xl border border-[#c8d6ea] bg-white px-3 py-2 text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:border-[#9cc0ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff] disabled:cursor-not-allowed disabled:bg-[#eef3fa] disabled:text-[#8093ad]"
+                    />
+                    <HubButton
+                      type="button"
+                      variant="primary"
+                      onClick={handleSend}
+                      disabled={!selectedThread || sending || !draft.trim()}
+                      className="shrink-0"
                     >
-                      {loadingMessages ? (
-                        <div className="text-sm text-[#51627b]">Chargement des messages…</div>
-                      ) : messages.length === 0 ? (
-                        <div className="text-sm text-[#51627b]">
-                          Aucun message dans ce thread.
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {messages.map((message) => {
-                            const raw = asObject(message.raw);
-                            const isDeleted = raw.deleted === true;
-                            const deliveryStatus =
-                              typeof raw.delivery_status === "string"
-                                ? raw.delivery_status.toLowerCase()
-                                : null;
-                            const statusLabel =
-                              deliveryStatus === "read"
-                                ? "Lu"
-                                : deliveryStatus === "delivered"
-                                  ? "Délivré"
-                                  : null;
-                            const outbound = String(message.direction).toLowerCase() === "outbound";
-
-                            return (
-                              <div
-                                key={message.id}
-                                className={[
-                                  "max-w-[82%] rounded-2xl border px-3 py-2 text-sm",
-                                  outbound
-                                    ? "ml-auto border-[#9cc0ff] bg-[#edf5ff] text-[#14345e]"
-                                    : "mr-auto border-[#d7e3f4] bg-[#f7fbff] text-[#1e3551]",
-                                ].join(" ")}
-                              >
-                                <div className="mb-1 text-[11px] text-[#6a7f9f]">
-                                  {message.sender_name || (outbound ? "Vous" : "Prospect")}
-                                </div>
-
-                                <div className="whitespace-pre-wrap">
-                                  {isDeleted ? "Message supprimé" : message.text || "—"}
-                                </div>
-
-                                <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-[#7a8ea9]">
-                                  <span>{formatDateTime(message.sent_at)}</span>
-                                  <span>{statusLabel ?? ""}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="sticky bottom-0 z-10 border-t border-[#d7e3f4] bg-[#f8fbff] p-3">
-                      <div className="flex items-end gap-2">
-                        <textarea
-                          value={draft}
-                          onChange={(e) => setDraft(e.target.value)}
-                          placeholder="Écrire une réponse..."
-                          className="min-h-[72px] w-full rounded-xl border border-[#c8d6ea] bg-white px-3 py-2 text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:border-[#9cc0ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
-                        />
-                        <HubButton
-                          type="button"
-                          variant="primary"
-                          onClick={handleSend}
-                          disabled={sending || !draft.trim()}
-                          className="shrink-0"
-                        >
-                          {sending ? "Envoi..." : "Envoyer"}
-                        </HubButton>
-                      </div>
-                    </div>
-                  </>
-                )}
+                      {sending ? "Envoi..." : "Envoyer"}
+                    </HubButton>
+                  </div>
+                </div>
               </div>
             </section>
           </div>
