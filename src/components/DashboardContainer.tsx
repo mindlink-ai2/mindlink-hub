@@ -56,7 +56,7 @@ export default function DashboardContainer({ children }: { children: React.React
   return (
     <div
       className={[
-        "relative z-[1] mx-auto flex min-h-0 w-full max-w-[1560px] flex-1 flex-col px-4 pt-6 sm:px-6 sm:pt-8",
+        "relative z-[1] mx-auto flex min-h-0 w-full max-w-[1560px] flex-1 flex-col overflow-y-auto px-4 pt-6 sm:px-6 sm:pt-8",
         hasMobileBottomNav
           ? "pb-[calc(env(safe-area-inset-bottom)+5.75rem)] sm:pb-8"
           : "pb-6 sm:pb-8",
