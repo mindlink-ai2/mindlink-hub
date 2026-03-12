@@ -194,18 +194,6 @@ export default function InboxPage() {
   const loadedMessagesThreadIdRef = useRef<string | null>(null);
   const syncInFlightRef = useRef(false);
 
-  // On desktop, prevent body scrolling so the height chain resolves correctly
-  // (messages viewport scrolls internally, composer stays always visible).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!window.matchMedia("(min-width: 768px)").matches) return;
-    const prev = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.documentElement.style.overflow = prev;
-    };
-  }, []);
-
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
     [threads, selectedThreadId]
@@ -1033,7 +1021,7 @@ export default function InboxPage() {
             ) : null}
           </MobileSheet>
 
-          <div className="hidden md:flex md:min-h-0 md:flex-1 md:flex-col">
+          <div className="hidden md:flex md:min-h-0 md:flex-col md:overflow-hidden md:h-[calc(100dvh-220px)]">
             <section className="hub-card-hero p-3 sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
