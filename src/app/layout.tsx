@@ -115,8 +115,8 @@ export default async function RootLayout({
     <ClerkProvider>
       <html lang="fr">
         <body className="bg-[#ecf2fa] text-[#0f213c]">
-          <div className="h-dvh overflow-hidden flex flex-col relative">
-            <div className="pointer-events-none fixed inset-0 overflow-hidden">
+          <div className="min-h-screen flex flex-col relative">
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
               <div className="absolute -top-40 left-1/2 h-[500px] w-[1120px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(31,94,255,0.14),rgba(31,94,255,0.01)_62%,transparent_78%)]" />
               <div className="absolute -left-24 top-20 h-80 w-80 rounded-full bg-[#dfeaff]/80 blur-3xl" />
               <div className="absolute -right-24 top-12 h-96 w-96 rounded-full bg-[#d8f0ff]/70 blur-3xl" />

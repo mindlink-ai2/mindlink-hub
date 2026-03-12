@@ -194,6 +194,18 @@ export default function InboxPage() {
   const loadedMessagesThreadIdRef = useRef<string | null>(null);
   const syncInFlightRef = useRef(false);
 
+  // On desktop, prevent body scrolling so the height chain resolves correctly
+  // (messages viewport scrolls internally, composer stays always visible).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(min-width: 768px)").matches) return;
+    const prev = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = prev;
+    };
+  }, []);
+
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
     [threads, selectedThreadId]
