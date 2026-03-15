@@ -1769,39 +1769,29 @@ export default function LeadsPage() {
                                 )}
 
                                 {isSent ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="inline-flex h-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-[11px] font-medium text-emerald-700">
-                                      Envoyé
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenConvModalForLead(lead)}
-                                      className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-[#9cc0ff] bg-[#f2f7ff] px-3 text-[11px] font-medium text-[#1f4f96] transition hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
-                                    >
-                                      <MessageSquare className="h-3 w-3" />
-                                      Conversation
-                                    </button>
-                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenConvModalForLead(lead)}
+                                    className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-[#9cc0ff] bg-[#f2f7ff] px-3 text-[11px] font-medium text-[#1f4f96] transition hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                                  >
+                                    <MessageSquare className="h-3 w-3" />
+                                    Conversation
+                                  </button>
                                 ) : isInviteAccepted ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="inline-flex h-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-[11px] font-medium text-emerald-700">
-                                      Connecté
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSendLinkedInMessageForLead(lead)}
-                                      disabled={sendingLinkedInMessageLeadIds.has(idStr)}
-                                      className={[
-                                        "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
-                                        linkedInMessageSendErrors[idStr]
-                                          ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
-                                          : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
-                                        sendingLinkedInMessageLeadIds.has(idStr) ? "cursor-wait opacity-70" : "",
-                                      ].join(" ")}
-                                    >
-                                      {sendingLinkedInMessageLeadIds.has(idStr) ? "Envoi..." : "Envoyer"}
-                                    </button>
-                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSendLinkedInMessageForLead(lead)}
+                                    disabled={sendingLinkedInMessageLeadIds.has(idStr)}
+                                    className={[
+                                      "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
+                                      linkedInMessageSendErrors[idStr]
+                                        ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
+                                        : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
+                                      sendingLinkedInMessageLeadIds.has(idStr) ? "cursor-wait opacity-70" : "",
+                                    ].join(" ")}
+                                  >
+                                    {sendingLinkedInMessageLeadIds.has(idStr) ? "Envoi..." : "Envoyer"}
+                                  </button>
                                 ) : (
                                   <button
                                     type="button"
