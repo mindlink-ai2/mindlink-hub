@@ -10,6 +10,7 @@ type InvitationRow = {
   sent_at: string | null;
   accepted_at: string | null;
   dm_draft_status: string | null;
+  dm_draft_text: string | null;
   dm_sent_at: string | null;
   last_error: string | null;
   unipile_account_id: string | null;
@@ -51,6 +52,7 @@ function mapEventRow(row: InvitationRow, leadById: Map<string, LeadRow>) {
     accepted_at: row.accepted_at,
     dm_sent_at: row.dm_sent_at,
     dm_draft_status: row.dm_draft_status,
+    dm_draft_text: row.dm_draft_text ?? null,
     unipile_account_id: row.unipile_account_id,
     last_error: row.last_error,
   };
@@ -100,7 +102,7 @@ export async function GET() {
       supabase
         .from("linkedin_invitations")
         .select(
-          "id, lead_id, status, sent_at, accepted_at, dm_draft_status, dm_sent_at, last_error, unipile_account_id"
+          "id, lead_id, status, sent_at, accepted_at, dm_draft_status, dm_draft_text, dm_sent_at, last_error, unipile_account_id"
         )
         .eq("client_id", clientId)
         .in("status", ["queued", "pending", "sent"])
@@ -109,7 +111,7 @@ export async function GET() {
       supabase
         .from("linkedin_invitations")
         .select(
-          "id, lead_id, status, sent_at, accepted_at, dm_draft_status, dm_sent_at, last_error, unipile_account_id"
+          "id, lead_id, status, sent_at, accepted_at, dm_draft_status, dm_draft_text, dm_sent_at, last_error, unipile_account_id"
         )
         .eq("client_id", clientId)
         .in("status", ["accepted", "connected"])
@@ -118,7 +120,7 @@ export async function GET() {
       supabase
         .from("linkedin_invitations")
         .select(
-          "id, lead_id, status, sent_at, accepted_at, dm_draft_status, dm_sent_at, last_error, unipile_account_id"
+          "id, lead_id, status, sent_at, accepted_at, dm_draft_status, dm_draft_text, dm_sent_at, last_error, unipile_account_id"
         )
         .eq("client_id", clientId)
         .eq("dm_draft_status", "sent")

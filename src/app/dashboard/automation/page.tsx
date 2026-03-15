@@ -15,6 +15,7 @@ type FeedItem = {
   accepted_at: string | null;
   dm_sent_at: string | null;
   dm_draft_status: string | null;
+  dm_draft_text: string | null;
   unipile_account_id: string | null;
   last_error: string | null;
 };
@@ -127,11 +128,13 @@ function TableRow(props: {
   item: FeedItem;
   dateValue: string | null;
   badge: React.ReactNode;
+  showMessage?: boolean;
 }) {
-  const { item, dateValue, badge } = props;
+  const { item, dateValue, badge, showMessage } = props;
   const linkedinUrl = toExternalUrl(item.linkedin_url);
   const ini = initials(item.person_name);
   const color = avatarColor(item.person_name);
+  const messageText = showMessage ? (item.dm_draft_text ?? null) : null;
 
   return (
     <tr className="group border-b border-[#edf2fb] transition hover:bg-[#f8fbff]">
@@ -166,6 +169,17 @@ function TableRow(props: {
           {relativeTime(dateValue)}
         </span>
       </td>
+      {showMessage ? (
+        <td className="max-w-[280px] px-4 py-2.5">
+          {messageText ? (
+            <p className="line-clamp-2 text-[12px] text-[#395577]" title={messageText}>
+              {messageText}
+            </p>
+          ) : (
+            <span className="text-[11px] text-[#b0bfd1]">—</span>
+          )}
+        </td>
+      ) : null}
       <td className="px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-1.5">
           {badge}
@@ -539,6 +553,9 @@ export default function LinkedinAutomationPage() {
                         <th className="border-b border-[#dce8ff] px-4 py-2.5 text-left font-medium">Prospect</th>
                         <th className="border-b border-[#dce8ff] px-4 py-2.5 text-left font-medium">Profil</th>
                         <th className="border-b border-[#dce8ff] px-4 py-2.5 text-left font-medium">Date</th>
+                        {activeTab === "dm" ? (
+                          <th className="border-b border-[#dce8ff] px-4 py-2.5 text-left font-medium">Message</th>
+                        ) : null}
                         <th className="border-b border-[#dce8ff] px-4 py-2.5 text-left font-medium">Statut</th>
                       </tr>
                     </thead>
@@ -549,6 +566,7 @@ export default function LinkedinAutomationPage() {
                           item={item}
                           dateValue={dateValueFor(activeTab, item)}
                           badge={badgeForTab(activeTab)}
+                          showMessage={activeTab === "dm"}
                         />
                       ))}
                     </tbody>
