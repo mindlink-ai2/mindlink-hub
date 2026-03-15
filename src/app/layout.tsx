@@ -94,15 +94,25 @@ export default async function RootLayout({
   let showSupportAdminLink = false;
   let showAnalyticsAdminLink = false;
 
+  let isFullActivePlanClient = false;
+
   if (user && email) {
     const { data, error } = await supabaseAdmin
       .from("clients")
-      .select("id")
+      .select("id, plan, subscription_status")
       .eq("email", email)
       .maybeSingle();
 
     hasAccess = !error && !!data;
+
+    if (data) {
+      const plan = String(data.plan ?? "").trim().toLowerCase();
+      const subscriptionStatus = String(data.subscription_status ?? "").trim().toLowerCase();
+      isFullActivePlanClient = plan === "full" && subscriptionStatus === "active";
+    }
   }
+
+  const dashboardHref = isFullActivePlanClient ? "/dashboard/automation" : "/dashboard";
 
   if (user) {
     const adminContext = await getSupportAdminContext();
@@ -148,7 +158,7 @@ export default async function RootLayout({
                   <SignedIn>
                     <nav className="hidden items-center gap-2 text-[11px] text-[#51627b] sm:flex">
                       <Link
-                        href="/dashboard"
+                        href={dashboardHref}
                         className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                       >
                         Dashboard
@@ -232,10 +242,9 @@ export default async function RootLayout({
               <DashboardContainer>{children}</DashboardContainer>
             </main>
 
-            <MobileBottomNav />
+            <MobileBottomNav dashboardHref={dashboardHref} />
             <InboxBackgroundSync />
             <SupportWidgetLoader />
-            <MobileBottomNav />
             {process.env.NODE_ENV === "development" ? <RightHitboxDebug /> : null}
 
             {/* 🔵 FOOTER */}

@@ -13,43 +13,48 @@ type MobileNavItem = {
   isActive: (pathname: string) => boolean;
 };
 
-const MOBILE_NAV_ITEMS: MobileNavItem[] = [
-  {
-    href: "/dashboard",
-    label: "Accueil",
-    icon: Home,
-    isActive: (pathname) => pathname === "/" || pathname === "/dashboard",
-  },
-  {
-    href: "/dashboard/leads",
-    label: "Prospects",
-    icon: Users,
-    isActive: (pathname) =>
-      pathname.startsWith("/dashboard/leads") ||
-      pathname.startsWith("/dashboard/prospection") ||
-      pathname.startsWith("/dashboard/maps"),
-  },
-  {
-    href: "/dashboard/inbox",
-    label: "Messagerie",
-    icon: Inbox,
-    isActive: (pathname) => pathname.startsWith("/dashboard/inbox"),
-  },
-  {
-    href: "/dashboard/followups",
-    label: "Relances",
-    icon: BellRing,
-    isActive: (pathname) => pathname.startsWith("/dashboard/followups"),
-  },
-  {
-    href: "/dashboard/hub/billing",
-    label: "Abonnement",
-    icon: CreditCard,
-    isActive: (pathname) => pathname.startsWith("/dashboard/hub/billing"),
-  },
-];
+function getMobileNavItems(dashboardHref: string): MobileNavItem[] {
+  return [
+    {
+      href: dashboardHref,
+      label: "Accueil",
+      icon: Home,
+      isActive: (pathname) =>
+        pathname === "/" ||
+        pathname === "/dashboard" ||
+        pathname === "/dashboard/automation",
+    },
+    {
+      href: "/dashboard/leads",
+      label: "Prospects",
+      icon: Users,
+      isActive: (pathname) =>
+        pathname.startsWith("/dashboard/leads") ||
+        pathname.startsWith("/dashboard/prospection") ||
+        pathname.startsWith("/dashboard/maps"),
+    },
+    {
+      href: "/dashboard/inbox",
+      label: "Messagerie",
+      icon: Inbox,
+      isActive: (pathname) => pathname.startsWith("/dashboard/inbox"),
+    },
+    {
+      href: "/dashboard/followups",
+      label: "Relances",
+      icon: BellRing,
+      isActive: (pathname) => pathname.startsWith("/dashboard/followups"),
+    },
+    {
+      href: "/dashboard/hub/billing",
+      label: "Abonnement",
+      icon: CreditCard,
+      isActive: (pathname) => pathname.startsWith("/dashboard/hub/billing"),
+    },
+  ];
+}
 
-export default function MobileBottomNav() {
+export default function MobileBottomNav({ dashboardHref = "/dashboard" }: { dashboardHref?: string }) {
   const pathname = usePathname();
   const { isLoaded, isSignedIn } = useUser();
 
@@ -58,10 +63,12 @@ export default function MobileBottomNav() {
   const showOnPath = pathname === "/" || pathname.startsWith("/dashboard");
   if (!showOnPath) return null;
 
+  const navItems = getMobileNavItems(dashboardHref);
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-[65] border-t border-[#c8d6ea] bg-[#f4f8ff]/98 backdrop-blur-xl sm:hidden">
       <div className="mx-auto grid max-w-[1560px] grid-cols-5 gap-1 px-2 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] pt-2">
-        {MOBILE_NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const active = item.isActive(pathname);
 

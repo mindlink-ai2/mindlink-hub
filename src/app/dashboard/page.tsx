@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SubscriptionGate from "@/components/SubscriptionGate";
 
@@ -52,6 +53,7 @@ const EMPTY_STATS: DashboardStats = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
@@ -106,6 +108,17 @@ export default function DashboardPage() {
   useEffect(() => {
     void loadStats();
   }, [loadStats]);
+
+  useEffect(() => {
+    fetch("/api/linkedin/settings", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.is_full_active === true) {
+          router.replace("/dashboard/automation");
+        }
+      })
+      .catch(() => undefined);
+  }, [router]);
 
   useEffect(() => {
     if (!active) return;

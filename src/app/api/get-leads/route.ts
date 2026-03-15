@@ -184,6 +184,7 @@ export async function GET() {
   return NextResponse.json({
     leads: leadsWithInvitationState,
     client: {
+      id: clientId,
       plan: normalizedPlan,
       subscription_status: subscriptionStatus,
       is_full,

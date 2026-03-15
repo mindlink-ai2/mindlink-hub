@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
+import { supabase } from "@/lib/supabase";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import LeadsCards, { type MobileLeadsViewMode } from "@/components/leads/LeadsCards";
@@ -262,6 +263,7 @@ export default function LeadsPage() {
 
   // ✅ plan (on garde la logique existante côté API, mais plus de premium gating)
   const [plan, setPlan] = useState<string>("essential");
+  const [clientId, setClientId] = useState<string | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exportingSelected, setExportingSelected] = useState(false);
@@ -390,6 +392,7 @@ export default function LeadsPage() {
 
       // ✅ plan (fallback essential)
       setPlan(String(client?.plan ?? "essential").toLowerCase());
+      if (client?.id) setClientId(String(client.id));
 
       // ✅ Tout le monde a email + phone
       setEmailOption(true);
@@ -398,6 +401,60 @@ export default function LeadsPage() {
       setClientLoaded(true);
     })();
   }, []);
+
+  // Realtime: auto-update linkedin_invitations state in leads
+  useEffect(() => {
+    if (!clientId) return;
+
+    const channel = supabase
+      .channel(`leads-invitations-${clientId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "linkedin_invitations",
+          filter: `client_id=eq.${clientId}`,
+        },
+        (payload) => {
+          const row = payload.new as {
+            lead_id?: string | number | null;
+            status?: string | null;
+            dm_draft_status?: string | null;
+          } | null;
+          if (!row?.lead_id) return;
+
+          const leadIdStr = String(row.lead_id);
+          const status = String(row.status ?? "").toLowerCase();
+          const dmStatus = String(row.dm_draft_status ?? "").toLowerCase();
+
+          setSafeLeads((prev) =>
+            prev.map((lead) => {
+              if (String(lead.id) !== leadIdStr) return lead;
+              return {
+                ...lead,
+                linkedin_invitation_status:
+                  status === "accepted" || status === "connected"
+                    ? "accepted"
+                    : status === "sent" || status === "queued"
+                      ? "sent"
+                      : lead.linkedin_invitation_status,
+                linkedin_invitation_sent:
+                  status === "sent" || status === "queued" || status === "accepted" || status === "connected"
+                    ? true
+                    : lead.linkedin_invitation_sent,
+                message_sent: dmStatus === "sent" ? true : lead.message_sent,
+              };
+            })
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [clientId]);
 
   // ✅ After leads loaded, open sidebar if query exists
   useEffect(() => {
@@ -1596,11 +1653,13 @@ export default function LeadsPage() {
                             `${lead.FirstName?.[0] ?? ""}${lead.LastName?.[0] ?? ""}`.toUpperCase() ||
                             fullName.slice(0, 2).toUpperCase()
                           ) || "—";
-                        const statusDotClass = isSent || isConnectedLeft
-                          ? "bg-emerald-500"
-                          : isPending
-                            ? "bg-amber-500"
-                            : "bg-[#6f85a6]";
+                        const statusDotClass = isSent
+                          ? "bg-violet-500"
+                          : isConnectedLeft
+                            ? "bg-emerald-500"
+                            : isPending
+                              ? "bg-amber-500"
+                              : "bg-[#6f85a6]";
                         const baseCellClass = "border-y border-[#d7e3f4] px-2.5 py-2 align-middle";
 
                         return (
@@ -1633,7 +1692,7 @@ export default function LeadsPage() {
                                 className={[
                                   "inline-flex h-8 items-center justify-center rounded-full border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
                                   isSent
-                                    ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
+                                    ? "cursor-default border-violet-200 bg-violet-50 text-violet-700 focus:ring-violet-200"
                                     : isConnectedLeft
                                       ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
                                     : isPending
@@ -1777,7 +1836,7 @@ export default function LeadsPage() {
                                     <MessageSquare className="h-3 w-3" />
                                     Conversation
                                   </button>
-                                ) : isInviteAccepted ? (
+                                ) : plan === "full" ? null : isInviteAccepted ? (
                                   <button
                                     type="button"
                                     onClick={() => handleSendLinkedInMessageForLead(lead)}
@@ -1786,7 +1845,7 @@ export default function LeadsPage() {
                                       "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
                                       linkedInMessageSendErrors[idStr]
                                         ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
-                                        : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
+                                        : "border-[#1e40af] bg-[#1e3a8a] text-white hover:bg-[#1e40af] focus:ring-[#3b82f6]",
                                       sendingLinkedInMessageLeadIds.has(idStr) ? "cursor-wait opacity-70" : "",
                                     ].join(" ")}
                                   >
