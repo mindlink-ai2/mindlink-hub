@@ -18,7 +18,7 @@ import ProspectionFilterBar, {
 } from "@/components/prospection/ProspectionFilterBar";
 import { Button } from "@/components/ui/button";
 import { HubButton } from "@/components/ui/hub-button";
-import { AlertTriangle, Building2, LayoutGrid, Linkedin, List, Mail, MapPin, MessageSquare, MoveRight, Phone, UserCircle2, X } from "lucide-react";
+import { AlertTriangle, Briefcase, Building2, Calendar, Globe, LayoutGrid, Linkedin, List, Mail, MapPin, MessageSquare, MoveRight, Phone, UserCircle2, X } from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -38,6 +38,7 @@ type Lead = {
   message_mail?: string | null;
   linkedinJobTitle?: string | null;
   LinkedInURL?: string | null;
+  website?: string | null;
   linkedin_invitation_status?: "sent" | "accepted" | null;
   linkedin_invitation_sent?: boolean | null;
   [key: string]: unknown;
@@ -1911,44 +1912,44 @@ export default function LeadsPage() {
               />
 
               <div className="animate-slideLeft fixed inset-y-0 right-0 z-[210] flex h-screen max-h-screen min-h-0 w-full touch-pan-y flex-col overflow-hidden border-l border-[#dbe5f3] bg-white shadow-[0_18px_42px_-22px_rgba(15,23,42,0.38)] sm:w-[520px]">
-                <div className="z-10 border-b border-[#e2e8f0] bg-white/95 p-6 pb-4 backdrop-blur-xl">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <HubButton type="button" variant="ghost" size="sm" onClick={() => setOpenLead(null)}>
-                        Fermer
-                      </HubButton>
-                      <button
-                        type="button"
-                        onClick={() => setOpenLead(null)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#dbe5f3] bg-white text-[#4B5563] transition hover:bg-[#f8fbff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
-                        aria-label="Fermer le panneau"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <span className="rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
+                <div className="z-10 border-b border-[#e2e8f0] bg-white/95 px-5 pt-4 pb-5 backdrop-blur-xl">
+                  {/* Barre de navigation */}
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setOpenLead(null)}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] text-[#64748b] transition hover:bg-[#f1f5f9] hover:text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                      aria-label="Fermer le panneau"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Fermer
+                    </button>
+                    <span className="rounded-full border border-[#dbe5f3] bg-[#f8fbff] px-3 py-1 text-[11px] text-[#64748b] whitespace-nowrap">
                       {plan || "essential"}
                     </span>
                   </div>
 
-                  <div className="mt-4 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="truncate text-2xl font-semibold leading-tight text-[#0F172A]">
+                  {/* Identité prospect */}
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8] text-sm font-semibold text-white shadow-sm">
+                      {((openLead.FirstName?.[0] ?? "") + (openLead.LastName?.[0] ?? "")).toUpperCase() || "?"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate text-[17px] font-semibold leading-tight text-[#0F172A]">
                         {(openLead.FirstName ?? "")} {(openLead.LastName ?? "")}
                       </h2>
-                      <p className="mt-1 truncate text-[12px] text-[#4B5563]">
-                        {openLead.Company || "—"} • {openLead.location || "—"}
+                      <p className="mt-0.5 truncate text-[12px] text-[#64748b]">
+                        {[openLead.Company, openLead.location].filter(Boolean).join(" • ") || "—"}
                       </p>
                     </div>
-
                     <div className="shrink-0">
                       {openLead.message_sent ? (
-                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] text-emerald-700 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 whitespace-nowrap">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                           Envoyé
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-2 rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#4B5563] whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#dbe5f3] bg-[#f8fbff] px-2.5 py-1 text-[11px] text-[#64748b] whitespace-nowrap">
                           <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" />
                           À faire
                         </span>
@@ -1958,46 +1959,77 @@ export default function LeadsPage() {
                 </div>
 
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain touch-pan-y p-6 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]">
-                  <div className="hub-card-soft p-4">
-                    <div className="text-[11px] uppercase tracking-wide text-[#4B5563]">Informations</div>
-                    <div className="mt-3 grid grid-cols-1 gap-3">
-                      <InfoBlock title="LinkedIn">
+                  <div className="hub-card-soft px-4 py-3">
+                    <div className="mb-1 text-[11px] uppercase tracking-wide text-[#94a3b8]">Informations</div>
+                    <div className="divide-y divide-[#f1f5f9]">
+                      <InfoBlock title="LinkedIn" icon={<Linkedin className="h-3.5 w-3.5" />}>
                         {openLead.LinkedInURL ? (
                           <button
                             type="button"
                             onClick={openLinkedInProfile}
-                            className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-[#dbe5f3] bg-white px-3 py-2 text-[#334155] transition hover:border-[#bfdbfe] hover:bg-[#f8fbff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#dbe5f3] bg-white px-2.5 py-1.5 text-xs text-[#334155] transition hover:border-[#bfdbfe] hover:bg-[#f0f6ff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
                           >
-                            Ouvrir le profil <span className="opacity-80">↗</span>
+                            <Linkedin className="h-3 w-3 text-[#0A66C2]" />
+                            Voir le profil
                           </button>
                         ) : (
-                          <span className="text-[#64748b]">—</span>
+                          <span className="text-[#94a3b8]">—</span>
                         )}
                       </InfoBlock>
 
-                      <InfoBlock title="Poste">
-                        <span className="text-[#0F172A]">
-                          {openLeadTranslatedJobTitle || "—"}
-                        </span>
+                      <InfoBlock title="Poste" icon={<Briefcase className="h-3.5 w-3.5" />}>
+                        <span>{openLeadTranslatedJobTitle || <span className="text-[#94a3b8]">—</span>}</span>
                       </InfoBlock>
 
                       {emailOption && (
-                        <InfoBlock title="Email">
-                          <span className="text-[#0F172A]">{openLead.email || "—"}</span>
+                        <InfoBlock title="Email" icon={<Mail className="h-3.5 w-3.5" />}>
+                          {openLead.email ? (
+                            <a
+                              href={`mailto:${openLead.email}`}
+                              className="truncate text-[#2563EB] hover:underline"
+                            >
+                              {openLead.email}
+                            </a>
+                          ) : (
+                            <span className="text-[#94a3b8]">—</span>
+                          )}
                         </InfoBlock>
                       )}
 
                       {phoneOption && (
-                        <InfoBlock title="Téléphone">
-                          <span className="text-[#0F172A]">{openLead.phone || "—"}</span>
+                        <InfoBlock title="Téléphone" icon={<Phone className="h-3.5 w-3.5" />}>
+                          {openLead.phone ? (
+                            <a
+                              href={`tel:${openLead.phone}`}
+                              className="text-[#2563EB] hover:underline"
+                            >
+                              {openLead.phone}
+                            </a>
+                          ) : (
+                            <span className="text-[#94a3b8]">—</span>
+                          )}
                         </InfoBlock>
                       )}
 
-                      <InfoBlock title="Créé le">
-                        <span className="text-[#0F172A]">
+                      {openLead.website && (
+                        <InfoBlock title="Site web" icon={<Globe className="h-3.5 w-3.5" />}>
+                          <a
+                            href={openLead.website.startsWith("http") ? openLead.website : `https://${openLead.website}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#dbe5f3] bg-white px-2.5 py-1.5 text-xs text-[#334155] transition hover:border-[#bfdbfe] hover:bg-[#f0f6ff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                          >
+                            <Globe className="h-3 w-3 text-[#64748b]" />
+                            Ouvrir le site
+                          </a>
+                        </InfoBlock>
+                      )}
+
+                      <InfoBlock title="Créé le" icon={<Calendar className="h-3.5 w-3.5" />}>
+                        <span>
                           {openLead.created_at
                             ? new Date(openLead.created_at).toLocaleDateString("fr-FR")
-                            : "—"}
+                            : <span className="text-[#94a3b8]">—</span>}
                         </span>
                       </InfoBlock>
                     </div>
@@ -2322,13 +2354,14 @@ function Metric({
   );
 }
 
-function InfoBlock({ title, children }: { title: string; children: ReactNode }) {
+function InfoBlock({ title, icon, children }: { title: string; icon?: ReactNode; children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-[#d7e3f4] bg-white p-4">
-      <div className="whitespace-nowrap text-[10px] uppercase tracking-wide text-[#51627b]">
-        {title}
+    <div className="flex items-center gap-3 py-3 first:pt-1 last:pb-1">
+      <div className="flex w-28 shrink-0 items-center gap-1.5 text-[#94a3b8]">
+        {icon}
+        <span className="text-[10px] uppercase tracking-wide whitespace-nowrap">{title}</span>
       </div>
-      <div className="mt-2 text-sm text-[#0b1c33]">{children}</div>
+      <div className="min-w-0 flex-1 text-sm text-[#1e293b]">{children}</div>
     </div>
   );
 }
