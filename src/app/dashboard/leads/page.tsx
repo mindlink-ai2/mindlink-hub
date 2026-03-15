@@ -1772,7 +1772,7 @@ export default function LeadsPage() {
                                   <button
                                     type="button"
                                     onClick={() => handleOpenConvModalForLead(lead)}
-                                    className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-[#9cc0ff] bg-[#f2f7ff] px-3 text-[11px] font-medium text-[#1f4f96] transition hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                                    className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-3 text-[11px] font-medium text-violet-700 transition hover:border-violet-300 hover:bg-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-200"
                                   >
                                     <MessageSquare className="h-3 w-3" />
                                     Conversation
@@ -1786,7 +1786,7 @@ export default function LeadsPage() {
                                       "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
                                       linkedInMessageSendErrors[idStr]
                                         ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
-                                        : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
+                                        : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 focus:ring-emerald-200",
                                       sendingLinkedInMessageLeadIds.has(idStr) ? "cursor-wait opacity-70" : "",
                                     ].join(" ")}
                                   >
