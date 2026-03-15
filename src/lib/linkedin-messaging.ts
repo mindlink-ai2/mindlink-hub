@@ -811,6 +811,11 @@ async function createConversationThreadId(params: {
     {
       account_id: unipileAccountId,
       provider: "LINKEDIN",
+      attendees_ids: [providerId],
+    },
+    {
+      account_id: unipileAccountId,
+      provider: "LINKEDIN",
       attendees: [{ provider_id: providerId }],
     },
     {
@@ -824,7 +829,7 @@ async function createConversationThreadId(params: {
       participants: [{ provider_id: providerId }],
     },
   ]);
-  const attemptNames = ["A", "B", "C"];
+  const attemptNames = ["A", "B", "C", "D"];
 
   const failures: UnipileCallFailureDetail[] = [];
 
