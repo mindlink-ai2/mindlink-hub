@@ -272,6 +272,7 @@ export default function LeadsPage() {
   const [linkedInMessageSendErrors, setLinkedInMessageSendErrors] = useState<Record<string, string>>({});
   const [openLeadThreadDbId, setOpenLeadThreadDbId] = useState<string | null>(null);
   const [convModalOpen, setConvModalOpen] = useState(false);
+  const [convModalLead, setConvModalLead] = useState<Lead | null>(null);
   const [convMessages, setConvMessages] = useState<ConvMessage[]>([]);
   const [convLoading, setConvLoading] = useState(false);
   const [convDraft, setConvDraft] = useState("");
@@ -914,6 +915,88 @@ export default function LeadsPage() {
     }
   };
 
+  const handleSendLinkedInMessageForLead = async (lead: Lead) => {
+    if (lead.linkedin_invitation_status !== "accepted") return;
+    const leadId = Number(lead.id);
+    const idStr = String(lead.id);
+    if (!Number.isFinite(leadId)) return;
+    if (lead.message_sent || sendingLinkedInMessageLeadIds.has(idStr)) return;
+    const content = (lead.internal_message ?? "").trim();
+    if (!content) {
+      setLinkedInMessageSendErrors((prev) => ({ ...prev, [idStr]: "Le message LinkedIn est vide." }));
+      return;
+    }
+    setSendingLinkedInMessageLeadIds((prev: Set<string>) => { const next = new Set(prev); next.add(idStr); return next; });
+    setLinkedInMessageSendErrors((prev) => { if (!prev[idStr]) return prev; const next = { ...prev }; delete next[idStr]; return next; });
+    try {
+      const res = await fetch("/api/prospection/send-linkedin-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId, content }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok === false || data?.success === false) {
+        const backendError = [data?.error_message, data?.error, data?.message].find(
+          (c): c is string => typeof c === "string" && c.trim().length > 0
+        );
+        throw new Error(backendError?.trim() ?? "Erreur pendant l'envoi du message LinkedIn.");
+      }
+      setSafeLeads((prev: Lead[]) =>
+        prev.map((l) =>
+          l.id === lead.id
+            ? { ...l, message_sent: true, message_sent_at: data?.lead?.message_sent_at ?? new Date().toISOString() }
+            : l
+        )
+      );
+      showSidebarToast("success", "Message LinkedIn envoyé ✅");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Erreur pendant l'envoi du message LinkedIn.";
+      setLinkedInMessageSendErrors((prev) => ({ ...prev, [idStr]: errorMessage }));
+      showSidebarToast("error", errorMessage);
+    } finally {
+      setSendingLinkedInMessageLeadIds((prev: Set<string>) => {
+        if (!prev.has(idStr)) return prev;
+        const next = new Set(prev);
+        next.delete(idStr);
+        return next;
+      });
+    }
+  };
+
+  const handleOpenConvModalForLead = async (lead: Lead) => {
+    setConvModalLead(lead);
+    setConvMessages([]);
+    setConvError(null);
+    setConvDraft("");
+    setConvModalOpen(true);
+    setConvLoading(true);
+    let threadId: string | null = null;
+    try {
+      const res = await fetch(`/api/inbox/thread-by-lead?leadId=${lead.id}`);
+      const data = await res.json().catch(() => ({}));
+      threadId = data?.thread?.id ? String(data.thread.id) : null;
+    } catch {
+      setConvError("Impossible de trouver la conversation.");
+      setConvLoading(false);
+      return;
+    }
+    if (!threadId) {
+      setConvError("Aucune conversation trouvée pour ce prospect.");
+      setConvLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/inbox/messages?threadDbId=${threadId}`);
+      const data = await res.json().catch(() => ({}));
+      const msgs: ConvMessage[] = Array.isArray(data?.messages) ? data.messages : [];
+      setConvMessages(msgs.slice().reverse());
+    } catch {
+      setConvError("Impossible de charger les messages.");
+    } finally {
+      setConvLoading(false);
+    }
+  };
+
   // Reset thread state when the selected lead changes
   useEffect(() => {
     setOpenLeadThreadDbId(null);
@@ -925,6 +1008,7 @@ export default function LeadsPage() {
 
   const handleOpenConvModal = async () => {
     if (!openLead) return;
+    setConvModalLead(openLead);
     setConvMessages([]);
     setConvError(null);
     setConvDraft("");
@@ -1684,41 +1768,64 @@ export default function LeadsPage() {
                                   </span>
                                 )}
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleLinkedInInvite(lead)}
-                                  disabled={
-                                    !lead.LinkedInURL ||
-                                    isInviteAccepted ||
-                                    isInviteSent ||
-                                    isInviteLoading
-                                  }
-                                  className={[
-                                    "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
-                                    isInviteAccepted
-                                      ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
-                                      : isInviteSent
-                                      ? "cursor-default border-amber-200 bg-amber-50 text-amber-700 focus:ring-amber-200"
-                                      : inviteError
-                                        ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
-                                        : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
-                                    !lead.LinkedInURL ? "cursor-not-allowed opacity-60" : "",
-                                    isInviteLoading ? "cursor-wait opacity-70" : "",
-                                  ].join(" ")}
-                                >
-                                  {isInviteAccepted
-                                    ? "Connecté"
-                                    : isInviteSent
-                                    ? "Connexion envoyée"
-                                    : isInviteLoading
-                                      ? "Envoi..."
-                                      : "Se connecter"}
-                                </button>
+                                {isSent ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="inline-flex h-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-[11px] font-medium text-emerald-700">
+                                      Envoyé
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenConvModalForLead(lead)}
+                                      className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-[#9cc0ff] bg-[#f2f7ff] px-3 text-[11px] font-medium text-[#1f4f96] transition hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                                    >
+                                      <MessageSquare className="h-3 w-3" />
+                                      Conversation
+                                    </button>
+                                  </div>
+                                ) : isInviteAccepted ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="inline-flex h-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-[11px] font-medium text-emerald-700">
+                                      Connecté
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSendLinkedInMessageForLead(lead)}
+                                      disabled={sendingLinkedInMessageLeadIds.has(idStr)}
+                                      className={[
+                                        "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
+                                        linkedInMessageSendErrors[idStr]
+                                          ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
+                                          : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
+                                        sendingLinkedInMessageLeadIds.has(idStr) ? "cursor-wait opacity-70" : "",
+                                      ].join(" ")}
+                                    >
+                                      {sendingLinkedInMessageLeadIds.has(idStr) ? "Envoi..." : "Envoyer"}
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLinkedInInvite(lead)}
+                                    disabled={!lead.LinkedInURL || isInviteSent || isInviteLoading}
+                                    className={[
+                                      "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
+                                      isInviteSent
+                                        ? "cursor-default border-amber-200 bg-amber-50 text-amber-700 focus:ring-amber-200"
+                                        : inviteError
+                                          ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
+                                          : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
+                                      !lead.LinkedInURL ? "cursor-not-allowed opacity-60" : "",
+                                      isInviteLoading ? "cursor-wait opacity-70" : "",
+                                    ].join(" ")}
+                                  >
+                                    {isInviteSent ? "Connexion envoyée" : isInviteLoading ? "Envoi..." : "Se connecter"}
+                                  </button>
+                                )}
 
                                 {inviteError ? (
-                                  <span className="text-[10px] text-red-600">
-                                    {inviteError}
-                                  </span>
+                                  <span className="text-[10px] text-red-600">{inviteError}</span>
+                                ) : linkedInMessageSendErrors[idStr] ? (
+                                  <span className="text-[10px] text-red-600">{linkedInMessageSendErrors[idStr]}</span>
                                 ) : null}
                               </div>
                             </td>
@@ -2013,7 +2120,7 @@ export default function LeadsPage() {
                 <div className="flex shrink-0 items-center justify-between border-b border-[#d7e3f4] px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold text-[#0b1c33]">
-                      {[openLead?.FirstName, openLead?.LastName].filter(Boolean).join(" ") || openLead?.Name || "Conversation"}
+                      {[convModalLead?.FirstName, convModalLead?.LastName].filter(Boolean).join(" ") || convModalLead?.Name || "Conversation"}
                     </p>
                     <p className="text-xs text-[#51627b]">Conversation LinkedIn</p>
                   </div>
