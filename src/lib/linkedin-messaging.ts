@@ -803,8 +803,9 @@ async function createConversationThreadId(params: {
   apiKey: string;
   unipileAccountId: string;
   providerId: string;
-}): Promise<{ threadId: string; details: UnipileCallFailureDetail[] }> {
-  const { baseUrl, apiKey, unipileAccountId, providerId } = params;
+  text: string;
+}): Promise<{ threadId: string; details: UnipileCallFailureDetail[]; messageSentWithCreation: boolean; creationPayload: unknown }> {
+  const { baseUrl, apiKey, unipileAccountId, providerId, text } = params;
 
   const endpoints = [`${baseUrl}/api/v1/chats`, `${baseUrl}/api/v1/conversations`];
   const bodyCandidates = dedupeBodies([
@@ -812,6 +813,7 @@ async function createConversationThreadId(params: {
       account_id: unipileAccountId,
       provider: "LINKEDIN",
       attendees_ids: [providerId],
+      text,
     },
     {
       account_id: unipileAccountId,
@@ -860,7 +862,7 @@ async function createConversationThreadId(params: {
           response_body: response.payload,
           response_text: response.text,
         });
-        if (threadId) return { threadId, details: failures };
+        if (threadId) return { threadId, details: failures, messageSentWithCreation: index === 0, creationPayload: response.payload };
 
         failures.push({
           status: response.status,
@@ -1332,6 +1334,8 @@ export async function ensureThreadAndSendMessage(params: {
   let threadDbId = String(existingThreadDbId ?? "").trim() || null;
   let unipileThreadId = String(existingUnipileThreadId ?? "").trim() || null;
   let createdNow = false;
+  let messageSentWithCreation = false;
+  let creationPayload: unknown = null;
 
   console.log({
     step: "ensure-thread",
@@ -1375,8 +1379,11 @@ export async function ensureThreadAndSendMessage(params: {
         apiKey,
         unipileAccountId,
         providerId: usableProviderId,
+        text,
       });
       unipileThreadId = created.threadId;
+      messageSentWithCreation = created.messageSentWithCreation;
+      creationPayload = created.creationPayload;
     } catch (error) {
       let failureStatus: number | null = null;
       let failureData: unknown = null;
@@ -1453,24 +1460,50 @@ export async function ensureThreadAndSendMessage(params: {
     provider_id: providerId,
     unipile_account_id: unipileAccountId,
     chat_id: unipileThreadId,
+    messageSentWithCreation,
   });
 
-  const sent = await sendOutboundMessageInThread({
-    baseUrl,
-    apiKey,
-    unipileAccountId,
-    unipileThreadId,
-    text,
-  });
-  if (sent.ok === false) {
-    return {
-      ok: false,
-      status: sent.status,
-      userMessage: sent.userMessage,
-      details: sent.details,
-      providerId,
+  let unipileMessageId: string = "";
+  let sentAt: string = new Date().toISOString();
+  let senderLinkedInUrl: string | null = null;
+  let persistPayload: unknown = null;
+
+  if (messageSentWithCreation) {
+    // Message was already sent during chat creation — extract info from creation response if available
+    const cp = toJsonObject(creationPayload);
+    const msgObj = toJsonObject(cp.message ?? cp.data ?? cp);
+    unipileMessageId =
+      getFirstString(msgObj, [["message_id"], ["id"]]) ??
+      getFirstString(cp, [["message_id"], ["message", "id"], ["data", "message_id"]]) ??
+      `creation-${Date.now()}`;
+    const rawSentAt =
+      getFirstString(msgObj, [["sent_at"], ["created_at"], ["timestamp"]]) ??
+      getFirstString(cp, [["sent_at"], ["created_at"]]);
+    if (rawSentAt) sentAt = rawSentAt;
+    persistPayload = creationPayload;
+    console.log("UNIPILE_MESSAGE_SENT_WITH_CREATION", { unipileMessageId, sentAt });
+  } else {
+    const sent = await sendOutboundMessageInThread({
+      baseUrl,
+      apiKey,
+      unipileAccountId,
       unipileThreadId,
-    };
+      text,
+    });
+    if (sent.ok === false) {
+      return {
+        ok: false,
+        status: sent.status,
+        userMessage: sent.userMessage,
+        details: sent.details,
+        providerId,
+        unipileThreadId,
+      };
+    }
+    unipileMessageId = sent.unipileMessageId;
+    sentAt = sent.sentAt;
+    senderLinkedInUrl = sent.senderLinkedInUrl;
+    persistPayload = sent.payload;
   }
 
   const persisted = await persistOutboundMessage({
@@ -1480,11 +1513,11 @@ export async function ensureThreadAndSendMessage(params: {
     threadDbId,
     unipileAccountId,
     unipileThreadId,
-    unipileMessageId: sent.unipileMessageId,
+    unipileMessageId,
     text,
-    sentAt: sent.sentAt,
-    payload: sent.payload,
-    senderLinkedInUrl: sent.senderLinkedInUrl,
+    sentAt,
+    payload: persistPayload,
+    senderLinkedInUrl,
   });
 
   if (persisted.ok === false) {
@@ -1502,9 +1535,9 @@ export async function ensureThreadAndSendMessage(params: {
     ok: true,
     threadDbId,
     unipileThreadId,
-    unipileMessageId: sent.unipileMessageId,
-    sentAt: sent.sentAt,
-    senderLinkedInUrl: sent.senderLinkedInUrl,
+    unipileMessageId,
+    sentAt,
+    senderLinkedInUrl,
     threadCreated: createdNow,
     providerId,
   };
