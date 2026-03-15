@@ -1786,7 +1786,7 @@ export default function LeadsPage() {
                                       "inline-flex h-8 items-center justify-center rounded-lg border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
                                       linkedInMessageSendErrors[idStr]
                                         ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus:ring-red-200"
-                                        : "border-orange-200 bg-orange-50 text-orange-700 hover:border-orange-300 hover:bg-orange-100 focus:ring-orange-200",
+                                        : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
                                       sendingLinkedInMessageLeadIds.has(idStr) ? "cursor-wait opacity-70" : "",
                                     ].join(" ")}
                                   >
