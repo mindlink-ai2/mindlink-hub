@@ -1,5 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
+  createUnipileChatWithMessage,
   extractLinkedInProfileSlug,
   normalizeUnipileBase,
   requireEnv,
@@ -286,24 +287,7 @@ async function autoSendDraftAfterAccepted(params: {
   const isFullActive = await isClientFullActivePlan(supabase, clientId);
   if (!isFullActive) return;
 
-  const thread = await resolveThreadForAutoSend({
-    supabase,
-    clientId,
-    leadId,
-    unipileAccountId,
-    payload,
-  });
-
-  if (!thread) {
-    await supabase
-      .from("linkedin_invitations")
-      .update({ last_error: "auto_send_thread_not_found" })
-      .eq("id", invitationId)
-      .eq("client_id", clientId)
-      .eq("dm_draft_status", "draft");
-    return;
-  }
-
+  // Atomic claim of the draft to prevent double-sends
   const provisionalSentAt = new Date().toISOString();
   const { data: claimed } = await supabase
     .from("linkedin_invitations")
@@ -326,11 +310,7 @@ async function autoSendDraftAfterAccepted(params: {
   if (!draftText) {
     await supabase
       .from("linkedin_invitations")
-      .update({
-        dm_draft_status: "none",
-        dm_sent_at: null,
-        last_error: "draft_text_empty",
-      })
+      .update({ dm_draft_status: "none", dm_sent_at: null, last_error: "draft_text_empty" })
       .eq("id", invitationId)
       .eq("client_id", clientId);
     return;
@@ -339,47 +319,109 @@ async function autoSendDraftAfterAccepted(params: {
   const unipileBase = normalizeUnipileBase(requireEnv("UNIPILE_DSN"));
   const unipileApiKey = requireEnv("UNIPILE_API_KEY");
 
-  const sendResult = await sendUnipileMessage({
-    baseUrl: unipileBase,
-    apiKey: unipileApiKey,
-    accountId: unipileAccountId,
-    threadId: thread.unipileThreadId,
-    text: draftText,
-  });
+  let thread = await resolveThreadForAutoSend({ supabase, clientId, leadId, unipileAccountId, payload });
 
-  if (!sendResult.ok) {
-    await supabase
-      .from("linkedin_invitations")
-      .update({
-        dm_draft_status: "draft",
-        dm_sent_at: null,
-        last_error: sendResult.error,
-      })
-      .eq("id", invitationId)
-      .eq("client_id", clientId);
-    return;
+  let messageId = `edge-auto-${Date.now()}`;
+  let sentAt = provisionalSentAt;
+  let sendPayload: unknown = null;
+
+  if (thread) {
+    // Thread already exists — send to it
+    const sendResult = await sendUnipileMessage({
+      baseUrl: unipileBase,
+      apiKey: unipileApiKey,
+      accountId: unipileAccountId,
+      threadId: thread.unipileThreadId,
+      text: draftText,
+    });
+
+    if (!sendResult.ok) {
+      await supabase
+        .from("linkedin_invitations")
+        .update({ dm_draft_status: "draft", dm_sent_at: null, last_error: sendResult.error })
+        .eq("id", invitationId)
+        .eq("client_id", clientId);
+      return;
+    }
+
+    sendPayload = sendResult.payload;
+    const p = asObject(sendResult.payload);
+    sentAt = firstString(p, [["sent_at"], ["timestamp"], ["created_at"], ["data", "sent_at"]]) ?? provisionalSentAt;
+    if (Number.isNaN(new Date(sentAt).getTime())) sentAt = provisionalSentAt;
+    messageId = firstString(p, [["message_id"], ["id"], ["provider_id"], ["data", "message_id"]]) ?? messageId;
+  } else {
+    // No thread found — create conversation with first message included (requires provider_id)
+    const { data: leadRow } = await supabase
+      .from("leads")
+      .select("linkedin_provider_id")
+      .eq("id", leadId)
+      .eq("client_id", clientId)
+      .limit(1)
+      .maybeSingle();
+
+    const providerId = String(leadRow?.linkedin_provider_id ?? "").trim();
+
+    if (!providerId) {
+      await supabase
+        .from("linkedin_invitations")
+        .update({ dm_draft_status: "draft", dm_sent_at: null, last_error: "auto_send_provider_id_missing" })
+        .eq("id", invitationId)
+        .eq("client_id", clientId);
+      return;
+    }
+
+    const createResult = await createUnipileChatWithMessage({
+      baseUrl: unipileBase,
+      apiKey: unipileApiKey,
+      accountId: unipileAccountId,
+      attendeeProviderId: providerId,
+      text: draftText,
+    });
+
+    if (!createResult.ok) {
+      await supabase
+        .from("linkedin_invitations")
+        .update({ dm_draft_status: "draft", dm_sent_at: null, last_error: createResult.error })
+        .eq("id", invitationId)
+        .eq("client_id", clientId);
+      return;
+    }
+
+    sendPayload = createResult.payload;
+    if (createResult.messageId) messageId = createResult.messageId;
+    if (createResult.sentAt) sentAt = createResult.sentAt;
+    if (Number.isNaN(new Date(sentAt).getTime())) sentAt = provisionalSentAt;
+
+    // Save new thread to DB
+    await supabase.from("inbox_threads").upsert(
+      {
+        client_id: clientId,
+        provider: "linkedin",
+        lead_id: leadId,
+        unipile_account_id: unipileAccountId,
+        unipile_thread_id: createResult.threadId,
+        last_message_at: sentAt,
+        last_message_preview: truncatePreview(draftText),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "client_id,unipile_account_id,unipile_thread_id" }
+    );
+
+    const { data: newThread } = await supabase
+      .from("inbox_threads")
+      .select("id, unipile_thread_id")
+      .eq("client_id", clientId)
+      .eq("unipile_account_id", unipileAccountId)
+      .eq("unipile_thread_id", createResult.threadId)
+      .limit(1)
+      .maybeSingle();
+
+    if (newThread?.id && newThread.unipile_thread_id) {
+      thread = { threadDbId: String(newThread.id), unipileThreadId: String(newThread.unipile_thread_id) };
+    }
   }
 
-  const payloadObject = asObject(sendResult.payload);
-  const sentAtCandidate =
-    firstString(payloadObject, [
-      ["sent_at"],
-      ["timestamp"],
-      ["created_at"],
-      ["data", "sent_at"],
-      ["data", "timestamp"],
-    ]) ?? provisionalSentAt;
-  const sentAt = Number.isNaN(new Date(sentAtCandidate).getTime())
-    ? provisionalSentAt
-    : new Date(sentAtCandidate).toISOString();
-  const messageId =
-    firstString(payloadObject, [
-      ["message_id"],
-      ["id"],
-      ["provider_id"],
-      ["data", "message_id"],
-      ["data", "id"],
-    ]) ?? `edge-auto-${Date.now()}`;
+  if (!thread) return;
 
   const { data: existingMessage } = await supabase
     .from("inbox_messages")
@@ -403,36 +445,25 @@ async function autoSendDraftAfterAccepted(params: {
       sender_linkedin_url: null,
       text: draftText,
       sent_at: sentAt,
-      raw: sendResult.payload,
+      raw: sendPayload,
     });
   }
 
   await supabase
     .from("inbox_threads")
-    .update({
-      last_message_at: sentAt,
-      last_message_preview: truncatePreview(draftText),
-      updated_at: new Date().toISOString(),
-    })
+    .update({ last_message_at: sentAt, last_message_preview: truncatePreview(draftText), updated_at: new Date().toISOString() })
     .eq("id", thread.threadDbId)
     .eq("client_id", clientId);
 
   await supabase
     .from("linkedin_invitations")
-    .update({
-      dm_draft_status: "sent",
-      dm_sent_at: sentAt,
-      last_error: null,
-    })
+    .update({ dm_draft_status: "sent", dm_sent_at: sentAt, last_error: null })
     .eq("id", invitationId)
     .eq("client_id", clientId);
 
   await supabase
     .from("leads")
-    .update({
-      message_sent: true,
-      message_sent_at: sentAt,
-    })
+    .update({ message_sent: true, message_sent_at: sentAt })
     .eq("id", leadId)
     .eq("client_id", clientId);
 }

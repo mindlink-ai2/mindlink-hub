@@ -117,6 +117,59 @@ export async function sendUnipileInvitation(params: {
   return { ok: true, payload };
 }
 
+export async function createUnipileChatWithMessage(params: {
+  baseUrl: string;
+  apiKey: string;
+  accountId: string;
+  attendeeProviderId: string;
+  text: string;
+}): Promise<
+  | { ok: true; threadId: string; messageId: string | null; sentAt: string | null; payload: unknown }
+  | { ok: false; error: string; details?: unknown }
+> {
+  const { baseUrl, apiKey, accountId, attendeeProviderId, text } = params;
+
+  const urls = [`${baseUrl}/api/v1/chats`, `${baseUrl}/api/v1/conversations`];
+
+  for (const url of urls) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "X-API-KEY": apiKey,
+        accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        account_id: accountId,
+        provider: "LINKEDIN",
+        attendees_ids: [attendeeProviderId],
+        text,
+      }),
+    });
+
+    const payload = await readResponseBody(response);
+    if (!response.ok) continue;
+
+    const obj = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+    const data = obj.data && typeof obj.data === "object" ? (obj.data as Record<string, unknown>) : {};
+    const msg = obj.message && typeof obj.message === "object" ? (obj.message as Record<string, unknown>) : {};
+
+    const threadId =
+      String(obj.thread_id ?? obj.threadId ?? obj.conversation_id ?? obj.id ?? data.thread_id ?? data.id ?? "").trim() || null;
+
+    if (!threadId) continue;
+
+    const messageId =
+      String(msg.message_id ?? msg.id ?? obj.message_id ?? data.message_id ?? "").trim() || null;
+    const sentAt =
+      String(msg.sent_at ?? msg.created_at ?? obj.sent_at ?? data.sent_at ?? "").trim() || null;
+
+    return { ok: true, threadId, messageId, sentAt, payload };
+  }
+
+  return { ok: false, error: "unipile_create_chat_failed" };
+}
+
 export async function sendUnipileMessage(params: {
   baseUrl: string;
   apiKey: string;

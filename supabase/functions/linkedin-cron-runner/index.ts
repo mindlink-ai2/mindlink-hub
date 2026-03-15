@@ -121,6 +121,14 @@ function isWithinWindow(nowMinutes: number, startMinutes: number, endMinutes: nu
   return nowMinutes >= startMinutes && nowMinutes < endMinutes;
 }
 
+function isWeekdayInZone(date: Date, timezone: string): boolean {
+  const parts = getTimePartsInZone(date, timezone);
+  // Reconstruct as UTC midnight using local date parts to get correct day of week
+  const localMidnight = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  const dow = localMidnight.getUTCDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+  return dow >= 1 && dow <= 5;
+}
+
 function normalizeClientQuota(rawQuota: unknown): number {
   const parsed = Number(rawQuota);
   if (!Number.isFinite(parsed)) return 10;
@@ -256,8 +264,13 @@ Deno.serve(async (req) => {
 
         const { startIso, endIso, nowParts } = getTodayBoundsUtc(timezone);
 
+        if (!isWeekdayInZone(new Date(), timezone)) {
+          processed.push({ client_id: clientId, skipped: "weekend" });
+          continue;
+        }
+
         const nowMinutes = nowParts.hour * 60 + nowParts.minute;
-        const startMinutes = 8 * 60;
+        const startMinutes = 9 * 60;
         const endMinutes = 18 * 60;
         if (!isWithinWindow(nowMinutes, startMinutes, endMinutes)) {
           processed.push({ client_id: clientId, skipped: "outside_window" });
