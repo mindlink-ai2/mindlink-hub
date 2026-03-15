@@ -2005,7 +2005,7 @@ export default function LeadsPage() {
           {/* Modal conversation LinkedIn */}
           {convModalOpen && (
             <div
-              className="fixed inset-0 z-[150] flex items-center justify-center bg-[#0f172a]/50 p-4"
+              className="fixed inset-0 z-[220] flex items-center justify-center bg-[#0f172a]/50 p-4"
               onClick={(e) => { if (e.target === e.currentTarget) setConvModalOpen(false); }}
             >
               <div className="relative flex h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[#d7e3f4] bg-white shadow-2xl">
