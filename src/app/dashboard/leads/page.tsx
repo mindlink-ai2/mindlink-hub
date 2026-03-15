@@ -17,7 +17,7 @@ import ProspectionFilterBar, {
 } from "@/components/prospection/ProspectionFilterBar";
 import { Button } from "@/components/ui/button";
 import { HubButton } from "@/components/ui/hub-button";
-import { AlertTriangle, Building2, LayoutGrid, Linkedin, List, Mail, MapPin, MoveRight, Phone, UserCircle2, X } from "lucide-react";
+import { AlertTriangle, Building2, LayoutGrid, Linkedin, List, Mail, MapPin, MessageSquare, MoveRight, Phone, UserCircle2, X } from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -46,6 +46,15 @@ type SidebarToast = {
   id: number;
   tone: "success" | "error";
   message: string;
+};
+
+type ConvMessage = {
+  id: string;
+  direction: string;
+  sender_name: string | null;
+  text: string | null;
+  sent_at: string | null;
+  raw: unknown;
 };
 
 const JOB_TITLE_EXACT_TRANSLATIONS: Record<string, string> = {
@@ -261,6 +270,14 @@ export default function LeadsPage() {
   const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({});
   const [sendingLinkedInMessageLeadIds, setSendingLinkedInMessageLeadIds] = useState<Set<string>>(new Set());
   const [linkedInMessageSendErrors, setLinkedInMessageSendErrors] = useState<Record<string, string>>({});
+  const [openLeadThreadDbId, setOpenLeadThreadDbId] = useState<string | null>(null);
+  const [convModalOpen, setConvModalOpen] = useState(false);
+  const [convMessages, setConvMessages] = useState<ConvMessage[]>([]);
+  const [convLoading, setConvLoading] = useState(false);
+  const [convDraft, setConvDraft] = useState("");
+  const [convSending, setConvSending] = useState(false);
+  const [convError, setConvError] = useState<string | null>(null);
+  const convMessagesEndRef = useRef<HTMLDivElement>(null);
   const [sidebarToast, setSidebarToast] = useState<SidebarToast | null>(null);
   const sidebarToastTimeoutRef = useRef<number | null>(null);
   const selectedCount = selectedIds.size;
@@ -795,6 +812,8 @@ export default function LeadsPage() {
 
   const handleSendLinkedInMessage = async () => {
     if (!openLead) return;
+    if (openLead.linkedin_invitation_status !== "accepted") return;
+
     const leadId = Number(openLead.id);
     const idStr = String(openLead.id);
     if (!Number.isFinite(leadId)) {
@@ -806,6 +825,15 @@ export default function LeadsPage() {
     }
 
     if (openLead.message_sent || sendingLinkedInMessageLeadIds.has(idStr)) return;
+
+    const content = (openLead.internal_message ?? "").trim();
+    if (!content) {
+      setLinkedInMessageSendErrors((prev) => ({
+        ...prev,
+        [idStr]: "Le message LinkedIn est vide.",
+      }));
+      return;
+    }
 
     setSendingLinkedInMessageLeadIds((prev: Set<string>) => {
       const next = new Set(prev);
@@ -821,12 +849,10 @@ export default function LeadsPage() {
     });
 
     try {
-      const res = await fetch("/api/leads/message-sent", {
+      const res = await fetch("/api/prospection/send-linkedin-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leadId,
-        }),
+        body: JSON.stringify({ leadId, content }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -840,6 +866,9 @@ export default function LeadsPage() {
           backendError?.trim() ?? "Erreur pendant l’envoi du message LinkedIn."
         );
       }
+
+      const threadId = data?.thread?.id ? String(data.thread.id) : null;
+      if (threadId) setOpenLeadThreadDbId(threadId);
 
       setOpenLead((prev: Lead | null) =>
         prev
@@ -864,13 +893,12 @@ export default function LeadsPage() {
             : l
         )
       );
-      showSidebarToast("success", "Message envoyé");
-      void fetch("/api/inbox/threads", { cache: "no-store" }).catch(() => undefined);
+      showSidebarToast("success", "Message LinkedIn envoyé ✅");
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Erreur pendant le marquage du lead.";
+          : "Erreur pendant l’envoi du message LinkedIn.";
       setLinkedInMessageSendErrors((prev) => ({
         ...prev,
         [idStr]: errorMessage,
@@ -883,6 +911,104 @@ export default function LeadsPage() {
         next.delete(idStr);
         return next;
       });
+    }
+  };
+
+  // Reset thread state when the selected lead changes
+  useEffect(() => {
+    setOpenLeadThreadDbId(null);
+    setConvMessages([]);
+    setConvError(null);
+    setConvDraft("");
+    setConvModalOpen(false);
+  }, [openLead?.id]);
+
+  const handleOpenConvModal = async () => {
+    if (!openLead) return;
+    setConvMessages([]);
+    setConvError(null);
+    setConvDraft("");
+    setConvModalOpen(true);
+    setConvLoading(true);
+
+    let threadId = openLeadThreadDbId;
+
+    if (!threadId) {
+      try {
+        const res = await fetch(`/api/inbox/thread-by-lead?leadId=${openLead.id}`);
+        const data = await res.json().catch(() => ({}));
+        threadId = data?.thread?.id ? String(data.thread.id) : null;
+        if (threadId) setOpenLeadThreadDbId(threadId);
+      } catch {
+        setConvError("Impossible de trouver la conversation.");
+        setConvLoading(false);
+        return;
+      }
+    }
+
+    if (!threadId) {
+      setConvError("Aucune conversation trouvée pour ce prospect.");
+      setConvLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/inbox/messages?threadDbId=${threadId}`);
+      const data = await res.json().catch(() => ({}));
+      const msgs: ConvMessage[] = Array.isArray(data?.messages) ? data.messages : [];
+      setConvMessages(msgs.slice().reverse());
+    } catch {
+      setConvError("Impossible de charger les messages.");
+    } finally {
+      setConvLoading(false);
+    }
+  };
+
+  const handleConvSend = async () => {
+    if (!openLeadThreadDbId || !convDraft.trim() || convSending) return;
+
+    setConvSending(true);
+    const text = convDraft.trim();
+    setConvDraft("");
+
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimistic: ConvMessage = {
+      id: optimisticId,
+      direction: "outbound",
+      sender_name: "Vous",
+      text,
+      sent_at: new Date().toISOString(),
+      raw: {},
+    };
+    setConvMessages((prev) => [...prev, optimistic]);
+
+    try {
+      const res = await fetch("/api/inbox/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threadDbId: openLeadThreadDbId, text }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || "Erreur d'envoi.");
+      }
+      setConvMessages((prev) =>
+        prev.map((m) =>
+          m.id === optimisticId
+            ? {
+                ...m,
+                id: data?.message?.unipile_message_id ?? m.id,
+                sent_at: data?.message?.sent_at ?? m.sent_at,
+              }
+            : m
+        )
+      );
+    } catch (e: unknown) {
+      setConvMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      setConvError(e instanceof Error ? e.message : "Erreur d'envoi.");
+      setConvDraft(text);
+    } finally {
+      setConvSending(false);
     }
   };
 
@@ -1742,30 +1868,55 @@ export default function LeadsPage() {
                       className="mt-3 min-h-[176px] w-full resize-y overflow-y-auto rounded-xl border border-[#dbe5f3] bg-white p-4 text-sm text-[#0F172A] placeholder-[#94a3b8] transition focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
                     />
 
-                    <div className="mt-3">
-                      <button
-                        type="button"
-                        onClick={handleSendLinkedInMessage}
-                        disabled={Boolean(openLead.message_sent) || isSendingOpenLeadLinkedInMessage}
-                        className={[
-                          "w-full rounded-xl px-4 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2",
-                          openLead.message_sent
-                            ? "cursor-default bg-emerald-600 text-white focus:ring-emerald-200"
-                            : openLeadLinkedInMessageError
+                    <div className="mt-3 space-y-2">
+                      {/* Invitation non acceptée */}
+                      {openLead.linkedin_invitation_status !== "accepted" && !openLead.message_sent && (
+                        <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] px-4 py-3 text-sm text-[#64748b]">
+                          <Linkedin className="h-4 w-4 text-[#0A66C2]" />
+                          En attente d&apos;acceptation
+                        </div>
+                      )}
+
+                      {/* Bouton envoyer — invitation acceptée et pas encore envoyé */}
+                      {openLead.linkedin_invitation_status === "accepted" && !openLead.message_sent && (
+                        <button
+                          type="button"
+                          onClick={handleSendLinkedInMessage}
+                          disabled={isSendingOpenLeadLinkedInMessage}
+                          className={[
+                            "flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2",
+                            openLeadLinkedInMessageError
                               ? "bg-red-600 text-white hover:bg-red-700 focus:ring-red-200"
                               : isSendingOpenLeadLinkedInMessage
                                 ? "cursor-wait bg-[#2563EB]/80 text-white focus:ring-[#bfdbfe]"
-                            : "bg-[#2563EB] text-white hover:bg-[#1d4ed8] focus:ring-[#bfdbfe]",
-                        ].join(" ")}
-                      >
-                        {openLead.message_sent
-                          ? "Envoyé ✅"
-                          : isSendingOpenLeadLinkedInMessage
-                            ? "Marquage…"
+                                : "bg-[#2563EB] text-white hover:bg-[#1d4ed8] focus:ring-[#bfdbfe]",
+                          ].join(" ")}
+                        >
+                          <Linkedin className="h-4 w-4" />
+                          {isSendingOpenLeadLinkedInMessage
+                            ? "Envoi en cours…"
                             : openLeadLinkedInMessageError
                               ? "Erreur — réessayer"
-                              : "Marquer comme envoyé"}
-                      </button>
+                              : "Envoyer le message LinkedIn"}
+                        </button>
+                      )}
+
+                      {/* Message envoyé + voir la conversation */}
+                      {openLead.message_sent && (
+                        <>
+                          <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                            Message envoyé ✅
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleOpenConvModal}
+                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#dbe5f3] bg-white px-4 py-3 text-sm font-medium text-[#2563EB] transition hover:bg-[#f0f6ff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                            Voir la conversation
+                          </button>
+                        </>
+                      )}
                     </div>
 
                     {openLeadLinkedInMessageError ? (
@@ -1849,6 +2000,108 @@ export default function LeadsPage() {
                 </div>
               </div>
             </>
+          )}
+
+          {/* Modal conversation LinkedIn */}
+          {convModalOpen && (
+            <div
+              className="fixed inset-0 z-[150] flex items-center justify-center bg-[#0f172a]/50 p-4"
+              onClick={(e) => { if (e.target === e.currentTarget) setConvModalOpen(false); }}
+            >
+              <div className="relative flex h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[#d7e3f4] bg-white shadow-2xl">
+                {/* Header */}
+                <div className="flex shrink-0 items-center justify-between border-b border-[#d7e3f4] px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[#0b1c33]">
+                      {[openLead?.FirstName, openLead?.LastName].filter(Boolean).join(" ") || openLead?.Name || "Conversation"}
+                    </p>
+                    <p className="text-xs text-[#51627b]">Conversation LinkedIn</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConvModalOpen(false)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#dbe5f3] text-[#51627b] transition hover:bg-[#f5f9ff] focus:outline-none focus:ring-2 focus:ring-[#bfd8ff]"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Messages */}
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+                  {convLoading ? (
+                    <div className="flex h-full items-center justify-center text-sm text-[#51627b]">
+                      Chargement…
+                    </div>
+                  ) : convError ? (
+                    <div className="flex h-full items-center justify-center text-sm text-red-600">
+                      {convError}
+                    </div>
+                  ) : convMessages.length === 0 ? (
+                    <div className="flex h-full items-center justify-center text-sm text-[#64748b]">
+                      Aucun message pour l&apos;instant.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {convMessages.map((msg) => {
+                        const raw = msg.raw && typeof msg.raw === "object" ? msg.raw as Record<string, unknown> : {};
+                        const isDeleted = raw.deleted === true;
+                        const outbound = String(msg.direction ?? "").toLowerCase() === "outbound";
+                        return (
+                          <div
+                            key={msg.id}
+                            className={[
+                              "max-w-[88%] rounded-2xl border px-3 py-2 text-sm",
+                              outbound
+                                ? "ml-auto border-[#9cc0ff] bg-[#edf5ff] text-[#14345e]"
+                                : "mr-auto border-[#d7e3f4] bg-[#f7fbff] text-[#1e3551]",
+                            ].join(" ")}
+                          >
+                            <div className="mb-1 text-[11px] text-[#6a7f9f]">
+                              {msg.sender_name || (outbound ? "Vous" : "Prospect")}
+                            </div>
+                            <div className="whitespace-pre-wrap">
+                              {isDeleted ? "Message supprimé" : msg.text || "—"}
+                            </div>
+                            <div className="mt-1 text-[10px] text-[#7a8ea9]">
+                              {msg.sent_at ? new Date(msg.sent_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div ref={convMessagesEndRef} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Composer */}
+                <div className="shrink-0 border-t border-[#d7e3f4] px-4 py-3">
+                  {convError && convMessages.length > 0 && (
+                    <p className="mb-2 text-xs text-red-600">{convError}</p>
+                  )}
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      value={convDraft}
+                      onChange={(e) => setConvDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleConvSend();
+                      }}
+                      placeholder="Écrire un message…"
+                      rows={3}
+                      className="min-h-[72px] flex-1 resize-none rounded-xl border border-[#c8d6ea] bg-[#f8fbff] px-3 py-2 text-sm text-[#0b1c33] placeholder-[#93a6c1] focus:border-[#9cc0ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff]"
+                    />
+                    <HubButton
+                      type="button"
+                      variant="primary"
+                      onClick={handleConvSend}
+                      disabled={convSending || !convDraft.trim()}
+                      className="shrink-0"
+                    >
+                      {convSending ? "…" : "Envoyer"}
+                    </HubButton>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {sidebarToast ? (
