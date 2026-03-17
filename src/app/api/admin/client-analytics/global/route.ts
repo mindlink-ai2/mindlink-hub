@@ -96,20 +96,20 @@ export async function GET() {
       .from("client_events")
       .select("event_type, created_at")
       .gte("created_at", day30ago.toISOString())
-      .in("event_type", ["login", "session_start", "message_sent", "prospects_received"]);
+      .in("event_type", ["login", "session_start", "message_sent", "connection_request_sent"]);
 
-    const chartMap: Record<string, { logins: number; messages: number; prospects: number }> = {};
+    const chartMap: Record<string, { logins: number; messages: number; connections: number }> = {};
     for (let i = 0; i < 30; i++) {
       const d = new Date();
       d.setDate(d.getDate() - (29 - i));
-      chartMap[formatDate(d)] = { logins: 0, messages: 0, prospects: 0 };
+      chartMap[formatDate(d)] = { logins: 0, messages: 0, connections: 0 };
     }
     for (const e of chartEvents ?? []) {
       const day = formatDate(new Date(e.created_at));
       if (!chartMap[day]) continue;
       if (e.event_type === "login" || e.event_type === "session_start") chartMap[day].logins++;
       else if (e.event_type === "message_sent") chartMap[day].messages++;
-      else if (e.event_type === "prospects_received") chartMap[day].prospects++;
+      else if (e.event_type === "connection_request_sent") chartMap[day].connections++;
     }
     const activityChart = Object.entries(chartMap).map(([date, vals]) => ({ date, ...vals }));
 
