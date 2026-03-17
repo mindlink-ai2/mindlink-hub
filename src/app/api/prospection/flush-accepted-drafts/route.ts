@@ -25,7 +25,7 @@ type LeadRow = {
 
 type SendResult =
   | { ok: true; invitation_id: string; lead_id: number; mode: string }
-  | { ok: false; invitation_id: string; lead_id: number; error: string; skipped?: boolean };
+  | { ok: false; invitation_id: string; lead_id: number; error: string; details?: unknown; provider_id?: string | null; skipped?: boolean };
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -157,7 +157,8 @@ export async function POST(req: Request) {
         .eq("id", inv.id)
         .eq("client_id", clientId);
 
-      results.push({ ok: false, invitation_id: inv.id, lead_id: inv.lead_id, error: errorMsg });
+      const details = "details" in sendResult ? sendResult.details : undefined;
+      results.push({ ok: false, invitation_id: inv.id, lead_id: inv.lead_id, error: errorMsg, details, provider_id: providerId });
     }
 
     // Wait between sends, except after the last one
