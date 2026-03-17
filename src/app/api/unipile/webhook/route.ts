@@ -1406,6 +1406,9 @@ async function handleNewRelation(params: {
     });
 
     const nowIso = new Date().toISOString();
+    const followupAt = new Date();
+    followupAt.setDate(followupAt.getDate() + 7);
+    const followupIso = followupAt.toISOString();
     if (sendResult.ok) {
       await supabase
         .from("linkedin_invitations")
@@ -1415,7 +1418,7 @@ async function handleNewRelation(params: {
 
       await supabase
         .from("leads")
-        .update({ message_sent: true, message_sent_at: nowIso })
+        .update({ message_sent: true, message_sent_at: nowIso, next_followup_at: followupIso })
         .eq("id", matchedLeadId)
         .eq("client_id", clientId);
     } else {

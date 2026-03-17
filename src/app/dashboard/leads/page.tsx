@@ -2112,12 +2112,15 @@ export default function LeadsPage() {
                     ) : null}
 
                     {openLead.next_followup_at && (
-                      <p className="mt-2 text-xs text-[#4B5563]">
-                        Prochaine relance :{" "}
-                        <span className="font-medium text-[#0F172A]">
-                          {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
-                        </span>
-                      </p>
+                      <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                        <span className="text-amber-500 text-sm">⏰</span>
+                        <p className="text-xs text-amber-800">
+                          Relance programmée le{" "}
+                          <span className="font-semibold">
+                            {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
+                          </span>
+                        </p>
+                      </div>
                     )}
                   </div>
 

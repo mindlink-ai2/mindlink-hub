@@ -202,6 +202,9 @@ export async function POST(req: Request) {
     });
 
     const nowIso = new Date().toISOString();
+    const followupAt = new Date();
+    followupAt.setDate(followupAt.getDate() + 7);
+    const followupIso = followupAt.toISOString();
 
     if (sendResult.ok) {
       await supabase
@@ -212,7 +215,7 @@ export async function POST(req: Request) {
 
       await supabase
         .from("leads")
-        .update({ message_sent: true, message_sent_at: nowIso })
+        .update({ message_sent: true, message_sent_at: nowIso, next_followup_at: followupIso })
         .eq("id", inv.lead_id)
         .eq("client_id", clientId);
 
