@@ -1195,7 +1195,7 @@ async function markInvitationAccepted(params: {
   unipileAccountId: string;
   payload: JsonObject;
   match: MatchResult;
-}): Promise<string | null> {
+}): Promise<{ invitationId: string | null; draftText: string | null }> {
   const { supabase, clientId, leadId, unipileAccountId, payload, match } = params;
   const now = new Date().toISOString();
   const draftText = await getLeadInternalMessage({ supabase, clientId, leadId });
@@ -1221,21 +1221,18 @@ async function markInvitationAccepted(params: {
     .maybeSingle();
 
   if (sentInvitation?.id) {
-    const { error } = await supabase
-      .from("linkedin_invitations")
-      .update({
-        status: "accepted",
-        accepted_at: now,
-        raw: {
-          invitation: sentInvitation.raw ?? null,
-          acceptance: acceptanceRaw,
-        },
-      })
-      .eq("id", sentInvitation.id)
-      .eq("client_id", clientId);
-
-    if (error) console.error("UNIPILE_WEBHOOK_RELATION_UPDATE_SENT_ERROR:", error);
-    return String(sentInvitation.id);
+    await updateInvitationAcceptedWithDraft({
+      supabase,
+      clientId,
+      invitationId: String(sentInvitation.id),
+      acceptedAtIso: now,
+      raw: {
+        invitation: sentInvitation.raw ?? null,
+        acceptance: acceptanceRaw,
+      },
+      draftText,
+    });
+    return { invitationId: String(sentInvitation.id), draftText };
   }
 
   const { data: existingAccepted } = await supabase
@@ -1248,7 +1245,7 @@ async function markInvitationAccepted(params: {
     .limit(1)
     .maybeSingle();
 
-  if (existingAccepted?.id) return String(existingAccepted.id);
+  if (existingAccepted?.id) return { invitationId: String(existingAccepted.id), draftText };
 
   const { data: inserted, error: insertErr } = await supabase
     .from("linkedin_invitations")
@@ -1259,13 +1256,15 @@ async function markInvitationAccepted(params: {
       status: "accepted",
       accepted_at: now,
       raw: acceptanceRaw,
+      dm_draft_text: draftText,
+      dm_draft_status: draftText ? "draft" : "none",
     })
     .select("id")
     .limit(1)
     .maybeSingle();
 
   if (insertErr) console.error("UNIPILE_WEBHOOK_RELATION_INSERT_ACCEPTED_ERROR:", insertErr);
-  return inserted?.id ? String(inserted.id) : null;
+  return { invitationId: inserted?.id ? String(inserted.id) : null, draftText };
 }
 
 async function fallbackAcceptLastSent(params: {
@@ -1274,7 +1273,7 @@ async function fallbackAcceptLastSent(params: {
   unipileAccountId: string;
   payload: JsonObject;
   match: MatchResult;
-}): Promise<{ leadId: number | string | null; invitationId: string | null }> {
+}): Promise<{ leadId: number | string | null; invitationId: string | null; draftText: string | null }> {
   const { supabase, clientId, unipileAccountId, payload, match } = params;
   const now = new Date().toISOString();
 
@@ -1289,7 +1288,7 @@ async function fallbackAcceptLastSent(params: {
     .maybeSingle();
 
   if (!lastSent?.id || lastSent?.lead_id === null || lastSent?.lead_id === undefined) {
-    return { leadId: null, invitationId: null };
+    return { leadId: null, invitationId: null, draftText: null };
   }
 
   const draftText = await getLeadInternalMessage({
@@ -1321,6 +1320,7 @@ async function fallbackAcceptLastSent(params: {
   return {
     leadId: lastSent.lead_id,
     invitationId: String(lastSent.id),
+    draftText,
   };
 }
 
@@ -1341,9 +1341,10 @@ async function handleNewRelation(params: {
 
   let matchedLeadId: number | string | null = null;
   let invitationEventId: string | null = null;
+  let draftText: string | null = null;
 
   if (match.leadId !== null) {
-    invitationEventId = await markInvitationAccepted({
+    const accepted = await markInvitationAccepted({
       supabase,
       clientId,
       leadId: match.leadId,
@@ -1351,6 +1352,8 @@ async function handleNewRelation(params: {
       payload,
       match,
     });
+    invitationEventId = accepted.invitationId;
+    draftText = accepted.draftText;
     matchedLeadId = match.leadId;
   } else {
     const fallback = await fallbackAcceptLastSent({
@@ -1362,6 +1365,7 @@ async function handleNewRelation(params: {
     });
     matchedLeadId = fallback.leadId;
     invitationEventId = fallback.invitationId;
+    draftText = fallback.draftText;
 
     if (fallback.leadId === null) {
       console.warn("UNIPILE_WEBHOOK_RELATION_NO_MATCH_NO_FALLBACK", {
@@ -1373,7 +1377,7 @@ async function handleNewRelation(params: {
     }
   }
 
-  await syncLeadProviderFromRelationPayload({
+  const syncResult = await syncLeadProviderFromRelationPayload({
     supabase,
     raw: {
       webhook_payload: payload,
@@ -1389,6 +1393,46 @@ async function handleNewRelation(params: {
     unipileAccountId,
     leadIdHint: matchedLeadId,
   });
+
+  if (matchedLeadId !== null && invitationEventId !== null && draftText) {
+    const providerId = syncResult.userProviderId ?? null;
+    const sendResult = await ensureThreadAndSendMessage({
+      supabase,
+      clientId,
+      leadId: String(matchedLeadId),
+      accountId: unipileAccountId,
+      linkedinProviderId: providerId,
+      text: draftText,
+    });
+
+    const nowIso = new Date().toISOString();
+    if (sendResult.ok) {
+      await supabase
+        .from("linkedin_invitations")
+        .update({ dm_draft_status: "sent", dm_sent_at: nowIso, last_error: null })
+        .eq("id", invitationEventId)
+        .eq("client_id", clientId);
+
+      await supabase
+        .from("leads")
+        .update({ message_sent: true, message_sent_at: nowIso })
+        .eq("id", matchedLeadId)
+        .eq("client_id", clientId);
+    } else {
+      const errorMsg = "error" in sendResult ? (sendResult.error ?? "auto_send_failed") : "auto_send_failed";
+      console.error("UNIPILE_WEBHOOK_RELATION_AUTO_SEND_ERROR", {
+        clientId,
+        leadId: String(matchedLeadId),
+        invitationId: invitationEventId,
+        error: errorMsg,
+      });
+      await supabase
+        .from("linkedin_invitations")
+        .update({ last_error: `auto_send: ${errorMsg}` })
+        .eq("id", invitationEventId)
+        .eq("client_id", clientId);
+    }
+  }
 }
 
 export async function POST(req: Request) {
