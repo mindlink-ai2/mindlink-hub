@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SubscriptionGate from "@/components/SubscriptionGate";
+import { trackBusinessEvent } from "@/lib/analytics/business-client";
 import { HubButton } from "@/components/ui/hub-button";
 import { supabase } from "@/lib/supabase";
 import { ChevronRight, Linkedin, Search } from "lucide-react";
@@ -215,6 +216,10 @@ export default function InboxPage() {
   const selectedThreadHasDraft =
     selectedThread?.dm_draft_status === "draft" &&
     Boolean((selectedThread?.dm_draft_text ?? "").trim());
+
+  useEffect(() => {
+    trackBusinessEvent("page_viewed", "navigation", { page: "inbox" });
+  }, []);
 
   useEffect(() => {
     if (!selectedThreadId) {

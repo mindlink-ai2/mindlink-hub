@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SubscriptionGate from "@/components/SubscriptionGate";
+import { trackBusinessEvent } from "@/lib/analytics/business-client";
 
 type DrilldownType =
   | "leads_today"
@@ -64,6 +65,10 @@ export default function DashboardPage() {
   const [itemsError, setItemsError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const drilldownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    trackBusinessEvent("dashboard_viewed", "navigation");
+  }, []);
 
   const loadStats = useCallback(async () => {
     setLoadingStats(true);

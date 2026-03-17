@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
+import { trackBusinessEvent } from "@/lib/analytics/business-client";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import LeadsCards, { type MobileLeadsViewMode } from "@/components/leads/LeadsCards";
@@ -288,6 +289,17 @@ export default function LeadsPage() {
 
   // ✅ open lead from query param (?open=ID)
   const [openFromQuery, setOpenFromQuery] = useState<string | null>(null);
+
+  // Tracking
+  useEffect(() => {
+    trackBusinessEvent("prospects_list_viewed", "prospects");
+  }, []);
+
+  useEffect(() => {
+    if (openLead) {
+      trackBusinessEvent("prospect_detail_viewed", "prospects", { lead_id: openLead.id });
+    }
+  }, [openLead]);
 
   // ✅ DERIVED filtered list (no state = no desync)
   const searchedLeads = useMemo(() => {

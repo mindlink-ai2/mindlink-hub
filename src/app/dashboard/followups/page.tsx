@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, CheckCircle2, ChevronRight } from "lucide-react";
+import { trackBusinessEvent } from "@/lib/analytics/business-client";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
 import MobileLayout from "@/components/mobile/MobileLayout";
@@ -40,6 +41,10 @@ export default function FollowupsPage() {
   const [reprogramDate, setReprogramDate] = useState("");
   const [reprogramming, setReprogramming] = useState(false);
   const [reprogramError, setReprogramError] = useState<string | null>(null);
+
+  useEffect(() => {
+    trackBusinessEvent("page_viewed", "navigation", { page: "followups" });
+  }, []);
 
   // Fetch all leads with followups
   useEffect(() => {
