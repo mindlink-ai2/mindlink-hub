@@ -110,6 +110,7 @@ export async function GET() {
       traite,
       internal_message,
       message_mail,
+      relance_linkedin,
       message_sent,
       message_sent_at,
       next_followup_at

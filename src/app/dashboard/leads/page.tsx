@@ -42,6 +42,7 @@ type Lead = {
   website?: string | null;
   linkedin_invitation_status?: "sent" | "accepted" | null;
   linkedin_invitation_sent?: boolean | null;
+  relance_linkedin?: string | null;
   [key: string]: unknown;
 };
 
@@ -256,6 +257,7 @@ export default function LeadsPage() {
   const [mobileViewMode, setMobileViewMode] = useState<MobileLeadsViewMode>("compact");
   const [desktopFilters, setDesktopFilters] = useState<ProspectionDesktopFilters>(defaultDesktopFilters);
   const [openLead, setOpenLead] = useState<Lead | null>(null);
+  const [showRelanceLinkedin, setShowRelanceLinkedin] = useState(false);
   const [clientLoaded, setClientLoaded] = useState(false);
 
   // ✅ client options (email / phone enrichment)
@@ -298,8 +300,9 @@ export default function LeadsPage() {
   useEffect(() => {
     if (openLead) {
       trackBusinessEvent("prospect_detail_viewed", "prospects", { lead_id: openLead.id });
+      setShowRelanceLinkedin(false);
     }
-  }, [openLead]);
+  }, [openLead?.id]);
 
   // ✅ DERIVED filtered list (no state = no desync)
   const searchedLeads = useMemo(() => {
@@ -2132,6 +2135,28 @@ export default function LeadsPage() {
                             {new Date(openLead.next_followup_at).toLocaleDateString("fr-FR")}
                           </span>
                         </p>
+                      </div>
+                    )}
+
+                    {openLead.relance_linkedin && (
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowRelanceLinkedin((v) => !v)}
+                          className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#dbe5f3] bg-white px-4 py-3 text-sm font-medium text-[#2563EB] transition hover:bg-[#f0f6ff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                        >
+                          <span className="flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4" />
+                            Voir le message de relance
+                          </span>
+                          <span className="text-[#94a3b8] text-xs">{showRelanceLinkedin ? "▲" : "▼"}</span>
+                        </button>
+
+                        {showRelanceLinkedin && (
+                          <div className="mt-2 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] p-4 text-sm text-[#0F172A] whitespace-pre-wrap">
+                            {openLead.relance_linkedin}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
