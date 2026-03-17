@@ -2065,8 +2065,8 @@ export default function LeadsPage() {
                         </div>
                       )}
 
-                      {/* Bouton envoyer — invitation acceptée et pas encore envoyé */}
-                      {openLead.linkedin_invitation_status === "accepted" && !openLead.message_sent && (
+                      {/* Bouton envoyer — invitation acceptée, pas encore envoyé, plan essential uniquement */}
+                      {openLead.linkedin_invitation_status === "accepted" && !openLead.message_sent && plan !== "full" && (
                         <button
                           type="button"
                           onClick={handleSendLinkedInMessage}
