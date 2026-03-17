@@ -168,10 +168,11 @@ Deno.serve(async (req) => {
     const processed: Array<Record<string, unknown>> = [];
 
     try {
-      // All active clients (both essential and full plans)
+      // Full plan only — essential clients manage follow-ups manually
       const { data: clients, error: clientsErr } = await supabase
         .from("clients")
         .select("id")
+        .eq("plan", "full")
         .eq("subscription_status", "active");
 
       if (clientsErr) {
