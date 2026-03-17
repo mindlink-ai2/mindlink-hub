@@ -9,17 +9,23 @@ import { ensureThreadAndSendMessage } from "@/lib/inbox-send";
 
 export const maxDuration = 300;
 
-type InvitationDraftRow = {
+type InvitationRow = {
   id: string;
   lead_id: number;
-  unipile_account_id: string;
-  dm_draft_text: string;
   accepted_at: string | null;
+  dm_draft_text: string | null;
+};
+
+type LeadRow = {
+  id: number;
+  linkedin_provider_id: string | null;
+  internal_message: string | null;
+  message_sent: boolean | null;
 };
 
 type SendResult =
   | { ok: true; invitation_id: string; lead_id: number; mode: string }
-  | { ok: false; invitation_id: string; lead_id: number; error: string };
+  | { ok: false; invitation_id: string; lead_id: number; error: string; skipped?: boolean };
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -42,22 +48,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "linkedin_account_not_found" }, { status: 400 });
   }
 
-  // Parse optional body params
   const body = await req.json().catch(() => ({}));
   const delayMs = typeof body.delay_ms === "number" ? Math.max(0, body.delay_ms) : 10_000;
-  // By default: today only. Pass all_pending=true to process all accepted drafts regardless of date.
   const allPending = body.all_pending === true;
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
+  // Fetch ALL accepted invitations (not just ones with dm_draft_text set)
+  // We'll fall back to lead.internal_message for those without dm_draft_text
   let query = supabase
     .from("linkedin_invitations")
-    .select("id, lead_id, unipile_account_id, dm_draft_text, accepted_at")
+    .select("id, lead_id, accepted_at, dm_draft_text")
     .eq("client_id", clientId)
     .eq("status", "accepted")
-    .eq("dm_draft_status", "draft")
-    .not("dm_draft_text", "is", null)
+    .not("dm_draft_status", "eq", "sent")
     .order("accepted_at", { ascending: true });
 
   if (!allPending) {
@@ -70,38 +75,52 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "query_failed", details: String(error.message) }, { status: 500 });
   }
 
-  const rows = (Array.isArray(data) ? data : []) as InvitationDraftRow[];
+  const invitations = (Array.isArray(data) ? data : []) as InvitationRow[];
 
-  if (rows.length === 0) {
+  if (invitations.length === 0) {
     return NextResponse.json({
       ok: true,
       total: 0,
       sent: 0,
       failed: 0,
+      skipped: 0,
       results: [],
-      message: allPending ? "Aucun draft en attente." : "Aucun draft en attente pour aujourd'hui.",
+      message: allPending ? "Aucune connexion acceptée sans message." : "Aucune connexion acceptée aujourd'hui sans message.",
     });
+  }
+
+  // Fetch leads for all invitation lead_ids in one query
+  const leadIds = [...new Set(invitations.map((inv) => inv.lead_id))];
+  const { data: leadsData } = await supabase
+    .from("leads")
+    .select("id, linkedin_provider_id, internal_message, message_sent")
+    .eq("client_id", clientId)
+    .in("id", leadIds);
+
+  const leadsMap = new Map<number, LeadRow>();
+  for (const lead of (Array.isArray(leadsData) ? leadsData : []) as LeadRow[]) {
+    leadsMap.set(lead.id, lead);
   }
 
   const results: SendResult[] = [];
 
-  for (let i = 0; i < rows.length; i++) {
-    const inv = rows[i];
-    const draftText = String(inv.dm_draft_text ?? "").trim();
+  for (let i = 0; i < invitations.length; i++) {
+    const inv = invitations[i];
+    const lead = leadsMap.get(inv.lead_id);
 
-    if (!draftText) {
-      results.push({ ok: false, invitation_id: inv.id, lead_id: inv.lead_id, error: "draft_text_empty" });
+    // Skip leads already marked as message_sent
+    if (lead?.message_sent === true) {
+      results.push({ ok: false, invitation_id: inv.id, lead_id: inv.lead_id, error: "already_sent", skipped: true });
       continue;
     }
 
-    // Fetch provider_id from lead
-    const { data: lead } = await supabase
-      .from("leads")
-      .select("linkedin_provider_id")
-      .eq("id", inv.lead_id)
-      .eq("client_id", clientId)
-      .limit(1)
-      .maybeSingle();
+    // Use dm_draft_text from invitation, fallback to lead.internal_message
+    const draftText = String(inv.dm_draft_text ?? lead?.internal_message ?? "").trim();
+
+    if (!draftText) {
+      results.push({ ok: false, invitation_id: inv.id, lead_id: inv.lead_id, error: "no_message_text", skipped: true });
+      continue;
+    }
 
     const providerId = typeof lead?.linkedin_provider_id === "string" ? lead.linkedin_provider_id.trim() : null;
 
@@ -142,19 +161,21 @@ export async function POST(req: Request) {
     }
 
     // Wait between sends, except after the last one
-    if (i < rows.length - 1 && delayMs > 0) {
+    if (i < invitations.length - 1 && delayMs > 0) {
       await sleep(delayMs);
     }
   }
 
   const sent = results.filter((r) => r.ok).length;
-  const failed = results.filter((r) => !r.ok).length;
+  const failed = results.filter((r) => !r.ok && !("skipped" in r && r.skipped)).length;
+  const skipped = results.filter((r) => "skipped" in r && r.skipped).length;
 
   return NextResponse.json({
     ok: true,
-    total: rows.length,
+    total: invitations.length,
     sent,
     failed,
+    skipped,
     results,
   });
 }
