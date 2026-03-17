@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, CheckCircle2, ChevronRight } from "lucide-react";
+import { CalendarDays, CheckCircle2, ChevronRight, MessageSquare } from "lucide-react";
 import { trackBusinessEvent } from "@/lib/analytics/business-client";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { HubButton } from "@/components/ui/hub-button";
@@ -26,6 +26,7 @@ type FollowupLead = {
   email?: string | null;
   phoneNumber?: string | null;
   LinkedInURL?: string | null;
+  relance_linkedin?: string | null;
   [key: string]: unknown;
 };
 
@@ -33,6 +34,7 @@ export default function FollowupsPage() {
   const [leads, setLeads] = useState<FollowupLead[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [openLead, setOpenLead] = useState<FollowupLead | null>(null);
+  const [showRelanceLinkedin, setShowRelanceLinkedin] = useState(false);
 
   // UI state (UX only)
   const [tab, setTab] = useState<TabKey>("overdue");
@@ -45,6 +47,10 @@ export default function FollowupsPage() {
   useEffect(() => {
     trackBusinessEvent("page_viewed", "navigation", { page: "followups" });
   }, []);
+
+  useEffect(() => {
+    setShowRelanceLinkedin(false);
+  }, [openLead?.id]);
 
   // Fetch all leads with followups
   useEffect(() => {
@@ -791,6 +797,27 @@ export default function FollowupsPage() {
                     </a>
                   )}
                 </div>
+
+                {openLead.relance_linkedin && (
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowRelanceLinkedin((v) => !v)}
+                      className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#dbe5f3] bg-white px-4 py-3 text-sm font-medium text-[#2563EB] transition hover:bg-[#f0f6ff] focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
+                    >
+                      <span className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Voir le message de relance
+                      </span>
+                      <span className="text-[#94a3b8] text-xs">{showRelanceLinkedin ? "▲" : "▼"}</span>
+                    </button>
+                    {showRelanceLinkedin && (
+                      <div className="mt-2 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] p-4 text-sm text-[#0F172A] whitespace-pre-wrap">
+                        {openLead.relance_linkedin}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -841,6 +868,27 @@ export default function FollowupsPage() {
                     </a>
                   ) : null}
                 </div>
+
+                {openLead.relance_linkedin && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowRelanceLinkedin((v) => !v)}
+                      className="flex w-full items-center justify-between gap-2 rounded-xl border border-[#d7e3f4] bg-white px-3 py-3 text-[13px] font-medium text-[#1f5eff] transition hover:bg-[#f0f6ff] focus:outline-none"
+                    >
+                      <span className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Voir le message de relance
+                      </span>
+                      <span className="text-[#94a3b8] text-xs">{showRelanceLinkedin ? "▲" : "▼"}</span>
+                    </button>
+                    {showRelanceLinkedin && (
+                      <div className="mt-2 rounded-xl border border-[#d7e3f4] bg-[#f8fbff] px-3 py-3 text-[13px] text-[#0b1c33] whitespace-pre-wrap">
+                        {openLead.relance_linkedin}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-2 rounded-xl border border-[#d7e3f4] bg-white px-3 py-3">
                   <p className="text-[12px] text-[#607894]">Reprogrammer</p>
