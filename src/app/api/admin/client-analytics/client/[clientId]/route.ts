@@ -166,8 +166,21 @@ export async function GET(
       (e) => e.event_type === "message_sent"
     ).length;
 
-    const totalMsgsSent = summary?.total_messages_sent ?? 0;
-    const totalReplies = summary?.total_replies_received ?? 0;
+    // Reply rate from leads table: responded / message_sent (1 reply max per person)
+    const { data: leadsMessageSent } = await supabase
+      .from("leads")
+      .select("id")
+      .eq("client_id", clientId)
+      .eq("message_sent", true);
+
+    const { data: leadsResponded } = await supabase
+      .from("leads")
+      .select("id")
+      .eq("client_id", clientId)
+      .eq("responded", true);
+
+    const totalMsgsSent = (leadsMessageSent ?? []).length;
+    const totalReplies = (leadsResponded ?? []).length;
     const replyRate =
       totalMsgsSent > 0 ? Math.round((totalReplies / totalMsgsSent) * 100) : 0;
 

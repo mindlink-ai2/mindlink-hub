@@ -73,17 +73,19 @@ export async function GET() {
       .gte("created_at", day14ago.toISOString())
       .lt("created_at", day7ago.toISOString());
 
-    // Reply rate: replies / messages sent (all time)
-    const { data: allMessages } = await supabase
-      .from("client_activity_summary")
-      .select("total_messages_sent, total_replies_received");
+    // Reply rate: leads responded / leads message_sent (1 reply max per person)
+    const { data: leadsMessageSent } = await supabase
+      .from("leads")
+      .select("id")
+      .eq("message_sent", true);
 
-    let totalMessagesSent = 0;
-    let totalReplies = 0;
-    for (const row of allMessages ?? []) {
-      totalMessagesSent += row.total_messages_sent ?? 0;
-      totalReplies += row.total_replies_received ?? 0;
-    }
+    const { data: leadsResponded } = await supabase
+      .from("leads")
+      .select("id")
+      .eq("responded", true);
+
+    const totalMessagesSent = (leadsMessageSent ?? []).length;
+    const totalReplies = (leadsResponded ?? []).length;
     const avgReplyRate =
       totalMessagesSent > 0
         ? Math.round((totalReplies / totalMessagesSent) * 100)
@@ -143,12 +145,32 @@ export async function GET() {
       weeklyProspectsMap[r.client_id] = (weeklyProspectsMap[r.client_id] ?? 0) + 1;
     }
 
+    // Per-client reply rate from leads table
+    const { data: allLeadsMessageSent } = await supabase
+      .from("leads")
+      .select("client_id")
+      .eq("message_sent", true);
+
+    const { data: allLeadsResponded } = await supabase
+      .from("leads")
+      .select("client_id")
+      .eq("responded", true);
+
+    const leadsMessageSentByClient: Record<number, number> = {};
+    for (const r of allLeadsMessageSent ?? []) {
+      leadsMessageSentByClient[r.client_id] = (leadsMessageSentByClient[r.client_id] ?? 0) + 1;
+    }
+    const leadsRespondedByClient: Record<number, number> = {};
+    for (const r of allLeadsResponded ?? []) {
+      leadsRespondedByClient[r.client_id] = (leadsRespondedByClient[r.client_id] ?? 0) + 1;
+    }
+
     const clientsTable = (summaries ?? []).map((s) => {
       const client = clientsMap[s.client_id];
       const clientName =
         client?.name ?? client?.company_name ?? client?.email ?? `Client ${s.client_id}`;
-      const msgs = s.total_messages_sent ?? 0;
-      const replies = s.total_replies_received ?? 0;
+      const msgs = leadsMessageSentByClient[s.client_id] ?? 0;
+      const replies = leadsRespondedByClient[s.client_id] ?? 0;
       const replyRate = msgs > 0 ? Math.round((replies / msgs) * 100) : 0;
       return {
         client_id: s.client_id,
