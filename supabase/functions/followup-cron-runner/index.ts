@@ -214,13 +214,15 @@ Deno.serve(async (req) => {
         }
 
         // Find leads due for follow-up today with a pending relance_linkedin
+        // Exclude leads that have already responded (prospect replied to first message)
         const { data: leadsRows, error: leadsErr } = await supabase
           .from("leads")
-          .select("id, relance_linkedin")
+          .select("id, relance_linkedin, responded")
           .eq("client_id", clientId)
           .eq("message_sent", true)
           .not("relance_linkedin", "is", null)
           .is("relance_sent_at", null)
+          .neq("responded", true)
           .gte("next_followup_at", startIso)
           .lt("next_followup_at", endIso)
           .order("next_followup_at", { ascending: true })
@@ -341,10 +343,10 @@ Deno.serve(async (req) => {
             .eq("id", thread.id)
             .eq("client_id", clientId);
 
-          // Mark relance as sent on the lead
+          // Mark relance as sent and remove from followups page
           await supabase
             .from("leads")
-            .update({ relance_sent_at: nowIso })
+            .update({ relance_sent_at: nowIso, next_followup_at: null })
             .eq("id", leadId)
             .eq("client_id", clientId);
 
