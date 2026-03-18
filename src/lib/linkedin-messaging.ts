@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeLinkedInUrl } from "@/lib/linkedin-url";
 import { normalizeUnipileBase, requireEnv } from "@/lib/inbox-server";
 import {
+  extractArrayCandidates,
   getFirstString,
   parseUnipileMessage,
   toJsonObject,
@@ -170,6 +171,7 @@ export type ResolveProviderIdResult =
         | "acceptance.matching.normalized_linkedin_url"
         | "acceptance.webhook_payload.user_profile_url"
         | "acceptance.webhook_payload.user_provider_id"
+        | "invitation.raw.provider_id"
         | "webhook_payload.user_provider_id"
         | null;
       candidatesCount: number;
@@ -194,6 +196,7 @@ export type FindProviderIdFromInvitationsResult = {
     | "acceptance.matching.normalized_linkedin_url"
     | "acceptance.webhook_payload.user_profile_url"
     | "acceptance.webhook_payload.user_provider_id"
+    | "invitation.raw.provider_id"
     | "webhook_payload.user_provider_id"
     | null;
   candidatesCount: number;
@@ -545,19 +548,130 @@ function isMissingColumnError(error: unknown, columnName: string): boolean {
   return missing === columnName;
 }
 
+function isValidLinkedinProviderId(value: string | null | undefined): value is string {
+  try {
+    assertValidLinkedinProviderId(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function decodeNormalizedSlug(value: string | null | undefined): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  try {
+    return decodeURIComponent(raw).trim().toLowerCase() || null;
+  } catch {
+    return raw.toLowerCase() || null;
+  }
+}
+
+function extractInvitationLinkedInUrl(candidate: JsonObject): string | null {
+  return (
+    normalizeLinkedInUrl(
+      getFirstString(candidate, [
+        ["matching", "normalized_linkedin_url"],
+        ["user_profile_url"],
+        ["userProfileUrl"],
+        ["profile_url"],
+        ["profileUrl"],
+        ["linkedin_url"],
+        ["linkedinUrl"],
+        ["user", "profile_url"],
+        ["user", "profileUrl"],
+        ["user", "linkedin_url"],
+        ["user", "linkedinUrl"],
+        ["contact", "profile_url"],
+        ["contact", "profileUrl"],
+        ["contact", "linkedin_url"],
+        ["contact", "linkedinUrl"],
+        ["webhook_payload", "user_profile_url"],
+        ["webhook_payload", "profile_url"],
+        ["webhook_payload", "linkedin_url"],
+      ])
+    ) ?? null
+  );
+}
+
+function extractInvitationSlug(candidate: JsonObject): string | null {
+  const profileUrl = extractInvitationLinkedInUrl(candidate);
+  const fromUrl = extractLinkedinSlug(profileUrl);
+  if (fromUrl) return fromUrl;
+
+  return decodeNormalizedSlug(
+    getFirstString(candidate, [
+      ["matching", "profile_slug"],
+      ["profile_slug"],
+      ["profileSlug"],
+      ["user_public_identifier"],
+      ["userPublicIdentifier"],
+      ["public_identifier"],
+      ["publicIdentifier"],
+      ["webhook_payload", "user_public_identifier"],
+      ["webhook_payload", "userPublicIdentifier"],
+    ])
+  );
+}
+
+function buildInvitationProviderCandidates(rawInput: unknown): JsonObject[] {
+  const raw = toJsonObject(rawInput);
+  const invitation = toJsonObject(raw.invitation);
+  const acceptance = toJsonObject(raw.acceptance);
+  const candidates: JsonObject[] = [
+    raw,
+    toJsonObject(raw.webhook_payload),
+    invitation,
+    toJsonObject(invitation.webhook_payload),
+    toJsonObject(invitation.invite_response),
+    acceptance,
+    toJsonObject(acceptance.webhook_payload),
+    ...extractArrayCandidates(raw),
+  ].filter((candidate) => Object.keys(candidate).length > 0);
+
+  const unique = new Map<string, JsonObject>();
+  for (const candidate of candidates) {
+    const key = JSON.stringify(candidate);
+    if (!unique.has(key)) unique.set(key, candidate);
+  }
+
+  return Array.from(unique.values());
+}
+
 function extractProviderIdFromInvitationRaw(rawInput: unknown): {
   providerId: string | null;
   matchedBy:
     | "acceptance.webhook_payload.user_provider_id"
+    | "invitation.raw.provider_id"
     | "webhook_payload.user_provider_id"
     | null;
   rawKeys: string[];
   acceptanceKeys: string[];
+  recentProfileUrls: string[];
+  invitationSlug: string | null;
+  normalizedLeadUrl: string | null;
+  targetSlug: string | null;
 } {
   const raw = toJsonObject(rawInput);
   const acceptance = toJsonObject(raw.acceptance);
   const acceptancePayload = toJsonObject(acceptance.webhook_payload);
   const webhookPayload = toJsonObject(raw.webhook_payload);
+  const invitation = toJsonObject(raw.invitation);
+
+  const recentProfileUrls = buildInvitationProviderCandidates(rawInput)
+    .map((candidate) => extractInvitationLinkedInUrl(candidate))
+    .filter((value): value is string => Boolean(value));
+
+  const invitationSlug =
+    extractInvitationSlug(acceptancePayload) ??
+    extractInvitationSlug(webhookPayload) ??
+    extractInvitationSlug(invitation) ??
+    null;
+  const normalizedLeadUrl =
+    extractInvitationLinkedInUrl(acceptancePayload) ??
+    extractInvitationLinkedInUrl(webhookPayload) ??
+    extractInvitationLinkedInUrl(invitation) ??
+    null;
 
   const providerIdFromAcceptance = getFirstString(acceptancePayload, [
     ["user_provider_id"],
@@ -567,12 +681,16 @@ function extractProviderIdFromInvitationRaw(rawInput: unknown): {
     ["user", "provider_id"],
     ["user", "providerId"],
   ]);
-  if (providerIdFromAcceptance) {
+  if (isValidLinkedinProviderId(providerIdFromAcceptance)) {
     return {
       providerId: providerIdFromAcceptance,
       matchedBy: "acceptance.webhook_payload.user_provider_id",
       rawKeys: Object.keys(raw),
       acceptanceKeys: Object.keys(acceptance),
+      recentProfileUrls,
+      invitationSlug,
+      normalizedLeadUrl,
+      targetSlug: invitationSlug,
     };
   }
 
@@ -584,12 +702,47 @@ function extractProviderIdFromInvitationRaw(rawInput: unknown): {
     ["user", "provider_id"],
     ["user", "providerId"],
   ]);
+  if (isValidLinkedinProviderId(providerIdFromWebhook)) {
+    return {
+      providerId: providerIdFromWebhook,
+      matchedBy: "webhook_payload.user_provider_id",
+      rawKeys: Object.keys(raw),
+      acceptanceKeys: Object.keys(acceptance),
+      recentProfileUrls,
+      invitationSlug,
+      normalizedLeadUrl,
+      targetSlug: invitationSlug,
+    };
+  }
+
+  const providerIdFromInvitation = getFirstString(invitation, [
+    ["provider_id"],
+    ["providerId"],
+    ["invite_response", "provider_id"],
+    ["invite_response", "providerId"],
+  ]);
+  if (isValidLinkedinProviderId(providerIdFromInvitation)) {
+    return {
+      providerId: providerIdFromInvitation,
+      matchedBy: "invitation.raw.provider_id",
+      rawKeys: Object.keys(raw),
+      acceptanceKeys: Object.keys(acceptance),
+      recentProfileUrls,
+      invitationSlug,
+      normalizedLeadUrl,
+      targetSlug: invitationSlug,
+    };
+  }
 
   return {
-    providerId: providerIdFromWebhook,
-    matchedBy: providerIdFromWebhook ? "webhook_payload.user_provider_id" : null,
+    providerId: null,
+    matchedBy: null,
     rawKeys: Object.keys(raw),
     acceptanceKeys: Object.keys(acceptance),
+    recentProfileUrls,
+    invitationSlug,
+    normalizedLeadUrl,
+    targetSlug: invitationSlug,
   };
 }
 
@@ -600,9 +753,37 @@ export async function getAcceptedProviderIdForLead(params: {
 }): Promise<FindProviderIdFromInvitationsResult> {
   const { supabase, leadId, clientId } = params;
 
+  let normalizedLeadUrl: string | null = null;
+  let slug: string | null = null;
+  const leadWithLowercase = await supabase
+    .from("leads")
+    .select("LinkedInURL, linkedin_url")
+    .eq("id", leadId)
+    .limit(1)
+    .maybeSingle();
+
+  if (!leadWithLowercase.error && leadWithLowercase.data) {
+    const leadUrl =
+      String(leadWithLowercase.data.LinkedInURL ?? "").trim() ||
+      String((leadWithLowercase.data as { linkedin_url?: unknown }).linkedin_url ?? "").trim() ||
+      null;
+    normalizedLeadUrl = normalizeLinkedInUrl(leadUrl);
+    slug = extractLinkedinSlug(leadUrl);
+  } else if (isMissingColumnError(leadWithLowercase.error, "linkedin_url")) {
+    const leadUpper = await supabase
+      .from("leads")
+      .select("LinkedInURL")
+      .eq("id", leadId)
+      .limit(1)
+      .maybeSingle();
+    const leadUrl = String(leadUpper.data?.LinkedInURL ?? "").trim() || null;
+    normalizedLeadUrl = normalizeLinkedInUrl(leadUrl);
+    slug = extractLinkedinSlug(leadUrl);
+  }
+
   const selectCandidates = [
+    "id, raw, accepted_at, sent_at, status, created_at",
     "id, raw, accepted_at, sent_at, status",
-    "id, raw, sent_at, status",
     "id, raw, status",
     "id, raw",
   ];
@@ -615,13 +796,10 @@ export async function getAcceptedProviderIdForLead(params: {
       .from("linkedin_invitations")
       .select(selectFields)
       .eq("lead_id", leadId)
-      .limit(1);
+      .limit(25);
 
     if (clientId) {
       query = query.eq("client_id", clientId);
-    }
-    if (selectFields.includes("status")) {
-      query = query.eq("status", "accepted");
     }
     if (selectFields.includes("accepted_at")) {
       query = query.order("accepted_at", { ascending: false, nullsFirst: false });
@@ -634,6 +812,7 @@ export async function getAcceptedProviderIdForLead(params: {
     const { data, error } = await query;
     if (error) {
       lastError = error;
+      if (isMissingColumnError(error, "created_at")) continue;
       if (isMissingColumnError(error, "accepted_at")) continue;
       if (isMissingColumnError(error, "sent_at")) continue;
       if (isMissingColumnError(error, "status")) continue;
@@ -653,50 +832,125 @@ export async function getAcceptedProviderIdForLead(params: {
     });
   }
 
-  const invitation = rows[0] ?? null;
-  const invitationId = invitation ? String(invitation.id ?? "").trim() || null : null;
-  const invitationStatus = invitation ? String(invitation.status ?? "").trim() || null : null;
-  const invitationAcceptedAt = invitation ? String(invitation.accepted_at ?? "").trim() || null : null;
-  const invitationSentAt = invitation ? String(invitation.sent_at ?? "").trim() || null : null;
-  const invitationCreatedAt = invitation ? String(invitation.created_at ?? "").trim() || null : null;
-  const extracted = extractProviderIdFromInvitationRaw(invitation?.raw);
+  const recentProfileUrls: string[] = [];
+  let extracted: {
+    providerId: string | null;
+    matchedBy: FindProviderIdFromInvitationsResult["matchedBy"];
+    rawKeys: string[];
+    acceptanceKeys: string[];
+    invitationId: string | null;
+    invitationStatus: string | null;
+    invitationAcceptedAt: string | null;
+    invitationSentAt: string | null;
+    invitationCreatedAt: string | null;
+  } = {
+    providerId: null,
+    matchedBy: null as FindProviderIdFromInvitationsResult["matchedBy"],
+    rawKeys: [] as string[],
+    acceptanceKeys: [] as string[],
+    invitationId: null as string | null,
+    invitationStatus: null as string | null,
+    invitationAcceptedAt: null as string | null,
+    invitationSentAt: null as string | null,
+    invitationCreatedAt: null as string | null,
+  };
+
+  for (const invitation of rows) {
+    const invitationId = String(invitation.id ?? "").trim() || null;
+    const invitationStatus = String(invitation.status ?? "").trim() || null;
+    const invitationAcceptedAt = String(invitation.accepted_at ?? "").trim() || null;
+    const invitationSentAt = String(invitation.sent_at ?? "").trim() || null;
+    const invitationCreatedAt = String(invitation.created_at ?? "").trim() || null;
+    const current = extractProviderIdFromInvitationRaw(invitation.raw);
+
+    for (const url of current.recentProfileUrls) {
+      if (!recentProfileUrls.includes(url)) recentProfileUrls.push(url);
+    }
+
+    const sameUrl = Boolean(
+      normalizedLeadUrl &&
+        current.normalizedLeadUrl &&
+        current.normalizedLeadUrl === normalizedLeadUrl
+    );
+    const sameSlug = Boolean(slug && current.invitationSlug && current.invitationSlug === slug);
+    const canUse = Boolean(current.providerId && (!normalizedLeadUrl && !slug ? true : sameUrl || sameSlug));
+
+    if (!canUse) {
+      if (!extracted.invitationId) {
+        extracted = {
+          ...extracted,
+          rawKeys: current.rawKeys,
+          acceptanceKeys: current.acceptanceKeys,
+        };
+      }
+      continue;
+    }
+
+    extracted = {
+      providerId: current.providerId,
+      matchedBy:
+        sameSlug && current.matchedBy === "acceptance.webhook_payload.user_provider_id"
+          ? "acceptance.matching.profile_slug"
+          : sameUrl && current.matchedBy === "acceptance.webhook_payload.user_provider_id"
+            ? "acceptance.matching.normalized_linkedin_url"
+            : sameUrl && current.matchedBy === "webhook_payload.user_provider_id"
+              ? "acceptance.webhook_payload.user_profile_url"
+              : sameSlug && current.matchedBy === "webhook_payload.user_provider_id"
+                ? "acceptance.webhook_payload.user_public_identifier"
+                : current.matchedBy,
+      rawKeys: current.rawKeys,
+      acceptanceKeys: current.acceptanceKeys,
+      invitationId,
+      invitationStatus,
+      invitationAcceptedAt,
+      invitationSentAt,
+      invitationCreatedAt,
+    };
+    break;
+  }
 
   console.log({
     step: "provider-lookup:accepted-invitation",
     leadId,
-    invitationId,
-    status: invitationStatus,
-    accepted_at: invitationAcceptedAt,
+    invitationId: extracted.invitationId,
+    status: extracted.invitationStatus,
+    accepted_at: extracted.invitationAcceptedAt,
     providerId: extracted.providerId,
+    matched_by: extracted.matchedBy,
+    normalized_lead_url: normalizedLeadUrl,
+    slug,
   });
 
   if (!extracted.providerId) {
     console.warn("PROVIDER_LOOKUP_NOT_FOUND", {
       leadId,
-      invitation_id: invitationId,
-      status: invitationStatus,
-      accepted_at: invitationAcceptedAt,
+      invitation_id: extracted.invitationId,
+      status: extracted.invitationStatus,
+      accepted_at: extracted.invitationAcceptedAt,
       raw_keys: extracted.rawKeys,
       acceptance_keys: extracted.acceptanceKeys,
+      normalized_lead_url: normalizedLeadUrl,
+      slug,
+      recent_profile_urls: recentProfileUrls,
     });
   }
 
   return {
     providerId: extracted.providerId,
-    invitationId,
-    invitationStatus,
-    invitationCreatedAt,
-    invitationAcceptedAt,
-    invitationSentAt,
+    invitationId: extracted.invitationId,
+    invitationStatus: extracted.invitationStatus,
+    invitationCreatedAt: extracted.invitationCreatedAt,
+    invitationAcceptedAt: extracted.invitationAcceptedAt,
+    invitationSentAt: extracted.invitationSentAt,
     matchedBy: extracted.matchedBy,
     candidatesCount: rows.length,
     inspectedCount: rows.length,
-    normalizedLeadUrl: null,
-    slug: null,
-    recentProfileUrls: [],
+    normalizedLeadUrl,
+    slug,
+    recentProfileUrls,
     rawKeys: extracted.rawKeys,
     acceptanceKeys: extracted.acceptanceKeys,
-    usedDateFilter: invitationAcceptedAt !== null,
+    usedDateFilter: rows.some((row) => Boolean(String(row.accepted_at ?? "").trim())),
   };
 }
 

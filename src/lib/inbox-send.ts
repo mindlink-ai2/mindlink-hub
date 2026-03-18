@@ -204,8 +204,8 @@ function extractProviderId(payload: unknown): string | null {
   const data = toJsonObject(obj.data);
 
   return (
-    firstString(obj, [["provider_id"], ["providerId"], ["public_identifier"], ["publicIdentifier"]]) ??
-    firstString(data, [["provider_id"], ["providerId"], ["public_identifier"], ["publicIdentifier"]])
+    firstString(obj, [["provider_id"], ["providerId"]]) ??
+    firstString(data, [["provider_id"], ["providerId"]])
   );
 }
 

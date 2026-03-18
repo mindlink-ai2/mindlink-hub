@@ -90,7 +90,10 @@ export function classifyInboxEvent(eventType: string): InboxEventKind {
     e.includes("NEW_RELATION") ||
     e.includes("RELATION_NEW") ||
     e.includes("NEW_CONNECTION") ||
-    e.includes("CONNECTION_NEW")
+    e.includes("CONNECTION_NEW") ||
+    e.includes("RELATION_ACCEPTED") ||
+    e.includes("CONNECTION_ACCEPTED") ||
+    e.includes("INVITATION_ACCEPTED")
   ) {
     return "new_relation";
   }

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { extractLinkedInProfileSlug, normalizeLinkedInUrl } from "@/lib/linkedin-url";
+import { processAcceptedInvitationAutoDm } from "@/lib/linkedin-auto-dm";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import { saveAttendeeAvatarToStorage } from "@/lib/unipile-avatar-storage";
-import { ensureThreadAndSendMessage } from "@/lib/inbox-send";
 import {
   extractSenderAttendeeId,
   resolveAttendeeForMessage,
@@ -361,109 +361,28 @@ async function autoSendDraftAfterAccepted(params: {
   const isFullActive = await isClientFullActivePlan(supabase, clientId);
   if (!isFullActive) return;
 
-  const provisionalSentAt = new Date().toISOString();
-  const { data: claimedInvitation, error: claimErr } = await supabase
-    .from("linkedin_invitations")
-    .update({
-      dm_draft_status: "sent",
-      dm_sent_at: provisionalSentAt,
-      last_error: null,
-    })
-    .eq("id", invitationId)
-    .eq("client_id", clientId)
-    .eq("dm_draft_status", "draft")
-    .is("dm_sent_at", null)
-    .select("id, dm_draft_text")
-    .limit(1)
-    .maybeSingle();
-
-  if (claimErr) {
-    console.error("UNIPILE_WEBHOOK_AUTO_SEND_CLAIM_ERROR:", claimErr);
-    return;
-  }
-
-  if (!claimedInvitation?.id) {
-    return;
-  }
-
-  const draftText =
-    typeof claimedInvitation.dm_draft_text === "string"
-      ? claimedInvitation.dm_draft_text.trim()
-      : "";
-  if (!draftText) {
-    await supabase
-      .from("linkedin_invitations")
-      .update({
-        dm_draft_status: "none",
-        dm_sent_at: null,
-        last_error: "draft_text_empty",
-      })
-      .eq("id", invitationId)
-      .eq("client_id", clientId);
-    return;
-  }
-
-  const linkedinProviderId = getFirstString(payload, [
-    ["provider_id"],
-    ["providerId"],
-    ["attendee", "provider_id"],
-    ["attendee", "providerId"],
-    ["sender", "provider_id"],
-    ["sender", "providerId"],
-    ["data", "provider_id"],
-    ["data", "providerId"],
-    ["data", "attendee", "provider_id"],
-    ["data", "attendee", "providerId"],
-    ["data", "sender", "provider_id"],
-    ["data", "sender", "providerId"],
-  ]);
-
-  const sendResult = await ensureThreadAndSendMessage({
+  const result = await processAcceptedInvitationAutoDm({
     supabase,
     clientId,
-    leadId: String(leadId),
-    accountId: unipileAccountId,
-    linkedinProviderId,
-    text: draftText,
+    invitationId,
+    leadId: Number(leadId),
+    unipileAccountId,
+    payload,
   });
 
-  if (!sendResult.ok) {
-    const lastError =
-      sendResult.mode === "blocked"
-        ? "NOT_CONNECTED_OR_NOT_MESSAGEABLE"
-        : String(sendResult.error ?? "auto_send_failed");
-
-    await supabase
-      .from("linkedin_invitations")
-      .update({
-        dm_draft_status: "draft",
-        dm_sent_at: null,
-        last_error: lastError,
-      })
-      .eq("id", invitationId)
-      .eq("client_id", clientId);
-    return;
+  if (!result.ok && !result.skipped) {
+    console.warn("UNIPILE_WEBHOOK_AUTO_SEND_RESULT", {
+      clientId,
+      invitationId,
+      leadId: Number(leadId),
+      unipileAccountId,
+      status: result.status,
+      stage: result.stage,
+      retryable: result.retryable,
+      last_error: result.lastError,
+      details: result.details ?? null,
+    });
   }
-
-  const finalSentAt = sendResult.message?.sent_at || provisionalSentAt;
-  await supabase
-    .from("linkedin_invitations")
-    .update({
-      dm_draft_status: "sent",
-      dm_sent_at: finalSentAt,
-      last_error: null,
-    })
-    .eq("id", invitationId)
-    .eq("client_id", clientId);
-
-  await supabase
-    .from("leads")
-    .update({
-      message_sent: true,
-      message_sent_at: finalSentAt,
-    })
-    .eq("id", leadId)
-    .eq("client_id", clientId);
 }
 
 async function logUnipileEvent(params: {
@@ -1396,44 +1315,22 @@ async function handleNewRelation(params: {
 
   if (matchedLeadId !== null && invitationEventId !== null && draftText) {
     const providerId = syncResult.userProviderId ?? null;
-    const sendResult = await ensureThreadAndSendMessage({
+    await autoSendDraftAfterAccepted({
       supabase,
       clientId,
-      leadId: String(matchedLeadId),
-      accountId: unipileAccountId,
-      linkedinProviderId: providerId,
-      text: draftText,
+      invitationId: invitationEventId,
+      leadId: matchedLeadId,
+      unipileAccountId,
+      payload,
     });
 
-    const nowIso = new Date().toISOString();
-    const followupAt = new Date();
-    followupAt.setDate(followupAt.getDate() + 7);
-    const followupIso = followupAt.toISOString();
-    if (sendResult.ok) {
-      await supabase
-        .from("linkedin_invitations")
-        .update({ dm_draft_status: "sent", dm_sent_at: nowIso, last_error: null })
-        .eq("id", invitationEventId)
-        .eq("client_id", clientId);
-
-      await supabase
-        .from("leads")
-        .update({ message_sent: true, message_sent_at: nowIso, next_followup_at: followupIso })
-        .eq("id", matchedLeadId)
-        .eq("client_id", clientId);
-    } else {
-      const errorMsg = "error" in sendResult ? (sendResult.error ?? "auto_send_failed") : "auto_send_failed";
-      console.error("UNIPILE_WEBHOOK_RELATION_AUTO_SEND_ERROR", {
+    if (providerId) {
+      console.log("UNIPILE_WEBHOOK_RELATION_PROVIDER_READY", {
         clientId,
         leadId: String(matchedLeadId),
         invitationId: invitationEventId,
-        error: errorMsg,
+        providerId,
       });
-      await supabase
-        .from("linkedin_invitations")
-        .update({ last_error: `auto_send: ${errorMsg}` })
-        .eq("id", invitationEventId)
-        .eq("client_id", clientId);
     }
   }
 }
