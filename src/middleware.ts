@@ -6,6 +6,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)", // pages de login Clerk
   "/sign-up(.*)", // pages de création de compte Clerk
   "/api/unipile/webhook(.*)", // webhook Unipile (protégé via secret header)
+  "/api/prospection/flush-accepted-drafts(.*)", // cron flush (protégé via secret header)
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
