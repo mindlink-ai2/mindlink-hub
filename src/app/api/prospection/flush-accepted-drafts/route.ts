@@ -14,6 +14,7 @@ type InvitationRow = {
   id: string;
   lead_id: number;
   accepted_at: string | null;
+  last_error: string | null;
 };
 
 type SendResult =
@@ -30,15 +31,28 @@ async function flushClientDrafts(params: {
   unipileAccountId: string;
   delayMs: number;
   todayOnly: boolean;
+  includeRecentRetryables?: boolean;
+  retryableLookbackDays?: number;
 }): Promise<{ total: number; sent: number; failed: number; skipped: number; results: SendResult[] }> {
-  const { supabase, clientId, unipileAccountId, delayMs, todayOnly } = params;
+  const {
+    supabase,
+    clientId,
+    unipileAccountId,
+    delayMs,
+    todayOnly,
+    includeRecentRetryables = false,
+    retryableLookbackDays = 3,
+  } = params;
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
+  const todayStartMs = todayStart.getTime();
+  const retryableLookbackStartMs =
+    Date.now() - Math.max(1, retryableLookbackDays) * 24 * 60 * 60 * 1000;
 
   let query = supabase
     .from("linkedin_invitations")
-    .select("id, lead_id, accepted_at")
+    .select("id, lead_id, accepted_at, last_error")
     .eq("client_id", clientId)
     .eq("status", "accepted")
     .not("dm_draft_status", "eq", "sent")
@@ -52,14 +66,29 @@ async function flushClientDrafts(params: {
   if (error) throw new Error(error.message);
 
   const invitations = (Array.isArray(data) ? data : []) as InvitationRow[];
-  if (invitations.length === 0) {
+  const filteredInvitations = invitations.filter((invitation) => {
+    if (!todayOnly) return true;
+
+    const acceptedAtMs = invitation.accepted_at ? new Date(invitation.accepted_at).getTime() : Number.NaN;
+    if (Number.isFinite(acceptedAtMs) && acceptedAtMs >= todayStartMs) {
+      return true;
+    }
+
+    if (!includeRecentRetryables || !Number.isFinite(acceptedAtMs) || acceptedAtMs < retryableLookbackStartMs) {
+      return false;
+    }
+
+    const lastError = String(invitation.last_error ?? "").trim().toLowerCase();
+    return lastError.startsWith("auto_send:") && !lastError.includes("retry_limit_exceeded");
+  });
+  if (filteredInvitations.length === 0) {
     return { total: 0, sent: 0, failed: 0, skipped: 0, results: [] };
   }
 
   const results: SendResult[] = [];
 
-  for (let i = 0; i < invitations.length; i++) {
-    const inv = invitations[i];
+  for (let i = 0; i < filteredInvitations.length; i++) {
+    const inv = filteredInvitations[i];
     const sendResult = await processAcceptedInvitationAutoDm({
       supabase,
       clientId,
@@ -91,7 +120,7 @@ async function flushClientDrafts(params: {
       });
     }
 
-    if (i < invitations.length - 1 && delayMs > 0) {
+    if (i < filteredInvitations.length - 1 && delayMs > 0) {
       await sleep(delayMs);
     }
   }
@@ -100,7 +129,7 @@ async function flushClientDrafts(params: {
   const failed = results.filter((r) => !r.ok && !("skipped" in r && r.skipped)).length;
   const skipped = results.filter((r) => "skipped" in r && r.skipped).length;
 
-  return { total: invitations.length, sent, failed, skipped, results };
+  return { total: filteredInvitations.length, sent, failed, skipped, results };
 }
 
 export async function POST(req: Request) {
@@ -143,6 +172,8 @@ export async function POST(req: Request) {
           unipileAccountId,
           delayMs: 2000,
           todayOnly: true,
+          includeRecentRetryables: true,
+          retryableLookbackDays: 3,
         });
         allResults.push({ clientId, ...result });
       } catch (err) {
