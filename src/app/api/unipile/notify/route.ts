@@ -73,6 +73,40 @@ export async function POST(req: Request) {
       );
     }
 
+    // Upsert client_linkedin_settings so the row always exists after Unipile connection.
+    // Quota comes from clients.quota (source of truth); enabled = true only for full+active.
+    if (provider === "linkedin") {
+      const { data: clientRow } = await supabase
+        .from("clients")
+        .select("plan, subscription_status, quota")
+        .eq("id", clientId)
+        .maybeSingle();
+
+      if (clientRow) {
+        const isFullActive =
+          String(clientRow.plan ?? "").toLowerCase() === "full" &&
+          String(clientRow.subscription_status ?? "").toLowerCase() === "active";
+
+        const rawQuota = Number(clientRow.quota);
+        const dailyQuota = Number.isFinite(rawQuota) && rawQuota >= 1 ? Math.trunc(rawQuota) : 10;
+
+        await supabase
+          .from("client_linkedin_settings")
+          .upsert(
+            {
+              client_id: clientId,
+              unipile_account_id: unipileAccountId,
+              enabled: isFullActive,
+              daily_invite_quota: dailyQuota,
+              timezone: "Europe/Paris",
+              start_time: "08:00",
+              end_time: "18:00",
+            },
+            { onConflict: "client_id" }
+          );
+      }
+    }
+
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json(
