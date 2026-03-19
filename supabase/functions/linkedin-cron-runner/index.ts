@@ -19,6 +19,7 @@ type LeadRow = {
   traite: boolean | null;
   responded: boolean | null;
   message_sent: boolean | null;
+  internal_message: string | null;
 };
 
 type TimeParts = {
@@ -326,7 +327,7 @@ Deno.serve(async (req) => {
 
         const { data: leadsRows, error: leadsErr } = await supabase
           .from("leads")
-          .select("id, LinkedInURL, traite, responded, message_sent")
+          .select("id, LinkedInURL, traite, responded, message_sent, internal_message")
           .eq("client_id", clientId)
           .gte("created_at", startIso)
           .lt("created_at", endIso)
@@ -400,6 +401,7 @@ Deno.serve(async (req) => {
 
         const chosenLeadId = String(chosenLead.id);
         const linkedinUrl = String(chosenLead.LinkedInURL ?? "").trim();
+        const draftText = String(chosenLead.internal_message ?? "").trim();
         const profileSlug = extractLinkedInProfileSlug(linkedinUrl);
 
         if (!profileSlug) {
@@ -508,6 +510,8 @@ Deno.serve(async (req) => {
             unipile_account_id: unipileAccountId,
             status: "sent",
             sent_at: nowIso,
+            dm_draft_text: draftText || null,
+            dm_draft_status: draftText ? "draft" : "none",
             raw: {
               runner: RUNNER_NAME,
               profile_slug: profileSlug,
