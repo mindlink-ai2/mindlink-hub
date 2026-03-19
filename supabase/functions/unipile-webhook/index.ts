@@ -359,7 +359,29 @@ async function autoSendDraftAfterAccepted(params: {
       .limit(1)
       .maybeSingle();
 
-    const providerId = String(leadRow?.linkedin_provider_id ?? "").trim();
+    let providerId = String(leadRow?.linkedin_provider_id ?? "").trim();
+
+    // Fallback: extract provider_id from the acceptance webhook payload (present in NEW_RELATION events)
+    if (!providerId) {
+      const payloadProviderId = firstString(payload, [
+        ["provider_id"],
+        ["attendee", "provider_id"],
+        ["data", "provider_id"],
+        ["contact", "provider_id"],
+        ["sender", "provider_id"],
+        ["user", "provider_id"],
+      ]);
+      // LinkedIn provider IDs (ACoA...) are at least 10 chars
+      if (payloadProviderId && payloadProviderId.length >= 10) {
+        providerId = payloadProviderId;
+        // Persist for future use (cron, followup, etc.)
+        await supabase
+          .from("leads")
+          .update({ linkedin_provider_id: providerId })
+          .eq("id", leadId)
+          .eq("client_id", clientId);
+      }
+    }
 
     if (!providerId) {
       await supabase

@@ -1210,12 +1210,9 @@ async function fallbackAcceptLastSent(params: {
     return { leadId: null, invitationId: null, draftText: null };
   }
 
-  const draftText = await getLeadInternalMessage({
-    supabase,
-    clientId,
-    leadId: lastSent.lead_id,
-  });
-
+  // Do NOT pass draftText to the update — this forces dm_draft_status = 'none',
+  // which prevents the flush-accepted-drafts cron from sending a DM to an uncertain match.
+  // We cannot confirm which prospect actually accepted when the webhook has no identity info.
   await updateInvitationAcceptedWithDraft({
     supabase,
     clientId,
@@ -1233,13 +1230,22 @@ async function fallbackAcceptLastSent(params: {
         },
       },
     },
-    draftText,
+    draftText: null,
   });
 
+  // Mark this invitation so the UI can prompt the client to send the DM manually.
+  // Using last_error as a stable, non-retryable marker (does not start with "auto_send:").
+  await supabase
+    .from("linkedin_invitations")
+    .update({ last_error: "send_manually" })
+    .eq("id", String(lastSent.id))
+    .eq("client_id", clientId);
+
+  // Return draftText: null so handleNewRelation also skips autoSendDraftAfterAccepted.
   return {
     leadId: lastSent.lead_id,
     invitationId: String(lastSent.id),
-    draftText,
+    draftText: null,
   };
 }
 
@@ -1261,6 +1267,7 @@ async function handleNewRelation(params: {
   let matchedLeadId: number | string | null = null;
   let invitationEventId: string | null = null;
   let draftText: string | null = null;
+  let usedFallback = false;
 
   if (match.leadId !== null) {
     const accepted = await markInvitationAccepted({
@@ -1285,6 +1292,7 @@ async function handleNewRelation(params: {
     matchedLeadId = fallback.leadId;
     invitationEventId = fallback.invitationId;
     draftText = fallback.draftText;
+    usedFallback = true;
 
     if (fallback.leadId === null) {
       console.warn("UNIPILE_WEBHOOK_RELATION_NO_MATCH_NO_FALLBACK", {
@@ -1292,6 +1300,18 @@ async function handleNewRelation(params: {
         unipileAccountId,
         normalizedUrl: identity.normalizedUrl,
         slug: identity.slug,
+      });
+    } else {
+      console.warn("UNIPILE_WEBHOOK_RELATION_FALLBACK_USED", {
+        clientId,
+        unipileAccountId,
+        fallbackLeadId: String(fallback.leadId),
+        fallbackInvitationId: fallback.invitationId,
+        webhookUrl: identity.normalizedUrl,
+        webhookSlug: identity.slug,
+        warning:
+          "Acceptance matched by fallback (no identity in webhook payload). " +
+          "provider_id sync and auto-DM are disabled to prevent data corruption.",
       });
     }
   }
@@ -1310,10 +1330,17 @@ async function handleNewRelation(params: {
     eventId: invitationEventId,
     clientId,
     unipileAccountId,
-    leadIdHint: matchedLeadId,
+    // When the fallback was used we cannot confirm which lead actually accepted,
+    // so we don't pass leadIdHint: writing a wrong provider_id to a lead causes
+    // future messages to be delivered to the wrong person on LinkedIn.
+    leadIdHint: usedFallback ? null : matchedLeadId,
   });
 
-  if (matchedLeadId !== null && invitationEventId !== null && draftText) {
+  // Only trigger the auto-DM when we have a confident match (not a fallback).
+  // For "full" plan clients this is the normal flow: webhook with proper identity
+  // → direct match → DM sent automatically.
+  // For "essential" plan clients the DM is sent manually, so this block is a no-op.
+  if (!usedFallback && matchedLeadId !== null && invitationEventId !== null && draftText) {
     const providerId = syncResult.userProviderId ?? null;
     await autoSendDraftAfterAccepted({
       supabase,

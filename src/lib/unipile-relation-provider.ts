@@ -268,11 +268,14 @@ async function findLeadBySlugIlike(params: {
 }): Promise<number | string | null> {
   const { supabase, clientId, normalizedSlug } = params;
 
+  // Use OR to anchor the end of the slug: prevent "jean" from matching "jean-pierre".
+  // Covers: exact end (%/in/slug), trailing slash (%/in/slug/%), query param (%/in/slug?%).
+  const slugPattern = `LinkedInURL.ilike.%/in/${normalizedSlug},LinkedInURL.ilike.%/in/${normalizedSlug}/%,LinkedInURL.ilike.%/in/${normalizedSlug}?%`;
   const byUppercase = await supabase
     .from("leads")
     .select("id")
     .eq("client_id", clientId)
-    .ilike("LinkedInURL", `%/in/${normalizedSlug}%`)
+    .or(slugPattern)
     .limit(1)
     .maybeSingle();
 
@@ -284,11 +287,12 @@ async function findLeadBySlugIlike(params: {
     return null;
   }
 
+  const slugPatternLower = `linkedin_url.ilike.%/in/${normalizedSlug},linkedin_url.ilike.%/in/${normalizedSlug}/%,linkedin_url.ilike.%/in/${normalizedSlug}?%`;
   const byLowercase = await supabase
     .from("leads")
     .select("id")
     .eq("client_id", clientId)
-    .ilike("linkedin_url", `%/in/${normalizedSlug}%`)
+    .or(slugPatternLower)
     .limit(1)
     .maybeSingle();
 
