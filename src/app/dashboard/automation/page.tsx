@@ -183,27 +183,11 @@ function TableRow(props: {
       <td className="px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-1.5">
           {badge}
-          {item.last_error === "send_manually" ? (
-            item.lead_id ? (
-              <a
-                href={`/dashboard/leads?open=${item.lead_id}`}
-                className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 transition hover:border-amber-300 hover:bg-amber-100"
-                title="La connexion a été détectée mais l'identité n'a pas pu être confirmée automatiquement. Envoyez le message depuis la fiche prospect."
-              >
-                <Send className="h-2.5 w-2.5" />
-                Envoyer manuellement
-              </a>
-            ) : (
-              <span
-                className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700"
-                title="La connexion a été détectée mais l'identité n'a pas pu être confirmée automatiquement."
-              >
-                <Send className="h-2.5 w-2.5" />
-                Envoyer manuellement
-              </span>
-            )
-          ) : item.last_error ? (
-            <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] text-red-700">
+          {item.last_error ? (
+            <span
+              className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] text-red-700"
+              title={item.last_error}
+            >
               ⚠ Erreur
             </span>
           ) : null}
@@ -463,7 +447,7 @@ export default function LinkedinAutomationPage() {
                   <div className="flex items-center gap-2">
                     <Zap className="h-4 w-4 text-[#1f5eff]" />
                     <span className="text-sm font-medium text-[#0b1c33]">
-                      Aujourd'hui : <span className="text-[#1f5eff]">{sentToday}</span>
+                      Aujourd&apos;hui : <span className="text-[#1f5eff]">{sentToday}</span>
                       <span className="text-[#8093ad]">/{quota}</span> invitations
                     </span>
                     {quotaPercent >= 100 ? (
@@ -501,7 +485,7 @@ export default function LinkedinAutomationPage() {
           {loading ? (
             <section className="hub-card flex items-center justify-center p-10 text-sm text-[#51627b]">
               <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-              Chargement de l'activité…
+              Chargement de l&apos;activité…
             </section>
           ) : forbidden ? null : (
             <section className="hub-card flex min-h-0 flex-1 flex-col overflow-hidden">

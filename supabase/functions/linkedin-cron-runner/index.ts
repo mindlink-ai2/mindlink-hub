@@ -33,6 +33,52 @@ type TimeParts = {
 
 const RUNNER_NAME = "linkedin-cron-runner";
 
+function normalizeLinkedInTargetUrl(value: string | null | undefined): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    if (!host.includes("linkedin.com")) return null;
+
+    let path = parsed.pathname.trim();
+    if (!path.startsWith("/")) path = `/${path}`;
+    path = path.replace(/\/{2,}/g, "/").replace(/\/+$/, "");
+    if (!path) path = "/";
+
+    return `https://${host}${path}`.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function extractInvitationId(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const row = payload as Record<string, unknown>;
+
+  const direct =
+    typeof row.invitation_id === "string" && row.invitation_id.trim()
+      ? row.invitation_id.trim()
+      : typeof row.invitationId === "string" && row.invitationId.trim()
+        ? row.invitationId.trim()
+        : null;
+  if (direct) return direct;
+
+  const nested = row.invite_response;
+  if (!nested || typeof nested !== "object" || Array.isArray(nested)) return null;
+  const nestedRow = nested as Record<string, unknown>;
+  if (typeof nestedRow.invitation_id === "string" && nestedRow.invitation_id.trim()) {
+    return nestedRow.invitation_id.trim();
+  }
+  if (typeof nestedRow.invitationId === "string" && nestedRow.invitationId.trim()) {
+    return nestedRow.invitationId.trim();
+  }
+  return null;
+}
+
 function getTimePartsInZone(date: Date, timezone: string): TimeParts {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -503,6 +549,8 @@ Deno.serve(async (req) => {
         }
 
         const nowIso = new Date().toISOString();
+        const normalizedLinkedInUrl = normalizeLinkedInTargetUrl(linkedinUrl);
+        const invitationId = extractInvitationId(inviteResult.payload);
         await supabase.from("linkedin_invitations").upsert(
           {
             client_id: clientId,
@@ -512,10 +560,16 @@ Deno.serve(async (req) => {
             sent_at: nowIso,
             dm_draft_text: draftText || null,
             dm_draft_status: draftText ? "draft" : "none",
+            target_linkedin_provider_id: providerIdResult.providerId,
+            target_profile_slug: profileSlug,
+            target_linkedin_url_normalized: normalizedLinkedInUrl,
+            unipile_invitation_id: invitationId,
             raw: {
               runner: RUNNER_NAME,
               profile_slug: profileSlug,
+              normalized_linkedin_url: normalizedLinkedInUrl,
               provider_id: providerIdResult.providerId,
+              unipile_invitation_id: invitationId,
               invite_response: inviteResult.payload,
             },
           },
@@ -539,6 +593,10 @@ Deno.serve(async (req) => {
             sent_today: sentToday + 1,
             daily_quota: dailyQuota,
             timezone,
+            invitation_id: invitationId,
+            target_provider_id: providerIdResult.providerId,
+            target_profile_slug: profileSlug,
+            target_linkedin_url_normalized: normalizedLinkedInUrl,
           },
         });
 

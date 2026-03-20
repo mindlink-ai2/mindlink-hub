@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { createClient } from "@supabase/supabase-js";
 import { extractLinkedInProfileSlug } from "@/lib/linkedin-url";
+import { buildInvitationRawPatch, buildInvitationTargetMetadata } from "@/lib/linkedin-invitations";
+import { createServiceSupabase, getLinkedinUnipileAccountId } from "@/lib/inbox-server";
 
 type JsonLike = Record<string, unknown> | string | null;
 
@@ -46,10 +47,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const supabase = createClient(
-      requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-      requireEnv("SUPABASE_SERVICE_ROLE_KEY")
-    );
+    const supabase = createServiceSupabase();
 
     const { data: client, error: clientErr } = await supabase
       .from("clients")
@@ -105,22 +103,12 @@ export async function POST(req: Request) {
       );
     }
 
-    const { data: unipileAccount, error: accountErr } = await supabase
-      .from("unipile_accounts")
-      .select("unipile_account_id")
-      .eq("client_id", client.id)
-      .eq("provider", "linkedin")
-      .limit(1)
-      .maybeSingle();
+    const unipileAccountId = await getLinkedinUnipileAccountId(
+      supabase,
+      String(client.id)
+    );
 
-    if (accountErr) {
-      return NextResponse.json(
-        { success: false, error: "account_lookup_failed" },
-        { status: 500 }
-      );
-    }
-
-    if (!unipileAccount?.unipile_account_id) {
+    if (!unipileAccountId) {
       return NextResponse.json(
         { success: false, error: "linkedin_account_not_connected" },
         { status: 404 }
@@ -170,8 +158,6 @@ export async function POST(req: Request) {
     const UNIPILE_DSN = requireEnv("UNIPILE_DSN");
     const UNIPILE_API_KEY = requireEnv("UNIPILE_API_KEY");
     const BASE = normalizeUnipileBase(UNIPILE_DSN);
-    const unipileAccountId = unipileAccount.unipile_account_id;
-
     const profileRes = await fetch(
       `${BASE}/api/v1/users/${encodeURIComponent(
         profileIdentifier
@@ -232,6 +218,19 @@ export async function POST(req: Request) {
       );
     }
 
+    const invitationMetadata = buildInvitationTargetMetadata({
+      leadLinkedInUrl: String(lead.LinkedInURL ?? "").trim() || null,
+      profileSlug: profileIdentifier,
+      providerId,
+      invitePayload,
+    });
+    const rawPatch = buildInvitationRawPatch({
+      leadLinkedInUrl: String(lead.LinkedInURL ?? "").trim() || null,
+      profileSlug: profileIdentifier,
+      providerId,
+      invitePayload,
+    });
+
     const { error: invitationInsertErr } = await supabase
       .from("linkedin_invitations")
       .upsert(
@@ -241,7 +240,12 @@ export async function POST(req: Request) {
           unipile_account_id: unipileAccountId,
           status: "sent",
           sent_at: new Date().toISOString(),
-          raw: invitePayload,
+          raw: rawPatch,
+          target_linkedin_provider_id: invitationMetadata.targetProviderId,
+          target_profile_slug: invitationMetadata.targetProfileSlug,
+          target_linkedin_url_normalized:
+            invitationMetadata.targetLinkedInUrlNormalized,
+          unipile_invitation_id: invitationMetadata.unipileInvitationId,
         },
         { onConflict: "client_id,lead_id,unipile_account_id" }
       );
@@ -262,6 +266,17 @@ export async function POST(req: Request) {
     if (updateLeadStatusErr) {
       console.error("LINKEDIN_INVITE_STATUS_UPDATE_ERROR:", updateLeadStatusErr);
     }
+
+    console.info("LINKEDIN_INVITE_SENT", {
+      client_id: String(client.id),
+      lead_id: String(lead.id),
+      unipile_account_id: unipileAccountId,
+      target_provider_id: invitationMetadata.targetProviderId,
+      target_profile_slug: invitationMetadata.targetProfileSlug,
+      target_linkedin_url_normalized:
+        invitationMetadata.targetLinkedInUrlNormalized,
+      unipile_invitation_id: invitationMetadata.unipileInvitationId,
+    });
 
     return NextResponse.json({ success: true, invitationStatus: "sent" });
   } catch (error: unknown) {

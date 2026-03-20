@@ -29,10 +29,22 @@ type InvitationRow = {
 
 export type RelationMatchResult = {
   leadId: number | string | null;
-  strategy: "url_exact" | "slug_match" | "slug_ilike" | "none";
+  strategy:
+    | "url_exact"
+    | "url_ambiguous"
+    | "slug_match"
+    | "slug_ambiguous"
+    | "slug_ilike"
+    | "slug_ilike_ambiguous"
+    | "none";
   normalizedLinkedInUrl: string | null;
   slug: string | null;
 };
+
+type UniqueLeadLookupResult =
+  | { status: "matched"; leadId: number | string }
+  | { status: "ambiguous" }
+  | { status: "unmatched" };
 
 export type ProviderSyncResultCode =
   | "UPDATED"
@@ -235,7 +247,7 @@ async function findLeadByNormalizedUrl(params: {
   supabase: SupabaseClient;
   clientId: string;
   normalizedUrl: string;
-}): Promise<number | string | null> {
+}): Promise<UniqueLeadLookupResult> {
   const { supabase, clientId, normalizedUrl } = params;
 
   const byNormalizedColumn = await supabase
@@ -243,29 +255,35 @@ async function findLeadByNormalizedUrl(params: {
     .select("id")
     .eq("client_id", clientId)
     .eq("linkedin_url_normalized", normalizedUrl)
-    .limit(1)
-    .maybeSingle();
+    .limit(2);
 
-  if (!byNormalizedColumn.error && byNormalizedColumn.data?.id !== undefined) {
-    return byNormalizedColumn.data.id as number | string;
+  if (!byNormalizedColumn.error && Array.isArray(byNormalizedColumn.data)) {
+    if (byNormalizedColumn.data.length === 1 && byNormalizedColumn.data[0]?.id !== undefined) {
+      return { status: "matched", leadId: byNormalizedColumn.data[0].id as number | string };
+    }
+    if (byNormalizedColumn.data.length > 1) {
+      return { status: "ambiguous" };
+    }
   }
 
   const leads = await fetchLeadIdentityRows(supabase, clientId);
-  const exact = leads.find((lead) => {
+  const exact = leads.filter((lead) => {
     const normalizedStored = normalizeLinkedInUrlForMatching(lead.linkedin_url_normalized ?? null);
     if (normalizedStored && normalizedStored === normalizedUrl) return true;
     const normalizedFromRaw = normalizeLinkedInUrlForMatching(getLeadLinkedInUrl(lead));
     return normalizedFromRaw === normalizedUrl;
   });
 
-  return exact ? exact.id : null;
+  if (exact.length === 1) return { status: "matched", leadId: exact[0].id };
+  if (exact.length > 1) return { status: "ambiguous" };
+  return { status: "unmatched" };
 }
 
 async function findLeadBySlugIlike(params: {
   supabase: SupabaseClient;
   clientId: string;
   normalizedSlug: string;
-}): Promise<number | string | null> {
+}): Promise<UniqueLeadLookupResult> {
   const { supabase, clientId, normalizedSlug } = params;
 
   // Use OR to anchor the end of the slug: prevent "jean" from matching "jean-pierre".
@@ -276,15 +294,19 @@ async function findLeadBySlugIlike(params: {
     .select("id")
     .eq("client_id", clientId)
     .or(slugPattern)
-    .limit(1)
-    .maybeSingle();
+    .limit(2);
 
-  if (!byUppercase.error && byUppercase.data?.id !== undefined) {
-    return byUppercase.data.id as number | string;
+  if (!byUppercase.error && Array.isArray(byUppercase.data)) {
+    if (byUppercase.data.length === 1 && byUppercase.data[0]?.id !== undefined) {
+      return { status: "matched", leadId: byUppercase.data[0].id as number | string };
+    }
+    if (byUppercase.data.length > 1) {
+      return { status: "ambiguous" };
+    }
   }
 
   if (!isMissingColumnError(byUppercase.error, "LinkedInURL")) {
-    return null;
+    return { status: "unmatched" };
   }
 
   const slugPatternLower = `linkedin_url.ilike.%/in/${normalizedSlug},linkedin_url.ilike.%/in/${normalizedSlug}/%,linkedin_url.ilike.%/in/${normalizedSlug}?%`;
@@ -293,14 +315,18 @@ async function findLeadBySlugIlike(params: {
     .select("id")
     .eq("client_id", clientId)
     .or(slugPatternLower)
-    .limit(1)
-    .maybeSingle();
+    .limit(2);
 
-  if (!byLowercase.error && byLowercase.data?.id !== undefined) {
-    return byLowercase.data.id as number | string;
+  if (!byLowercase.error && Array.isArray(byLowercase.data)) {
+    if (byLowercase.data.length === 1 && byLowercase.data[0]?.id !== undefined) {
+      return { status: "matched", leadId: byLowercase.data[0].id as number | string };
+    }
+    if (byLowercase.data.length > 1) {
+      return { status: "ambiguous" };
+    }
   }
 
-  return null;
+  return { status: "unmatched" };
 }
 
 function extractSlugFromLinkedInRaw(value: string | null | undefined): string | null {
@@ -387,15 +413,23 @@ export async function findLeadForRelation(params: {
   const normalizedSlug = normalizeSlug(publicIdentifier);
 
   if (normalizedUrl) {
-    const leadId = await findLeadByNormalizedUrl({
+    const byUrl = await findLeadByNormalizedUrl({
       supabase,
       clientId,
       normalizedUrl,
     });
-    if (leadId !== null) {
+    if (byUrl.status === "matched") {
       return {
-        leadId,
+        leadId: byUrl.leadId,
         strategy: "url_exact",
+        normalizedLinkedInUrl: normalizedUrl,
+        slug: normalizedSlug,
+      };
+    }
+    if (byUrl.status === "ambiguous") {
+      return {
+        leadId: null,
+        strategy: "url_ambiguous",
         normalizedLinkedInUrl: normalizedUrl,
         slug: normalizedSlug,
       };
@@ -405,29 +439,45 @@ export async function findLeadForRelation(params: {
   if (normalizedSlug) {
     const leads = await fetchLeadIdentityRows(supabase, clientId);
 
-    const bySlug = leads.find((lead) => {
+    const bySlug = leads.filter((lead) => {
       const slugFromUrl = extractSlugFromLinkedInRaw(getLeadLinkedInUrl(lead));
       return slugFromUrl === normalizedSlug;
     });
 
-    if (bySlug) {
+    if (bySlug.length === 1) {
       return {
-        leadId: bySlug.id,
+        leadId: bySlug[0].id,
         strategy: "slug_match",
         normalizedLinkedInUrl: normalizedUrl,
         slug: normalizedSlug,
       };
     }
+    if (bySlug.length > 1) {
+      return {
+        leadId: null,
+        strategy: "slug_ambiguous",
+        normalizedLinkedInUrl: normalizedUrl,
+        slug: normalizedSlug,
+      };
+    }
 
-    const ilikeLeadId = await findLeadBySlugIlike({
+    const ilikeLead = await findLeadBySlugIlike({
       supabase,
       clientId,
       normalizedSlug,
     });
-    if (ilikeLeadId !== null) {
+    if (ilikeLead.status === "matched") {
       return {
-        leadId: ilikeLeadId,
+        leadId: ilikeLead.leadId,
         strategy: "slug_ilike",
+        normalizedLinkedInUrl: normalizedUrl,
+        slug: normalizedSlug,
+      };
+    }
+    if (ilikeLead.status === "ambiguous") {
+      return {
+        leadId: null,
+        strategy: "slug_ilike_ambiguous",
         normalizedLinkedInUrl: normalizedUrl,
         slug: normalizedSlug,
       };
@@ -976,7 +1026,7 @@ export async function backfillProviderIdsFromInvitations(params: {
   if (cursor > 0) queryWithDate = queryWithDate.gt("id", cursor);
   if (clientIdFilter) queryWithDate = queryWithDate.eq("client_id", clientIdFilter);
 
-  let dataResultWithDate = await queryWithDate;
+  const dataResultWithDate = await queryWithDate;
   let usedDateFilter = true;
   let fetchError: unknown = null;
   let rows: InvitationRow[] = [];

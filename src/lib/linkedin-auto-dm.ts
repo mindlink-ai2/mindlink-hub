@@ -904,7 +904,14 @@ export async function processAcceptedInvitationAutoDm(params: {
   unipileAccountId: string;
   payload?: JsonObject | null;
 }): Promise<AcceptedInvitationAutoDmResult> {
-  const { supabase, clientId, invitationId, leadId, unipileAccountId, payload = null } = params;
+  const {
+    supabase,
+    clientId,
+    invitationId,
+    leadId,
+    unipileAccountId: requestedUnipileAccountId,
+    payload = null,
+  } = params;
 
   const invitation = await loadInvitation({ supabase, clientId, invitationId });
   if (!invitation) {
@@ -924,6 +931,25 @@ export async function processAcceptedInvitationAutoDm(params: {
     };
   }
 
+  const invitationAccountId =
+    String(invitation.unipile_account_id ?? "").trim() ||
+    String(requestedUnipileAccountId ?? "").trim();
+
+  if (
+    invitationAccountId &&
+    requestedUnipileAccountId &&
+    invitationAccountId !== requestedUnipileAccountId
+  ) {
+    console.warn("LINKEDIN_AUTO_DM_ACCOUNT_MISMATCH", {
+      clientId,
+      invitationId: invitation.id,
+      leadId,
+      requested_unipile_account_id: requestedUnipileAccountId,
+      invitation_unipile_account_id: invitationAccountId,
+      warning: "Using invitation.unipile_account_id as source of truth.",
+    });
+  }
+
   const lead = await loadLead({ supabase, clientId, leadId });
   if (!lead) {
     const lastError = "auto_send: lead_not_found";
@@ -937,7 +963,7 @@ export async function processAcceptedInvitationAutoDm(params: {
       supabase,
       clientId,
       leadId,
-      accountId: unipileAccountId,
+      accountId: invitationAccountId,
       status: "error",
       stage: "skip",
       invitationId: invitation.id,
@@ -973,7 +999,7 @@ export async function processAcceptedInvitationAutoDm(params: {
       supabase,
       clientId,
       leadId,
-      accountId: unipileAccountId,
+      accountId: invitationAccountId,
       status: "skipped",
       stage: "skip",
       invitationId: invitation.id,
@@ -1007,7 +1033,7 @@ export async function processAcceptedInvitationAutoDm(params: {
     supabase,
     clientId,
     leadId,
-    unipileAccountId,
+    unipileAccountId: invitationAccountId,
     normalizedLeadLinkedInUrl,
   });
   const existingThreadDbId = existingThread?.threadDbId ?? null;
@@ -1034,7 +1060,7 @@ export async function processAcceptedInvitationAutoDm(params: {
       supabase,
       clientId,
       leadId,
-      accountId: unipileAccountId,
+      accountId: invitationAccountId,
       status: "skipped",
       stage: "skip",
       invitationId: invitation.id,
@@ -1071,7 +1097,7 @@ export async function processAcceptedInvitationAutoDm(params: {
     supabase,
     clientId,
     leadId,
-    accountId: unipileAccountId,
+    accountId: invitationAccountId,
     invitationId: invitation.id,
   });
 
@@ -1092,7 +1118,7 @@ export async function processAcceptedInvitationAutoDm(params: {
       supabase,
       clientId,
       leadId,
-      accountId: unipileAccountId,
+      accountId: invitationAccountId,
       status: "error",
       stage: "skip",
       invitationId: invitation.id,
@@ -1134,7 +1160,7 @@ export async function processAcceptedInvitationAutoDm(params: {
       supabase,
       clientId,
       leadId,
-      accountId: unipileAccountId,
+      accountId: invitationAccountId,
       status: "skipped",
       stage: "skip",
       invitationId: invitation.id,
@@ -1190,7 +1216,7 @@ export async function processAcceptedInvitationAutoDm(params: {
       supabase,
       clientId,
       leadId,
-      accountId: unipileAccountId,
+      accountId: invitationAccountId,
       status: "skipped",
       stage: "skip",
       invitationId: invitation.id,
@@ -1235,7 +1261,7 @@ export async function processAcceptedInvitationAutoDm(params: {
       supabase,
       clientId,
       leadId,
-      accountId: unipileAccountId,
+      accountId: invitationAccountId,
       status: "skipped",
       stage: "claim",
       invitationId: invitation.id,
@@ -1292,7 +1318,7 @@ export async function processAcceptedInvitationAutoDm(params: {
       supabase,
       clientId,
       leadId,
-      accountId: unipileAccountId,
+      accountId: invitationAccountId,
       status: "retryable",
       stage: "resolve_identity",
       invitationId: invitation.id,
@@ -1343,7 +1369,7 @@ export async function processAcceptedInvitationAutoDm(params: {
     text: draftText,
     leadLinkedInUrl: getLeadLinkedInUrl(lead),
     contactName: getLeadDisplayName(lead),
-    unipileAccountId,
+    unipileAccountId: invitationAccountId,
     providerId: identity.providerId,
     existingThreadDbId,
     existingUnipileThreadId,
@@ -1409,7 +1435,7 @@ export async function processAcceptedInvitationAutoDm(params: {
       supabase,
       clientId,
       leadId,
-      accountId: unipileAccountId,
+      accountId: invitationAccountId,
       status: retryable ? "retryable" : "error",
       stage,
       invitationId: invitation.id,
@@ -1471,7 +1497,7 @@ export async function processAcceptedInvitationAutoDm(params: {
     supabase,
     clientId,
     leadId,
-    accountId: unipileAccountId,
+    accountId: invitationAccountId,
     status: "success",
     stage: "complete",
     invitationId: invitation.id,

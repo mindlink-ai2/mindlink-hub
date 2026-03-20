@@ -3,6 +3,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { extractLinkedInProfileSlug, normalizeLinkedInUrl } from "@/lib/linkedin-url";
 import { processAcceptedInvitationAutoDm } from "@/lib/linkedin-auto-dm";
 import { createServiceSupabase } from "@/lib/inbox-server";
+import {
+  extractAcceptedRelationIdentity,
+  resolveAcceptedInvitationMatch,
+} from "@/lib/linkedin-invitations";
 import { saveAttendeeAvatarToStorage } from "@/lib/unipile-avatar-storage";
 import {
   extractSenderAttendeeId,
@@ -21,19 +25,6 @@ import {
   resolveClientIdFromUnipileAccountId,
   syncLeadProviderFromRelationPayload,
 } from "@/lib/unipile-relation-provider";
-
-type MatchResult = {
-  leadId: number | string | null;
-  strategy: "url_exact" | "slug_match" | "fallback_last_sent" | "none";
-  uncertain: boolean;
-  matchedLinkedInUrl: string | null;
-  matchedSlug: string | null;
-};
-
-type AcceptedResolution = {
-  invitationId: string | null;
-  leadId: number | string;
-};
 
 type InboxThreadRow = {
   id: string;
@@ -908,134 +899,6 @@ async function updateMessage(params: {
   }
 }
 
-function extractRelationIdentity(payload: JsonObject): {
-  normalizedUrl: string | null;
-  slug: string | null;
-} {
-  const urlCandidate = getFirstString(payload, [
-    ["user_profile_url"],
-    ["userProfileUrl"],
-    ["profile_url"],
-    ["profileUrl"],
-    ["linkedin_url"],
-    ["linkedinUrl"],
-    ["data", "user_profile_url"],
-    ["data", "userProfileUrl"],
-    ["data", "profile_url"],
-    ["data", "profileUrl"],
-    ["data", "linkedin_url"],
-    ["data", "linkedinUrl"],
-    ["data", "user", "profile_url"],
-    ["data", "user", "profileUrl"],
-    ["data", "user", "linkedin_url"],
-    ["data", "user", "linkedinUrl"],
-    ["user", "profile_url"],
-    ["user", "profileUrl"],
-    ["user", "linkedin_url"],
-    ["user", "linkedinUrl"],
-    ["contact", "profile_url"],
-    ["contact", "profileUrl"],
-    ["contact", "linkedin_url"],
-    ["contact", "linkedinUrl"],
-    ["relation", "profile_url"],
-    ["relation", "profileUrl"],
-    ["relation", "linkedin_url"],
-    ["relation", "linkedinUrl"],
-    ["counterpart", "profile_url"],
-    ["counterpart", "profileUrl"],
-    ["counterpart", "linkedin_url"],
-    ["counterpart", "linkedinUrl"],
-    ["attendee", "profile_url"],
-    ["attendee", "profileUrl"],
-    ["attendee", "linkedin_url"],
-    ["attendee", "linkedinUrl"],
-  ]);
-
-  const slugCandidate = getFirstString(payload, [
-    ["user_public_identifier"],
-    ["userPublicIdentifier"],
-    ["user_provider_id"],
-    ["userProviderId"],
-    ["public_identifier"],
-    ["publicIdentifier"],
-    ["provider_id"],
-    ["providerId"],
-    ["data", "user_public_identifier"],
-    ["data", "userPublicIdentifier"],
-    ["data", "user_provider_id"],
-    ["data", "userProviderId"],
-    ["data", "public_identifier"],
-    ["data", "publicIdentifier"],
-    ["data", "provider_id"],
-    ["data", "providerId"],
-    ["data", "user", "public_identifier"],
-    ["data", "user", "publicIdentifier"],
-    ["data", "user", "provider_id"],
-    ["data", "user", "providerId"],
-    ["contact", "public_identifier"],
-    ["contact", "publicIdentifier"],
-    ["contact", "provider_id"],
-    ["contact", "providerId"],
-    ["relation", "public_identifier"],
-    ["relation", "publicIdentifier"],
-    ["relation", "provider_id"],
-    ["relation", "providerId"],
-    ["counterpart", "public_identifier"],
-    ["counterpart", "publicIdentifier"],
-    ["counterpart", "provider_id"],
-    ["counterpart", "providerId"],
-  ]);
-
-  return {
-    normalizedUrl: normalizeLinkedInUrl(urlCandidate),
-    slug: extractLinkedInProfileSlug(slugCandidate) ?? slugCandidate?.toLowerCase() ?? null,
-  };
-}
-
-async function findLeadForRelation(params: {
-  supabase: SupabaseClient;
-  clientId: string;
-  normalizedUrl: string | null;
-  slug: string | null;
-}): Promise<MatchResult> {
-  const { supabase, clientId, normalizedUrl, slug } = params;
-
-  if (!normalizedUrl && !slug) {
-    return {
-      leadId: null,
-      strategy: "none",
-      uncertain: true,
-      matchedLinkedInUrl: null,
-      matchedSlug: null,
-    };
-  }
-
-  const leadId = await findLeadIdByLinkedInIdentity({
-    supabase,
-    clientId,
-    linkedinUrl: normalizedUrl,
-    slug,
-  });
-
-  if (leadId !== null) {
-    return {
-      leadId,
-      strategy: normalizedUrl ? "url_exact" : "slug_match",
-      uncertain: false,
-      matchedLinkedInUrl: normalizedUrl,
-      matchedSlug: slug,
-    };
-  }
-
-  return {
-    leadId: null,
-    strategy: "none",
-    uncertain: true,
-    matchedLinkedInUrl: normalizedUrl,
-    matchedSlug: slug,
-  };
-}
-
 async function getLeadInternalMessage(params: {
   supabase: SupabaseClient;
   clientId: string;
@@ -1053,6 +916,31 @@ async function getLeadInternalMessage(params: {
   const draftText =
     typeof lead?.internal_message === "string" ? lead.internal_message.trim() : "";
   return draftText || null;
+}
+
+async function logAcceptanceResolution(params: {
+  supabase: SupabaseClient;
+  clientId: string;
+  leadId?: number | string | null;
+  unipileAccountId: string;
+  status: "success" | "skipped" | "error";
+  details: Record<string, unknown>;
+}) {
+  const { supabase, clientId, leadId = null, unipileAccountId, status, details } = params;
+
+  try {
+    await supabase.from("automation_logs").insert({
+      client_id: clientId,
+      runner: "unipile-webhook",
+      action: "relation_acceptance_match",
+      status,
+      lead_id: leadId,
+      unipile_account_id: unipileAccountId,
+      details,
+    });
+  } catch (error: unknown) {
+    console.error("UNIPILE_WEBHOOK_ACCEPTANCE_LOG_ERROR:", error);
+  }
 }
 
 async function updateInvitationAcceptedWithDraft(params: {
@@ -1107,146 +995,88 @@ async function updateInvitationAcceptedWithDraft(params: {
   }
 }
 
-async function markInvitationAccepted(params: {
-  supabase: SupabaseClient;
-  clientId: string;
-  leadId: number | string;
-  unipileAccountId: string;
+function buildAcceptedInvitationRaw(params: {
+  currentRaw: unknown;
   payload: JsonObject;
-  match: MatchResult;
-}): Promise<{ invitationId: string | null; draftText: string | null }> {
-  const { supabase, clientId, leadId, unipileAccountId, payload, match } = params;
-  const now = new Date().toISOString();
-  const draftText = await getLeadInternalMessage({ supabase, clientId, leadId });
-  const acceptanceRaw = {
-    webhook_payload: payload,
-    matching: {
-      strategy: match.strategy,
-      uncertain: match.uncertain,
-      normalized_linkedin_url: match.matchedLinkedInUrl,
-      profile_slug: match.matchedSlug,
+  matchedBy: string;
+  candidatesCount: number;
+}) {
+  const { currentRaw, payload, matchedBy, candidatesCount } = params;
+  const identity = extractAcceptedRelationIdentity(payload);
+  const rawObject = toJsonObject(currentRaw);
+  const preservedInvitation =
+    Object.keys(toJsonObject(rawObject.invitation)).length > 0 ? rawObject.invitation : currentRaw;
+
+  return {
+    invitation: preservedInvitation ?? null,
+    acceptance: {
+      webhook_payload: payload,
+      matching: {
+        strategy: matchedBy,
+        uncertain: false,
+        candidates_count: candidatesCount,
+        normalized_linkedin_url: identity.normalizedLinkedInUrl,
+        profile_slug: identity.profileSlug,
+        provider_id: identity.providerId,
+        unipile_invitation_id: identity.unipileInvitationId,
+      },
     },
   };
-
-  const { data: sentInvitation } = await supabase
-    .from("linkedin_invitations")
-    .select("id, raw")
-    .eq("client_id", clientId)
-    .eq("lead_id", leadId)
-    .eq("unipile_account_id", unipileAccountId)
-    .in("status", ["queued", "sent", "pending"])
-    .order("sent_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (sentInvitation?.id) {
-    await updateInvitationAcceptedWithDraft({
-      supabase,
-      clientId,
-      invitationId: String(sentInvitation.id),
-      acceptedAtIso: now,
-      raw: {
-        invitation: sentInvitation.raw ?? null,
-        acceptance: acceptanceRaw,
-      },
-      draftText,
-    });
-    return { invitationId: String(sentInvitation.id), draftText };
-  }
-
-  const { data: existingAccepted } = await supabase
-    .from("linkedin_invitations")
-    .select("id")
-    .eq("client_id", clientId)
-    .eq("lead_id", leadId)
-    .eq("unipile_account_id", unipileAccountId)
-    .eq("status", "accepted")
-    .limit(1)
-    .maybeSingle();
-
-  if (existingAccepted?.id) return { invitationId: String(existingAccepted.id), draftText };
-
-  const { data: inserted, error: insertErr } = await supabase
-    .from("linkedin_invitations")
-    .insert({
-      client_id: clientId,
-      lead_id: leadId,
-      unipile_account_id: unipileAccountId,
-      status: "accepted",
-      accepted_at: now,
-      raw: acceptanceRaw,
-      dm_draft_text: draftText,
-      dm_draft_status: draftText ? "draft" : "none",
-    })
-    .select("id")
-    .limit(1)
-    .maybeSingle();
-
-  if (insertErr) console.error("UNIPILE_WEBHOOK_RELATION_INSERT_ACCEPTED_ERROR:", insertErr);
-  return { invitationId: inserted?.id ? String(inserted.id) : null, draftText };
 }
 
-async function fallbackAcceptLastSent(params: {
+async function markResolvedInvitationAccepted(params: {
   supabase: SupabaseClient;
   clientId: string;
-  unipileAccountId: string;
+  invitationId: string;
+  leadId: number | string;
   payload: JsonObject;
-  match: MatchResult;
-}): Promise<{ leadId: number | string | null; invitationId: string | null; draftText: string | null }> {
-  const { supabase, clientId, unipileAccountId, payload, match } = params;
-  const now = new Date().toISOString();
+  matchedBy: string;
+  candidatesCount: number;
+}): Promise<{ invitationId: string | null; draftText: string | null }> {
+  const {
+    supabase,
+    clientId,
+    invitationId,
+    leadId,
+    payload,
+    matchedBy,
+    candidatesCount,
+  } = params;
 
-  const { data: lastSent } = await supabase
+  const { data: invitation, error: invitationError } = await supabase
     .from("linkedin_invitations")
-    .select("id, lead_id, raw")
+    .select("id, raw, accepted_at, lead_id")
     .eq("client_id", clientId)
-    .eq("unipile_account_id", unipileAccountId)
-    .in("status", ["queued", "sent", "pending"])
-    .order("sent_at", { ascending: false })
+    .eq("id", invitationId)
     .limit(1)
     .maybeSingle();
 
-  if (!lastSent?.id || lastSent?.lead_id === null || lastSent?.lead_id === undefined) {
-    return { leadId: null, invitationId: null, draftText: null };
+  if (invitationError || !invitation?.id) {
+    console.error("UNIPILE_WEBHOOK_RELATION_ACCEPT_LOAD_ERROR:", invitationError);
+    return { invitationId: null, draftText: null };
   }
 
-  // Do NOT pass draftText to the update — this forces dm_draft_status = 'none',
-  // which prevents the flush-accepted-drafts cron from sending a DM to an uncertain match.
-  // We cannot confirm which prospect actually accepted when the webhook has no identity info.
+  const acceptedAtIso =
+    typeof invitation.accepted_at === "string" && invitation.accepted_at.trim()
+      ? invitation.accepted_at
+      : new Date().toISOString();
+  const draftText = await getLeadInternalMessage({ supabase, clientId, leadId });
+
   await updateInvitationAcceptedWithDraft({
     supabase,
     clientId,
-    invitationId: String(lastSent.id),
-    acceptedAtIso: now,
-    raw: {
-      invitation: lastSent.raw ?? null,
-      acceptance: {
-        webhook_payload: payload,
-        matching: {
-          strategy: "fallback_last_sent",
-          uncertain: true,
-          normalized_linkedin_url: match.matchedLinkedInUrl,
-          profile_slug: match.matchedSlug,
-        },
-      },
-    },
-    draftText: null,
+    invitationId: String(invitation.id),
+    acceptedAtIso,
+    raw: buildAcceptedInvitationRaw({
+      currentRaw: invitation.raw,
+      payload,
+      matchedBy,
+      candidatesCount,
+    }),
+    draftText,
   });
 
-  // Mark this invitation so the UI can prompt the client to send the DM manually.
-  // Using last_error as a stable, non-retryable marker (does not start with "auto_send:").
-  await supabase
-    .from("linkedin_invitations")
-    .update({ last_error: "send_manually" })
-    .eq("id", String(lastSent.id))
-    .eq("client_id", clientId);
-
-  // Return draftText: null so handleNewRelation also skips autoSendDraftAfterAccepted.
-  return {
-    leadId: lastSent.lead_id,
-    invitationId: String(lastSent.id),
-    draftText: null,
-  };
+  return { invitationId: String(invitation.id), draftText };
 }
 
 async function handleNewRelation(params: {
@@ -1256,92 +1086,115 @@ async function handleNewRelation(params: {
   payload: JsonObject;
 }) {
   const { supabase, clientId, unipileAccountId, payload } = params;
-  const identity = extractRelationIdentity(payload);
-  const match = await findLeadForRelation({
+  const resolution = await resolveAcceptedInvitationMatch({
     supabase,
     clientId,
-    normalizedUrl: identity.normalizedUrl,
-    slug: identity.slug,
+    unipileAccountId,
+    payload,
   });
 
-  let matchedLeadId: number | string | null = null;
-  let invitationEventId: string | null = null;
-  let draftText: string | null = null;
-  let usedFallback = false;
-
-  if (match.leadId !== null) {
-    const accepted = await markInvitationAccepted({
-      supabase,
-      clientId,
-      leadId: match.leadId,
-      unipileAccountId,
-      payload,
-      match,
-    });
-    invitationEventId = accepted.invitationId;
-    draftText = accepted.draftText;
-    matchedLeadId = match.leadId;
-  } else {
-    const fallback = await fallbackAcceptLastSent({
+  if (!resolution.ok) {
+    await logAcceptanceResolution({
       supabase,
       clientId,
       unipileAccountId,
-      payload,
-      match,
+      status: resolution.status === "ambiguous" ? "error" : "skipped",
+      details: {
+        result: resolution.status,
+        reason: resolution.reason,
+        matched_by: resolution.matchedBy,
+        candidates_count: resolution.candidatesCount,
+        identity: resolution.identity,
+        details: resolution.details ?? null,
+      },
     });
-    matchedLeadId = fallback.leadId;
-    invitationEventId = fallback.invitationId;
-    draftText = fallback.draftText;
-    usedFallback = true;
 
-    if (fallback.leadId === null) {
-      console.warn("UNIPILE_WEBHOOK_RELATION_NO_MATCH_NO_FALLBACK", {
-        clientId,
-        unipileAccountId,
-        normalizedUrl: identity.normalizedUrl,
-        slug: identity.slug,
-      });
-    } else {
-      console.warn("UNIPILE_WEBHOOK_RELATION_FALLBACK_USED", {
-        clientId,
-        unipileAccountId,
-        fallbackLeadId: String(fallback.leadId),
-        fallbackInvitationId: fallback.invitationId,
-        webhookUrl: identity.normalizedUrl,
-        webhookSlug: identity.slug,
-        warning:
-          "Acceptance matched by fallback (no identity in webhook payload). " +
-          "provider_id sync and auto-DM are disabled to prevent data corruption.",
-      });
-    }
+    console.warn("UNIPILE_WEBHOOK_RELATION_UNRESOLVED", {
+      clientId,
+      unipileAccountId,
+      result: resolution.status,
+      reason: resolution.reason,
+      matched_by: resolution.matchedBy,
+      candidates_count: resolution.candidatesCount,
+      identity: resolution.identity,
+      details: resolution.details ?? null,
+    });
+    return;
   }
+
+  const matchedLeadId = resolution.leadId;
+  const accepted = await markResolvedInvitationAccepted({
+    supabase,
+    clientId,
+    invitationId: resolution.invitationId,
+    leadId: matchedLeadId,
+    payload,
+    matchedBy: resolution.matchedBy,
+    candidatesCount: resolution.candidatesCount,
+  });
+
+  const invitationEventId = accepted.invitationId;
+  const draftText = accepted.draftText;
+
+  if (!invitationEventId) {
+    await logAcceptanceResolution({
+      supabase,
+      clientId,
+      leadId: matchedLeadId,
+      unipileAccountId,
+      status: "error",
+      details: {
+        result: "accept_update_failed",
+        matched_by: resolution.matchedBy,
+        candidates_count: resolution.candidatesCount,
+        identity: resolution.identity,
+        invitation_id: resolution.invitationId,
+      },
+    });
+    return;
+  }
+
+  const matchingDetails = {
+    strategy: resolution.matchedBy,
+    uncertain: false,
+    candidates_count: resolution.candidatesCount,
+    normalized_linkedin_url: resolution.identity.normalizedLinkedInUrl,
+    profile_slug: resolution.identity.profileSlug,
+    provider_id: resolution.identity.providerId,
+    unipile_invitation_id: resolution.identity.unipileInvitationId,
+  };
 
   const syncResult = await syncLeadProviderFromRelationPayload({
     supabase,
     raw: {
       webhook_payload: payload,
-      matching: {
-        strategy: match.strategy,
-        uncertain: match.uncertain,
-        normalized_linkedin_url: match.matchedLinkedInUrl,
-        profile_slug: match.matchedSlug,
-      },
+      matching: matchingDetails,
     },
     eventId: invitationEventId,
     clientId,
     unipileAccountId,
-    // When the fallback was used we cannot confirm which lead actually accepted,
-    // so we don't pass leadIdHint: writing a wrong provider_id to a lead causes
-    // future messages to be delivered to the wrong person on LinkedIn.
-    leadIdHint: usedFallback ? null : matchedLeadId,
+    leadIdHint: matchedLeadId,
   });
 
-  // Only trigger the auto-DM when we have a confident match (not a fallback).
-  // For "full" plan clients this is the normal flow: webhook with proper identity
-  // → direct match → DM sent automatically.
-  // For "essential" plan clients the DM is sent manually, so this block is a no-op.
-  if (!usedFallback && matchedLeadId !== null && invitationEventId !== null && draftText) {
-    const providerId = syncResult.userProviderId ?? null;
+  await logAcceptanceResolution({
+    supabase,
+    clientId,
+    leadId: matchedLeadId,
+    unipileAccountId,
+    status: "success",
+    details: {
+      result: "accepted_matched",
+      matched_by: resolution.matchedBy,
+      candidates_count: resolution.candidatesCount,
+      invitation_id: invitationEventId,
+      lead_id: matchedLeadId,
+      identity: resolution.identity,
+      sync_result: syncResult,
+    },
+  });
+
+  if (draftText) {
+    const providerId = syncResult.userProviderId ?? resolution.identity.providerId ?? null;
     await autoSendDraftAfterAccepted({
       supabase,
       clientId,
