@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, ExternalLink, Search, X } from "lucide-react";
 import SubscriptionGate from "@/components/SubscriptionGate";
+import { SkeletonTable } from "@/components/ui/Skeleton";
+import { useDebounce } from "@/hooks/useDebounce";
+import { queryKeys } from "@/lib/query-keys";
 import {
   getProspectionStatusClasses,
   getProspectionStatusDotClass,
@@ -308,40 +312,35 @@ function Pagination({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function FullDashboardPage() {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilterKey>("all");
   const [dateFilter, setDateFilter] = useState<DateFilterKey>("all");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
 
-  useEffect(() => {
-    fetch("/api/get-leads", { credentials: "include" })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data) => {
-        setLeads(Array.isArray(data?.leads) ? (data.leads as Lead[]) : []);
-      })
-      .catch((err: unknown) => {
-        console.error("FULL_DASHBOARD_LOAD_ERROR:", err);
-        setError("Impossible de charger les prospects.");
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  // Debounce la recherche pour éviter un re-filter à chaque frappe
+  const debouncedSearch = useDebounce(searchTerm, 300);
+
+  // Données mises en cache — partagées avec la page Leads si déjà chargées
+  const { data: queryData, isLoading: loading, isError } = useQuery({
+    queryKey: queryKeys.leads(),
+    queryFn: async () => {
+      const res = await fetch("/api/get-leads", { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json() as Promise<{ leads: Lead[] }>;
+    },
+  });
+
+  const error = isError ? "Impossible de charger les prospects." : null;
 
   const enrichedLeads = useMemo<EnrichedLead[]>(
     () =>
-      leads.map((lead) => ({
+      (queryData?.leads ?? []).map((lead: Lead) => ({
         ...lead,
         _status: getProspectionStatusKey(lead),
         _statusTimestamp: getStatusTimestamp(lead),
       })),
-    [leads]
+    [queryData]
   );
 
   const stats = useMemo<Stats>(
@@ -358,8 +357,8 @@ export default function FullDashboardPage() {
   const filtered = useMemo<EnrichedLead[]>(() => {
     let result = enrichedLeads;
 
-    if (searchTerm.trim()) {
-      const term = searchTerm.trim().toLowerCase();
+    if (debouncedSearch.trim()) {
+      const term = debouncedSearch.trim().toLowerCase();
       result = result.filter((l) => {
         const name = leadDisplayName(l).toLowerCase();
         return (
@@ -383,7 +382,7 @@ export default function FullDashboardPage() {
     }
 
     return result;
-  }, [enrichedLeads, searchTerm, statusFilter, dateFilter]);
+  }, [enrichedLeads, debouncedSearch, statusFilter, dateFilter]);
 
   // page is reset to 1 directly in the filter handlers (see setSearchTerm, handleStatusClick, setDateFilter, setPerPage usages below)
 
@@ -528,9 +527,10 @@ export default function FullDashboardPage() {
 
             {/* Table */}
             {loading ? (
-              <div className="px-5 py-14 text-center text-sm text-[#51627b]">
-                Chargement des prospects…
-              </div>
+              <SkeletonTable
+                rows={10}
+                headers={["Prénom / Nom", "Entreprise", "Poste", "Statut", "LinkedIn"]}
+              />
             ) : error ? (
               <div className="px-5 py-14 text-center text-sm text-red-600">
                 {error}

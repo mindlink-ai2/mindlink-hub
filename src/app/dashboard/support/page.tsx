@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
+import { queryKeys } from "@/lib/query-keys";
 import { ArrowLeft, Loader2, Plus, Send } from "lucide-react";
 
 import SubscriptionGate from "@/components/SubscriptionGate";
@@ -96,6 +98,7 @@ function normalizeConversation(raw: Partial<SupportConversation> | null | undefi
 
 export default function SupportPage() {
   const { isLoaded, isSignedIn } = useUser();
+  const queryClient = useQueryClient();
 
   const [conversations, setConversations] = useState<SupportConversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -131,11 +134,19 @@ export default function SupportPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/support/conversation", { cache: "no-store" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.error ?? "Impossible de charger les tickets support.");
-      }
+      const data = await queryClient.fetchQuery({
+        queryKey: queryKeys.supportConversations(),
+        queryFn: async () => {
+          const res = await fetch("/api/support/conversation");
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err?.error ?? "Impossible de charger les tickets support.");
+          }
+          return res.json();
+        },
+        staleTime: 15 * 1000,
+      });
+      if (!data) throw new Error("Impossible de charger les tickets support.");
 
       const nextRows = Array.isArray(data?.conversations)
         ? (data.conversations as Partial<SupportConversation>[])
@@ -156,7 +167,7 @@ export default function SupportPage() {
     } finally {
       setLoadingConversations(false);
     }
-  }, [isSignedIn]);
+  }, [isSignedIn, queryClient]);
 
   const markConversationRead = useCallback(
     async (conversationId: string) => {
@@ -189,14 +200,20 @@ export default function SupportPage() {
       setError(null);
 
       try {
-        const res = await fetch(
-          `/api/support/messages?conversationId=${encodeURIComponent(conversationId)}`,
-          { cache: "no-store" }
-        );
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(data?.error ?? "Impossible de charger les messages.");
-        }
+        const data = await queryClient.fetchQuery({
+          queryKey: queryKeys.supportMessages(conversationId),
+          queryFn: async () => {
+            const res = await fetch(
+              `/api/support/messages?conversationId=${encodeURIComponent(conversationId)}`
+            );
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err?.error ?? "Impossible de charger les messages.");
+            }
+            return res.json();
+          },
+          staleTime: 15 * 1000,
+        });
 
         const nextMessages = Array.isArray(data?.messages)
           ? (data.messages as SupportMessage[])
@@ -210,7 +227,7 @@ export default function SupportPage() {
         setLoadingMessages(false);
       }
     },
-    [markConversationRead]
+    [markConversationRead, queryClient]
   );
 
   const handleCreateTicket = async () => {

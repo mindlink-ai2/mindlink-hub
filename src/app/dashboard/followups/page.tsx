@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 import { CalendarDays, CheckCircle2, ChevronRight, MessageSquare } from "lucide-react";
 import { trackBusinessEvent } from "@/lib/analytics/business-client";
 import SubscriptionGate from "@/components/SubscriptionGate";
@@ -31,6 +33,7 @@ type FollowupLead = {
 };
 
 export default function FollowupsPage() {
+  const queryClient = useQueryClient();
   const [leads, setLeads] = useState<FollowupLead[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [openLead, setOpenLead] = useState<FollowupLead | null>(null);
@@ -52,24 +55,34 @@ export default function FollowupsPage() {
     setShowRelanceLinkedin(false);
   }, [openLead?.id]);
 
-  // Fetch all leads with followups
+  // Fetch all leads with followups — utilise le cache TanStack Query si dispo
   useEffect(() => {
     (async () => {
-      const res1 = await fetch("/api/get-leads");
-      const res2 = await fetch("/api/get-map-leads");
-
-      const data1 = await res1.json();
-      const data2 = await res2.json();
+      const [data1, data2] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: queryKeys.leads(),
+          queryFn: async () => {
+            const res = await fetch("/api/get-leads");
+            return res.json();
+          },
+          staleTime: 5 * 60 * 1000,
+        }),
+        queryClient.fetchQuery({
+          queryKey: queryKeys.mapLeads(),
+          queryFn: async () => {
+            const res = await fetch("/api/get-map-leads");
+            return res.json();
+          },
+          staleTime: 10 * 60 * 1000,
+        }),
+      ]);
 
       const merged = [...(data1.leads ?? []), ...(data2.leads ?? [])] as FollowupLead[];
-
-      // Only leads with next_followup_at
       const filtered = merged.filter((l) => l.next_followup_at != null);
-
       setLeads(filtered);
       setLoaded(true);
     })();
-  }, []);
+  }, [queryClient]);
 
   // Paris timezone date
   const today = new Date(
@@ -131,12 +144,13 @@ export default function FollowupsPage() {
 
   // 🔵 Fonction : marquer comme répondu (LinkedIn OU Maps)
   const markAsResponded = async (leadId: string | number) => {
-    // 🔧 FIX 2 : éviter crash si openLead est null
     const isMapLead = !!openLead?.placeUrl;
+    const endpoint = isMapLead ? "/api/map-leads/responded" : "/api/leads/responded";
 
-    const endpoint = isMapLead
-      ? "/api/map-leads/responded"
-      : "/api/leads/responded";
+    // Optimistic: remove immediately, capture snapshot for rollback
+    const snapshot = leads;
+    setLeads((prev) => prev.filter((l) => l.id !== leadId));
+    setOpenLead(null);
 
     const res = await fetch(endpoint, {
       method: "POST",
@@ -144,9 +158,8 @@ export default function FollowupsPage() {
       body: JSON.stringify({ leadId }),
     });
 
-    if (res.ok) {
-      setLeads((prev) => prev.filter((l) => l.id !== leadId));
-      setOpenLead(null);
+    if (!res.ok) {
+      setLeads(snapshot);
     }
   };
 

@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 import { Check, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
 import MobileLayout from "@/components/mobile/MobileLayout";
 import MobilePageHeader from "@/components/mobile/MobilePageHeader";
+import { SkeletonBillingCard } from "@/components/ui/Skeleton";
 
 type BillingStatus = {
   plan: string | null; // "essential" | "full"
@@ -43,6 +46,7 @@ function prettyStatus(s?: string | null) {
 }
 
 export default function BillingPage() {
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState<"essential" | "portal" | null>(null);
   const [selectedEssentialQuota, setSelectedEssentialQuota] = useState<10 | 20 | 30>(10);
   const [error, setError] = useState<string | null>(null);
@@ -92,34 +96,38 @@ export default function BillingPage() {
 
     (async () => {
       try {
-        const res = await fetch("/api/billing/status", { method: "GET" });
-        const data = await res.json().catch(() => ({}));
+        const data = await queryClient.fetchQuery({
+          queryKey: queryKeys.billingStatus(),
+          queryFn: async () => {
+            const res = await fetch("/api/billing/status", { method: "GET" });
+            return res.json().catch(() => ({}));
+          },
+          staleTime: 5 * 60 * 1000,
+        });
+
         if (!mounted) return;
 
-        if (res.ok) {
-          const plan = data.plan ?? null;
-          const quota = data.quota ?? null;
+        const plan = data.plan ?? null;
+        const quota = data.quota ?? null;
 
-          setBilling({
-            plan,
-            quota,
-            subscription_status: data.subscription_status ?? null,
-            current_period_end: data.current_period_end ?? null,
-          });
+        setBilling({
+          plan,
+          quota,
+          subscription_status: data.subscription_status ?? null,
+          current_period_end: data.current_period_end ?? null,
+        });
 
-          // ✅ pré-sélection UI : si essential + quota valide, on le met dans le sélecteur
-          const nPlan = normalizePlan(plan);
-          const q = normalizeQuota(quota);
-          if (nPlan === "essential" && (q === 10 || q === 20 || q === 30)) {
-            setSelectedEssentialQuota(q);
-          } else {
-            setSelectedEssentialQuota(10);
-          }
+        const nPlan = normalizePlan(plan);
+        const q = normalizeQuota(quota);
+        if (nPlan === "essential" && (q === 10 || q === 20 || q === 30)) {
+          setSelectedEssentialQuota(q);
         } else {
-          // pas bloquant : on affiche la page quand même
-          setBilling({ plan: null, quota: null, subscription_status: null, current_period_end: null });
           setSelectedEssentialQuota(10);
         }
+      } catch {
+        if (!mounted) return;
+        setBilling({ plan: null, quota: null, subscription_status: null, current_period_end: null });
+        setSelectedEssentialQuota(10);
       } finally {
         if (mounted) setStatusLoading(false);
       }
@@ -128,7 +136,7 @@ export default function BillingPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [queryClient]);
 
   const startEssentialCheckout = async () => {
     setError(null);
@@ -175,16 +183,23 @@ export default function BillingPage() {
     return 89; // 30
   }, [selectedEssentialQuota]);
 
+  if (statusLoading) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <MobileLayout className="gap-4">
+          <MobilePageHeader title="Facturation" subtitle="Chargement de votre abonnement..." />
+          <SkeletonBillingCard />
+        </MobileLayout>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <MobileLayout className="gap-4">
         <MobilePageHeader
           title="Facturation"
-          subtitle={
-            statusLoading
-              ? "Chargement de votre abonnement..."
-              : `${prettyPlan(billing.plan)} · ${prettyStatus(billing.subscription_status)}`
-          }
+          subtitle={`${prettyPlan(billing.plan)} · ${prettyStatus(billing.subscription_status)}`}
         />
 
         {error ? (
@@ -270,9 +285,7 @@ export default function BillingPage() {
         </section>
 
         <div className="rounded-xl border border-[#d7e5ff] bg-[#f6f9ff] px-3 py-2 text-[12px] text-[#4f678f]">
-          {statusLoading
-            ? "Chargement…"
-            : `${prettyPlan(billing.plan)} · ${prettyStatus(billing.subscription_status)}`}
+          {`${prettyPlan(billing.plan)} · ${prettyStatus(billing.subscription_status)}`}
           {currentPaceLabel !== "—" ? <span> · {currentPaceLabel}</span> : null}
           {renewalLabel ? <div className="mt-1 text-[#6982a9]">{renewalLabel}</div> : null}
         </div>
@@ -301,7 +314,7 @@ export default function BillingPage() {
               <div className="mt-4 flex flex-wrap gap-2 text-xs">
                 <span className="rounded-full border border-[#d4e2fc] bg-white px-3 py-1 text-[#49648e]">
                   <span className="text-[#6f87ae]">Statut :</span>{" "}
-                  {statusLoading ? "Chargement…" : prettyStatus(billing.subscription_status)}
+                  {prettyStatus(billing.subscription_status)}
                   {(isActive || isTrial) && currentPaceLabel !== "—" ? (
                     <span className="text-[#6f87ae]"> · {currentPaceLabel}</span>
                   ) : null}
@@ -320,13 +333,13 @@ export default function BillingPage() {
               <div className="text-xs">
                 <div className="text-[#6c84aa]">Plan actuel</div>
                 <div className="font-semibold text-[#173963]">
-                  {statusLoading ? "Chargement…" : prettyPlan(billing.plan)}
+                  {prettyPlan(billing.plan)}
                   <span className="font-normal text-[#7590b6]"> · </span>
                   <span className="font-normal text-[#5a739b]">
-                    {statusLoading ? "…" : prettyStatus(billing.subscription_status)}
+                    {prettyStatus(billing.subscription_status)}
                   </span>
                 </div>
-                {!statusLoading && currentPaceLabel !== "—" ? (
+                {currentPaceLabel !== "—" ? (
                   <div className="mt-1 text-[#6f88ae]">{currentPaceLabel}</div>
                 ) : null}
               </div>
@@ -568,9 +581,7 @@ export default function BillingPage() {
 
           <div className="rounded-2xl border border-[#d7e5ff] bg-[#f6f9ff] px-4 py-3 text-xs text-[#4f678f] sm:hidden">
             <span className="text-[#6c86ad]">Plan actuel :</span>{" "}
-            {statusLoading
-              ? "Chargement…"
-              : `${prettyPlan(billing.plan)} · ${prettyStatus(billing.subscription_status)}`}
+            {`${prettyPlan(billing.plan)} · ${prettyStatus(billing.subscription_status)}`}
             {currentPaceLabel !== "—" ? <span> · {currentPaceLabel}</span> : null}
             {renewalLabel ? <div className="mt-1 text-[#6982a9]">{renewalLabel}</div> : null}
           </div>

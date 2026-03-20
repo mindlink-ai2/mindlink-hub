@@ -9,5 +9,8 @@ export const queryKeys = {
   supportMessages: (conversationId: string) =>
     ["support", "messages", conversationId] as const,
   inboxThreads: () => ["inbox", "threads"] as const,
+  inboxUnreadCount: () => ["inbox", "unread-count"] as const,
+  inboxClientId: () => ["inbox", "client-id"] as const,
   linkedinSettings: () => ["linkedin", "settings"] as const,
+  billingStatus: () => ["billing", "status"] as const,
 } as const;

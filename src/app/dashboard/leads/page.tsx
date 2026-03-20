@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { queryKeys } from "@/lib/query-keys";
+import { useDebounce } from "@/hooks/useDebounce";
 import { supabase } from "@/lib/supabase";
 import { trackBusinessEvent } from "@/lib/analytics/business-client";
 import {
@@ -13,16 +17,22 @@ import {
 } from "@/lib/prospection-status";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
+import dynamic from "next/dynamic";
 import LeadsCards, { type MobileLeadsViewMode } from "@/components/leads/LeadsCards";
 import LeadsMobileFilters, {
   type MobileLeadFilterKey,
 } from "@/components/leads/LeadsMobileFilters";
-import ProspectionFilterBar, {
-  type ProspectionDatePreset,
-  type ProspectionDesktopFilters,
-  type ProspectionSegmentKey,
-  type ProspectionStatusKey,
+import type {
+  ProspectionDatePreset,
+  ProspectionDesktopFilters,
+  ProspectionSegmentKey,
+  ProspectionStatusKey,
 } from "@/components/prospection/ProspectionFilterBar";
+
+const ProspectionFilterBar = dynamic(
+  () => import("@/components/prospection/ProspectionFilterBar"),
+  { ssr: false }
+);
 import { Button } from "@/components/ui/button";
 import { HubButton } from "@/components/ui/hub-button";
 import { AlertTriangle, Briefcase, Building2, Calendar, Globe, LayoutGrid, Linkedin, List, Mail, MapPin, MessageSquare, MoveRight, Phone, UserCircle2, X } from "lucide-react";
@@ -287,8 +297,11 @@ export default function LeadsPage() {
   const selectedCount = selectedIds.size;
 
   // ✅ open lead from query param (?open=ID)
+  const queryClient = useQueryClient();
   const [openFromQuery, setOpenFromQuery] = useState<string | null>(null);
   const isAutomationManaged = plan === "full";
+  const debouncedSearch = useDebounce(searchTerm, 300);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   // Tracking
   useEffect(() => {
@@ -304,12 +317,19 @@ export default function LeadsPage() {
 
   // ✅ DERIVED filtered list (no state = no desync)
   const searchedLeads = useMemo(() => {
-    return filterLeads(safeLeads, searchTerm);
-  }, [safeLeads, searchTerm]);
+    return filterLeads(safeLeads, debouncedSearch);
+  }, [safeLeads, debouncedSearch]);
 
   const filteredLeads = useMemo(() => {
     return applyDesktopFilters(searchedLeads, desktopFilters);
   }, [searchedLeads, desktopFilters]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: filteredLeads.length,
+    getScrollElement: () => tableScrollRef.current,
+    estimateSize: () => 52,
+    overscan: 8,
+  });
 
   const mobileFilterOptions = useMemo(() => {
     const counts: Record<Exclude<MobileLeadFilterKey, "all">, number> = {
@@ -395,8 +415,14 @@ export default function LeadsPage() {
   // Load leads + options + plan
   useEffect(() => {
     (async () => {
-      const res = await fetch("/api/get-leads");
-      const data = await res.json();
+      const data = await queryClient.fetchQuery({
+        queryKey: queryKeys.leads(),
+        queryFn: async () => {
+          const res = await fetch("/api/get-leads");
+          return res.json();
+        },
+        staleTime: 5 * 60 * 1000,
+      });
 
       const leads = data.leads ?? [];
       setSafeLeads(leads);
@@ -414,7 +440,7 @@ export default function LeadsPage() {
 
       setClientLoaded(true);
     })();
-  }, []);
+  }, [queryClient]);
 
   // Realtime: auto-update linkedin_invitations state in leads
   useEffect(() => {
@@ -1330,7 +1356,6 @@ export default function LeadsPage() {
 
             <div className="mt-6 h-12 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
             <div className="mt-4 h-72 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
-            <div className="mt-3 text-xs text-[#4B5563]">Chargement des leads…</div>
           </div>
         </div>
       </div>
@@ -1609,7 +1634,7 @@ export default function LeadsPage() {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 w-full overflow-auto px-2 pb-2 pt-1">
+              <div ref={tableScrollRef} className="min-h-0 flex-1 w-full overflow-auto px-2 pb-2 pt-1">
                 <table className="min-w-[1080px] w-full table-fixed border-separate [border-spacing:0_6px] text-[13px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="text-[11px] font-medium tracking-[0.02em] text-[#405770]">
@@ -1656,7 +1681,13 @@ export default function LeadsPage() {
                         </td>
                       </tr>
                     ) : (
-                      filteredLeads.map((lead, idx) => {
+                      <>
+                        {rowVirtualizer.getVirtualItems()[0]?.start > 0 && (
+                          <tr><td colSpan={colCount} style={{ height: rowVirtualizer.getVirtualItems()[0].start }} /></tr>
+                        )}
+                        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const lead = filteredLeads[virtualRow.index];
+                        const idx = virtualRow.index;
                         const fullName =
                           `${lead.FirstName ?? ""} ${lead.LastName ?? ""}`.trim() ||
                           lead.Name ||
@@ -1920,7 +1951,13 @@ export default function LeadsPage() {
                             </td>
                           </tr>
                         );
-                      })
+                        })}
+                        {(() => {
+                          const items = rowVirtualizer.getVirtualItems();
+                          const paddingBottom = items.length > 0 ? rowVirtualizer.getTotalSize() - items[items.length - 1].end : 0;
+                          return paddingBottom > 0 ? <tr><td colSpan={colCount} style={{ height: paddingBottom }} /></tr> : null;
+                        })()}
+                      </>
                     )}
                   </tbody>
                 </table>

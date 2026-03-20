@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { trackBusinessEvent } from "@/lib/analytics/business-client";
 import { queryKeys } from "@/lib/query-keys";
+import { SkeletonTable } from "@/components/ui/Skeleton";
 
 type DrilldownType =
   | "leads_today"
@@ -419,7 +420,7 @@ export default function DashboardPage() {
               </div>
 
               {loadingItems ? (
-                <div className="px-5 py-10 text-sm text-[#51627b]">Chargement...</div>
+                <div className="px-5 py-4"><SkeletonTable rows={5} /></div>
               ) : itemsError ? (
                 <div className="px-5 py-10 text-sm text-red-700">{itemsError}</div>
               ) : filteredItems.length === 0 ? (

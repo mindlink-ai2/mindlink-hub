@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { INBOX_GLOBAL_SYNC_EVENT, INBOX_SYNC_INTERVAL_MS } from "@/lib/inbox-events";
+import { queryKeys } from "@/lib/query-keys";
 import { supabase } from "@/lib/supabase";
 
 function formatUnreadTotal(total: number): string {
@@ -11,24 +13,28 @@ function formatUnreadTotal(total: number): string {
 }
 
 export default function InboxNavLink() {
+  const queryClient = useQueryClient();
   const [clientId, setClientId] = useState<string | null>(null);
   const [totalUnread, setTotalUnread] = useState(0);
 
   const loadUnreadCount = useCallback(async () => {
     try {
-      const res = await fetch("/api/inbox/unread-count", { cache: "no-store" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setTotalUnread(0);
-        return;
-      }
+      const data = await queryClient.fetchQuery({
+        queryKey: queryKeys.inboxUnreadCount(),
+        queryFn: async () => {
+          const res = await fetch("/api/inbox/unread-count");
+          if (!res.ok) return { total: 0 };
+          return res.json();
+        },
+        staleTime: 10 * 1000,
+      });
 
       const nextTotal = Number(data?.total ?? 0);
       setTotalUnread(Number.isFinite(nextTotal) && nextTotal > 0 ? nextTotal : 0);
     } catch {
       setTotalUnread(0);
     }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {
@@ -43,15 +49,22 @@ export default function InboxNavLink() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/inbox/client", { cache: "no-store" });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data?.clientId) return;
+        const data = await queryClient.fetchQuery({
+          queryKey: queryKeys.inboxClientId(),
+          queryFn: async () => {
+            const res = await fetch("/api/inbox/client");
+            if (!res.ok) return null;
+            return res.json();
+          },
+          staleTime: 30 * 60 * 1000,
+        });
+        if (!data?.clientId) return;
         setClientId(String(data.clientId));
       } catch {
         // no-op
       }
     })();
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     if (!clientId) return;
