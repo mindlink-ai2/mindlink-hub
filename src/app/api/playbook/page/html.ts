@@ -812,7 +812,7 @@ function doSearch(q) {
     marks[i].parentNode.replaceChild(t, marks[i]);
   }
   if (!q.trim()) return;
-  var escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  var escaped = q.replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
   var re = new RegExp('(' + escaped + ')', 'gi');
   var walker = document.createTreeWalker(s, NodeFilter.SHOW_TEXT, null, false);
   var nodes = [];
