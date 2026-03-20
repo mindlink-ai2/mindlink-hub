@@ -59,7 +59,7 @@ function CopyBtn({ text, variant = "default" }: { text: string; variant?: "defau
       t.value = text;
       document.body.appendChild(t);
       t.select();
-      document.execCommand("copy");
+      document.execCommand("copy"); // fallback for older browsers
       document.body.removeChild(t);
     }
     setCopied(true);
@@ -174,15 +174,6 @@ function Tag({ children, color = "default" }: { children: React.ReactNode; color
   );
 }
 
-function StepDot({ color = "blue" }: { color?: "blue" | "green" | "amber" | "gray" }) {
-  const cls = {
-    blue: "bg-[#2563eb] text-white border-[#2563eb]",
-    green: "bg-emerald-500 text-white border-emerald-500",
-    amber: "bg-amber-500 text-white border-amber-500",
-    gray: "bg-white text-[#94a3b8] border-[#e2e8f0]",
-  }[color];
-  return <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${cls}`} />;
-}
 
 function Accordion({
   items,
@@ -697,7 +688,7 @@ function SIACoach() {
         <textarea
           value={msg}
           onChange={e => setMsg(e.target.value)}
-          placeholder='Ex : "C\'est quoi exactement ? On gère déjà notre prospection mais je suis curieux"'
+          placeholder="Ex : &quot;C'est quoi exactement ? On gère déjà notre prospection mais je suis curieux&quot;"
           className="min-h-[100px] w-full resize-y bg-transparent px-5 py-4 text-[13.5px] leading-relaxed text-[#0b1c33] placeholder:text-[#94a3b8] focus:outline-none"
         />
         <div className="flex items-center justify-between border-t border-[#f1f5f9] px-4 py-3">
