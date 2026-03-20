@@ -106,22 +106,43 @@ begin
 end
 $$;
 
-with duplicated_invitation_ids as (
-  select
-    id,
-    row_number() over (
-      partition by client_id, unipile_account_id, unipile_invitation_id
-      order by coalesce(accepted_at, sent_at, created_at, now()) desc, id desc
-    ) as rn
-  from public.linkedin_invitations
-  where unipile_invitation_id is not null
-    and btrim(unipile_invitation_id) <> ''
-)
-update public.linkedin_invitations li
-set unipile_invitation_id = null
-from duplicated_invitation_ids d
-where li.id = d.id
-  and d.rn > 1;
+do $$
+declare
+  dedupe_order_expr text := 'coalesce(accepted_at, sent_at, now()) desc, id desc';
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'linkedin_invitations'
+      and column_name = 'created_at'
+  ) then
+    dedupe_order_expr := 'coalesce(accepted_at, sent_at, created_at, now()) desc, id desc';
+  end if;
+
+  execute format(
+    $sql$
+      with duplicated_invitation_ids as (
+        select
+          id,
+          row_number() over (
+            partition by client_id, unipile_account_id, unipile_invitation_id
+            order by %1$s
+          ) as rn
+        from public.linkedin_invitations
+        where unipile_invitation_id is not null
+          and btrim(unipile_invitation_id) <> ''
+      )
+      update public.linkedin_invitations li
+      set unipile_invitation_id = null
+      from duplicated_invitation_ids d
+      where li.id = d.id
+        and d.rn > 1;
+    $sql$,
+    dedupe_order_expr
+  );
+end
+$$;
 
 update public.linkedin_invitations
 set
