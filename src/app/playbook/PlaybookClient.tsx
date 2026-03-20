@@ -1069,7 +1069,7 @@ export default function PlaybookClient() {
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto bg-[#f4f8ff]">
-          <div className="mx-auto max-w-3xl px-6 py-8">
+          <div className="px-8 py-8">
             <ContentComponent go={setActive} />
           </div>
         </div>
