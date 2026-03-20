@@ -13,6 +13,7 @@ import BusinessTracker from "@/components/analytics/BusinessTracker";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
 import { PLAYBOOK_ALLOWED_CLIENT_IDS } from "@/lib/playbook-auth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import QueryProvider from "@/components/QueryProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -241,7 +242,9 @@ export default async function RootLayout({
 
             {/* 🔵 PAGE CONTENT */}
             <main className="flex min-h-0 flex-1">
-              <DashboardContainer>{children}</DashboardContainer>
+              <QueryProvider>
+                <DashboardContainer>{children}</DashboardContainer>
+              </QueryProvider>
             </main>
 
             <MobileBottomNav dashboardHref={dashboardHref} />
