@@ -11,6 +11,7 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import SupportWidgetLoader from "@/components/support/SupportWidgetLoader";
 import BusinessTracker from "@/components/analytics/BusinessTracker";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
+import { PLAYBOOK_ALLOWED_CLIENT_IDS } from "@/lib/playbook-auth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -92,6 +93,7 @@ export default async function RootLayout({
 
   let hasAccess = false;
   let showSupportAdminLink = false;
+  let showPlaybookLink = false;
 
   let isFullActivePlanClient = false;
 
@@ -108,6 +110,9 @@ export default async function RootLayout({
       const plan = String(data.plan ?? "").trim().toLowerCase();
       const subscriptionStatus = String(data.subscription_status ?? "").trim().toLowerCase();
       isFullActivePlanClient = plan === "full" && subscriptionStatus === "active";
+
+      const clientId = Number(data.id);
+      showPlaybookLink = (PLAYBOOK_ALLOWED_CLIENT_IDS as readonly number[]).includes(clientId);
     }
   }
 
@@ -185,6 +190,14 @@ export default async function RootLayout({
                           className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                         >
                           Support Admin
+                        </Link>
+                      ) : null}
+                      {showPlaybookLink ? (
+                        <Link
+                          href="/playbook"
+                          className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
+                        >
+                          📋 Playbook
                         </Link>
                       ) : null}
                     </nav>
