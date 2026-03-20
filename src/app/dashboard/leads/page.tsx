@@ -3,17 +3,23 @@
 import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { trackBusinessEvent } from "@/lib/analytics/business-client";
+import {
+  getProspectionInvitationState,
+  getProspectionStatusClasses,
+  getProspectionStatusDotClass,
+  getProspectionStatusKey,
+  getProspectionStatusLabel,
+  mergeLeadWithInvitationUpdate,
+} from "@/lib/prospection-status";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import LeadsCards, { type MobileLeadsViewMode } from "@/components/leads/LeadsCards";
-import { getLeadStatusKey } from "@/components/leads/LeadCard";
 import LeadsMobileFilters, {
   type MobileLeadFilterKey,
 } from "@/components/leads/LeadsMobileFilters";
 import ProspectionFilterBar, {
   type ProspectionDatePreset,
   type ProspectionDesktopFilters,
-  type ProspectionInvitationKey,
   type ProspectionSegmentKey,
   type ProspectionStatusKey,
 } from "@/components/prospection/ProspectionFilterBar";
@@ -160,17 +166,8 @@ function filterLeads(leads: Lead[], term: string) {
   });
 }
 
-function getLeadInvitationFilterStatus(lead: Lead): ProspectionInvitationKey {
-  if (lead.linkedin_invitation_status === "accepted") return "accepted";
-  if (lead.linkedin_invitation_status === "sent" || lead.linkedin_invitation_sent) return "sent";
-  return "none";
-}
-
 function getLeadPipelineStatus(lead: Lead): ProspectionStatusKey {
-  if (lead.message_sent) return "sent";
-  if (getLeadInvitationFilterStatus(lead) === "accepted") return "connected";
-  if (lead.traite) return "pending";
-  return "todo";
+  return getProspectionStatusKey(lead);
 }
 
 function matchesDatePreset(
@@ -291,6 +288,7 @@ export default function LeadsPage() {
 
   // ✅ open lead from query param (?open=ID)
   const [openFromQuery, setOpenFromQuery] = useState<string | null>(null);
+  const isAutomationManaged = plan === "full";
 
   // Tracking
   useEffect(() => {
@@ -322,7 +320,7 @@ export default function LeadsPage() {
     };
 
     searchedLeads.forEach((lead) => {
-      const key = getLeadStatusKey(lead);
+      const key = getProspectionStatusKey(lead);
       counts[key] += 1;
     });
 
@@ -337,7 +335,7 @@ export default function LeadsPage() {
 
   const mobileFilteredLeads = useMemo(() => {
     if (mobileStatusFilter === "all") return searchedLeads;
-    return searchedLeads.filter((lead) => getLeadStatusKey(lead) === mobileStatusFilter);
+    return searchedLeads.filter((lead) => getProspectionStatusKey(lead) === mobileStatusFilter);
   }, [searchedLeads, mobileStatusFilter]);
 
   const segmentScopeLeads = useMemo(() => {
@@ -436,11 +434,31 @@ export default function LeadsPage() {
           const row = payload.new as {
             lead_id?: string | number | null;
             status?: string | null;
+            sent_at?: string | null;
+            accepted_at?: string | null;
+            dm_sent_at?: string | null;
             dm_draft_status?: string | null;
           } | null;
           if (!row?.lead_id) return;
 
           const leadIdStr = String(row.lead_id);
+          if (plan === "full") {
+            setSafeLeads((prev) =>
+              prev.map((lead) =>
+                String(lead.id) === leadIdStr
+                  ? mergeLeadWithInvitationUpdate(lead, row)
+                  : lead
+              )
+            );
+
+            setOpenLead((prev) =>
+              prev && String(prev.id) === leadIdStr
+                ? mergeLeadWithInvitationUpdate(prev, row)
+                : prev
+            );
+            return;
+          }
+
           const status = String(row.status ?? "").toLowerCase();
           const dmStatus = String(row.dm_draft_status ?? "").toLowerCase();
 
@@ -470,7 +488,7 @@ export default function LeadsPage() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [clientId]);
+  }, [clientId, plan]);
 
   // ✅ After leads loaded, open sidebar if query exists
   useEffect(() => {
@@ -622,6 +640,8 @@ export default function LeadsPage() {
   };
 
   const handleStatusBadgeClick = async (lead: Lead) => {
+    if (plan === "full") return;
+
     const idStr = String(lead.id);
     if (lead.message_sent || updatingStatusIds.has(idStr)) return;
 
@@ -701,6 +721,8 @@ export default function LeadsPage() {
   };
 
   const handleLinkedInInvite = async (lead: Lead) => {
+    if (plan === "full") return;
+
     const idStr = String(lead.id);
 
     if (invitingLeadIds.has(idStr) || lead.linkedin_invitation_sent) return;
@@ -886,6 +908,7 @@ export default function LeadsPage() {
 
   const handleSendLinkedInMessage = async () => {
     if (!openLead) return;
+    if (plan === "full") return;
     if (openLead.linkedin_invitation_status !== "accepted") return;
 
     const leadId = Number(openLead.id);
@@ -989,6 +1012,7 @@ export default function LeadsPage() {
   };
 
   const handleSendLinkedInMessageForLead = async (lead: Lead) => {
+    if (plan === "full") return;
     if (lead.linkedin_invitation_status !== "accepted") return;
     const leadId = Number(lead.id);
     const idStr = String(lead.id);
@@ -1315,10 +1339,10 @@ export default function LeadsPage() {
 
   const total = safeLeads.length;
   const treatedCount = safeLeads.filter((l) => l.traite === true).length;
-  const pendingCount = safeLeads.filter(
-    (l) => Boolean(l.traite) && !Boolean(l.message_sent)
-  ).length;
+  const pendingCount = safeLeads.filter((l) => getProspectionStatusKey(l) === "pending").length;
   const remainingToTreat = total - treatedCount;
+  const openLeadStatus = openLead ? getProspectionStatusKey(openLead) : null;
+  const openLeadStatusLabel = openLeadStatus ? getProspectionStatusLabel(openLeadStatus) : null;
 
   const allFilteredSelected =
     filteredLeads.length > 0 && filteredLeads.every((l) => selectedIds.has(String(l.id)));
@@ -1424,6 +1448,7 @@ export default function LeadsPage() {
                     updatingStatusIds={updatingStatusIds}
                     invitingLeadIds={invitingLeadIds}
                     inviteErrors={inviteErrors}
+                    isAutomationManaged={isAutomationManaged}
                     onResetFilters={() => {
                       setSearchTerm("");
                       setMobileStatusFilter("all");
@@ -1642,26 +1667,20 @@ export default function LeadsPage() {
                         const isSelected = selectedIds.has(idStr);
                         const isStatusUpdating = updatingStatusIds.has(idStr);
                         const isInviteLoading = invitingLeadIds.has(idStr);
-                        const invitationStatus =
-                          lead.linkedin_invitation_status === "accepted"
-                            ? "accepted"
-                            : lead.linkedin_invitation_status === "sent"
-                              ? "sent"
-                              : lead.linkedin_invitation_sent
-                                ? "sent"
-                                : null;
+                        const invitationStatus = getProspectionInvitationState(lead);
+                        const statusKey = getProspectionStatusKey(lead);
                         const isInviteAccepted = invitationStatus === "accepted";
                         const isInviteSent = invitationStatus === "sent";
                         const inviteError = inviteErrors[idStr];
-                        const isSent = Boolean(lead.message_sent);
-                        const isPending = !isSent && Boolean(lead.traite);
-                        const isTodo = !isSent && !isPending;
-                        const isConnectedLeft = !isSent && isInviteAccepted;
-                        const statusLabel = isSent
+                        const isSent = statusKey === "sent";
+                        const isPending = statusKey === "pending";
+                        const isTodo = statusKey === "todo";
+                        const isConnectedLeft = statusKey === "connected";
+                        const statusLabel = statusKey === "sent"
                           ? "Envoyé"
-                          : isConnectedLeft
+                          : statusKey === "connected"
                             ? "Connecté"
-                            : isPending
+                            : statusKey === "pending"
                               ? "En attente"
                               : "À faire";
                         const initials =
@@ -1669,13 +1688,7 @@ export default function LeadsPage() {
                             `${lead.FirstName?.[0] ?? ""}${lead.LastName?.[0] ?? ""}`.toUpperCase() ||
                             fullName.slice(0, 2).toUpperCase()
                           ) || "—";
-                        const statusDotClass = isSent
-                          ? "bg-violet-500"
-                          : isConnectedLeft
-                            ? "bg-emerald-500"
-                            : isPending
-                              ? "bg-amber-500"
-                              : "bg-[#6f85a6]";
+                        const statusDotClass = getProspectionStatusDotClass(statusKey);
                         const baseCellClass = "border-y border-[#d7e3f4] px-2.5 py-2 align-middle";
 
                         return (
@@ -1704,20 +1717,25 @@ export default function LeadsPage() {
                               <button
                                 type="button"
                                 onClick={() => handleStatusBadgeClick(lead)}
-                                disabled={isSent || isConnectedLeft || isStatusUpdating}
+                                disabled={isAutomationManaged || isSent || isConnectedLeft || isStatusUpdating}
                                 className={[
                                   "inline-flex h-8 items-center justify-center rounded-full border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
+                                  getProspectionStatusClasses(statusKey, "table"),
                                   isSent
-                                    ? "cursor-default border-violet-200 bg-violet-50 text-violet-700 focus:ring-violet-200"
+                                    ? "cursor-default focus:ring-violet-200"
                                     : isConnectedLeft
-                                      ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
-                                    : isPending
-                                      ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 focus:ring-amber-200"
-                                      : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
+                                      ? "cursor-default focus:ring-emerald-200"
+                                      : isAutomationManaged
+                                        ? "cursor-default focus:ring-[#dce8ff]"
+                                        : isPending
+                                          ? "hover:bg-amber-100 focus:ring-amber-200"
+                                          : "hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
                                   isStatusUpdating ? "cursor-wait opacity-70" : "",
                                 ].join(" ")}
                                 title={
-                                  isSent
+                                  isAutomationManaged
+                                    ? "Statut pilote automatiquement"
+                                    : isSent
                                     ? "Message déjà envoyé"
                                     : isConnectedLeft
                                       ? "Connexion LinkedIn acceptée"
@@ -1909,7 +1927,11 @@ export default function LeadsPage() {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#d7e3f4] bg-[#f8fbff] px-6 py-3 text-[11px] text-[#51627b]">
-                <div>Passez “À faire” en “En attente”, puis “Voir” pour traiter le lead.</div>
+                <div>
+                  {isAutomationManaged
+                    ? "Les statuts LinkedIn se mettent a jour automatiquement depuis l'automatisation."
+                    : "Passez “À faire” en “En attente”, puis “Voir” pour traiter le lead."}
+                </div>
                 <div className="tabular-nums">
                   {treatedCount} traité(s) • {remainingToTreat} à traiter
                 </div>
@@ -1958,17 +1980,34 @@ export default function LeadsPage() {
                       </p>
                     </div>
                     <div className="shrink-0">
-                      {openLead.message_sent ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 whitespace-nowrap">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          Envoyé
+                      {openLeadStatus && openLeadStatusLabel ? (
+                        <span
+                          className={[
+                            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium whitespace-nowrap",
+                            getProspectionStatusClasses(openLeadStatus, "sidebar"),
+                          ].join(" ")}
+                        >
+                          <span
+                            className={[
+                              "h-1.5 w-1.5 rounded-full",
+                              openLeadStatus === "sent"
+                                ? "bg-violet-500"
+                                : openLeadStatus === "connected"
+                                  ? "bg-emerald-500"
+                                  : openLeadStatus === "pending"
+                                    ? "bg-amber-500"
+                                    : "bg-[#94a3b8]",
+                            ].join(" ")}
+                          />
+                          {openLeadStatus === "sent"
+                            ? "Envoyé"
+                            : openLeadStatus === "connected"
+                              ? "Connecté"
+                              : openLeadStatus === "pending"
+                                ? "En attente"
+                                : "À faire"}
                         </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#dbe5f3] bg-[#f8fbff] px-2.5 py-1 text-[11px] text-[#64748b] whitespace-nowrap">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" />
-                          À faire
-                        </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -2072,8 +2111,14 @@ export default function LeadsPage() {
                     />
 
                     <div className="mt-3 space-y-2">
-                      {/* Invitation non acceptée */}
-                      {openLead.linkedin_invitation_status !== "accepted" && !openLead.message_sent && (
+                      {openLeadStatus === "todo" && (
+                        <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] px-4 py-3 text-sm text-[#64748b]">
+                          <Linkedin className="h-4 w-4 text-[#0A66C2]" />
+                          A faire
+                        </div>
+                      )}
+
+                      {openLeadStatus === "pending" && (
                         <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] px-4 py-3 text-sm text-[#64748b]">
                           <Linkedin className="h-4 w-4 text-[#0A66C2]" />
                           En attente d&apos;acceptation
@@ -2081,7 +2126,7 @@ export default function LeadsPage() {
                       )}
 
                       {/* Bouton envoyer — invitation acceptée, pas encore envoyé, plan essential uniquement */}
-                      {openLead.linkedin_invitation_status === "accepted" && !openLead.message_sent && plan !== "full" && (
+                      {openLeadStatus === "connected" && plan !== "full" && (
                         <button
                           type="button"
                           onClick={handleSendLinkedInMessage}
@@ -2104,11 +2149,17 @@ export default function LeadsPage() {
                         </button>
                       )}
 
+                      {openLeadStatus === "connected" && plan === "full" && (
+                        <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                          Connexion acceptee
+                        </div>
+                      )}
+
                       {/* Message envoyé + voir la conversation */}
-                      {openLead.message_sent && (
+                      {openLeadStatus === "sent" && (
                         <>
-                          <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-                            Message envoyé ✅
+                          <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-violet-700">
+                            Message envoye ✅
                           </div>
                           <button
                             type="button"

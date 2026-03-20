@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  applyDerivedProspectionStateToLead,
+  deriveProspectionStateFromInvitations,
+  type ProspectionInvitationRow,
+} from "@/lib/prospection-status";
 
 const SUPABASE_PAGE_SIZE = 1000;
 
@@ -12,6 +17,10 @@ type InvitationRow = {
   id?: number | string | null;
   lead_id?: number | string | null;
   status?: string | null;
+  sent_at?: string | null;
+  accepted_at?: string | null;
+  dm_sent_at?: string | null;
+  dm_draft_status?: string | null;
 };
 
 export async function GET() {
@@ -66,9 +75,9 @@ export async function GET() {
       const to = from + SUPABASE_PAGE_SIZE - 1;
       const { data, error } = await supabase
         .from("linkedin_invitations")
-        .select("id, lead_id, status")
+        .select("id, lead_id, status, sent_at, accepted_at, dm_sent_at, dm_draft_status")
         .eq("client_id", clientId)
-        .in("status", ["queued", "sent", "accepted", "connected"])
+        .in("status", ["queued", "pending", "sent", "accepted", "connected"])
         .order("id", { ascending: true })
         .range(from, to);
 
@@ -135,6 +144,7 @@ export async function GET() {
   const leadIdSet = new Set(leadIds.map((id) => String(id)));
 
   const invitationStatusByLead = new Map<string, "sent" | "accepted">();
+  const invitationsByLead = new Map<string, ProspectionInvitationRow[]>();
 
   if (leadIds.length > 0) {
     try {
@@ -150,6 +160,14 @@ export async function GET() {
         const normalizedStatus = String(invitation?.status ?? "")
           .trim()
           .toLowerCase();
+
+        const existingRows = invitationsByLead.get(key);
+        if (existingRows) {
+          existingRows.push(invitation);
+        } else {
+          invitationsByLead.set(key, [invitation]);
+        }
+
         if (
           normalizedStatus !== "queued" &&
           normalizedStatus !== "sent" &&
@@ -176,11 +194,28 @@ export async function GET() {
     }
   }
 
-  const leadsWithInvitationState = leadRows.map((lead) => ({
-    ...lead,
-    linkedin_invitation_status: invitationStatusByLead.get(String(lead.id)) ?? null,
-    linkedin_invitation_sent: invitationStatusByLead.has(String(lead.id)),
-  }));
+  const leadsWithInvitationState = leadRows.map((lead) => {
+    const leadId = String(lead.id);
+
+    if (normalizedPlan === "full") {
+      const derivedState = deriveProspectionStateFromInvitations({
+        invitations: invitationsByLead.get(leadId) ?? [],
+        fallbackLead: {
+          message_sent: lead.message_sent === true,
+          message_sent_at:
+            typeof lead.message_sent_at === "string" ? lead.message_sent_at : null,
+        },
+      });
+
+      return applyDerivedProspectionStateToLead(lead, derivedState);
+    }
+
+    return {
+      ...lead,
+      linkedin_invitation_status: invitationStatusByLead.get(leadId) ?? null,
+      linkedin_invitation_sent: invitationStatusByLead.has(leadId),
+    };
+  });
 
   return NextResponse.json({
     leads: leadsWithInvitationState,

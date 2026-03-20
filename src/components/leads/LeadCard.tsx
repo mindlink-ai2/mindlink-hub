@@ -2,6 +2,12 @@ import { memo } from "react";
 import { Building2, Linkedin, Mail, MapPin, MoveRight, Phone } from "lucide-react";
 
 import { HubButton } from "@/components/ui/hub-button";
+import {
+  getProspectionInvitationState,
+  getProspectionStatusClasses,
+  getProspectionStatusKey,
+  getProspectionStatusLabel,
+} from "@/lib/prospection-status";
 
 export type LeadCardLead = {
   id: number | string;
@@ -23,37 +29,8 @@ export type LeadCardLead = {
 
 export type LeadCardStatusKey = "todo" | "pending" | "connected" | "sent";
 
-function getLinkedInInviteState(lead: LeadCardLead): "sent" | "accepted" | null {
-  if (lead.linkedin_invitation_status === "accepted") return "accepted";
-  if (lead.linkedin_invitation_status === "sent") return "sent";
-  if (lead.linkedin_invitation_sent) return "sent";
-  return null;
-}
-
 export function getLeadStatusKey(lead: LeadCardLead): LeadCardStatusKey {
-  if (lead.message_sent) return "sent";
-  if (getLinkedInInviteState(lead) === "accepted") return "connected";
-  if (lead.traite) return "pending";
-  return "todo";
-}
-
-function getStatusLabel(status: LeadCardStatusKey): string {
-  if (status === "sent") return "Envoye";
-  if (status === "connected") return "Connecte";
-  if (status === "pending") return "En attente";
-  return "A faire";
-}
-
-function getStatusClasses(status: LeadCardStatusKey): string {
-  if (status === "sent" || status === "connected") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  if (status === "pending") {
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  }
-
-  return "border-[#c8d6ea] bg-[#f4f8ff] text-[#34527a]";
+  return getProspectionStatusKey(lead);
 }
 
 function formatRecencyLabel(createdAt: string | null | undefined): string | null {
@@ -88,6 +65,7 @@ export type LeadCardProps = {
   onInviteLinkedIn: (lead: LeadCardLead) => void;
   isStatusUpdating: boolean;
   isInviteLoading: boolean;
+  isAutomationManaged?: boolean;
   inviteError?: string;
 };
 
@@ -98,11 +76,12 @@ function LeadCardComponent({
   onInviteLinkedIn,
   isStatusUpdating,
   isInviteLoading,
+  isAutomationManaged = false,
   inviteError,
 }: LeadCardProps) {
   const displayName = `${lead.FirstName ?? ""} ${lead.LastName ?? ""}`.trim() || lead.Name || "Lead";
   const status = getLeadStatusKey(lead);
-  const statusLabel = getStatusLabel(status);
+  const statusLabel = getProspectionStatusLabel(status);
   const recency = formatRecencyLabel(lead.created_at);
   const jobTitle = (lead.linkedinJobTitle ?? "").trim();
   const company = (lead.Company ?? "").trim();
@@ -127,11 +106,12 @@ function LeadCardComponent({
       : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);
 
-  const inviteState = getLinkedInInviteState(lead);
+  const inviteState = getProspectionInvitationState(lead);
   const isInviteAccepted = inviteState === "accepted";
   const isInviteSent = inviteState === "sent";
-  const canToggleStatus = status !== "sent" && status !== "connected";
+  const canToggleStatus = !isAutomationManaged && status !== "sent" && status !== "connected";
   const canInvite =
+    !isAutomationManaged &&
     Boolean(lead.LinkedInURL) &&
     !isInviteAccepted &&
     !isInviteSent &&
@@ -140,6 +120,8 @@ function LeadCardComponent({
     ? "Connecte"
     : isInviteSent
       ? "Invitation envoyee"
+      : isAutomationManaged
+        ? "Pilotage auto"
       : isInviteLoading
         ? "Connexion..."
         : "Se connecter";
@@ -154,7 +136,7 @@ function LeadCardComponent({
         <span
           className={[
             "inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-medium",
-            getStatusClasses(status),
+            getProspectionStatusClasses(status, "card"),
           ].join(" ")}
         >
           {statusLabel}
@@ -206,8 +188,18 @@ function LeadCardComponent({
             onClick={() => onToggleStatus(lead)}
             disabled={!canToggleStatus || isStatusUpdating}
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#d7e3f4] bg-white text-[#3f5675] transition hover:bg-[#f4f8ff] focus:outline-none focus:ring-2 focus:ring-[#dce8ff] disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={canToggleStatus ? `Basculer le statut de ${displayName}` : `Statut verrouille pour ${displayName}`}
-            title={canToggleStatus ? "Basculer le statut" : "Statut verrouille"}
+            aria-label={
+              canToggleStatus
+                ? `Basculer le statut de ${displayName}`
+                : `Statut verrouille pour ${displayName}`
+            }
+            title={
+              canToggleStatus
+                ? "Basculer le statut"
+                : isAutomationManaged
+                  ? "Statut pilote automatiquement"
+                  : "Statut verrouille"
+            }
           >
             <MoveRight className="h-4 w-4" />
           </button>
@@ -222,13 +214,23 @@ function LeadCardComponent({
                 ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700"
                 : isInviteSent
                   ? "cursor-default border-amber-200 bg-amber-50 text-amber-700"
+                  : isAutomationManaged
+                    ? "cursor-not-allowed border-[#d7e3f4] bg-[#f5f9ff] text-[#6b7f9b]"
                   : inviteError
                     ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
                     : "border-[#d7e3f4] bg-white text-[#3f5675] hover:bg-[#f4f8ff]",
               !canInvite ? "cursor-not-allowed opacity-60" : "",
             ].join(" ")}
-            aria-label="Se connecter sur LinkedIn"
-            title="Se connecter sur LinkedIn"
+            aria-label={
+              isAutomationManaged
+                ? "Statut LinkedIn pilote automatiquement"
+                : "Se connecter sur LinkedIn"
+            }
+            title={
+              isAutomationManaged
+                ? "Statut LinkedIn pilote automatiquement"
+                : "Se connecter sur LinkedIn"
+            }
           >
             <Linkedin className="h-3.5 w-3.5 text-[#0A66C2]" />
             <span>{inviteButtonLabel}</span>
