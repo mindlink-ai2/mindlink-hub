@@ -19,8 +19,23 @@ const PREFETCH_MAP: Record<string, PrefetchEntry[]> = {
   ],
   "/dashboard/leads": [
     {
-      queryKey: queryKeys.leads(),
-      queryFn: () => fetch("/api/get-leads").then((r) => r.json()),
+      queryKey: queryKeys.leadsSummary(),
+      queryFn: () => fetch("/api/get-leads?mode=summary").then((r) => r.json()),
+    },
+    {
+      queryKey: queryKeys.prospectionLeads({
+        page: 1,
+        pageSize: 25,
+        search: "",
+        segment: "all",
+        contacts: "",
+        datePreset: "all",
+        customDate: "",
+      }),
+      queryFn: () =>
+        fetch(
+          "/api/get-leads?mode=paginated&page=1&pageSize=25&segment=all&datePreset=all"
+        ).then((r) => r.json()),
     },
   ],
   "/dashboard/automation": [

@@ -2,6 +2,12 @@
 
 export const queryKeys = {
   leads: () => ["leads"] as const,
+  leadsSummary: () => ["leads", "summary"] as const,
+  prospectionLeadsBase: () => ["leads", "prospection"] as const,
+  prospectionLeads: (params: Record<string, unknown>) =>
+    ["leads", "prospection", params] as const,
+  leadDetailsBase: () => ["leads", "detail"] as const,
+  leadDetails: (leadId: string | number) => ["leads", "detail", String(leadId)] as const,
   mapLeads: () => ["map-leads"] as const,
   dashboardStats: () => ["dashboard", "stats"] as const,
   dashboardDrilldown: (type: string) => ["dashboard", "drilldown", type] as const,
