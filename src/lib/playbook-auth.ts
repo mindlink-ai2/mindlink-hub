@@ -3,7 +3,7 @@ import "server-only";
 import { auth } from "@clerk/nextjs/server";
 import { resolveClientIdForClerkUserId } from "@/lib/support-admin-auth";
 
-export const PLAYBOOK_ALLOWED_CLIENT_IDS = [16, 18] as const;
+export const PLAYBOOK_ALLOWED_CLIENT_IDS = [16, 18, 70] as const;
 const PLAYBOOK_ALLOWED_SET = new Set<number>(PLAYBOOK_ALLOWED_CLIENT_IDS);
 
 export type PlaybookContext = {
