@@ -27,6 +27,34 @@ async function readResponseBody(res: Response): Promise<JsonLike> {
   }
 }
 
+function toJsonRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function extractProviderId(payload: unknown): string {
+  const obj = toJsonRecord(payload);
+  const data = toJsonRecord(obj.data);
+
+  const direct =
+    typeof obj.provider_id === "string" && obj.provider_id.trim()
+      ? obj.provider_id.trim()
+      : typeof obj.providerId === "string" && obj.providerId.trim()
+        ? obj.providerId.trim()
+        : "";
+  if (direct) return direct;
+
+  if (typeof data.provider_id === "string" && data.provider_id.trim()) {
+    return data.provider_id.trim();
+  }
+  if (typeof data.providerId === "string" && data.providerId.trim()) {
+    return data.providerId.trim();
+  }
+
+  return "";
+}
+
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();
@@ -183,12 +211,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const providerId =
-      profilePayload &&
-      typeof profilePayload === "object" &&
-      "provider_id" in profilePayload
-        ? String(profilePayload.provider_id ?? "")
-        : "";
+    const providerId = extractProviderId(profilePayload);
 
     if (!providerId) {
       return NextResponse.json(

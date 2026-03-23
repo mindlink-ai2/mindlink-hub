@@ -487,32 +487,30 @@ async function findUniqueLeadId(params: {
     return { status: "unmatched" };
   }
 
-  const { data, error } = await supabase
+  let leadRows: LeadIdentityRow[] = [];
+
+  const upperCaseRows = await supabase
     .from("leads")
-    .select("id, LinkedInURL, linkedin_url")
+    .select("id, LinkedInURL")
     .eq("client_id", clientId)
     .not("LinkedInURL", "is", null);
 
-  let leadRows: LeadIdentityRow[] = [];
-
-  if (
-    error &&
-    (isMissingColumnError(error, "linkedin_url") || isMissingColumnError(error, "LinkedInURL"))
-  ) {
-    const fallback = await supabase
+  if (!upperCaseRows.error) {
+    leadRows = (Array.isArray(upperCaseRows.data) ? upperCaseRows.data : []) as LeadIdentityRow[];
+  } else if (!isMissingColumnError(upperCaseRows.error, "LinkedInURL")) {
+    return { status: "error", error: upperCaseRows.error };
+  } else {
+    const lowerCaseRows = await supabase
       .from("leads")
-      .select("id, LinkedInURL, linkedin_url")
-      .eq("client_id", clientId);
+      .select("id, linkedin_url")
+      .eq("client_id", clientId)
+      .not("linkedin_url", "is", null);
 
-    if (fallback.error) {
-      return { status: "error", error: fallback.error };
+    if (lowerCaseRows.error) {
+      return { status: "error", error: lowerCaseRows.error };
     }
 
-    leadRows = (Array.isArray(fallback.data) ? fallback.data : []) as LeadIdentityRow[];
-  } else if (error) {
-    return { status: "error", error };
-  } else {
-    leadRows = (Array.isArray(data) ? data : []) as LeadIdentityRow[];
+    leadRows = (Array.isArray(lowerCaseRows.data) ? lowerCaseRows.data : []) as LeadIdentityRow[];
   }
 
   const matches = leadRows.filter((lead) => {
