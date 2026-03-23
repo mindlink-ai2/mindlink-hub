@@ -11,6 +11,8 @@ type ClientRow = { id: number | string; quota: string | number | null };
 type SettingsRow = {
   client_id: number | string;
   timezone: string | null;
+  start_time: string | null;
+  end_time: string | null;
   unipile_account_id: string | null;
 };
 type LeadRow = {
@@ -32,6 +34,8 @@ type TimeParts = {
 };
 
 const RUNNER_NAME = "linkedin-cron-runner";
+const DEFAULT_START_MINUTES = 8 * 60;
+const DEFAULT_END_MINUTES = 18 * 60;
 
 function normalizeLinkedInTargetUrl(value: string | null | undefined): string | null {
   const raw = String(value ?? "").trim();
@@ -168,6 +172,19 @@ function isWithinWindow(nowMinutes: number, startMinutes: number, endMinutes: nu
   return nowMinutes >= startMinutes && nowMinutes < endMinutes;
 }
 
+function parseTimeToMinutes(raw: string | null | undefined, fallback: number): number {
+  const normalized = String(raw ?? "").trim();
+  const match = normalized.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!match) return fallback;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return fallback;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return fallback;
+
+  return hours * 60 + minutes;
+}
+
 function isWeekdayInZone(date: Date, timezone: string): boolean {
   const parts = getTimePartsInZone(date, timezone);
   // Reconstruct as UTC midnight using local date parts to get correct day of week
@@ -287,7 +304,7 @@ Deno.serve(async (req) => {
 
       const { data: settingsRows, error: settingsErr } = await supabase
         .from("client_linkedin_settings")
-        .select("client_id, timezone, unipile_account_id")
+        .select("client_id, timezone, start_time, end_time, unipile_account_id")
         .in("client_id", clientIds);
 
       if (settingsErr) {
@@ -317,8 +334,8 @@ Deno.serve(async (req) => {
         }
 
         const nowMinutes = nowParts.hour * 60 + nowParts.minute;
-        const startMinutes = 9 * 60;
-        const endMinutes = 18 * 60;
+        const startMinutes = parseTimeToMinutes(settings?.start_time, DEFAULT_START_MINUTES);
+        const endMinutes = parseTimeToMinutes(settings?.end_time, DEFAULT_END_MINUTES);
         if (!isWithinWindow(nowMinutes, startMinutes, endMinutes)) {
           processed.push({ client_id: clientId, skipped: "outside_window" });
           continue;
