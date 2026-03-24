@@ -277,13 +277,15 @@ async function findNextEligibleLead(params: {
   supabase: ReturnType<typeof createClient>;
   clientId: string;
   unipileAccountId: string;
+  startIso: string;
+  endIso: string;
 }): Promise<
   | { ok: true; lead: LeadRow }
   | { ok: false; reason: "no_eligible_leads" | "all_leads_already_invited" }
   | { ok: false; reason: "eligible_leads_fetch_failed"; error: unknown }
   | { ok: false; reason: "existing_invites_fetch_failed"; error: unknown }
 > {
-  const { supabase, clientId, unipileAccountId } = params;
+  const { supabase, clientId, unipileAccountId, startIso, endIso } = params;
   let sawEligibleLead = false;
 
   for (let pageIndex = 0; pageIndex < MAX_LEAD_SCAN_PAGES; pageIndex += 1) {
@@ -295,6 +297,8 @@ async function findNextEligibleLead(params: {
       .select("id, LinkedInURL, traite, responded, message_sent, internal_message")
       .eq("client_id", clientId)
       .not("LinkedInURL", "is", null)
+      .gte("created_at", startIso)
+      .lt("created_at", endIso)
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to);
@@ -500,6 +504,8 @@ Deno.serve(async (req) => {
           supabase,
           clientId,
           unipileAccountId,
+          startIso,
+          endIso,
         });
 
         if (!nextLeadResult.ok && nextLeadResult.reason === "eligible_leads_fetch_failed") {
