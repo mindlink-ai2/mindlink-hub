@@ -29,6 +29,8 @@ type ExistingInvitationRow = {
   sent_at?: string | null;
   accepted_at?: string | null;
   dm_sent_at?: string | null;
+  last_error?: string | null;
+  raw?: unknown;
 };
 
 type TimeParts = {
@@ -216,15 +218,23 @@ function isExistingInvitationBlockingRetry(row: ExistingInvitationRow): boolean 
   const sentAt = String(row.sent_at ?? "").trim();
   const acceptedAt = String(row.accepted_at ?? "").trim();
   const dmSentAt = String(row.dm_sent_at ?? "").trim();
+  const lastError = String(row.last_error ?? "").trim();
+  const raw =
+    row.raw && typeof row.raw === "object" && !Array.isArray(row.raw)
+      ? (row.raw as Record<string, unknown>)
+      : null;
+  const rawError = String(raw?.error ?? "").trim();
 
   if (acceptedAt || dmSentAt || sentAt) return true;
   if (status === "accepted" || status === "connected" || status === "pending" || status === "sent") {
     return true;
   }
 
-  // `queued` rows without any timestamps are retryable. The cron writes those
-  // when lookup/send fails, and we do not want them to block the lead forever.
-  if (status === "queued") return false;
+  // When a lead already failed during a previous pass, skip it so the runner
+  // can continue with the remaining leads selected for today.
+  if (status === "queued") {
+    return Boolean(lastError || rawError);
+  }
 
   return false;
 }
@@ -328,7 +338,7 @@ async function findNextEligibleLead(params: {
     const leadIds = eligibleBase.map((lead) => String(lead.id));
     const { data: existingInvites, error: existingErr } = await supabase
       .from("linkedin_invitations")
-      .select("lead_id, status, sent_at, accepted_at, dm_sent_at")
+      .select("lead_id, status, sent_at, accepted_at, dm_sent_at, last_error, raw")
       .eq("client_id", clientId)
       .eq("unipile_account_id", unipileAccountId)
       .in("lead_id", leadIds);
@@ -551,6 +561,24 @@ Deno.serve(async (req) => {
         const profileSlug = extractLinkedInProfileSlug(linkedinUrl);
 
         if (!profileSlug) {
+          await supabase
+            .from("linkedin_invitations")
+            .upsert(
+              {
+                client_id: clientId,
+                lead_id: chosenLeadId,
+                unipile_account_id: unipileAccountId,
+                status: "queued",
+                last_error: "invalid_linkedin_url",
+                raw: {
+                  runner: RUNNER_NAME,
+                  error: "invalid_linkedin_url",
+                  linkedin_url: linkedinUrl,
+                },
+              },
+              { onConflict: "client_id,lead_id,unipile_account_id" }
+            );
+
           await logAutomation({
             supabase,
             clientId,
@@ -580,6 +608,7 @@ Deno.serve(async (req) => {
                 lead_id: chosenLeadId,
                 unipile_account_id: unipileAccountId,
                 status: "queued",
+                last_error: providerIdResult.error,
                 raw: {
                   runner: RUNNER_NAME,
                   error: providerIdResult.error,
@@ -622,6 +651,7 @@ Deno.serve(async (req) => {
                 lead_id: chosenLeadId,
                 unipile_account_id: unipileAccountId,
                 status: "queued",
+                last_error: inviteResult.error,
                 raw: {
                   runner: RUNNER_NAME,
                   error: inviteResult.error,
