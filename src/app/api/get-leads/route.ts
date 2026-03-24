@@ -380,10 +380,13 @@ function buildDecoratedLeadMaps(params: {
     const leadId = String(lead.id);
 
     if (params.plan === "full") {
+      const invitationRows = invitationRowsByLeadId.get(leadId) ?? [];
       const derivedState = deriveProspectionStateFromInvitations({
-        invitations: invitationRowsByLeadId.get(leadId) ?? [],
+        invitations: invitationRows,
         fallbackLead: {
-          traite: lead.traite === true,
+          // Full plan statuses should reflect actual invitation/message activity.
+          // A legacy `traite=true` flag alone should not make a lead look invited.
+          traite: false,
           message_sent: lead.message_sent === true,
           message_sent_at:
             typeof lead.message_sent_at === "string" ? lead.message_sent_at : null,

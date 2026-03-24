@@ -210,7 +210,6 @@ function buildInvitationCandidate(row: ProspectionInvitationRow): InvitationCand
 
   if (
     sentAt ||
-    normalizedStatus === "queued" ||
     normalizedStatus === "pending" ||
     normalizedStatus === "sent"
   ) {
@@ -220,6 +219,10 @@ function buildInvitationCandidate(row: ProspectionInvitationRow): InvitationCand
       relevantTimestampMs: parseIsoMs(sentAt),
       tieBreakerId,
     };
+  }
+
+  if (normalizedStatus === "queued") {
+    return null;
   }
 
   return null;

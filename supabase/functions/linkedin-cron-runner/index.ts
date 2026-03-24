@@ -23,6 +23,13 @@ type LeadRow = {
   message_sent: boolean | null;
   internal_message: string | null;
 };
+type ExistingInvitationRow = {
+  lead_id: number | string | null;
+  status: string | null;
+  sent_at?: string | null;
+  accepted_at?: string | null;
+  dm_sent_at?: string | null;
+};
 
 type TimeParts = {
   year: number;
@@ -36,6 +43,8 @@ type TimeParts = {
 const RUNNER_NAME = "linkedin-cron-runner";
 const DEFAULT_START_MINUTES = 8 * 60;
 const DEFAULT_END_MINUTES = 18 * 60;
+const LEAD_SCAN_PAGE_SIZE = 200;
+const MAX_LEAD_SCAN_PAGES = 15;
 
 function normalizeLinkedInTargetUrl(value: string | null | undefined): string | null {
   const raw = String(value ?? "").trim();
@@ -202,6 +211,24 @@ function normalizeClientQuota(rawQuota: unknown): number {
   return intQuota;
 }
 
+function isExistingInvitationBlockingRetry(row: ExistingInvitationRow): boolean {
+  const status = String(row.status ?? "").trim().toLowerCase();
+  const sentAt = String(row.sent_at ?? "").trim();
+  const acceptedAt = String(row.accepted_at ?? "").trim();
+  const dmSentAt = String(row.dm_sent_at ?? "").trim();
+
+  if (acceptedAt || dmSentAt || sentAt) return true;
+  if (status === "accepted" || status === "connected" || status === "pending" || status === "sent") {
+    return true;
+  }
+
+  // `queued` rows without any timestamps are retryable. The cron writes those
+  // when lookup/send fails, and we do not want them to block the lead forever.
+  if (status === "queued") return false;
+
+  return false;
+}
+
 async function logAutomation(params: {
   supabase: ReturnType<typeof createClient>;
   clientId: string;
@@ -244,6 +271,87 @@ async function resolveAccountId(params: {
     .maybeSingle();
 
   return account?.unipile_account_id ? String(account.unipile_account_id) : null;
+}
+
+async function findNextEligibleLead(params: {
+  supabase: ReturnType<typeof createClient>;
+  clientId: string;
+  unipileAccountId: string;
+}): Promise<
+  | { ok: true; lead: LeadRow }
+  | { ok: false; reason: "no_eligible_leads" | "all_leads_already_invited" }
+  | { ok: false; reason: "eligible_leads_fetch_failed"; error: unknown }
+  | { ok: false; reason: "existing_invites_fetch_failed"; error: unknown }
+> {
+  const { supabase, clientId, unipileAccountId } = params;
+  let sawEligibleLead = false;
+
+  for (let pageIndex = 0; pageIndex < MAX_LEAD_SCAN_PAGES; pageIndex += 1) {
+    const from = pageIndex * LEAD_SCAN_PAGE_SIZE;
+    const to = from + LEAD_SCAN_PAGE_SIZE - 1;
+
+    const { data: leadsRows, error: leadsErr } = await supabase
+      .from("leads")
+      .select("id, LinkedInURL, traite, responded, message_sent, internal_message")
+      .eq("client_id", clientId)
+      .not("LinkedInURL", "is", null)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+
+    if (leadsErr) {
+      return { ok: false, reason: "eligible_leads_fetch_failed", error: leadsErr };
+    }
+
+    const batch = (leadsRows ?? []) as LeadRow[];
+    if (batch.length === 0) break;
+
+    const eligibleBase = batch.filter((lead) => {
+      const linkedinUrl = String(lead.LinkedInURL ?? "").trim();
+      if (!linkedinUrl) return false;
+      if (lead.responded === true) return false;
+      if (lead.message_sent === true) return false;
+      return true;
+    });
+
+    if (eligibleBase.length === 0) {
+      if (batch.length < LEAD_SCAN_PAGE_SIZE) break;
+      continue;
+    }
+
+    sawEligibleLead = true;
+
+    const leadIds = eligibleBase.map((lead) => String(lead.id));
+    const { data: existingInvites, error: existingErr } = await supabase
+      .from("linkedin_invitations")
+      .select("lead_id, status, sent_at, accepted_at, dm_sent_at")
+      .eq("client_id", clientId)
+      .eq("unipile_account_id", unipileAccountId)
+      .in("lead_id", leadIds);
+
+    if (existingErr) {
+      return { ok: false, reason: "existing_invites_fetch_failed", error: existingErr };
+    }
+
+    const blockedLeadIds = new Set(
+      ((existingInvites ?? []) as ExistingInvitationRow[])
+        .filter((row) => isExistingInvitationBlockingRetry(row))
+        .map((row) => String(row.lead_id ?? "").trim())
+        .filter((value) => value.length > 0)
+    );
+
+    const chosenLead = eligibleBase.find((lead) => !blockedLeadIds.has(String(lead.id)));
+    if (chosenLead) {
+      return { ok: true, lead: chosenLead };
+    }
+
+    if (batch.length < LEAD_SCAN_PAGE_SIZE) break;
+  }
+
+  return {
+    ok: false,
+    reason: sawEligibleLead ? "all_leads_already_invited" : "no_eligible_leads",
+  };
 }
 
 Deno.serve(async (req) => {
@@ -388,80 +496,49 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const { data: leadsRows, error: leadsErr } = await supabase
-          .from("leads")
-          .select("id, LinkedInURL, traite, responded, message_sent, internal_message")
-          .eq("client_id", clientId)
-          .gte("created_at", startIso)
-          .lt("created_at", endIso)
-          .not("LinkedInURL", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(200);
+        const nextLeadResult = await findNextEligibleLead({
+          supabase,
+          clientId,
+          unipileAccountId,
+        });
 
-        if (leadsErr) {
+        if (!nextLeadResult.ok && nextLeadResult.reason === "eligible_leads_fetch_failed") {
           await logAutomation({
             supabase,
             clientId,
             action: "invitation_send",
             status: "error",
             unipileAccountId,
-            details: { reason: "eligible_leads_fetch_failed", error: leadsErr },
+            details: { reason: "eligible_leads_fetch_failed", error: nextLeadResult.error },
           });
           processed.push({ client_id: clientId, error: "eligible_leads_fetch_failed" });
           continue;
         }
 
-        const eligibleBase = (leadsRows ?? []).filter((lead) => {
-          const row = lead as LeadRow;
-          const linkedinUrl = String(row.LinkedInURL ?? "").trim();
-          if (!linkedinUrl) return false;
-          if (row.traite === true) return false;
-          if (row.responded === true) return false;
-          if (row.message_sent === true) return false;
-          return true;
-        });
-
-        if (eligibleBase.length === 0) {
-          processed.push({ client_id: clientId, skipped: "no_eligible_leads" });
-          continue;
-        }
-
-        const leadIds = eligibleBase.map((lead) => String((lead as LeadRow).id));
-        const { data: existingInvites, error: existingErr } = await supabase
-          .from("linkedin_invitations")
-          .select("lead_id")
-          .eq("client_id", clientId)
-          .eq("unipile_account_id", unipileAccountId)
-          .in("lead_id", leadIds);
-
-        if (existingErr) {
+        if (!nextLeadResult.ok && nextLeadResult.reason === "existing_invites_fetch_failed") {
           await logAutomation({
             supabase,
             clientId,
             action: "invitation_send",
             status: "error",
             unipileAccountId,
-            details: { reason: "existing_invites_fetch_failed", error: existingErr },
+            details: { reason: "existing_invites_fetch_failed", error: nextLeadResult.error },
           });
           processed.push({ client_id: clientId, error: "existing_invites_fetch_failed" });
           continue;
         }
 
-        const alreadyInvitedLeadIds = new Set(
-          (existingInvites ?? [])
-            .map((row) => String((row as { lead_id?: number | string | null }).lead_id ?? ""))
-            .filter((value) => value.length > 0)
-        );
+        if (!nextLeadResult.ok && nextLeadResult.reason === "no_eligible_leads") {
+          processed.push({ client_id: clientId, skipped: "no_eligible_leads" });
+          continue;
+        }
 
-        const chosenLead = eligibleBase.find(
-          (lead) => !alreadyInvitedLeadIds.has(String((lead as LeadRow).id))
-        ) as LeadRow | undefined;
-
-        if (!chosenLead?.id) {
+        if (!nextLeadResult.ok && nextLeadResult.reason === "all_leads_already_invited") {
           processed.push({ client_id: clientId, skipped: "all_leads_already_invited" });
           continue;
         }
 
+        const chosenLead = nextLeadResult.lead;
         const chosenLeadId = String(chosenLead.id);
         const linkedinUrl = String(chosenLead.LinkedInURL ?? "").trim();
         const draftText = String(chosenLead.internal_message ?? "").trim();
