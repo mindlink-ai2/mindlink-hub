@@ -583,6 +583,92 @@ async function enrichThreadContactIfMissing(params: {
   }
 }
 
+// ---------------------------------------------------------------------------
+// AUTO-RESPONDED TRACKING (plan='full' uniquement)
+//
+// AUDIT: responded=true n'est jamais positionné automatiquement dans ce webhook.
+// Les deux seuls endpoints qui l'écrivent sont :
+//   - /api/leads/responded       (action manuelle depuis la page /followups)
+//   - /api/map-leads/responded   (idem pour les leads Google Maps)
+//
+// Pour les clients plan='full' + subscription_status='active', on doit détecter
+// automatiquement quand un prospect répond à notre DM et passer responded=true.
+// On le fait ici, sur chaque new_message inbound, si :
+//   1. Le client est plan='full' && subscription_status='active'
+//   2. Le lead est identifié (leadId != null)
+//   3. Le lead a message_sent=true (on lui a envoyé le premier DM)
+//   4. Le lead n'a pas encore responded=true
+// On efface aussi next_followup_at pour le retirer de la file de relance.
+// ---------------------------------------------------------------------------
+async function autoMarkLeadResponded(params: {
+  supabase: SupabaseClient;
+  clientId: string;
+  leadId: number | string;
+  // URL LinkedIn du prospect expéditeur (issue du payload webhook) — utilisée pour
+  // vérifier explicitement que le lead résolu correspond bien au bon prospect et non
+  // à un homonymne ou à une erreur de résolution silencieuse.
+  senderLinkedInUrl: string | null;
+}): Promise<void> {
+  const { supabase, clientId, leadId, senderLinkedInUrl } = params;
+
+  // 1. Vérifier que le client est plan='full' + subscription_status='active'
+  const { data: clientRow, error: clientErr } = await supabase
+    .from("clients")
+    .select("plan, subscription_status")
+    .eq("id", clientId)
+    .maybeSingle();
+
+  if (clientErr || !clientRow) return;
+
+  const plan = String(clientRow.plan ?? "").trim().toLowerCase();
+  const subscriptionStatus = String(clientRow.subscription_status ?? "").trim().toLowerCase();
+  if (plan !== "full" || subscriptionStatus !== "active") return;
+
+  // 2. Vérifier que le lead matché possède bien l'URL LinkedIn du prospect expéditeur.
+  //    Ce double-check protège contre une erreur de résolution silencieuse dans
+  //    findLeadIdByLinkedInIdentity() : un message du prospect A ne peut jamais
+  //    marquer le prospect B comme répondu.
+  if (senderLinkedInUrl) {
+    const { data: leadRow } = await supabase
+      .from("leads")
+      .select("id, LinkedInURL")
+      .eq("id", leadId)
+      .eq("client_id", clientId)
+      .maybeSingle();
+
+    if (!leadRow) return; // lead introuvable pour ce client
+
+    const normalizedLeadUrl = normalizeLinkedInUrl(
+      typeof leadRow.LinkedInURL === "string" ? leadRow.LinkedInURL : null
+    );
+    const normalizedSenderUrl = normalizeLinkedInUrl(senderLinkedInUrl);
+
+    if (normalizedLeadUrl && normalizedSenderUrl && normalizedLeadUrl !== normalizedSenderUrl) {
+      // Mismatch : le leadId résolu ne correspond pas à l'expéditeur du message
+      console.warn("UNIPILE_WEBHOOK_AUTO_RESPONDED_LINKEDIN_MISMATCH", {
+        clientId,
+        leadId: String(leadId),
+        leadLinkedInUrl: normalizedLeadUrl,
+        senderLinkedInUrl: normalizedSenderUrl,
+      });
+      return;
+    }
+  }
+
+  // 3. Mettre à jour uniquement si message_sent=true et responded != true
+  const { error: updateErr } = await supabase
+    .from("leads")
+    .update({ responded: true, next_followup_at: null })
+    .eq("id", leadId)
+    .eq("client_id", clientId)
+    .eq("message_sent", true)
+    .neq("responded", true);
+
+  if (updateErr) {
+    console.error("UNIPILE_WEBHOOK_AUTO_RESPONDED_UPDATE_ERROR:", updateErr);
+  }
+}
+
 async function handleNewMessage(params: {
   supabase: SupabaseClient;
   clientId: string;
@@ -823,6 +909,11 @@ async function handleNewMessage(params: {
     if (updateThreadErr) {
       console.error("UNIPILE_WEBHOOK_THREAD_UPDATE_ERROR:", updateThreadErr);
     }
+  }
+
+  // Auto-marquer le lead comme répondu (plan='full' uniquement, voir commentaire ci-dessus)
+  if (wasInserted && parsed.direction === "inbound" && leadId != null) {
+    await autoMarkLeadResponded({ supabase, clientId, leadId, senderLinkedInUrl });
   }
 }
 

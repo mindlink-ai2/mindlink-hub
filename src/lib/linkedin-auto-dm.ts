@@ -593,11 +593,55 @@ async function markLeadMessageSent(params: {
   chatId: string | null;
 }) {
   const { supabase, clientId, leadId, sentAt, chatId } = params;
+
+  // Résolution du délai de relance (ordre de priorité) :
+  //   1. custom_followup_delay_days sur le lead
+  //   2. followup_delay_days sur le client
+  //   3. Fallback 7 jours
+  // Les colonnes peuvent ne pas exister si la migration n'est pas encore déployée
+  // → on lit de manière défensive et on ignore les erreurs.
+  let delayDays = 7;
+
+  const leadDelayResult = await supabase
+    .from("leads")
+    .select("custom_followup_delay_days")
+    .eq("id", leadId)
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  const customDelay =
+    !leadDelayResult.error &&
+    leadDelayResult.data &&
+    typeof (leadDelayResult.data as Record<string, unknown>).custom_followup_delay_days === "number"
+      ? (leadDelayResult.data as Record<string, unknown>).custom_followup_delay_days as number
+      : null;
+
+  if (customDelay !== null && customDelay >= 1) {
+    delayDays = customDelay;
+  } else {
+    const clientDelayResult = await supabase
+      .from("clients")
+      .select("followup_delay_days")
+      .eq("id", clientId)
+      .maybeSingle();
+
+    const globalDelay =
+      !clientDelayResult.error &&
+      clientDelayResult.data &&
+      typeof (clientDelayResult.data as Record<string, unknown>).followup_delay_days === "number"
+        ? (clientDelayResult.data as Record<string, unknown>).followup_delay_days as number
+        : null;
+
+    if (globalDelay !== null && globalDelay >= 1) {
+      delayDays = globalDelay;
+    }
+  }
+
   const followupAt = new Date(sentAt);
   if (Number.isNaN(followupAt.getTime())) {
     followupAt.setTime(Date.now());
   }
-  followupAt.setDate(followupAt.getDate() + 7);
+  followupAt.setDate(followupAt.getDate() + delayDays);
 
   const payload: Record<string, unknown> = {
     message_sent: true,
