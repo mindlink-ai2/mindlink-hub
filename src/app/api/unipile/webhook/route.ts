@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { extractLinkedInProfileSlug, normalizeLinkedInUrl } from "@/lib/linkedin-url";
-import { processAcceptedInvitationAutoDm } from "@/lib/linkedin-auto-dm";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import {
   extractAcceptedRelationIdentity,
@@ -316,65 +315,6 @@ async function resolveClientId(
   });
 }
 
-async function isClientFullActivePlan(
-  supabase: SupabaseClient,
-  clientId: string
-): Promise<boolean> {
-  const { data: client, error } = await supabase
-    .from("clients")
-    .select("plan, subscription_status")
-    .eq("id", clientId)
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !client) {
-    if (error) console.error("UNIPILE_WEBHOOK_CLIENT_PLAN_LOOKUP_ERROR:", error);
-    return false;
-  }
-
-  const plan = String(client.plan ?? "").trim().toLowerCase();
-  const subscriptionStatus = String(client.subscription_status ?? "")
-    .trim()
-    .toLowerCase();
-  return plan === "full" && subscriptionStatus === "active";
-}
-
-async function autoSendDraftAfterAccepted(params: {
-  supabase: SupabaseClient;
-  clientId: string;
-  invitationId: string;
-  leadId: number | string;
-  unipileAccountId: string;
-  payload: JsonObject;
-}) {
-  const { supabase, clientId, invitationId, leadId, unipileAccountId, payload } = params;
-
-  const isFullActive = await isClientFullActivePlan(supabase, clientId);
-  if (!isFullActive) return;
-
-  const result = await processAcceptedInvitationAutoDm({
-    supabase,
-    clientId,
-    invitationId,
-    leadId: Number(leadId),
-    unipileAccountId,
-    payload,
-  });
-
-  if (!result.ok && !result.skipped) {
-    console.warn("UNIPILE_WEBHOOK_AUTO_SEND_RESULT", {
-      clientId,
-      invitationId,
-      leadId: Number(leadId),
-      unipileAccountId,
-      status: result.status,
-      stage: result.stage,
-      retryable: result.retryable,
-      last_error: result.lastError,
-      details: result.details ?? null,
-    });
-  }
-}
 
 async function logUnipileEvent(params: {
   supabase: SupabaseClient;
@@ -1286,13 +1226,22 @@ async function handleNewRelation(params: {
 
   if (draftText) {
     const providerId = syncResult.userProviderId ?? resolution.identity.providerId ?? null;
-    await autoSendDraftAfterAccepted({
-      supabase,
-      clientId,
-      invitationId: invitationEventId,
-      leadId: matchedLeadId,
-      unipileAccountId,
-      payload,
+
+    // DM délégué au cron flush-accepted-drafts — pas d'envoi immédiat depuis le webhook
+    await supabase.from("automation_logs").insert({
+      client_id: clientId,
+      runner: "unipile-webhook",
+      action: "dm_delegated_to_cron",
+      status: "info",
+      lead_id: matchedLeadId,
+      unipile_account_id: unipileAccountId,
+      details: {
+        invitation_id: invitationEventId,
+        provider_id: providerId,
+        dm_draft_status: "draft",
+      },
+    }).then(({ error }) => {
+      if (error) console.error("UNIPILE_WEBHOOK_DM_DELEGATE_LOG_ERROR:", error);
     });
 
     if (providerId) {
