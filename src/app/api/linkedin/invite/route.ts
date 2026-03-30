@@ -274,6 +274,25 @@ export async function POST(req: Request) {
       );
 
     if (invitationInsertErr) {
+      await supabase.from("automation_logs").insert({
+        client_id: client.id,
+        runner: "essential-manual-invite",
+        action: "send_invitation",
+        status: "error",
+        lead_id: lead.id,
+        unipile_account_id: unipileAccountId,
+        details: {
+          error_code: "invitation_log_failed",
+          error_message: invitationInsertErr.message ?? String(invitationInsertErr),
+          target_provider_id: invitationMetadata.targetProviderId,
+          target_profile_slug: invitationMetadata.targetProfileSlug,
+          target_linkedin_url_normalized: invitationMetadata.targetLinkedInUrlNormalized,
+          unipile_invitation_id: invitationMetadata.unipileInvitationId,
+        },
+      }).then(({ error }) => {
+        if (error) console.error("LINKEDIN_INVITE_LOG_INSERT_ERROR:", error);
+      });
+
       return NextResponse.json(
         { success: false, error: "invitation_log_failed" },
         { status: 500 }
@@ -289,6 +308,26 @@ export async function POST(req: Request) {
     if (updateLeadStatusErr) {
       console.error("LINKEDIN_INVITE_STATUS_UPDATE_ERROR:", updateLeadStatusErr);
     }
+
+    await supabase.from("automation_logs").insert({
+      client_id: client.id,
+      runner: "essential-manual-invite",
+      action: "send_invitation",
+      status: "success",
+      lead_id: lead.id,
+      unipile_account_id: unipileAccountId,
+      details: {
+        target_provider_id: invitationMetadata.targetProviderId,
+        target_profile_slug: invitationMetadata.targetProfileSlug,
+        target_linkedin_url_normalized: invitationMetadata.targetLinkedInUrlNormalized,
+        unipile_invitation_id: invitationMetadata.unipileInvitationId,
+        lead_status_update_error: updateLeadStatusErr
+          ? (updateLeadStatusErr.message ?? String(updateLeadStatusErr))
+          : null,
+      },
+    }).then(({ error }) => {
+      if (error) console.error("LINKEDIN_INVITE_LOG_INSERT_ERROR:", error);
+    });
 
     console.info("LINKEDIN_INVITE_SENT", {
       client_id: String(client.id),
