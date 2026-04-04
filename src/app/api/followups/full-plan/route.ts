@@ -21,6 +21,79 @@ type LeadRow = {
   custom_followup_delay_days?: number | null;
 };
 
+type TimeParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+function getTimePartsInZone(date: Date, timezone: string): TimeParts {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(date);
+  const map = new Map<string, string>();
+  for (const part of parts) map.set(part.type, part.value);
+
+  return {
+    year: Number(map.get("year") ?? "0"),
+    month: Number(map.get("month") ?? "1"),
+    day: Number(map.get("day") ?? "1"),
+    hour: Number(map.get("hour") ?? "0"),
+    minute: Number(map.get("minute") ?? "0"),
+    second: Number(map.get("second") ?? "0"),
+  };
+}
+
+function getOffsetMs(date: Date, timezone: string): number {
+  const parts = getTimePartsInZone(date, timezone);
+  const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return asUtc - date.getTime();
+}
+
+function zonedToUtc(parts: TimeParts, timezone: string): Date {
+  const utcGuess = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  const offset = getOffsetMs(new Date(utcGuess), timezone);
+  return new Date(utcGuess - offset);
+}
+
+function getTodayBoundsUtc(timezone: string): { startIso: string; endIso: string } {
+  const now = new Date();
+  const nowParts = getTimePartsInZone(now, timezone);
+
+  const start = zonedToUtc(
+    { year: nowParts.year, month: nowParts.month, day: nowParts.day, hour: 0, minute: 0, second: 0 },
+    timezone
+  );
+
+  const tomorrowUtc = new Date(Date.UTC(nowParts.year, nowParts.month - 1, nowParts.day + 1));
+  const tomorrowParts = getTimePartsInZone(tomorrowUtc, timezone);
+  const end = zonedToUtc(
+    {
+      year: tomorrowParts.year,
+      month: tomorrowParts.month,
+      day: tomorrowParts.day,
+      hour: 0,
+      minute: 0,
+      second: 0,
+    },
+    timezone
+  );
+
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
+}
+
 export async function GET() {
   const { userId } = await auth();
   if (!userId) {
@@ -51,45 +124,60 @@ export async function GET() {
 
   const clientId: number = client.id as number;
 
-  // Date du jour en timezone Paris (YYYY-MM-DD)
-  const todayStr = new Date()
-    .toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" }); // "YYYY-MM-DD"
-  const todayStart = `${todayStr}T00:00:00.000Z`;
-  const todayEnd = `${todayStr}T23:59:59.999Z`;
+  const { startIso: todayStart, endIso: tomorrowStart } = getTodayBoundsUtc("Europe/Paris");
 
-  // 2. Leads "À venir" : next_followup_at > aujourd'hui, relance pas encore envoyée
-  const { data: upcomingRows, error: upcomingErr } = await supabase
+  // 2. Leads "En retard" : date dépassée, relance pas encore envoyée
+  const overdueQuery = supabase
     .from("leads")
     .select(LEAD_SELECT)
     .eq("client_id", clientId)
     .eq("message_sent", true)
     .is("relance_sent_at", null)
-    .neq("responded", true)
-    .gt("next_followup_at", todayEnd)
-    .order("next_followup_at", { ascending: true });
+    .lt("next_followup_at", todayStart)
+    .order("next_followup_at", { ascending: true })
+    .or("responded.is.null,responded.eq.false");
 
-  // 3. Leads "Aujourd'hui" : next_followup_at = aujourd'hui, relance pas encore envoyée
-  const { data: todayRows, error: todayErr } = await supabase
+  const { data: overdueRows, error: overdueErr } = await overdueQuery;
+
+  // 3. Leads "Aujourd'hui" : next_followup_at aujourd'hui, relance pas encore envoyée
+  const todayQuery = supabase
     .from("leads")
     .select(LEAD_SELECT)
     .eq("client_id", clientId)
     .eq("message_sent", true)
     .is("relance_sent_at", null)
-    .neq("responded", true)
     .gte("next_followup_at", todayStart)
-    .lte("next_followup_at", todayEnd)
-    .order("next_followup_at", { ascending: true });
+    .lt("next_followup_at", tomorrowStart)
+    .order("next_followup_at", { ascending: true })
+    .or("responded.is.null,responded.eq.false");
 
-  // 4. Leads "Relance envoyée" : relance_sent_at renseigné, pas encore répondu
-  const { data: relanceSentRows, error: relanceSentErr } = await supabase
+  const { data: todayRows, error: todayErr } = await todayQuery;
+
+  // 4. Leads "À venir" : next_followup_at > aujourd'hui, relance pas encore envoyée
+  const upcomingQuery = supabase
+    .from("leads")
+    .select(LEAD_SELECT)
+    .eq("client_id", clientId)
+    .eq("message_sent", true)
+    .is("relance_sent_at", null)
+    .gte("next_followup_at", tomorrowStart)
+    .order("next_followup_at", { ascending: true })
+    .or("responded.is.null,responded.eq.false");
+
+  const { data: upcomingRows, error: upcomingErr } = await upcomingQuery;
+
+  // 5. Leads "Relance envoyée" : relance_sent_at renseigné, pas encore répondu
+  const relanceSentQuery = supabase
     .from("leads")
     .select(LEAD_SELECT)
     .eq("client_id", clientId)
     .not("relance_sent_at", "is", null)
-    .neq("responded", true)
-    .order("relance_sent_at", { ascending: false });
+    .order("relance_sent_at", { ascending: false })
+    .or("responded.is.null,responded.eq.false");
 
-  // 5. Leads "Répondu" : responded=true
+  const { data: relanceSentRows, error: relanceSentErr } = await relanceSentQuery;
+
+  // 6. Leads "Répondu" : responded=true
   const { data: respondedRows, error: respondedErr } = await supabase
     .from("leads")
     .select(LEAD_SELECT)
@@ -97,13 +185,14 @@ export async function GET() {
     .eq("responded", true)
     .order("relance_sent_at", { ascending: false });
 
-  const errors = [upcomingErr, todayErr, relanceSentErr, respondedErr].filter(Boolean);
+  const errors = [overdueErr, todayErr, upcomingErr, relanceSentErr, respondedErr].filter(Boolean);
   if (errors.length > 0) {
     console.error("FOLLOWUPS_FULL_PLAN_QUERY_ERROR:", errors);
     return NextResponse.json({ error: "Query error" }, { status: 500 });
   }
 
   return NextResponse.json({
+    overdue: (overdueRows ?? []) as LeadRow[],
     upcoming: (upcomingRows ?? []) as LeadRow[],
     today: (todayRows ?? []) as LeadRow[],
     relance_sent: (relanceSentRows ?? []) as LeadRow[],

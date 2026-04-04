@@ -602,7 +602,7 @@ async function autoMarkLeadResponded(params: {
     .eq("id", leadId)
     .eq("client_id", clientId)
     .eq("message_sent", true)
-    .neq("responded", true);
+    .or("responded.is.null,responded.eq.false");
 
   if (updateErr) {
     console.error("UNIPILE_WEBHOOK_AUTO_RESPONDED_UPDATE_ERROR:", updateErr);

@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
       for (const rawClient of clients ?? []) {
         const clientId = String((rawClient as { id: number | string }).id);
         const timezone = timezoneByClientId.get(clientId) ?? "Europe/Paris";
-        const { startIso, endIso, nowParts } = getTodayBoundsUtc(timezone);
+        const { endIso, nowParts } = getTodayBoundsUtc(timezone);
 
         // Enforce 9h–18h window in client's timezone
         const nowMinutes = nowParts.hour * 60 + nowParts.minute;
@@ -213,20 +213,21 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Find leads due for follow-up today with a pending relance_linkedin
-        // Exclude leads that have already responded (prospect replied to first message)
-        const { data: leadsRows, error: leadsErr } = await supabase
+        // Find leads due for follow-up now (today or overdue) with a pending relance_linkedin.
+        // Exclude only leads explicitly marked as responded; NULL means "not answered yet".
+        const leadQuery = supabase
           .from("leads")
           .select("id, relance_linkedin, responded")
           .eq("client_id", clientId)
           .eq("message_sent", true)
           .not("relance_linkedin", "is", null)
           .is("relance_sent_at", null)
-          .neq("responded", true)
-          .gte("next_followup_at", startIso)
           .lt("next_followup_at", endIso)
           .order("next_followup_at", { ascending: true })
-          .limit(50);
+          .limit(50)
+          .or("responded.is.null,responded.eq.false");
+
+        const { data: leadsRows, error: leadsErr } = await leadQuery;
 
         if (leadsErr) {
           await logAutomation({
@@ -240,7 +241,7 @@ Deno.serve(async (req) => {
         const leads = (leadsRows ?? []) as Array<{ id: number | string; relance_linkedin: string }>;
 
         if (leads.length === 0) {
-          processed.push({ client_id: clientId, skipped: "no_leads_due_today" });
+          processed.push({ client_id: clientId, skipped: "no_leads_due_now" });
           continue;
         }
 

@@ -30,8 +30,8 @@ import { supabase } from "@/lib/supabase";
 // Tabs pour le plan essential (inchangé)
 type TabKey = "overdue" | "today" | "upcoming";
 
-// Tabs pour le plan full (pas de "En retard")
-type FullTabKey = "today" | "upcoming" | "relance_sent" | "responded";
+// Tabs pour le plan full
+type FullTabKey = "overdue" | "today" | "upcoming" | "relance_sent" | "responded";
 
 type FollowupLead = {
   id: string | number;
@@ -65,6 +65,7 @@ type FullPlanLead = {
 };
 
 type FullPlanData = {
+  overdue: FullPlanLead[];
   upcoming: FullPlanLead[];
   today: FullPlanLead[];
   relance_sent: FullPlanLead[];
@@ -154,6 +155,7 @@ export default function FollowupsPage() {
   // État plan FULL
   // -------------------------------------------------------------------------
   const [fullData, setFullData] = useState<FullPlanData>({
+    overdue: [],
     upcoming: [],
     today: [],
     relance_sent: [],
@@ -193,6 +195,15 @@ export default function FollowupsPage() {
       .then((r) => r.json())
       .then((data: FullPlanData) => {
         setFullData(data);
+        setFullTab((current) =>
+          current === "today" &&
+          Array.isArray(data.overdue) &&
+          data.overdue.length > 0 &&
+          Array.isArray(data.today) &&
+          data.today.length === 0
+            ? "overdue"
+            : current
+        );
         setFullLoaded(true);
       })
       .catch(() => setFullLoaded(true));
@@ -704,16 +715,25 @@ export default function FollowupsPage() {
 
   const fullMobileOptions = useMemo(
     () => [
+      { key: "overdue" as const, label: "En retard", count: fullData.overdue.length },
       { key: "today" as const, label: "Aujourd'hui", count: fullData.today.length },
       { key: "upcoming" as const, label: "À venir", count: fullData.upcoming.length },
       { key: "relance_sent" as const, label: "Relance envoyée", count: fullData.relance_sent.length },
       { key: "responded" as const, label: "Répondu", count: fullData.responded.length },
     ],
-    [fullData.today.length, fullData.upcoming.length, fullData.relance_sent.length, fullData.responded.length]
+    [
+      fullData.overdue.length,
+      fullData.today.length,
+      fullData.upcoming.length,
+      fullData.relance_sent.length,
+      fullData.responded.length,
+    ]
   );
 
   const fullActiveData: FullPlanLead[] =
-    fullTab === "today"
+    fullTab === "overdue"
+      ? fullData.overdue
+      : fullTab === "today"
       ? fullData.today
       : fullTab === "upcoming"
       ? fullData.upcoming
@@ -722,7 +742,9 @@ export default function FollowupsPage() {
       : fullData.responded;
 
   const fullActiveTitle =
-    fullTab === "today"
+    fullTab === "overdue"
+      ? "En retard"
+      : fullTab === "today"
       ? "Aujourd'hui"
       : fullTab === "upcoming"
       ? "À venir"
@@ -735,7 +757,7 @@ export default function FollowupsPage() {
     const dateLabel =
       fullTab === "relance_sent"
         ? formatDateFR(lead.relance_sent_at)
-        : fullTab === "responded"
+      : fullTab === "responded"
         ? "—"
         : formatDateFR(lead.next_followup_at);
 
@@ -822,6 +844,8 @@ export default function FollowupsPage() {
     const markerColor =
       tone === "today"
         ? "bg-[#1f5eff]"
+        : tone === "overdue"
+        ? "bg-amber-500"
         : tone === "upcoming"
         ? "bg-emerald-500"
         : tone === "relance_sent"
@@ -831,6 +855,8 @@ export default function FollowupsPage() {
     const badgeClass =
       tone === "today"
         ? "border-[#d7e3f4] bg-white text-[#51627b]"
+        : tone === "overdue"
+        ? "border-amber-200 bg-amber-50 text-amber-800"
         : tone === "upcoming"
         ? "border-emerald-200 bg-emerald-50 text-emerald-700"
         : tone === "relance_sent"
@@ -840,6 +866,8 @@ export default function FollowupsPage() {
     const badgeLabel =
       tone === "today"
         ? "Aujourd'hui"
+        : tone === "overdue"
+        ? "Retard"
         : tone === "upcoming"
         ? "À venir"
         : tone === "relance_sent"
@@ -849,6 +877,8 @@ export default function FollowupsPage() {
     const hoverClass =
       tone === "today"
         ? "hover:border-[#9cc0ff] hover:bg-[#f3f8ff]"
+        : tone === "overdue"
+        ? "hover:border-amber-300 hover:bg-amber-50/80"
         : tone === "upcoming"
         ? "hover:border-emerald-300 hover:bg-emerald-50/80"
         : tone === "relance_sent"
@@ -878,6 +908,8 @@ export default function FollowupsPage() {
               <p className="mt-1 text-xs text-[#51627b]">
                 {tone === "today"
                   ? "Les relances planifiées pour aujourd'hui apparaîtront ici."
+                  : tone === "overdue"
+                  ? "Les relances non envoyées à temps apparaîtront ici."
                   : tone === "upcoming"
                   ? "Les futures relances apparaîtront ici dès qu'un DM est envoyé (j+7)."
                   : tone === "relance_sent"
@@ -888,12 +920,12 @@ export default function FollowupsPage() {
           ) : (
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               {data.map((lead) => {
-                const dateInfo =
-                  tone === "relance_sent"
-                    ? { label: "Envoyée le", value: formatDateFR(lead.relance_sent_at) }
-                    : tone === "responded"
-                    ? { label: "Relance le", value: lead.relance_sent_at ? formatDateFR(lead.relance_sent_at) : "—" }
-                    : { label: "Date", value: formatDateFR(lead.next_followup_at) };
+                    const dateInfo =
+                      tone === "relance_sent"
+                        ? { label: "Envoyée le", value: formatDateFR(lead.relance_sent_at) }
+                      : tone === "responded"
+                        ? { label: "Relance le", value: lead.relance_sent_at ? formatDateFR(lead.relance_sent_at) : "—" }
+                      : { label: "Date", value: formatDateFR(lead.next_followup_at) };
 
                 return (
                   <button
@@ -949,8 +981,16 @@ export default function FollowupsPage() {
   const renderFullSidebar = () => {
     if (!openFullLead) return null;
 
+    const isOverdue =
+      !openFullLead.responded &&
+      !openFullLead.relance_sent_at &&
+      Boolean(openFullLead.next_followup_at) &&
+      cleanDate(openFullLead.next_followup_at).getTime() < cleanDate(today.toISOString()).getTime();
+
     const statusBadge = openFullLead.responded
       ? { label: "Répondu", cls: "border-teal-200 bg-teal-50 text-teal-700", dot: "bg-teal-500" }
+      : isOverdue
+      ? { label: "En retard", cls: "border-amber-200 bg-amber-50 text-amber-800", dot: "bg-amber-500" }
       : openFullLead.relance_sent_at
       ? { label: "Relance envoyée", cls: "border-violet-200 bg-violet-50 text-violet-700", dot: "bg-violet-500" }
       : openFullLead.next_followup_at
@@ -1631,6 +1671,8 @@ export default function FollowupsPage() {
                         description={
                           fullTab === "responded"
                             ? "Les prospects ayant répondu apparaîtront ici."
+                            : fullTab === "overdue"
+                            ? "Les relances en retard apparaîtront ici."
                             : "Aucune entrée dans cette section pour le moment."
                         }
                       />
@@ -1694,7 +1736,15 @@ export default function FollowupsPage() {
                       </div>
 
                       {/* Cards stats — 4 sections, pas de "En retard" */}
-                      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+                        {renderFullStat({
+                          label: "En retard",
+                          value: fullData.overdue.length,
+                          tabKey: "overdue",
+                          dotColor: "bg-amber-500",
+                          chipClass: "border-amber-200 bg-amber-50 text-amber-800",
+                          subLabel: "À envoyer en priorité",
+                        })}
                         {/* Aujourd'hui */}
                         {renderFullStat({
                           label: "Aujourd'hui",
@@ -1736,6 +1786,13 @@ export default function FollowupsPage() {
 
                     {/* Section active */}
                     <div className="grid grid-cols-1 gap-4">
+                      {fullTab === "overdue" &&
+                        renderFullSection({
+                          title: "En retard",
+                          subtitle: "Relances non envoyées à temps. Elles restent prioritaires.",
+                          data: fullData.overdue,
+                          tone: "overdue",
+                        })}
                       {fullTab === "today" &&
                         renderFullSection({
                           title: "Aujourd'hui",
@@ -1860,6 +1917,11 @@ export default function FollowupsPage() {
                     subtitle={
                       openFullLead.responded
                         ? "Répondu"
+                        : !openFullLead.relance_sent_at &&
+                          openFullLead.next_followup_at &&
+                          cleanDate(openFullLead.next_followup_at).getTime() <
+                            cleanDate(today.toISOString()).getTime()
+                        ? "En retard"
                         : openFullLead.relance_sent_at
                         ? "Relance envoyée"
                         : "En attente de relance"
