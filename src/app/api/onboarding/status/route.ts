@@ -72,7 +72,9 @@ export async function GET() {
     const finalState = connected
       ? onboarding.state === "completed"
         ? "completed"
-        : "linkedin_connected"
+        : onboarding.state === "form_submitted"
+          ? "form_submitted"
+          : "linkedin_connected"
       : "created";
 
     return NextResponse.json({

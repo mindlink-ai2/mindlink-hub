@@ -1,19 +1,18 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import OnboardingActivationWizard from "@/components/onboarding/OnboardingActivationWizard";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import {
   ensureClientOnboardingStateRow,
   getClientOnboardingStateRow,
-  isLinkedinConnectedInAccounts,
   resolveClientContextForUser,
 } from "@/lib/client-onboarding-state";
+import OnboardingVideoStep from "@/components/onboarding/OnboardingVideoStep";
 
-type WizardInitialState = {
-  state: "created" | "linkedin_connected" | "form_submitted" | "completed" | null;
-  linkedinConnected: boolean;
-  completed: boolean;
+const VIDEO_URLS: Record<string, string> = {
+  full: "https://assets.lidmeo.com/Pre%CC%81sentation%20lidmeo%20Full.mp4",
+  essential: "https://assets.lidmeo.com/Video%20Pre%CC%81sentation%20essential.mp4",
 };
+const THUMBNAIL_URL = "https://assets.lidmeo.com/thumbnail-full.png";
 
 function getPrimaryEmail(user: Awaited<ReturnType<typeof currentUser>>): string | null {
   return (
@@ -24,7 +23,7 @@ function getPrimaryEmail(user: Awaited<ReturnType<typeof currentUser>>): string 
   );
 }
 
-export default async function OnboardingWizardPage() {
+export default async function OnboardingVideoPage() {
   const { userId } = await auth();
   if (!userId) {
     redirect("/sign-in");
@@ -40,35 +39,28 @@ export default async function OnboardingWizardPage() {
   }
 
   await ensureClientOnboardingStateRow(supabase, clientContext.clientId);
-
   const onboarding = await getClientOnboardingStateRow(supabase, clientContext.clientId);
   if (!onboarding) {
     redirect("/dashboard");
   }
 
-  const { data: accountRows } = await supabase
-    .from("unipile_accounts")
-    .select("provider, connected, status")
-    .eq("client_id", clientContext.clientId)
-    .limit(25);
-
-  const linkedinConnected = isLinkedinConnectedInAccounts(
-    Array.isArray(accountRows) ? (accountRows as Array<Record<string, unknown>>) : []
-  );
-
-  if (onboarding.state === "completed" && linkedinConnected) {
+  if (onboarding.state === "completed") {
     redirect("/");
   }
 
-  if (onboarding.state === "form_submitted") {
-    redirect("/onboarding/video");
+  if (onboarding.state !== "form_submitted") {
+    redirect("/onboarding");
   }
 
-  const initialStatus: WizardInitialState = {
-    state: linkedinConnected ? onboarding.state : "created",
-    linkedinConnected,
-    completed: false,
-  };
+  // Fetch client plan for video selection
+  const { data: clientData } = await supabase
+    .from("clients")
+    .select("plan")
+    .eq("id", clientContext.clientId)
+    .maybeSingle();
 
-  return <OnboardingActivationWizard initialStatus={initialStatus} />;
+  const plan = String(clientData?.plan ?? "essential").trim().toLowerCase();
+  const videoUrl = VIDEO_URLS[plan] ?? VIDEO_URLS.essential;
+
+  return <OnboardingVideoStep videoUrl={videoUrl} thumbnailUrl={THUMBNAIL_URL} />;
 }

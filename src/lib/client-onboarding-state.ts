@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type ClientOnboardingState = "created" | "linkedin_connected" | "completed";
+export type ClientOnboardingState = "created" | "linkedin_connected" | "form_submitted" | "completed";
 
 export type ClientOnboardingRow = {
   id: number;
@@ -115,6 +115,25 @@ export async function markClientOnboardingLinkedinConnected(
 
   if (error) {
     throw new Error(`client_onboarding_mark_linkedin_failed:${error.message}`);
+  }
+}
+
+export async function markClientOnboardingFormSubmitted(
+  supabase: SupabaseClient,
+  clientId: number
+): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const { error } = await supabase
+    .from("client_onboarding_state")
+    .update({
+      state: "form_submitted",
+      completed_at: nowIso,
+    })
+    .eq("client_id", clientId)
+    .neq("state", "completed");
+
+  if (error) {
+    throw new Error(`client_onboarding_mark_form_submitted_failed:${error.message}`);
   }
 }
 

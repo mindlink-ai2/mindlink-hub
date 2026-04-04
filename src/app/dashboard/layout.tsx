@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import {
   ensureClientOnboardingStateRow,
+  getClientOnboardingStateRow,
   isLinkedinConnectedInAccounts,
   resolveClientContextForUser,
 } from "@/lib/client-onboarding-state";
@@ -50,6 +51,12 @@ export default async function DashboardLayout({
 
     if (!linkedinConnected) {
       redirect("/onboarding");
+    }
+
+    // Block access if form submitted but step 3 (video) not yet completed
+    const onboarding = await getClientOnboardingStateRow(supabase, clientContext.clientId);
+    if (onboarding?.state === "form_submitted") {
+      redirect("/onboarding/video");
     }
   }
 

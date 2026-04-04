@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
-import { getOnboardingMetadataForCompletion } from "@/lib/onboarding";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import {
-  markClientOnboardingCompleted,
+  markClientOnboardingFormSubmitted,
   resolveClientContextForUser,
 } from "@/lib/client-onboarding-state";
 
@@ -181,7 +180,7 @@ export async function POST(req: Request) {
     // 7) Email récap interne (Resend)
     await sendNotifyEmail(n8nBody);
 
-    // 7bis) Onboarding wizard state completed (nouveau flux)
+    // 7bis) Marque l'onboarding en état "form_submitted" (étape 3 vidéo à venir)
     try {
       const supabase = createServiceSupabase();
       const clientContext = await resolveClientContextForUser(
@@ -190,23 +189,13 @@ export async function POST(req: Request) {
         clerkEmail
       );
       if (clientContext) {
-        await markClientOnboardingCompleted(supabase, clientContext.clientId);
+        await markClientOnboardingFormSubmitted(supabase, clientContext.clientId);
       }
     } catch (onboardingStateErr) {
-      console.error("Unable to mark onboarding state completed:", onboardingStateErr);
+      console.error("Unable to mark onboarding state form_submitted:", onboardingStateErr);
     }
 
-    // 8) Marque l'onboarding comme complété pour stopper les redirections
-    let onboardingMarked = false;
-    try {
-      const client = await clerkClient();
-      await client.users.updateUserMetadata(userId, getOnboardingMetadataForCompletion());
-      onboardingMarked = true;
-    } catch (metaErr) {
-      console.error("Unable to mark onboarding metadata:", metaErr);
-    }
-
-    return NextResponse.json({ ok: true, onboardingMarked });
+    return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     const details = e instanceof Error ? e.message : String(e);
     return NextResponse.json(

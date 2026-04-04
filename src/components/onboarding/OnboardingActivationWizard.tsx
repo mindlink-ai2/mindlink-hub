@@ -6,7 +6,7 @@ import { CheckCircle2, ChevronRight, Linkedin, Loader2, Sparkles } from "lucide-
 import { cn } from "@/lib/utils";
 
 type WizardStatus = {
-  state: "created" | "linkedin_connected" | "completed" | null;
+  state: "created" | "linkedin_connected" | "form_submitted" | "completed" | null;
   linkedinConnected: boolean;
   completed: boolean;
 };
@@ -64,6 +64,11 @@ export default function OnboardingActivationWizard({
 
         if (nextStatus.completed || nextStatus.state === "completed") {
           router.replace(nextStatus.linkedinConnected ? "/" : "/dashboard");
+          return;
+        }
+
+        if (nextStatus.state === "form_submitted") {
+          router.replace("/onboarding/video");
           return;
         }
 
@@ -142,21 +147,21 @@ export default function OnboardingActivationWizard({
             </div>
 
             <h1 className="mt-4 text-2xl font-semibold tracking-tight text-[#102a50] sm:text-3xl">
-              Finalisons votre démarrage en 2 étapes
+              Finalisons votre démarrage en 3 étapes
             </h1>
             <p className="mt-2 text-sm text-[#5f779e]">
-              Connectez LinkedIn, puis complétez votre questionnaire onboarding.
+              Connectez LinkedIn, complétez votre questionnaire, puis découvrez comment Lidmeo travaille pour vous.
             </p>
 
             <div className="mt-6">
               <div className="mb-2 flex items-center justify-between text-xs text-[#5f779e]">
                 <span>Progression</span>
-                <span>{step}/2</span>
+                <span>{step}/3</span>
               </div>
               <div className="h-2 w-full rounded-full bg-[#e6efff]">
                 <div
                   className="h-2 rounded-full bg-[#316ded] transition-all"
-                  style={{ width: `${step === 1 ? 50 : 100}%` }}
+                  style={{ width: `${step === 1 ? 33 : 67}%` }}
                 />
               </div>
             </div>
