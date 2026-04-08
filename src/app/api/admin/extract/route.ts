@@ -14,33 +14,57 @@ interface ExtractRequestBody {
 
 // ── Helpers Apollo ────────────────────────────────────────────────────────────
 
+/**
+ * Convertit les filtres ICP en payload pour l'API de recherche (extraction complète).
+ * Même logique que buildSearchPayload dans /api/apollo/search/route.ts.
+ *
+ * Paramètres supportés : person_titles, person_seniorities, person_locations,
+ * q_keywords, organization_num_employees_ranges, organization_locations,
+ * currently_using_any_of_technology_uids, revenue_range.
+ *
+ * Supprimés car non supportés : organization_industry_tag_ids (→ q_keywords),
+ * person_departments, organization_not_locations.
+ */
 function buildApolloPayload(
   filters: Record<string, unknown>,
   page: number
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = { page, per_page: 100 };
 
+  // ── Personne ──
   if (arr(filters.person_titles)) payload.person_titles = filters.person_titles;
-  if (arr(filters.person_not_titles)) payload.person_not_titles = filters.person_not_titles;
   if (arr(filters.person_seniorities)) payload.person_seniorities = filters.person_seniorities;
-  if (arr(filters.person_departments)) payload.person_departments = filters.person_departments;
   if (arr(filters.person_locations)) payload.person_locations = filters.person_locations;
-  if (str(filters.q_keywords)) payload.q_keywords = filters.q_keywords;
-  if (arr(filters.organization_industry_tag_ids))
-    payload.organization_industry_tag_ids = filters.organization_industry_tag_ids;
+
+  // q_keywords : combine mots-clés libres + noms de secteurs
+  const keywordParts: string[] = [];
+  if (str(filters.q_keywords)) keywordParts.push((filters.q_keywords as string).trim());
+  if (arr(filters.organization_industry_tag_ids)) {
+    for (const tag of filters.organization_industry_tag_ids as string[]) {
+      if (tag && !keywordParts.includes(tag)) keywordParts.push(tag);
+    }
+  }
+  if (keywordParts.length > 0) payload.q_keywords = keywordParts.join(" ");
+
+  // ── Entreprise ──
   if (arr(filters.organization_num_employees_ranges))
     payload.organization_num_employees_ranges = filters.organization_num_employees_ranges;
   if (arr(filters.organization_locations))
     payload.organization_locations = filters.organization_locations;
-  if (arr(filters.organization_not_locations))
-    payload.organization_not_locations = filters.organization_not_locations;
   if (arr(filters.currently_using_any_of_technology_uids))
     payload.currently_using_any_of_technology_uids =
       filters.currently_using_any_of_technology_uids;
+
+  // Revenue range
   if (filters.revenue_range && typeof filters.revenue_range === "object") {
     const rr = filters.revenue_range as Record<string, unknown>;
-    if (rr.min !== undefined || rr.max !== undefined) {
-      payload.revenue_range = { min: rr.min ?? null, max: rr.max ?? null };
+    const hasMin = rr.min !== null && rr.min !== undefined;
+    const hasMax = rr.max !== null && rr.max !== undefined;
+    if (hasMin || hasMax) {
+      payload.revenue_range = {
+        ...(hasMin ? { min: rr.min } : {}),
+        ...(hasMax ? { max: rr.max } : {}),
+      };
     }
   }
 

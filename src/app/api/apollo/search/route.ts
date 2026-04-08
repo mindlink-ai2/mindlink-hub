@@ -207,24 +207,41 @@ export async function POST(request: Request) {
 
 /**
  * Convertit les filtres du formulaire en payload compatible avec l'API de recherche.
+ *
+ * Paramètres supportés par mixed_people/api_search (doc Apollo) :
+ *   person_titles, person_seniorities, person_locations, q_keywords,
+ *   organization_num_employees_ranges, organization_locations,
+ *   currently_using_any_of_technology_uids, revenue_range
+ *
+ * NON supportés (supprimés) :
+ *   organization_industry_tag_ids → les valeurs texte sont fusionnées dans q_keywords
+ *   person_departments            → non documenté, retire du payload
+ *   organization_not_locations    → non documenté, retire du payload
  */
 function buildSearchPayload(filters: Record<string, unknown>): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
 
+  // ── Personne ──
   if (arr(filters.person_titles)) payload.person_titles = filters.person_titles;
-  if (arr(filters.person_not_titles)) payload.person_not_titles = filters.person_not_titles;
   if (arr(filters.person_seniorities)) payload.person_seniorities = filters.person_seniorities;
-  if (arr(filters.person_departments)) payload.person_departments = filters.person_departments;
   if (arr(filters.person_locations)) payload.person_locations = filters.person_locations;
-  if (str(filters.q_keywords)) payload.q_keywords = filters.q_keywords;
-  if (arr(filters.organization_industry_tag_ids))
-    payload.organization_industry_tag_ids = filters.organization_industry_tag_ids;
+
+  // q_keywords : combine les mots-clés libres + les noms de secteurs saisis
+  // (organization_industry_tag_ids n'existe pas dans l'API, on passe les valeurs en keywords)
+  const keywordParts: string[] = [];
+  if (str(filters.q_keywords)) keywordParts.push((filters.q_keywords as string).trim());
+  if (arr(filters.organization_industry_tag_ids)) {
+    for (const tag of filters.organization_industry_tag_ids as string[]) {
+      if (tag && !keywordParts.includes(tag)) keywordParts.push(tag);
+    }
+  }
+  if (keywordParts.length > 0) payload.q_keywords = keywordParts.join(" ");
+
+  // ── Entreprise ──
   if (arr(filters.organization_num_employees_ranges))
     payload.organization_num_employees_ranges = filters.organization_num_employees_ranges;
   if (arr(filters.organization_locations))
     payload.organization_locations = filters.organization_locations;
-  if (arr(filters.organization_not_locations))
-    payload.organization_not_locations = filters.organization_not_locations;
   if (arr(filters.currently_using_any_of_technology_uids))
     payload.currently_using_any_of_technology_uids =
       filters.currently_using_any_of_technology_uids;
