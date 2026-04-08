@@ -24,8 +24,7 @@ type StripeStatus = string | null;
 type ClientRow = {
   id: number;
   email: string | null;
-  first_name: string | null;
-  last_name: string | null;
+  name: string | null;
   company_name: string | null;
   plan: string | null;
   quota: string | null;
@@ -159,6 +158,8 @@ function IcpModal({
     { label: "Chiffre d'affaires", value: revenueLabel },
   ];
 
+  const commercialPromise = (filters.commercial_promise as string | null) || null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
@@ -169,7 +170,7 @@ function IcpModal({
         <div className="flex items-center justify-between p-5 border-b border-[#eef1f8] sticky top-0 bg-white rounded-t-2xl">
           <div>
             <h2 className="font-bold text-[#0b1c33]">
-              Config ICP — {client.first_name ?? client.email}
+              Config ICP — {client.name ?? client.email}
             </h2>
             <IcpBadge status={client.icp.status} />
           </div>
@@ -192,6 +193,13 @@ function IcpModal({
             </div>
           ))}
         </div>
+
+        {commercialPromise && (
+          <div className="mx-5 mb-5 rounded-xl border border-[#e8f0fe] bg-[#f4f8ff] p-4">
+            <p className="text-xs font-semibold text-[#1f5eff] mb-1.5">Promesse commerciale</p>
+            <p className="text-sm text-[#0b1c33] whitespace-pre-wrap">{commercialPromise}</p>
+          </div>
+        )}
 
         {client.icp.submitted_at && (
           <p className="px-5 pb-5 text-xs text-[#9ab0c8]">
@@ -251,7 +259,7 @@ function ExtractModal({
       <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-[#0b1c33]">
-            Lancer l'extraction — {client.first_name ?? client.email}
+            Lancer l'extraction — {client.name ?? client.email}
           </h2>
           <button
             type="button"
@@ -332,10 +340,7 @@ function ClientTableRow({
   const isIcpOk = client.icp.status !== "none" && client.icp.status !== "draft";
   const canExtract = isStripeOk && isIcpOk;
 
-  const displayName =
-    [client.first_name, client.last_name].filter(Boolean).join(" ") ||
-    client.email ||
-    `Client #${client.id}`;
+  const displayName = client.name || client.email || `Client #${client.id}`;
 
   const lastExtrDate = client.last_extraction?.date
     ? new Date(client.last_extraction.date).toLocaleDateString("fr-FR", {
@@ -573,8 +578,7 @@ export default function AdminClientsPage() {
     const matchesQuery =
       !q ||
       (c.email ?? "").toLowerCase().includes(q) ||
-      (c.first_name ?? "").toLowerCase().includes(q) ||
-      (c.last_name ?? "").toLowerCase().includes(q) ||
+      (c.name ?? "").toLowerCase().includes(q) ||
       (c.company_name ?? "").toLowerCase().includes(q);
 
     const matchesIcp =
@@ -593,7 +597,7 @@ export default function AdminClientsPage() {
       url,
       count,
       clientName:
-        [c?.first_name, c?.last_name].filter(Boolean).join(" ") || c?.email || "Client",
+        c?.name || c?.email || "Client",
     });
     loadClients();
   };

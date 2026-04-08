@@ -33,6 +33,8 @@ type IcpFilters = {
   organization_not_locations: string[];
   currently_using_any_of_technology_uids: string[];
   revenue_range: { min: number | null; max: number | null };
+  // Offre commerciale (usage interne uniquement, non envoyé à la recherche)
+  commercial_promise: string;
 };
 
 type ApolloProfile = {
@@ -117,6 +119,7 @@ const emptyFilters = (): IcpFilters => ({
   organization_num_employees_ranges: [],
   organization_locations: [],
   organization_not_locations: [],
+  commercial_promise: "",
   currently_using_any_of_technology_uids: [],
   revenue_range: { min: null, max: null },
 });
@@ -829,6 +832,36 @@ export default function IcpBuilderPage() {
           </div>
         )}
 
+        {/* ── Votre offre ── */}
+        <div className="bg-white rounded-2xl border border-[#c8d6ea] p-6">
+          <h2 className="text-base font-bold text-[#0b1c33] mb-1">Votre offre</h2>
+          <p className="text-sm text-[#51627b] mb-4">
+            Ces informations sont uniquement à destination de notre équipe pour préparer votre
+            campagne.
+          </p>
+          <label className="block text-sm font-semibold text-[#0b1c33] mb-1.5">
+            Quelle est votre promesse commerciale ?{" "}
+            <span className="text-[#e53935] font-normal">*</span>
+            <span className="ml-1 text-xs text-[#7a9abf] font-normal">
+              Qu'est-ce que vous vendez et pourquoi vous choisir plutôt qu'un autre ?
+            </span>
+          </label>
+          <textarea
+            rows={4}
+            className={cn(
+              "w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-[#0b1c33]",
+              "placeholder:text-[#9ab0c8] focus:outline-none transition-colors resize-none",
+              isLocked
+                ? "border-[#c8d6ea] bg-[#f8fafc] text-[#7a9abf] cursor-not-allowed"
+                : "border-[#c8d6ea] focus:border-[#1f5eff]"
+            )}
+            placeholder="Ex : Nous aidons les PME à doubler leur visibilité en ligne grâce à des campagnes publicitaires ciblées, avec un ROI garanti sous 90 jours."
+            value={filters.commercial_promise}
+            onChange={(e) => updateFilter("commercial_promise", e.target.value)}
+            disabled={isLocked}
+          />
+        </div>
+
         {/* ── Validation ICP ── */}
         {!isLocked && (
           <div className="bg-white rounded-2xl border border-[#c8d6ea] p-6">
@@ -851,7 +884,7 @@ export default function IcpBuilderPage() {
               variant="primary"
               size="lg"
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || !filters.commercial_promise.trim()}
               className="gap-2"
             >
               {submitting ? (
@@ -861,6 +894,11 @@ export default function IcpBuilderPage() {
               )}
               {submitting ? "Validation en cours…" : "Valider mon ciblage"}
             </HubButton>
+            {!filters.commercial_promise.trim() && (
+              <p className="text-xs text-[#9ab0c8] mt-2">
+                Remplissez votre promesse commerciale pour valider.
+              </p>
+            )}
           </div>
         )}
 

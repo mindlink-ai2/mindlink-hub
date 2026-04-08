@@ -16,9 +16,13 @@ export async function GET() {
   const { data: clients, error: clientsErr } = await supabase
     .from("clients")
     .select(
-      "id, email, first_name, last_name, company_name, plan, quota, subscription_status, stripe_customer_id, stripe_subscription_id, current_period_end, created_at"
+      "id, email, name, company_name, plan, quota, subscription_status, stripe_customer_id, stripe_subscription_id, current_period_end, created_at"
     )
     .order("id", { ascending: true });
+
+  if (clientsErr) {
+    console.error("[admin/clients] Supabase error on clients query:", clientsErr.message, clientsErr.details);
+  }
 
   if (clientsErr) {
     return NextResponse.json({ error: "Erreur base de données" }, { status: 500 });
@@ -79,8 +83,7 @@ export async function GET() {
     return {
       id: client.id,
       email: client.email,
-      first_name: (client as Record<string, unknown>).first_name ?? null,
-      last_name: (client as Record<string, unknown>).last_name ?? null,
+      name: (client as Record<string, unknown>).name ?? null,
       company_name: (client as Record<string, unknown>).company_name ?? null,
       plan: client.plan ?? null,
       quota: client.quota ?? null,
