@@ -12,20 +12,24 @@ export async function GET() {
 
   const supabase = createServiceSupabase();
 
-  // Récupérer tous les clients
+  // Récupérer tous les clients — select("*") pour éviter tout souci de nom de colonne
   const { data: clients, error: clientsErr } = await supabase
     .from("clients")
-    .select(
-      "id, email, name, company_name, plan, quota, subscription_status, stripe_customer_id, stripe_subscription_id, current_period_end, created_at"
-    )
+    .select("*")
     .order("id", { ascending: true });
 
   if (clientsErr) {
-    console.error("[admin/clients] Supabase error on clients query:", clientsErr.message, clientsErr.details);
-  }
-
-  if (clientsErr) {
-    return NextResponse.json({ error: "Erreur base de données" }, { status: 500 });
+    console.error(
+      "[admin/clients] Supabase error:",
+      clientsErr.message,
+      clientsErr.details,
+      clientsErr.hint,
+      clientsErr.code
+    );
+    return NextResponse.json(
+      { error: "Erreur base de données", detail: clientsErr.message },
+      { status: 500 }
+    );
   }
 
   if (!clients || clients.length === 0) {
@@ -82,7 +86,8 @@ export async function GET() {
 
     return {
       id: client.id,
-      email: client.email,
+      email: (client as Record<string, unknown>).email ?? null,
+      // "name" ou fallback sur l'email si la colonne n'existe pas
       name: (client as Record<string, unknown>).name ?? null,
       company_name: (client as Record<string, unknown>).company_name ?? null,
       plan: client.plan ?? null,

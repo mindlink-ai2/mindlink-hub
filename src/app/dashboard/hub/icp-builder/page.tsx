@@ -8,6 +8,7 @@ import {
   ChevronUp,
   HelpCircle,
   Loader2,
+  Pencil,
   Save,
   Search,
   User,
@@ -318,6 +319,7 @@ export default function IcpBuilderPage() {
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [submitDone, setSubmitDone] = useState(false);
@@ -487,6 +489,27 @@ export default function IcpBuilderPage() {
     }
   };
 
+  const handleReopen = async () => {
+    setReopening(true);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/icp/reopen", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setSaveError(data.error ?? "Impossible de modifier le ciblage.");
+      } else {
+        setIcpStatus("draft");
+        setSubmitDone(false);
+        setProfiles([]);
+        setTotalResults(null);
+      }
+    } catch {
+      setSaveError("Impossible de modifier le ciblage. Veuillez réessayer.");
+    } finally {
+      setReopening(false);
+    }
+  };
+
   const isLocked = icpStatus === "submitted";
 
   return (
@@ -529,10 +552,32 @@ export default function IcpBuilderPage() {
       {/* Bannière statut */}
       {submitDone && (
         <div className="bg-[#e8f5e9] border-b border-[#a5d6a7] px-6 py-3">
-          <div className="max-w-4xl mx-auto flex items-center gap-2 text-[#2e7d32] text-sm font-medium">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-            Votre ciblage a été validé et transmis à notre équipe. Nous vous contacterons très
-            prochainement.
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2 text-[#2e7d32] text-sm font-medium">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              Votre ciblage a été validé et transmis à notre équipe. Nous vous contacterons très
+              prochainement.
+            </div>
+            {creditsRemaining !== null && creditsRemaining > 0 ? (
+              <HubButton
+                variant="secondary"
+                size="sm"
+                onClick={handleReopen}
+                disabled={reopening}
+                className="gap-1.5 shrink-0"
+              >
+                {reopening ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Pencil className="w-3.5 h-3.5" />
+                )}
+                {reopening ? "Réouverture…" : "Modifier mon ciblage"}
+              </HubButton>
+            ) : creditsRemaining === 0 ? (
+              <span className="text-xs text-[#7a9abf]">
+                Plus de crédits de recherche disponibles.
+              </span>
+            ) : null}
           </div>
         </div>
       )}
