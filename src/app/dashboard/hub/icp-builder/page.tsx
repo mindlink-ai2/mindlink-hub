@@ -391,6 +391,18 @@ export default function IcpBuilderPage() {
     }
   };
 
+  const refreshCredits = useCallback(async () => {
+    try {
+      const res = await fetch("/api/icp/credits");
+      if (res.ok) {
+        const data = await res.json();
+        setCreditsRemaining(data.credits_remaining ?? null);
+      }
+    } catch {
+      // silencieux
+    }
+  }, []);
+
   const handleSearch = async () => {
     setSearching(true);
     setSearchError(null);
@@ -408,19 +420,20 @@ export default function IcpBuilderPage() {
 
       if (!res.ok) {
         setSearchError(data.error ?? "Une erreur est survenue.");
-        if (data.credits_remaining !== undefined) {
-          setCreditsRemaining(data.credits_remaining);
-        }
+        // Re-fetcher les crédits réels depuis la DB — ne jamais lire depuis l'erreur
+        await refreshCredits();
         return;
       }
 
       setProfiles(data.profiles ?? []);
       setTotalResults(data.total_results ?? null);
+      // Mettre à jour les crédits depuis la réponse de succès
       if (data.credits_remaining !== undefined) {
         setCreditsRemaining(data.credits_remaining);
       }
     } catch {
       setSearchError("Impossible de contacter le serveur. Veuillez réessayer.");
+      await refreshCredits();
     } finally {
       setSearching(false);
     }
@@ -643,7 +656,7 @@ export default function IcpBuilderPage() {
               <div className="pt-4">
                 <FieldLabel
                   label="Secteur d'activité"
-                  tooltip="Saisissez le nom du secteur ou l'identifiant Apollo de l'industrie."
+                  tooltip="Saisissez le nom du secteur d'activité. Ex : SaaS, Fintech, Immobilier, Logistique."
                 />
                 <TagInput
                   values={filters.organization_industry_tag_ids}
@@ -735,7 +748,7 @@ export default function IcpBuilderPage() {
               <div>
                 <FieldLabel
                   label="Technologies utilisées"
-                  tooltip='Identifiants Apollo de technologies. Ex : "salesforce", "hubspot", "stripe".'
+                  tooltip={"Technologies utilisées par l'entreprise cible. Ex : salesforce, hubspot, stripe, intercom."}
                 />
                 <TagInput
                   values={filters.currently_using_any_of_technology_uids}

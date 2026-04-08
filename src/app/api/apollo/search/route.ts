@@ -27,45 +27,42 @@ export async function POST(request: Request) {
     .single();
 
   if (clientErr || !clientRow) {
+    console.error("[search] client not found for userId", userId, clientErr?.message);
     return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
   }
   const orgId: number = clientRow.id;
 
-  // Vérifier / créer les crédits (lazy init : 15 crédits à la première recherche)
+  // ── ÉTAPE 1 : Vérifier les crédits (lecture seule, PAS de décrémentation encore) ──
   const { data: creditRow } = await supabase
     .from("search_credits")
     .select("id, credits_total, credits_used")
     .eq("org_id", orgId)
     .maybeSingle();
 
+  let creditsUsedBefore: number;
+  let creditsTotal: number;
+
   if (!creditRow) {
-    // Première fois : initialiser les crédits
-    await supabase.from("search_credits").insert({
+    // Première recherche : initialiser les crédits
+    const { error: insertErr } = await supabase.from("search_credits").insert({
       org_id: orgId,
       credits_total: 15,
       credits_used: 0,
     });
-  } else {
-    const remaining = creditRow.credits_total - creditRow.credits_used;
-    if (remaining <= 0) {
-      return NextResponse.json(
-        {
-          error:
-            "Vous n'avez plus de crédits de recherche. Contactez-nous pour en obtenir davantage.",
-          credits_remaining: 0,
-        },
-        { status: 402 }
-      );
+    if (insertErr) {
+      console.error("[search] failed to init credits for org", orgId, insertErr.message);
     }
+    creditsUsedBefore = 0;
+    creditsTotal = 15;
+  } else {
+    creditsUsedBefore = creditRow.credits_used;
+    creditsTotal = creditRow.credits_total;
   }
 
-  // Décrémenter atomiquement
-  const { data: decrementOk, error: rpcErr } = await supabase.rpc(
-    "decrement_search_credit",
-    { p_org_id: orgId }
-  );
+  const creditsBeforeSearch = creditsTotal - creditsUsedBefore;
+  console.log(`[search] org_id=${orgId} crédits avant=${creditsBeforeSearch}/${creditsTotal}`);
 
-  if (rpcErr || decrementOk === false) {
+  if (creditsBeforeSearch <= 0) {
     return NextResponse.json(
       {
         error:
@@ -76,50 +73,89 @@ export async function POST(request: Request) {
     );
   }
 
-  // Appel Apollo — prévisualisation 5 profils max
-  const apolloKey = process.env.APOLLO_API_KEY;
-  if (!apolloKey) {
-    return NextResponse.json({ error: "Configuration Apollo manquante" }, { status: 500 });
+  // ── ÉTAPE 2 : Appel à la base de données de profils (AVANT décrémentation) ──
+  const apiKey = process.env.APOLLO_API_KEY;
+  if (!apiKey) {
+    console.error("[search] APOLLO_API_KEY non configurée");
+    return NextResponse.json(
+      { error: "Service de recherche non configuré. Contactez le support." },
+      { status: 500 }
+    );
   }
 
-  const apolloPayload = {
-    ...buildApolloPayload(filters),
+  const searchPayload = {
+    ...buildSearchPayload(filters),
     page: 1,
     per_page: 5,
   };
 
-  let apolloData: Record<string, unknown>;
+  console.log(
+    "[search] payload envoyé:",
+    JSON.stringify(searchPayload).slice(0, 500)
+  );
+
+  let searchData: Record<string, unknown>;
   try {
-    const apolloRes = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
+    const searchRes = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Api-Key": apolloKey,
+        "X-Api-Key": apiKey,
       },
-      body: JSON.stringify(apolloPayload),
+      body: JSON.stringify(searchPayload),
     });
 
-    if (!apolloRes.ok) {
-      const errText = await apolloRes.text().catch(() => "");
-      console.error("[apollo/search] Apollo error", apolloRes.status, errText);
+    const responseText = await searchRes.text();
+    console.log(
+      `[search] réponse status=${searchRes.status} body=${responseText.slice(0, 300)}`
+    );
+
+    if (!searchRes.ok) {
+      // L'appel a échoué — NE PAS décrémenter les crédits
       return NextResponse.json(
-        { error: "Erreur lors de la recherche Apollo. Veuillez réessayer." },
+        { error: "Erreur lors de la recherche. Veuillez réessayer." },
         { status: 502 }
       );
     }
 
-    apolloData = await apolloRes.json();
+    try {
+      searchData = JSON.parse(responseText);
+    } catch {
+      console.error("[search] impossible de parser la réponse JSON");
+      return NextResponse.json(
+        { error: "Réponse inattendue du service de recherche. Veuillez réessayer." },
+        { status: 502 }
+      );
+    }
   } catch (err) {
-    console.error("[apollo/search] fetch error", err);
+    console.error("[search] erreur réseau:", err);
+    // Erreur réseau — NE PAS décrémenter les crédits
     return NextResponse.json(
-      { error: "Impossible de contacter Apollo. Veuillez réessayer." },
+      { error: "Impossible de contacter le service de recherche. Veuillez réessayer." },
       { status: 502 }
     );
   }
 
-  // Formater les profils (sans email ni téléphone — prévisualisation uniquement)
-  const rawPeople = Array.isArray(apolloData.people)
-    ? (apolloData.people as Array<Record<string, unknown>>)
+  // ── ÉTAPE 3 : Décrémentation des crédits (seulement après succès) ──
+  // UPDATE atomique avec optimistic lock sur la valeur précédemment lue
+  const { error: decrementErr, count: decrementCount } = await supabase
+    .from("search_credits")
+    .update({ credits_used: creditsUsedBefore + 1 })
+    .eq("org_id", orgId)
+    .eq("credits_used", creditsUsedBefore); // optimistic lock
+
+  if (decrementErr) {
+    // Loguer l'échec mais ne pas bloquer — la recherche a déjà eu lieu
+    console.error("[search] échec décrémentation crédits:", decrementErr.message);
+  } else {
+    console.log(
+      `[search] org_id=${orgId} crédits après=${creditsBeforeSearch - 1}/${creditsTotal} (rows updated: ${decrementCount ?? "?"})`
+    );
+  }
+
+  // ── ÉTAPE 4 : Formater les profils (sans email ni téléphone) ──
+  const rawPeople = Array.isArray(searchData.people)
+    ? (searchData.people as Array<Record<string, unknown>>)
     : [];
 
   const profiles = rawPeople.slice(0, 5).map((p) => ({
@@ -149,28 +185,20 @@ export async function POST(request: Request) {
     results_count: profiles.length,
   });
 
-  // Crédits restants après décrément
-  const { data: updatedCredits } = await supabase
-    .from("search_credits")
-    .select("credits_total, credits_used")
-    .eq("org_id", orgId)
-    .single();
-
-  const creditsRemaining = updatedCredits
-    ? updatedCredits.credits_total - updatedCredits.credits_used
-    : null;
+  const creditsRemaining = creditsBeforeSearch - 1;
 
   return NextResponse.json({
     profiles,
-    total_results: (apolloData.pagination as Record<string, unknown>)?.total_entries ?? null,
+    total_results:
+      (searchData.pagination as Record<string, unknown>)?.total_entries ?? null,
     credits_remaining: creditsRemaining,
   });
 }
 
 /**
- * Convertit les filtres du formulaire ICP en payload Apollo valide.
+ * Convertit les filtres du formulaire en payload compatible avec l'API de recherche.
  */
-function buildApolloPayload(filters: Record<string, unknown>): Record<string, unknown> {
+function buildSearchPayload(filters: Record<string, unknown>): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
 
   if (arr(filters.person_titles)) payload.person_titles = filters.person_titles;
@@ -191,11 +219,16 @@ function buildApolloPayload(filters: Record<string, unknown>): Record<string, un
     payload.currently_using_any_of_technology_uids =
       filters.currently_using_any_of_technology_uids;
 
-  // Revenue range
+  // Revenue range — n'inclure que si min ou max est défini et non-null
   if (filters.revenue_range && typeof filters.revenue_range === "object") {
     const rr = filters.revenue_range as Record<string, unknown>;
-    if (rr.min !== undefined || rr.max !== undefined) {
-      payload.revenue_range = { min: rr.min ?? null, max: rr.max ?? null };
+    const hasMin = rr.min !== null && rr.min !== undefined;
+    const hasMax = rr.max !== null && rr.max !== undefined;
+    if (hasMin || hasMax) {
+      payload.revenue_range = {
+        ...(hasMin ? { min: rr.min } : {}),
+        ...(hasMax ? { max: rr.max } : {}),
+      };
     }
   }
 
