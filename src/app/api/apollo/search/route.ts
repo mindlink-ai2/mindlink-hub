@@ -96,7 +96,7 @@ export async function POST(request: Request) {
 
   let searchData: Record<string, unknown>;
   try {
-    const searchRes = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
+    const searchRes = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -154,9 +154,14 @@ export async function POST(request: Request) {
   }
 
   // ── ÉTAPE 4 : Formater les profils (sans email ni téléphone) ──
-  const rawPeople = Array.isArray(searchData.people)
-    ? (searchData.people as Array<Record<string, unknown>>)
-    : [];
+  // Le nouveau endpoint retourne "matches", l'ancien retournait "people"
+  const rawPeople = (
+    Array.isArray(searchData.matches)
+      ? searchData.matches
+      : Array.isArray(searchData.people)
+      ? searchData.people
+      : []
+  ) as Array<Record<string, unknown>>;
 
   const profiles = rawPeople.slice(0, 5).map((p) => ({
     id: p.id ?? null,
@@ -187,10 +192,15 @@ export async function POST(request: Request) {
 
   const creditsRemaining = creditsBeforeSearch - 1;
 
+  // Le nouveau endpoint expose unique_enriched_records, l'ancien exposait pagination.total_entries
+  const totalResults =
+    (searchData.unique_enriched_records as number | null) ??
+    (searchData.pagination as Record<string, unknown> | null)?.total_entries ??
+    null;
+
   return NextResponse.json({
     profiles,
-    total_results:
-      (searchData.pagination as Record<string, unknown>)?.total_entries ?? null,
+    total_results: totalResults,
     credits_remaining: creditsRemaining,
   });
 }

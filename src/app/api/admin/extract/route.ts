@@ -52,7 +52,7 @@ async function apolloFetchPage(
   page: number,
   apiKey: string
 ): Promise<{ people: ApolloPersonRaw[]; total: number }> {
-  const res = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
+  const res = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -62,15 +62,21 @@ async function apolloFetchPage(
   });
 
   if (!res.ok) {
-    throw new Error(`Apollo HTTP ${res.status}`);
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Apollo HTTP ${res.status}: ${errText.slice(0, 200)}`);
   }
 
   const data = await res.json();
-  const people = Array.isArray(data.people)
+  // Nouveau endpoint : "matches", ancien : "people"
+  const people = Array.isArray(data.matches)
+    ? (data.matches as ApolloPersonRaw[])
+    : Array.isArray(data.people)
     ? (data.people as ApolloPersonRaw[])
     : [];
   const total: number =
-    typeof data.pagination?.total_entries === "number"
+    typeof data.unique_enriched_records === "number"
+      ? data.unique_enriched_records
+      : typeof data.pagination?.total_entries === "number"
       ? data.pagination.total_entries
       : people.length;
 
