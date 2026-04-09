@@ -293,7 +293,9 @@ export async function POST(request: Request) {
   }
 
   const { org_id, quota } = body;
-  if (!org_id || !quota || quota < 1) {
+  // Forcer la coercion en nombre (client.id peut arriver en string selon la version supabase-js)
+  const orgId = Number(org_id);
+  if (!orgId || !quota || quota < 1) {
     return NextResponse.json({ error: "org_id et quota requis" }, { status: 400 });
   }
 
@@ -303,18 +305,22 @@ export async function POST(request: Request) {
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
     .select("id, email, name, company_name")
-    .eq("id", org_id)
+    .eq("id", orgId)
     .single();
 
   if (clientErr || !clientRow) {
-    return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
+    console.error("[extract] client lookup failed — orgId:", orgId, "error:", clientErr?.code, clientErr?.message, clientErr?.details);
+    return NextResponse.json(
+      { error: "Client introuvable", debug: { orgId, code: clientErr?.code, detail: clientErr?.message } },
+      { status: 404 }
+    );
   }
 
   // Récupérer la config ICP validée
   const { data: icpConfig, error: icpErr } = await supabase
     .from("icp_configs")
     .select("id, filters, status")
-    .eq("org_id", org_id)
+    .eq("org_id", orgId)
     .in("status", ["submitted", "reviewed", "active"])
     .order("created_at", { ascending: false })
     .limit(1)
@@ -336,7 +342,7 @@ export async function POST(request: Request) {
   const { data: extractionLog, error: logErr } = await supabase
     .from("extraction_logs")
     .insert({
-      org_id,
+      org_id: orgId,
       icp_config_id: icpConfig.id,
       status: "running",
       leads_count: 0,
