@@ -245,13 +245,10 @@ export default function OnboardingActivationWizard({
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-[#5f779e]">Étape 2</p>
               <h2 className="mt-1 text-lg font-semibold text-[#102a50]">
-                Questionnaire onboarding
+                Définissez votre ciblage
               </h2>
               <p className="mt-1 text-sm text-[#5f779e]">
-                Complétez le formulaire existant pour finaliser votre activation.
-              </p>
-              <p className="mt-1 text-xs text-[#6f84a6]">
-                Si vous avez deja rempli un formulaire, indiquez N/A dans les champs deja traites.
+                Répondez à quelques questions pour que notre équipe puisse lancer votre prospection.
               </p>
             </div>
             <span
@@ -269,7 +266,7 @@ export default function OnboardingActivationWizard({
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => router.push("/onboarding/form")}
+              onClick={() => router.push("/dashboard/hub/icp-builder")}
               disabled={!isLinkedinConnected || loadingStatus}
               className={cn(
                 "inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition",
@@ -279,7 +276,7 @@ export default function OnboardingActivationWizard({
               )}
             >
               {loadingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Aller au questionnaire
+              Définir mon ciblage
             </button>
 
             <button

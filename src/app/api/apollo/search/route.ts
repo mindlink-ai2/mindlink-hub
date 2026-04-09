@@ -83,43 +83,63 @@ export async function POST(request: Request) {
     );
   }
 
-  const searchPayload = {
-    ...buildSearchPayload(filters),
-    page: 1,
-    per_page: 5,
-  };
+  // ── ÉTAPE 2 : Appel Apollo avec retries progressifs si 0 résultat ──
+  // Séquence de payloads : full → sans q_keywords → sans revenue/technologies → titres + localisation seuls
+  const basePayload = buildSearchPayload(filters);
+  const retryPayloads = buildRetryPayloads(basePayload);
 
-  console.log(
-    "[search] payload envoyé:",
-    JSON.stringify(searchPayload).slice(0, 500)
-  );
+  let searchData: Record<string, unknown> | null = null;
+  let attemptIndex = 0;
 
-  let searchData: Record<string, unknown>;
-  try {
-    const searchRes = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": apiKey,
-      },
-      body: JSON.stringify(searchPayload),
-    });
+  for (const payload of retryPayloads) {
+    const searchPayload = { ...payload, page: 1, per_page: 5 };
+    const attemptLabel = attemptIndex === 0 ? "initial" : `retry ${attemptIndex}`;
 
-    const responseText = await searchRes.text();
     console.log(
-      `[search] réponse status=${searchRes.status} body=${responseText.slice(0, 300)}`
+      `[search] ${attemptLabel} payload:`,
+      JSON.stringify(searchPayload).slice(0, 500)
     );
 
-    if (!searchRes.ok) {
-      // L'appel a échoué — NE PAS décrémenter les crédits
+    let rawText: string;
+    let httpOk: boolean;
+    let httpStatus: number;
+
+    try {
+      const searchRes = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Api-Key": apiKey,
+        },
+        body: JSON.stringify(searchPayload),
+      });
+      rawText = await searchRes.text();
+      httpOk = searchRes.ok;
+      httpStatus = searchRes.status;
+    } catch (err) {
+      console.error("[search] erreur réseau:", err);
+      // Erreur réseau — NE PAS décrémenter les crédits
+      return NextResponse.json(
+        { error: "Impossible de contacter le service de recherche. Veuillez réessayer." },
+        { status: 502 }
+      );
+    }
+
+    console.log(
+      `[search] ${attemptLabel} réponse status=${httpStatus} body=${rawText.slice(0, 300)}`
+    );
+
+    if (!httpOk) {
+      // Erreur HTTP — NE PAS décrémenter les crédits
       return NextResponse.json(
         { error: "Erreur lors de la recherche. Veuillez réessayer." },
         { status: 502 }
       );
     }
 
+    let parsed: Record<string, unknown>;
     try {
-      searchData = JSON.parse(responseText);
+      parsed = JSON.parse(rawText);
     } catch {
       console.error("[search] impossible de parser la réponse JSON");
       return NextResponse.json(
@@ -127,17 +147,25 @@ export async function POST(request: Request) {
         { status: 502 }
       );
     }
-  } catch (err) {
-    console.error("[search] erreur réseau:", err);
-    // Erreur réseau — NE PAS décrémenter les crédits
-    return NextResponse.json(
-      { error: "Impossible de contacter le service de recherche. Veuillez réessayer." },
-      { status: 502 }
+
+    const total =
+      (parsed.unique_enriched_records as number | undefined) ??
+      ((parsed.pagination as Record<string, unknown> | null)?.total_entries as number | undefined) ??
+      0;
+
+    if (total > 0) {
+      searchData = parsed;
+      break;
+    }
+
+    // 0 résultats — log et essayer le prochain payload
+    console.log(
+      `[search] ${attemptLabel} → 0 résultats, ${attemptIndex < retryPayloads.length - 1 ? "retry..." : "abandon."}`
     );
+    attemptIndex++;
   }
 
-  // ── ÉTAPE 3 : Décrémentation des crédits (seulement après succès) ──
-  // UPDATE atomique avec optimistic lock sur la valeur précédemment lue
+  // ── ÉTAPE 3 : Décrémentation des crédits (un seul crédit, même après retries) ──
   const { error: decrementErr, count: decrementCount } = await supabase
     .from("search_credits")
     .update({ credits_used: creditsUsedBefore + 1 })
@@ -145,7 +173,6 @@ export async function POST(request: Request) {
     .eq("credits_used", creditsUsedBefore); // optimistic lock
 
   if (decrementErr) {
-    // Loguer l'échec mais ne pas bloquer — la recherche a déjà eu lieu
     console.error("[search] échec décrémentation crédits:", decrementErr.message);
   } else {
     console.log(
@@ -153,8 +180,24 @@ export async function POST(request: Request) {
     );
   }
 
-  // ── ÉTAPE 4 : Formater les profils (sans email ni téléphone) ──
-  // Le nouveau endpoint retourne "matches", l'ancien retournait "people"
+  const creditsRemaining = creditsBeforeSearch - 1;
+
+  // Aucun résultat après tous les retries
+  if (!searchData) {
+    await supabase.from("search_logs").insert({
+      org_id: orgId,
+      filters_used: filters,
+      results_count: 0,
+    });
+    return NextResponse.json({
+      profiles: [],
+      total_results: 0,
+      credits_remaining: creditsRemaining,
+      error: "Aucun profil trouvé. Essayez de reformuler vos réponses.",
+    });
+  }
+
+  // ── ÉTAPE 4 : Formater les profils ──
   const rawPeople = (
     Array.isArray(searchData.matches)
       ? searchData.matches
@@ -183,16 +226,12 @@ export async function POST(request: Request) {
     country: p.country ?? null,
   }));
 
-  // Log la recherche
   await supabase.from("search_logs").insert({
     org_id: orgId,
     filters_used: filters,
     results_count: profiles.length,
   });
 
-  const creditsRemaining = creditsBeforeSearch - 1;
-
-  // Le nouveau endpoint expose unique_enriched_records, l'ancien exposait pagination.total_entries
   const totalResults =
     (searchData.unique_enriched_records as number | null) ??
     (searchData.pagination as Record<string, unknown> | null)?.total_entries ??
@@ -244,6 +283,40 @@ function buildSearchPayload(filters: Record<string, unknown>): Record<string, un
   }
 
   return payload;
+}
+
+/**
+ * Produit une séquence de payloads de plus en plus permissifs pour les retries.
+ * Appelé uniquement si le payload initial retourne 0 résultats.
+ *
+ * Ordre de suppression :
+ *   1. Full payload (déjà essayé)
+ *   2. Sans q_keywords (trop restrictif si mal formaté)
+ *   3. Sans revenue_range + sans currently_using_any_of_technology_uids
+ *   4. Seulement person_titles + include_similar_titles + localisation principale
+ */
+function buildRetryPayloads(
+  base: Record<string, unknown>
+): Array<Record<string, unknown>> {
+  // Retry 1 : supprimer q_keywords
+  const r1 = { ...base };
+  delete r1.q_keywords;
+
+  // Retry 2 : supprimer aussi revenue_range et technologies
+  const r2 = { ...r1 };
+  delete r2.revenue_range;
+  delete r2.currently_using_any_of_technology_uids;
+
+  // Retry 3 : garder uniquement titres + include_similar_titles + localisation principale
+  const r3: Record<string, unknown> = { include_similar_titles: true };
+  if (base.person_titles) r3.person_titles = base.person_titles;
+  if (base.person_locations) {
+    r3.person_locations = base.person_locations;
+  } else if (base.organization_locations) {
+    r3.organization_locations = base.organization_locations;
+  }
+
+  return [base, r1, r2, r3];
 }
 
 function arr(v: unknown): v is unknown[] {
