@@ -148,8 +148,17 @@ export async function POST(request: Request) {
       );
     }
 
+    console.log(
+      `[search] parsed people count:`,
+      (parsed.people as unknown[] | undefined)?.length ?? (parsed.matches as unknown[] | undefined)?.length ?? 0,
+      `total_entries:`, parsed.total_entries,
+      `unique_enriched_records:`, parsed.unique_enriched_records
+    );
+
+    // Apollo peut retourner total_entries à la racine OU dans pagination OU unique_enriched_records
     const total =
       (parsed.unique_enriched_records as number | undefined) ??
+      (parsed.total_entries as number | undefined) ??
       ((parsed.pagination as Record<string, unknown> | null)?.total_entries as number | undefined) ??
       0;
 
@@ -234,6 +243,7 @@ export async function POST(request: Request) {
 
   const totalResults =
     (searchData.unique_enriched_records as number | null) ??
+    (searchData.total_entries as number | null) ??
     (searchData.pagination as Record<string, unknown> | null)?.total_entries ??
     null;
 
