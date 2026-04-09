@@ -170,24 +170,24 @@ async function createSpreadsheet(
   accessToken: string,
   title: string
 ): Promise<{ spreadsheetId: string; url: string }> {
-  const res = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
+  const url = "https://sheets.googleapis.com/v4/spreadsheets";
+  const authHeader = `Bearer ${accessToken}`;
+  console.log("[createSpreadsheet] URL:", url);
+  console.log("[createSpreadsheet] Authorization header (first 20):", authHeader.slice(0, 20));
+  console.log("[createSpreadsheet] Token length:", accessToken.length);
+
+  const res = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: authHeader,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      properties: { title },
-      sheets: [
-        {
-          properties: { title: "Leads" },
-        },
-      ],
-    }),
+    body: JSON.stringify({ properties: { title } }),
   });
 
   if (!res.ok) {
     const err = await res.text().catch(() => "");
+    console.error("[createSpreadsheet] Error body:", err.slice(0, 600));
     throw new Error(`Sheets create error ${res.status}: ${err.slice(0, 400)}`);
   }
 
