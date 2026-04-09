@@ -33,6 +33,8 @@ type ClientRow = {
   stripe_subscription_id: string | null;
   current_period_end: string | null;
   created_at: string | null;
+  n8n_workflow_id: string | null;
+  n8n_folder_id: string | null;
   icp: {
     status: IcpStatus;
     filters: Record<string, unknown>;
@@ -47,6 +49,11 @@ type ClientRow = {
   } | null;
   extractions_count: number;
   credits: { total: number; used: number; remaining: number };
+  extraction_history: Array<{
+    date: string | null;
+    leads_count: number;
+    google_sheet_url: string;
+  }>;
 };
 
 type StripeSub = {
@@ -216,7 +223,19 @@ function IcpModal({
   );
 }
 
-// ─── Modal Extraction ─────────────────────────────────────────────────────────
+// ─── Modal Extraction (3 phases) ─────────────────────────────────────────────
+
+type ExtractionData = {
+  sheetUrl: string;
+  sheetId: string;
+  leadsCount: number;
+  logId: string;
+};
+
+type WorkflowResult = {
+  workflowId: string;
+  workflowUrl: string;
+};
 
 function ExtractModal({
   client,
@@ -227,13 +246,49 @@ function ExtractModal({
   onClose: () => void;
   onSuccess: (url: string, count: number) => void;
 }) {
+  // ── Phase 1 — Extraction ────────────────────────────────────────────────
   const [quota, setQuota] = useState(500);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [extractLoading, setExtractLoading] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+
+  // ── Phase tracking ──────────────────────────────────────────────────────
+  // "new"          → première extraction, flow complet (prompt + création workflow)
+  // "renewal"      → workflow existant, on met juste à jour le sheet
+  // "renewal-new"  → workflow supprimé dans n8n (404), revenir au flow complet
+  type FlowMode = "new" | "renewal" | "renewal-new";
+  const [phase, setPhase] = useState<1 | 2 | 3>(1);
+  const [flowMode, setFlowMode] = useState<FlowMode>("new");
+  const [extractionData, setExtractionData] = useState<ExtractionData | null>(null);
+
+  // ── Phase 2 — Renouvellement (workflow existant) ─────────────────────────
+  const [renewalResult, setRenewalResult] = useState<WorkflowResult | null>(null);
+  const [renewalLoading, setRenewalLoading] = useState(false);
+  const [renewalError, setRenewalError] = useState<string | null>(null);
+
+  // ── Phase 2 — Génération du prompt (nouveau workflow) ───────────────────
+  const [generatedPrompt, setGeneratedPrompt] = useState("");
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
+
+  // ── Phase 3 — Création du workflow ──────────────────────────────────────
+  const [workflowResult, setWorkflowResult] = useState<WorkflowResult | null>(null);
+  const [workflowLoading, setWorkflowLoading] = useState(false);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
+
+  // Fermer proprement : si extraction déjà faite, déclencher onSuccess
+  const handleClose = () => {
+    if (extractionData) {
+      onSuccess(extractionData.sheetUrl, extractionData.leadsCount);
+    } else {
+      onClose();
+    }
+  };
+
+  // ── Handlers ────────────────────────────────────────────────────────────
 
   const handleExtract = async () => {
-    setLoading(true);
-    setError(null);
+    setExtractLoading(true);
+    setExtractError(null);
     try {
       const res = await fetch("/api/admin/extract", {
         method: "POST",
@@ -242,77 +297,481 @@ function ExtractModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Erreur lors de l'extraction.");
+        setExtractError(data.error ?? "Erreur lors de l'extraction.");
         return;
       }
-      onSuccess(data.google_sheet_url, data.leads_count);
+      setExtractionData({
+        sheetUrl: data.google_sheet_url ?? "",
+        sheetId: data.google_sheet_id ?? "",
+        leadsCount: data.leads_count ?? 0,
+        logId: data.extraction_log_id ?? "",
+      });
+      // Détecter si c'est un renouvellement (workflow existant) ou une première création
+      setFlowMode(client.n8n_workflow_id ? "renewal" : "new");
+      setPhase(2);
     } catch {
-      setError("Impossible de lancer l'extraction. Réessayez.");
+      setExtractError("Impossible de lancer l'extraction. Réessayez.");
     } finally {
-      setLoading(false);
+      setExtractLoading(false);
     }
   };
 
+  const handleUpdateWorkflow = async () => {
+    if (!extractionData) return;
+    setRenewalLoading(true);
+    setRenewalError(null);
+    try {
+      const res = await fetch("/api/admin/update-workflow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          org_id: client.id,
+          google_sheet_id: extractionData.sheetId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // Workflow supprimé dans n8n → basculer vers le flow de création complet
+        if (data.code === "WORKFLOW_NOT_FOUND" || data.code === "NO_WORKFLOW") {
+          setFlowMode("renewal-new");
+          setRenewalError(null);
+          return;
+        }
+        setRenewalError(data.error ?? "Erreur lors de la mise à jour du workflow.");
+        return;
+      }
+      setRenewalResult({
+        workflowId: data.workflow_id,
+        workflowUrl: data.workflow_url,
+      });
+    } catch {
+      setRenewalError("Impossible de mettre à jour le workflow. Réessayez.");
+    } finally {
+      setRenewalLoading(false);
+    }
+  };
+
+  const handleGeneratePrompt = async () => {
+    setPromptLoading(true);
+    setPromptError(null);
+    try {
+      const res = await fetch("/api/admin/generate-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ org_id: client.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPromptError(data.error ?? "Erreur lors de la génération du prompt.");
+        return;
+      }
+      setGeneratedPrompt(data.prompt ?? "");
+    } catch {
+      setPromptError("Impossible de générer le prompt. Réessayez.");
+    } finally {
+      setPromptLoading(false);
+    }
+  };
+
+  const handleCreateWorkflow = async () => {
+    if (!extractionData) return;
+    setWorkflowLoading(true);
+    setWorkflowError(null);
+    setPhase(3);
+    try {
+      const res = await fetch("/api/admin/create-workflow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          org_id: client.id,
+          prompt_systeme: generatedPrompt,
+          google_sheet_id: extractionData.sheetId,
+          extraction_log_id: extractionData.logId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setWorkflowError(data.error ?? "Erreur lors de la création du workflow.");
+        return;
+      }
+      setWorkflowResult({
+        workflowId: data.workflow_id,
+        workflowUrl: data.workflow_url,
+      });
+    } catch {
+      setWorkflowError("Impossible de créer le workflow. Réessayez.");
+    } finally {
+      setWorkflowLoading(false);
+    }
+  };
+
+  // ── Phase labels ─────────────────────────────────────────────────────────
+  const isRenewal = flowMode === "renewal";
+  const phaseLabel =
+    phase === 1
+      ? "Étape 1 — Extraction"
+      : phase === 2
+      ? isRenewal
+        ? "Étape 2 — Mise à jour du workflow"
+        : "Étape 2 — Prompt IA"
+      : "Étape 3 — Workflow n8n";
+  // Renouvellement = 2 étapes seulement, création = 3 étapes
+  const totalPhases = isRenewal ? 2 : 3;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-[#0b1c33]">
-            Lancer l'extraction — {client.name ?? client.email}
-          </h2>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleClose} />
+      <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#eef1f8]">
+          <div>
+            <h2 className="font-bold text-[#0b1c33] text-sm">
+              {phaseLabel} — {client.name ?? client.email}
+            </h2>
+            <div className="flex gap-1.5 mt-2">
+              {Array.from({ length: totalPhases }, (_, i) => i + 1).map((p) => (
+                <div
+                  key={p}
+                  className={`h-1 w-10 rounded-full transition-colors ${
+                    phase > p
+                      ? "bg-[#22c55e]"
+                      : phase === p
+                      ? "bg-[#1f5eff]"
+                      : "bg-[#e2e8f0]"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1.5 rounded-lg hover:bg-[#f0f4fb] text-[#7a9abf]"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="mb-4">
-          <label className="text-sm font-semibold text-[#0b1c33] block mb-1.5">
-            Quota de leads à extraire
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={10000}
-            className="w-full rounded-xl border border-[#c8d6ea] px-3.5 py-2.5 text-sm focus:border-[#1f5eff] focus:outline-none"
-            value={quota}
-            onChange={(e) => setQuota(Number(e.target.value))}
-          />
-        </div>
+        <div className="p-5 space-y-4">
+          {/* ── Phase 1 ── */}
+          {phase === 1 && (
+            <>
+              <div>
+                <label className="text-sm font-semibold text-[#0b1c33] block mb-1.5">
+                  Quota de leads à extraire
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10000}
+                  className="w-full rounded-xl border border-[#c8d6ea] px-3.5 py-2.5 text-sm focus:border-[#1f5eff] focus:outline-none"
+                  value={quota}
+                  onChange={(e) => setQuota(Number(e.target.value))}
+                />
+              </div>
 
-        {error && (
-          <div className="rounded-xl border border-[#fecdd3] bg-[#fff5f5] px-4 py-3 flex items-start gap-2 text-sm text-[#b91c1c] mb-4">
-            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            {error}
-          </div>
-        )}
+              {extractError && (
+                <div className="rounded-xl border border-[#fecdd3] bg-[#fff5f5] px-4 py-3 flex items-start gap-2 text-sm text-[#b91c1c]">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  {extractError}
+                </div>
+              )}
 
-        <div className="flex gap-3">
-          <HubButton variant="ghost" onClick={onClose} disabled={loading}>
-            Annuler
-          </HubButton>
-          <HubButton
-            variant="primary"
-            onClick={handleExtract}
-            disabled={loading || quota < 1}
-            className="flex-1 gap-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Extraction en cours…
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4" />
-                Lancer l'extraction ({quota} leads)
-              </>
-            )}
-          </HubButton>
+              <div className="flex gap-3">
+                <HubButton variant="ghost" onClick={onClose} disabled={extractLoading}>
+                  Annuler
+                </HubButton>
+                <HubButton
+                  variant="primary"
+                  onClick={handleExtract}
+                  disabled={extractLoading || quota < 1}
+                  className="flex-1 gap-2"
+                >
+                  {extractLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Extraction en cours…
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4" />
+                      Lancer l'extraction ({quota} leads)
+                    </>
+                  )}
+                </HubButton>
+              </div>
+            </>
+          )}
+
+          {/* ── Phase 2 ── */}
+          {phase === 2 && extractionData && (
+            <>
+              {/* Résumé extraction — toujours affiché */}
+              <div className="rounded-xl border border-[#e8f5e9] bg-[#f0fdf4] px-4 py-3 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-[#22c55e] mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-[#15803d]">
+                    {extractionData.leadsCount.toLocaleString("fr-FR")} leads extraits
+                  </p>
+                  {extractionData.sheetUrl && (
+                    <a
+                      href={extractionData.sheetUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#15803d] underline flex items-center gap-1 mt-0.5"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Voir le Google Sheet
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Renouvellement : workflow existant ── */}
+              {isRenewal && !renewalResult && (
+                <>
+                  <div className="rounded-xl border border-[#e8f0fe] bg-[#f4f8ff] px-4 py-3 text-sm text-[#0b1c33]">
+                    <p className="font-semibold text-[#1f5eff] mb-1">
+                      Workflow n8n existant détecté
+                    </p>
+                    <p className="text-[#51627b]">
+                      Le Google Sheet va être mis à jour automatiquement dans le workflow existant.
+                      La date de départ sera réinitialisée à demain.
+                    </p>
+                    {client.n8n_workflow_id && (
+                      <a
+                        href={`${process.env.NEXT_PUBLIC_N8N_BASE_URL ?? "https://mindlink2.app.n8n.cloud"}/workflow/${client.n8n_workflow_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-[#1f5eff] hover:underline mt-1.5 text-xs"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Voir le workflow actuel
+                      </a>
+                    )}
+                  </div>
+
+                  {renewalError && (
+                    <div className="rounded-xl border border-[#fecdd3] bg-[#fff5f5] px-4 py-3 flex items-start gap-2 text-sm text-[#b91c1c]">
+                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                      {renewalError}
+                    </div>
+                  )}
+
+                  <HubButton
+                    variant="primary"
+                    onClick={handleUpdateWorkflow}
+                    disabled={renewalLoading}
+                    className="w-full gap-2"
+                  >
+                    {renewalLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Mise à jour en cours…
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4" />
+                        Mettre à jour le workflow
+                      </>
+                    )}
+                  </HubButton>
+                </>
+              )}
+
+              {/* ── Renouvellement : succès ── */}
+              {isRenewal && renewalResult && (
+                <>
+                  <div className="rounded-xl border border-[#e8f5e9] bg-[#f0fdf4] px-4 py-3 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-[#22c55e] shrink-0" />
+                      <p className="font-semibold text-[#15803d] text-sm">
+                        Workflow mis à jour avec succès
+                      </p>
+                    </div>
+                    <a
+                      href={renewalResult.workflowUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-sm text-[#1f5eff] hover:underline font-medium"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Ouvrir dans n8n
+                    </a>
+                  </div>
+                  <HubButton variant="primary" onClick={handleClose} className="w-full">
+                    Fermer
+                  </HubButton>
+                </>
+              )}
+
+              {/* ── Nouveau workflow ou workflow supprimé → flow complet ── */}
+              {!isRenewal && (
+                <>
+                  {/* Génération du prompt */}
+                  {!generatedPrompt && (
+                    <>
+                      {flowMode === "renewal-new" && (
+                        <div className="rounded-xl border border-[#fff3e0] bg-[#fffbf2] px-4 py-3 flex items-start gap-2 text-sm text-[#92400e]">
+                          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                          Le workflow n8n n&apos;existe plus. Un nouveau workflow va être créé.
+                        </div>
+                      )}
+                      {promptError && (
+                        <div className="rounded-xl border border-[#fecdd3] bg-[#fff5f5] px-4 py-3 flex items-start gap-2 text-sm text-[#b91c1c]">
+                          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                          {promptError}
+                        </div>
+                      )}
+                      <HubButton
+                        variant="primary"
+                        onClick={handleGeneratePrompt}
+                        disabled={promptLoading}
+                        className="w-full gap-2"
+                      >
+                        {promptLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Génération du prompt…
+                          </>
+                        ) : (
+                          "Générer le prompt IA"
+                        )}
+                      </HubButton>
+                    </>
+                  )}
+
+                  {/* Textarea éditable */}
+                  {generatedPrompt && (
+                    <>
+                      <div>
+                        <label className="text-xs font-semibold text-[#7a9abf] uppercase tracking-wide block mb-1.5">
+                          Prompt système généré — relisez et modifiez si besoin
+                        </label>
+                        <textarea
+                          className="w-full rounded-xl border border-[#c8d6ea] px-3.5 py-2.5 text-sm focus:border-[#1f5eff] focus:outline-none resize-none font-mono"
+                          rows={12}
+                          value={generatedPrompt}
+                          onChange={(e) => setGeneratedPrompt(e.target.value)}
+                        />
+                      </div>
+
+                      {promptError && (
+                        <div className="rounded-xl border border-[#fecdd3] bg-[#fff5f5] px-4 py-3 flex items-start gap-2 text-sm text-[#b91c1c]">
+                          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                          {promptError}
+                        </div>
+                      )}
+
+                      <div className="flex gap-3">
+                        <HubButton
+                          variant="ghost"
+                          onClick={handleGeneratePrompt}
+                          disabled={promptLoading}
+                          className="gap-1.5"
+                        >
+                          <RefreshCw
+                            className={`w-3.5 h-3.5 ${promptLoading ? "animate-spin" : ""}`}
+                          />
+                          Régénérer
+                        </HubButton>
+                        <HubButton
+                          variant="primary"
+                          onClick={handleCreateWorkflow}
+                          disabled={!generatedPrompt.trim()}
+                          className="flex-1 gap-2"
+                        >
+                          <Play className="w-4 h-4" />
+                          Confirmer et créer le workflow
+                        </HubButton>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* ── Phase 3 ── */}
+          {phase === 3 && (
+            <>
+              {workflowLoading && (
+                <div className="flex flex-col items-center justify-center py-8 gap-3 text-[#51627b]">
+                  <Loader2 className="w-8 h-8 animate-spin text-[#1f5eff]" />
+                  <p className="text-sm font-medium">Création du workflow n8n en cours…</p>
+                  <p className="text-xs text-[#9ab0c8]">Dossier + workflow + activation</p>
+                </div>
+              )}
+
+              {!workflowLoading && workflowError && (
+                <>
+                  <div className="rounded-xl border border-[#fecdd3] bg-[#fff5f5] px-4 py-3 flex items-start gap-2 text-sm text-[#b91c1c]">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    {workflowError}
+                  </div>
+                  <div className="flex gap-3">
+                    <HubButton variant="ghost" onClick={() => setPhase(2)}>
+                      Retour
+                    </HubButton>
+                    <HubButton
+                      variant="primary"
+                      onClick={handleCreateWorkflow}
+                      className="flex-1 gap-2"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Réessayer
+                    </HubButton>
+                  </div>
+                </>
+              )}
+
+              {!workflowLoading && workflowResult && (
+                <>
+                  <div className="rounded-xl border border-[#e8f5e9] bg-[#f0fdf4] px-4 py-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-[#22c55e] shrink-0" />
+                      <p className="font-semibold text-[#15803d] text-sm">
+                        Workflow créé et activé avec succès
+                      </p>
+                    </div>
+                    <a
+                      href={workflowResult.workflowUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-sm text-[#1f5eff] hover:underline font-medium"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Ouvrir dans n8n
+                    </a>
+                    <p className="text-xs text-[#9ab0c8] font-mono">{workflowResult.workflowId}</p>
+                  </div>
+
+                  {extractionData?.sheetUrl && (
+                    <div className="rounded-xl border border-[#e8f0fe] bg-[#f4f8ff] px-4 py-3">
+                      <a
+                        href={extractionData.sheetUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-sm text-[#1f5eff] hover:underline font-medium"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Google Sheet —{" "}
+                        {extractionData.leadsCount.toLocaleString("fr-FR")} leads
+                      </a>
+                    </div>
+                  )}
+
+                  <HubButton
+                    variant="primary"
+                    onClick={handleClose}
+                    className="w-full"
+                  >
+                    Fermer
+                  </HubButton>
+                </>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -466,7 +925,8 @@ function ClientTableRow({
       {/* Ligne détail */}
       {expanded && (
         <tr className="bg-[#f8fafc] border-b border-[#eef1f8]">
-          <td colSpan={6} className="px-6 py-4">
+          <td colSpan={6} className="px-6 py-4 space-y-4">
+            {/* Infos générales */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
                 <p className="text-xs font-semibold text-[#9ab0c8] mb-1">Email</p>
@@ -489,6 +949,71 @@ function ClientTableRow({
                 </div>
               )}
             </div>
+
+            {/* Workflow n8n */}
+            <div className="border-t border-[#eef1f8] pt-3">
+              <p className="text-xs font-semibold text-[#9ab0c8] mb-2 uppercase tracking-wide">
+                Workflow n8n
+              </p>
+              {client.n8n_workflow_id ? (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e8f5e9] text-[#2e7d32] text-xs font-semibold px-2.5 py-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#2e7d32]" />
+                    Workflow actif
+                  </span>
+                  <a
+                    href={`https://mindlink2.app.n8n.cloud/workflow/${client.n8n_workflow_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-[#1f5eff] hover:underline"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Ouvrir dans n8n
+                  </a>
+                  <span className="text-xs text-[#9ab0c8] font-mono">{client.n8n_workflow_id}</span>
+                </div>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f5f5f5] text-[#9e9e9e] text-xs font-medium px-2.5 py-1">
+                  Pas de workflow
+                </span>
+              )}
+            </div>
+
+            {/* Historique des extractions */}
+            {client.extraction_history.length > 0 && (
+              <div className="border-t border-[#eef1f8] pt-3">
+                <p className="text-xs font-semibold text-[#9ab0c8] mb-2 uppercase tracking-wide">
+                  Historique Google Sheets
+                </p>
+                <div className="space-y-1.5">
+                  {client.extraction_history.map((h, i) => (
+                    <div key={i} className="flex items-center gap-3 text-xs">
+                      <span className="text-[#9ab0c8] w-20 shrink-0">
+                        {h.date
+                          ? new Date(h.date).toLocaleDateString("fr-FR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "2-digit",
+                            })
+                          : "—"}
+                      </span>
+                      <span className="text-[#51627b]">
+                        {h.leads_count.toLocaleString("fr-FR")} leads
+                      </span>
+                      <a
+                        href={h.google_sheet_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-[#1f5eff] hover:underline"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Ouvrir
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </td>
         </tr>
       )}

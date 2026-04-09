@@ -47,7 +47,7 @@ export async function GET() {
   // Récupérer les dernières extractions
   const { data: extractionLogs } = await supabase
     .from("extraction_logs")
-    .select("org_id, leads_count, google_sheet_url, started_at, completed_at, status")
+    .select("org_id, leads_count, google_sheet_url, google_sheet_id, started_at, completed_at, status")
     .in("org_id", orgIds)
     .order("started_at", { ascending: false });
 
@@ -97,6 +97,8 @@ export async function GET() {
       stripe_subscription_id: client.stripe_subscription_id ?? null,
       current_period_end: client.current_period_end ?? null,
       created_at: client.created_at ?? null,
+      n8n_workflow_id: (client as Record<string, unknown>).n8n_workflow_id ?? null,
+      n8n_folder_id: (client as Record<string, unknown>).n8n_folder_id ?? null,
 
       icp: icp
         ? {
@@ -117,6 +119,15 @@ export async function GET() {
         : null,
 
       extractions_count: extractions.filter((e) => e.status === "completed").length,
+
+      extraction_history: extractions
+        .filter((e) => e.status === "completed" && e.google_sheet_url)
+        .slice(0, 5)
+        .map((e) => ({
+          date: (e.completed_at ?? e.started_at) as string | null,
+          leads_count: e.leads_count as number,
+          google_sheet_url: e.google_sheet_url as string,
+        })),
 
       credits: credits
         ? {

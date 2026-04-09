@@ -191,12 +191,20 @@ export default async function RootLayout({
                         Abonnement
                       </Link>
                       {showSupportAdminLink ? (
-                        <Link
-                          href="/admin/support"
-                          className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
-                        >
-                          Support Admin
-                        </Link>
+                        <>
+                          <Link
+                            href="/admin/clients"
+                            className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
+                          >
+                            Panel Admin
+                          </Link>
+                          <Link
+                            href="/admin/support"
+                            className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
+                          >
+                            Support Admin
+                          </Link>
+                        </>
                       ) : null}
                       {showPlaybookLink ? (
                         <Link
