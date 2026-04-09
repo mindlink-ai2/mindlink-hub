@@ -114,6 +114,8 @@ function getGoogleCredentials(): {
   const raw = process.env.GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY;
   if (!raw) throw new Error("GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY non défini");
   const parsed = JSON.parse(raw) as { client_email: string; private_key: string };
+  // Vercel encode les sauts de ligne en \\n dans les variables d'env — on les restaure
+  parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
   return parsed;
 }
 
@@ -156,6 +158,7 @@ async function getGoogleAccessToken(
 
   if (!tokenRes.ok) {
     const err = await tokenRes.text().catch(() => "");
+    console.error("[extract] Google OAuth failed:", tokenRes.status, err.slice(0, 300));
     throw new Error(`Google OAuth error: ${err}`);
   }
 
