@@ -24,8 +24,7 @@ type QuestionnaireAnswers = {
   q3_sector: string;
   q4_company_sizes: string[];
   q5_locations: string;
-  q6_additional: string;
-  q7_commercial_promise: string;
+  q6_commercial_promise: string;
 };
 
 type ApolloFilters = Record<string, unknown>;
@@ -133,17 +132,6 @@ const STEPS: StepDef[] = [
   {
     id: "q6",
     number: 6,
-    title: "Avez-vous d'autres critères importants pour votre ciblage ?",
-    subtitle:
-      "Technologies utilisées, chiffre d'affaires, ancienneté dans le poste, ou tout autre critère pertinent.",
-    placeholder: "Ex : Entreprises qui utilisent HubSpot, CA > 1M€, en poste depuis moins de 6 mois",
-    type: "textarea",
-    key: "q6_additional",
-    required: false,
-  },
-  {
-    id: "q7",
-    number: 7,
     title:
       "Quelle est votre promesse commerciale ? Qu'est-ce que vous vendez et pourquoi vous choisir plutôt qu'un autre ?",
     subtitle:
@@ -151,7 +139,7 @@ const STEPS: StepDef[] = [
     placeholder:
       "Ex : Nous aidons les PME à doubler leur visibilité en ligne grâce à des campagnes publicitaires ciblées, avec un ROI garanti sous 90 jours.",
     type: "textarea",
-    key: "q7_commercial_promise",
+    key: "q6_commercial_promise",
     required: true,
   },
 ];
@@ -165,8 +153,7 @@ function emptyAnswers(): QuestionnaireAnswers {
     q3_sector: "",
     q4_company_sizes: [],
     q5_locations: "",
-    q6_additional: "",
-    q7_commercial_promise: "",
+    q6_commercial_promise: "",
   };
 }
 
@@ -439,7 +426,7 @@ export default function IcpBuilderPage() {
           filters: {
             questionnaire: answers,
             apollo_filters: filters,
-            commercial_promise: answers.q7_commercial_promise,
+            commercial_promise: answers.q6_commercial_promise,
           },
         }),
       });
@@ -518,7 +505,7 @@ export default function IcpBuilderPage() {
           filters: {
             questionnaire: answers,
             apollo_filters: generatedFilters ?? {},
-            commercial_promise: answers.q7_commercial_promise,
+            commercial_promise: answers.q6_commercial_promise,
           },
           preview_profiles: profiles,
         }),

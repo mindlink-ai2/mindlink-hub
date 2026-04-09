@@ -53,10 +53,8 @@ function formatAnswers(answers: Record<string, unknown>): string {
     lines.push(`Tailles d'entreprise (fourchettes employés) : ${(answers.q4_company_sizes as string[]).join(", ")}`);
   if (answers.q5_locations)
     lines.push(`Localisation des cibles : ${answers.q5_locations}`);
-  if (answers.q6_additional)
-    lines.push(`Critères supplémentaires : ${answers.q6_additional}`);
-  if (answers.q7_commercial_promise)
-    lines.push(`Promesse commerciale : ${answers.q7_commercial_promise}`);
+  if (answers.q6_commercial_promise)
+    lines.push(`Promesse commerciale : ${answers.q6_commercial_promise}`);
 
   return lines.join("\n");
 }
