@@ -15,36 +15,34 @@ interface ExtractRequestBody {
 // ── Helpers Apollo ────────────────────────────────────────────────────────────
 
 /**
- * Convertit les filtres ICP en payload pour l'API de recherche (extraction complète).
- * Même logique que buildSearchPayload dans /api/apollo/search/route.ts.
+ * Whitelist stricte des paramètres acceptés par mixed_people/api_search.
  *
- * Paramètres supportés : person_titles, person_seniorities, person_locations,
- * q_keywords, organization_num_employees_ranges, organization_locations,
- * currently_using_any_of_technology_uids, revenue_range.
- *
- * Supprimés car non supportés : organization_industry_tag_ids (→ q_keywords),
- * person_departments, organization_not_locations.
+ * Gère les deux formats de filters dans icp_configs :
+ *  - Nouveau format : { questionnaire: {...}, apollo_filters: {...}, commercial_promise: "..." }
+ *  - Ancien format  : les filtres Apollo directement à la racine
  */
 function buildApolloPayload(
-  filters: Record<string, unknown>,
+  rawFilters: Record<string, unknown>,
   page: number
 ): Record<string, unknown> {
+  // Détecter le nouveau format (questionnaire + apollo_filters)
+  const filters =
+    rawFilters.apollo_filters &&
+    typeof rawFilters.apollo_filters === "object" &&
+    !Array.isArray(rawFilters.apollo_filters)
+      ? (rawFilters.apollo_filters as Record<string, unknown>)
+      : rawFilters;
+
   const payload: Record<string, unknown> = { page, per_page: 100 };
 
   // ── Personne ──
   if (arr(filters.person_titles)) payload.person_titles = filters.person_titles;
+  payload.include_similar_titles = true;
   if (arr(filters.person_seniorities)) payload.person_seniorities = filters.person_seniorities;
   if (arr(filters.person_locations)) payload.person_locations = filters.person_locations;
 
-  // q_keywords : combine mots-clés libres + noms de secteurs
-  const keywordParts: string[] = [];
-  if (str(filters.q_keywords)) keywordParts.push((filters.q_keywords as string).trim());
-  if (arr(filters.organization_industry_tag_ids)) {
-    for (const tag of filters.organization_industry_tag_ids as string[]) {
-      if (tag && !keywordParts.includes(tag)) keywordParts.push(tag);
-    }
-  }
-  if (keywordParts.length > 0) payload.q_keywords = keywordParts.join(" ");
+  // ── Mots-clés ──
+  if (str(filters.q_keywords)) payload.q_keywords = (filters.q_keywords as string).trim();
 
   // ── Entreprise ──
   if (arr(filters.organization_num_employees_ranges))
