@@ -170,13 +170,13 @@ async function createSpreadsheet(
   accessToken: string,
   title: string
 ): Promise<{ spreadsheetId: string; url: string }> {
-  const url = "https://sheets.googleapis.com/v4/spreadsheets";
+  const sheetsApiUrl = "https://sheets.googleapis.com/v4/spreadsheets";
   const authHeader = `Bearer ${accessToken}`;
-  console.log("[createSpreadsheet] URL:", url);
+  console.log("[createSpreadsheet] URL:", sheetsApiUrl);
   console.log("[createSpreadsheet] Authorization header (first 20):", authHeader.slice(0, 20));
   console.log("[createSpreadsheet] Token length:", accessToken.length);
 
-  const res = await fetch(url, {
+  const res = await fetch(sheetsApiUrl, {
     method: "POST",
     headers: {
       Authorization: authHeader,
