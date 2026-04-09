@@ -188,7 +188,7 @@ async function createSpreadsheet(
 
   if (!res.ok) {
     const err = await res.text().catch(() => "");
-    throw new Error(`Sheets create error: ${err}`);
+    throw new Error(`Sheets create error ${res.status}: ${err.slice(0, 400)}`);
   }
 
   const data = await res.json();
@@ -216,7 +216,7 @@ async function writeSheetData(
 
   if (!res.ok) {
     const err = await res.text().catch(() => "");
-    throw new Error(`Sheets write error: ${err}`);
+    throw new Error(`Sheets write error ${res.status}: ${err.slice(0, 400)}`);
   }
 }
 
@@ -389,7 +389,9 @@ export async function POST(request: Request) {
 
   try {
     const creds = getGoogleCredentials();
+    console.log("[extract] SA email:", creds.client_email, "| key starts:", creds.private_key.slice(0, 40));
     const token = await getGoogleAccessToken(creds.client_email, creds.private_key);
+    console.log("[extract] Google token obtained, length:", token.length);
 
     const company = (clientRow as Record<string, unknown>).company_name as string | null;
     const email = clientRow.email as string | null;
@@ -400,21 +402,28 @@ export async function POST(request: Request) {
       .filter(Boolean)
       .join(" — ");
 
+    console.log("[extract] Creating spreadsheet:", sheetTitle);
     const created = await createSpreadsheet(token, sheetTitle);
     spreadsheetId = created.spreadsheetId;
     sheetUrl = created.url;
+    console.log("[extract] Spreadsheet created:", spreadsheetId);
 
     // Écrire les données
     const rows = [
       SHEET_HEADERS,
       ...finalPeople.map(formatPersonRow),
     ];
+    console.log("[extract] Writing", rows.length - 1, "rows to sheet");
     await writeSheetData(token, spreadsheetId, rows);
+    console.log("[extract] Sheet data written");
 
     // Partager avec l'adresse Lidmeo
+    console.log("[extract] Sharing sheet with contact@lidmeo.com");
     await shareSheet(token, spreadsheetId, "contact@lidmeo.com");
+    console.log("[extract] Sheet shared");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    console.error("[extract] Google Sheets step failed:", msg);
     await supabase
       .from("extraction_logs")
       .update({ status: "failed", error_message: msg, completed_at: new Date().toISOString() })
