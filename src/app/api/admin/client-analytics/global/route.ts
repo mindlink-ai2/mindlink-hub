@@ -41,7 +41,7 @@ export async function GET() {
     // Total distinct clients
     const { data: allClientsData } = await supabase
       .from("clients")
-      .select("id, email, name, company_name");
+      .select("id, email, company_name");
 
     const totalClients = (allClientsData ?? []).length;
 
@@ -168,7 +168,7 @@ export async function GET() {
     const clientsTable = (summaries ?? []).map((s) => {
       const client = clientsMap[s.client_id];
       const clientName =
-        client?.name ?? client?.company_name ?? client?.email ?? `Client ${s.client_id}`;
+        client?.company_name ?? client?.email ?? `Client ${s.client_id}`;
       const msgs = leadsMessageSentByClient[s.client_id] ?? 0;
       const replies = leadsRespondedByClient[s.client_id] ?? 0;
       const replyRate = msgs > 0 ? Math.round((replies / msgs) * 100) : 0;
@@ -195,7 +195,7 @@ export async function GET() {
     const recentEventsMapped = (recentEvents ?? []).map((e) => {
       const client = clientsMap[e.client_id];
       const clientName =
-        client?.name ?? client?.company_name ?? client?.email ?? `Client ${e.client_id}`;
+        client?.company_name ?? client?.email ?? `Client ${e.client_id}`;
       return {
         client_id: e.client_id,
         client_name: clientName,

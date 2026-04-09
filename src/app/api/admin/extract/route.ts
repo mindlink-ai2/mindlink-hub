@@ -304,7 +304,7 @@ export async function POST(request: Request) {
   // Récupérer les infos client (nom, prénom, entreprise)
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id, email, name, company_name")
+    .select("id, email, company_name")
     .eq("id", orgId)
     .single();
 
@@ -388,13 +388,11 @@ export async function POST(request: Request) {
     const creds = getGoogleCredentials();
     const token = await getGoogleAccessToken(creds.client_email, creds.private_key);
 
-    const clientName = (clientRow as Record<string, unknown>).name as string | null;
     const company = (clientRow as Record<string, unknown>).company_name as string | null;
     const email = clientRow.email as string | null;
 
     const sheetTitle = [
-      clientName ?? email ?? `Client ${org_id}`,
-      company,
+      company ?? email ?? `Client ${org_id}`,
     ]
       .filter(Boolean)
       .join(" — ");

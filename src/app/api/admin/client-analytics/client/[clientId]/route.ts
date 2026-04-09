@@ -78,12 +78,11 @@ export async function GET(
     // Client info
     const { data: clientData } = await supabase
       .from("clients")
-      .select("id, email, name, company_name")
+      .select("id, email, company_name")
       .eq("id", clientId)
       .maybeSingle();
 
     const clientName =
-      clientData?.name ??
       clientData?.company_name ??
       clientData?.email ??
       `Client ${clientId}`;
