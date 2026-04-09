@@ -643,7 +643,7 @@ export async function POST(request: Request) {
   // ── Récupérer les infos client ────────────────────────────────────────────
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id, name, company_name, quota")
+    .select("id, company_name, quota")
     .eq("id", org_id)
     .single();
 
@@ -663,7 +663,7 @@ export async function POST(request: Request) {
     console.warn(`[create-workflow] No unipile_account_id found for org_id=${org_id}`);
   }
 
-  const clientName = [clientRow.name].filter(Boolean).join(" ") || `Client ${org_id}`;
+  const clientName = (clientRow.company_name as string | null) || `Client ${org_id}`;
   const companyName = (clientRow.company_name as string | null) ?? "";
   const quotaPerDay = Number(clientRow.quota) || 10;
   const startDate = getTomorrowDate();

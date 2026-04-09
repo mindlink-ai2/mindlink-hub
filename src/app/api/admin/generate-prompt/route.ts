@@ -175,7 +175,7 @@ export async function POST(request: Request) {
 
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id, name, company_name")
+    .select("id, company_name")
     .eq("id", org_id)
     .single();
 
@@ -208,8 +208,7 @@ export async function POST(request: Request) {
     : (questionnaire.q4_company_sizes as string) || "";
 
   const userMessage = [
-    `Nom du client : ${clientRow.name ?? "Inconnu"}`,
-    `Entreprise : ${clientRow.company_name ?? "Inconnue"}`,
+    `Entreprise : ${(clientRow.company_name as string | null) ?? "Inconnue"}`,
     commercialPromise ? `Promesse commerciale : ${commercialPromise}` : null,
     questionnaire.q1_titles ? `Postes ciblés : ${questionnaire.q1_titles}` : null,
     questionnaire.q2_exclusions ? `Postes à exclure : ${questionnaire.q2_exclusions}` : null,
