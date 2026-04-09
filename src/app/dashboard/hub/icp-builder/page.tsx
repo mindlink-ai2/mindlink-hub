@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowLeft,
@@ -277,6 +278,8 @@ function SummaryItem({
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 export default function IcpBuilderPage() {
+  const router = useRouter();
+
   const [answers, setAnswers] = useState<QuestionnaireAnswers>(emptyAnswers);
   const [currentStep, setCurrentStep] = useState(0);
   const [editingFromSummary, setEditingFromSummary] = useState(false);
@@ -288,6 +291,8 @@ export default function IcpBuilderPage() {
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
   const [loadingCredits, setLoadingCredits] = useState(true);
   const [icpStatus, setIcpStatus] = useState<IcpStatus>("none");
+  // true si le client arrive depuis le wizard d'onboarding (step 2 non complété)
+  const [onboardingPending, setOnboardingPending] = useState(false);
 
   const [generatingFilters, setGeneratingFilters] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -296,14 +301,15 @@ export default function IcpBuilderPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Charger la config existante + crédits au montage
+  // Charger la config existante + crédits + statut onboarding au montage
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const [configRes, creditsRes] = await Promise.all([
+        const [configRes, creditsRes, onboardingRes] = await Promise.all([
           fetch("/api/icp/config"),
           fetch("/api/icp/credits"),
+          fetch("/api/onboarding/status", { cache: "no-store" }),
         ]);
         if (!mounted) return;
 
@@ -329,6 +335,15 @@ export default function IcpBuilderPage() {
         if (creditsRes.ok) {
           const creditsData = await creditsRes.json();
           setCreditsRemaining(creditsData.credits_remaining ?? null);
+        }
+
+        if (onboardingRes.ok) {
+          const onboardingData = await onboardingRes.json();
+          // Onboarding en cours si LinkedIn connecté mais pas encore complété
+          const isPending =
+            onboardingData.state === "linkedin_connected" &&
+            onboardingData.completed !== true;
+          if (mounted) setOnboardingPending(isPending);
         }
       } catch {
         // silencieux
@@ -513,7 +528,13 @@ export default function IcpBuilderPage() {
         setSubmitError(data.error ?? "Erreur lors de la validation.");
       } else {
         setIcpStatus("submitted");
-        setScreen("submitted");
+        if (onboardingPending) {
+          // Valider le step 2 de l'onboarding et rediriger vers le dashboard
+          await fetch("/api/onboarding/complete", { method: "POST" }).catch(() => null);
+          router.replace("/");
+        } else {
+          setScreen("submitted");
+        }
       }
     } catch {
       setSubmitError("Impossible de valider. Veuillez réessayer.");
