@@ -71,7 +71,10 @@ function parseIsoDate(value: string | null): number | null {
 function isMissingColumnError(error: unknown, columnName: string): boolean {
   if (!error || typeof error !== "object") return false;
   const pgError = error as PostgrestErrorLike;
-  if (String(pgError.code ?? "") !== "42703") return false;
+  const code = String(pgError.code ?? "");
+  // 42703 = PostgreSQL "column does not exist"
+  // PGRST204 = PostgREST schema cache miss (column unknown to PostgREST)
+  if (code !== "42703" && code !== "PGRST204") return false;
   const details = `${pgError.message ?? ""} ${pgError.details ?? ""} ${pgError.hint ?? ""}`
     .toLowerCase();
   return details.includes(columnName.toLowerCase());
