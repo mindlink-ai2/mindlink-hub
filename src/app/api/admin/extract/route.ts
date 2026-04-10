@@ -106,6 +106,37 @@ async function apolloFetchPage(
   return { people, total };
 }
 
+async function apolloBulkMatch(
+  ids: string[],
+  apiKey: string
+): Promise<ApolloPersonRaw[]> {
+  const res = await fetch("https://api.apollo.io/api/v1/people/bulk_match", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Api-Key": apiKey,
+    },
+    body: JSON.stringify({
+      details: ids.map((id) => ({ id })),
+      reveal_personal_emails: true,
+      reveal_phone_number: true,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Apollo bulk_match HTTP ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const matches = Array.isArray(data.matches)
+    ? data.matches
+    : Array.isArray(data.people)
+    ? data.people
+    : [];
+  return (matches as (ApolloPersonRaw | null)[]).filter(Boolean) as ApolloPersonRaw[];
+}
+
 // ── Helpers Google Sheets (googleapis SDK) ───────────────────────────────────
 
 function getGoogleAuth() {
@@ -121,41 +152,71 @@ function getGoogleAuth() {
   });
 }
 
-// ── Formater un profil Apollo en ligne de sheet ────────────────────────────────
+// ── Formater un profil Apollo enrichi en ligne de sheet ───────────────────────
 
 function formatPersonRow(p: ApolloPersonRaw): string[] {
-  const org = p.organization as Record<string, unknown> | null ?? {};
-  const getStr = (v: unknown) => (typeof v === "string" ? v : String(v ?? ""));
-  const numStr = (v: unknown) =>
-    typeof v === "number" ? v.toString() : "";
+  const org = (p.organization as Record<string, unknown> | null) ?? {};
+  const getStr = (v: unknown) =>
+    typeof v === "string" ? v : v != null ? String(v) : "";
+  const joinArr = (v: unknown) =>
+    Array.isArray(v) ? (v as unknown[]).map(getStr).join(", ") : "";
+
+  // Phone numbers from enriched phone_numbers array
+  const phoneNumbers = Array.isArray(p.phone_numbers)
+    ? (p.phone_numbers as Record<string, unknown>[])
+    : [];
+  const getPhone = (type: string) => {
+    const found = phoneNumbers.find((ph) => ph.type === type);
+    return found ? getStr(found.sanitized_number ?? found.raw_number) : "";
+  };
+
+  // Technologies: can be array of strings or objects with .name
+  const techs = Array.isArray(p.technologies)
+    ? (p.technologies as unknown[]).map((t) =>
+        typeof t === "string" ? t : getStr((t as Record<string, unknown>)?.name ?? t)
+      )
+    : [];
 
   return [
     getStr(p.first_name),
     getStr(p.last_name),
     getStr(p.title),
     getStr(org.name),
-    getStr(org.industry),
-    numStr(org.estimated_num_employees),
-    [p.city, p.state, p.country].filter(Boolean).map(getStr).join(", "),
     getStr(p.email),
-    getStr(p.phone_number ?? p.sanitized_phone),
+    getStr(p.email_status),
+    getStr(p.seniority),
+    joinArr(p.departments),
+    getStr(p.work_direct_phone) || getPhone("work_direct_phone"),
+    getStr(p.mobile_phone) || getPhone("mobile"),
+    getPhone("corporate") || getStr(org.phone),
+    getStr(org.estimated_num_employees),
+    getStr(org.industry),
+    joinArr(p.keywords),
     getStr(p.linkedin_url),
-    getStr(org.primary_domain),
+    getStr(org.website_url ?? org.primary_domain),
+    getStr(org.linkedin_url),
+    getStr(p.city),
+    getStr(p.state),
+    getStr(p.country),
+    getStr(org.city),
+    getStr(org.state),
+    getStr(org.country),
+    getStr(org.phone),
+    techs.join(", "),
+    getStr(org.annual_revenue),
+    getStr(p.id),
+    getStr(p.account_id ?? (org as Record<string, unknown>).id),
   ];
 }
 
 const SHEET_HEADERS = [
-  "Prénom",
-  "Nom",
-  "Titre",
-  "Entreprise",
-  "Secteur",
-  "Taille entreprise",
-  "Localisation",
-  "Email",
-  "Téléphone",
-  "LinkedIn URL",
-  "Domaine",
+  "First Name", "Last Name", "Title", "Company Name", "Email",
+  "Email Status", "Seniority", "Departments", "Work Direct Phone",
+  "Mobile Phone", "Corporate Phone", "# Employees", "Industry",
+  "Keywords", "Person Linkedin Url", "Website", "Company Linkedin Url",
+  "City", "State", "Country", "Company City", "Company State",
+  "Company Country", "Company Phone", "Technologies", "Annual Revenue",
+  "Apollo Contact Id", "Apollo Account Id",
 ];
 
 // ── Handler principal ─────────────────────────────────────────────────────────
@@ -261,6 +322,35 @@ export async function POST(request: Request) {
 
   const finalPeople = allPeople.slice(0, quota);
 
+  // ── Phase 2 : Enrichissement via people/bulk_match ────────────────────────
+  const BATCH_SIZE = 10;
+  const enrichedPeople: ApolloPersonRaw[] = [];
+  let totalEnriched = 0;
+
+  for (let i = 0; i < finalPeople.length; i += BATCH_SIZE) {
+    const batch = finalPeople.slice(i, i + BATCH_SIZE);
+    const batchIds = batch.map((p) => p.id as string).filter(Boolean);
+    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+
+    if (batchIds.length === 0) {
+      enrichedPeople.push(...batch);
+      continue;
+    }
+
+    try {
+      const enriched = await apolloBulkMatch(batchIds, apolloKey);
+      enrichedPeople.push(...enriched);
+      totalEnriched += enriched.length;
+      console.log(`[extract] Batch ${batchNum}: enriched ${enriched.length}/${batchIds.length}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[extract] Batch ${batchNum} enrichment failed — using raw data:`, msg);
+      enrichedPeople.push(...batch);
+    }
+  }
+
+  console.log(`[extract] Enrichissement terminé: ${totalEnriched}/${finalPeople.length} leads enrichis`);
+
   // ── Écrire dans le sheet maître (un onglet par extraction) ───────────────
   const MASTER_SHEET_ID = process.env.GOOGLE_MASTER_SHEET_ID;
   if (!MASTER_SHEET_ID) {
@@ -295,7 +385,7 @@ export async function POST(request: Request) {
     console.log("[extract] Tab created, gid:", newSheetId);
 
     // Écrire les données dans le nouvel onglet
-    const rows = [SHEET_HEADERS, ...finalPeople.map(formatPersonRow)];
+    const rows = [SHEET_HEADERS, ...enrichedPeople.map(formatPersonRow)];
     console.log("[extract] Writing", rows.length - 1, "rows to tab:", tabName);
     await sheets.spreadsheets.values.update({
       spreadsheetId: MASTER_SHEET_ID,
@@ -319,7 +409,7 @@ export async function POST(request: Request) {
     .from("extraction_logs")
     .update({
       status: "completed",
-      leads_count: finalPeople.length,
+      leads_count: enrichedPeople.length,
       google_sheet_url: sheetUrl,
       google_sheet_id: MASTER_SHEET_ID,
       completed_at: new Date().toISOString(),
@@ -328,7 +418,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     success: true,
-    leads_count: finalPeople.length,
+    leads_count: enrichedPeople.length,
     google_sheet_url: sheetUrl,
     google_sheet_id: MASTER_SHEET_ID,
     tab_name: tabName,
