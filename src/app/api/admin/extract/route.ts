@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
 import { createServiceSupabase } from "@/lib/inbox-server";
+import { google } from "googleapis";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // Vercel Pro: jusqu'à 300s pour les extractions longues
@@ -105,142 +106,22 @@ async function apolloFetchPage(
   return { people, total };
 }
 
-// ── Helpers Google Sheets ─────────────────────────────────────────────────────
+// ── Helpers Google Sheets (googleapis SDK) ───────────────────────────────────
 
-function getGoogleCredentials(): {
-  client_email: string;
-  private_key: string;
-} {
+function getGoogleAuth() {
   const raw = process.env.GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY;
   if (!raw) throw new Error("GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY non défini");
-  const parsed = JSON.parse(raw) as { client_email: string; private_key: string };
-  // Vercel encode les sauts de ligne en \\n dans les variables d'env — on les restaure
-  parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
-  return parsed;
-}
-
-async function getGoogleAccessToken(
-  clientEmail: string,
-  privateKey: string
-): Promise<string> {
-  // JWT pour Service Account Google
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "RS256", typ: "JWT" };
-  const claim = {
-    iss: clientEmail,
-    scope: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive",
-    aud: "https://oauth2.googleapis.com/token",
-    exp: now + 3600,
-    iat: now,
-  };
-
-  const encode = (obj: unknown) =>
-    Buffer.from(JSON.stringify(obj)).toString("base64url");
-
-  const signingInput = `${encode(header)}.${encode(claim)}`;
-
-  // Signer avec la clé privée RSA
-  const { createSign } = await import("crypto");
-  const sign = createSign("RSA-SHA256");
-  sign.update(signingInput);
-  const signature = sign.sign(privateKey, "base64url");
-
-  const jwt = `${signingInput}.${signature}`;
-
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: jwt,
-    }),
+  const credentials = JSON.parse(raw) as Record<string, string>;
+  // Vercel encode les sauts de ligne en \\n — on les restaure
+  credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
+  console.log("[extract] SA email:", credentials.client_email);
+  return new google.auth.GoogleAuth({
+    credentials,
+    scopes: [
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/drive",
+    ],
   });
-
-  if (!tokenRes.ok) {
-    const err = await tokenRes.text().catch(() => "");
-    console.error("[extract] Google OAuth failed:", tokenRes.status, err.slice(0, 300));
-    throw new Error(`Google OAuth error: ${err}`);
-  }
-
-  const tokenData = await tokenRes.json();
-  return tokenData.access_token as string;
-}
-
-async function createSpreadsheet(
-  accessToken: string,
-  title: string
-): Promise<{ spreadsheetId: string; url: string }> {
-  const sheetsApiUrl = "https://sheets.googleapis.com/v4/spreadsheets";
-  const authHeader = `Bearer ${accessToken}`;
-  console.log("[createSpreadsheet] URL:", sheetsApiUrl);
-  console.log("[createSpreadsheet] Authorization header (first 20):", authHeader.slice(0, 20));
-  console.log("[createSpreadsheet] Token length:", accessToken.length);
-
-  const res = await fetch(sheetsApiUrl, {
-    method: "POST",
-    headers: {
-      Authorization: authHeader,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ properties: { title } }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text().catch(() => "");
-    console.error("[createSpreadsheet] Error body:", err.slice(0, 600));
-    throw new Error(`Sheets create error ${res.status}: ${err.slice(0, 400)}`);
-  }
-
-  const data = await res.json();
-  const spreadsheetId = data.spreadsheetId as string;
-  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
-  return { spreadsheetId, url };
-}
-
-async function writeSheetData(
-  accessToken: string,
-  spreadsheetId: string,
-  rows: string[][]
-): Promise<void> {
-  const res = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Leads!A1:append?valueInputOption=RAW`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ values: rows }),
-    }
-  );
-
-  if (!res.ok) {
-    const err = await res.text().catch(() => "");
-    throw new Error(`Sheets write error ${res.status}: ${err.slice(0, 400)}`);
-  }
-}
-
-async function shareSheet(
-  accessToken: string,
-  spreadsheetId: string,
-  email: string
-): Promise<void> {
-  await fetch(
-    `https://www.googleapis.com/drive/v3/files/${spreadsheetId}/permissions`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        role: "writer",
-        type: "user",
-        emailAddress: email,
-      }),
-    }
-  );
-  // Non bloquant si ça échoue
 }
 
 // ── Formater un profil Apollo en ligne de sheet ────────────────────────────────
@@ -388,38 +269,43 @@ export async function POST(request: Request) {
   let sheetUrl: string;
 
   try {
-    const creds = getGoogleCredentials();
-    console.log("[extract] SA email:", creds.client_email, "| key starts:", creds.private_key.slice(0, 40));
-    const token = await getGoogleAccessToken(creds.client_email, creds.private_key);
-    console.log("[extract] Google token obtained, length:", token.length);
+    const auth = getGoogleAuth();
+    const sheets = google.sheets({ version: "v4", auth });
+    const drive = google.drive({ version: "v3", auth });
 
     const company = (clientRow as Record<string, unknown>).company_name as string | null;
-    const email = clientRow.email as string | null;
-
-    const sheetTitle = [
-      company ?? email ?? `Client ${org_id}`,
-    ]
-      .filter(Boolean)
-      .join(" — ");
+    const clientEmail = clientRow.email as string | null;
+    const sheetTitle = company ?? clientEmail ?? `Client ${org_id}`;
 
     console.log("[extract] Creating spreadsheet:", sheetTitle);
-    const created = await createSpreadsheet(token, sheetTitle);
-    spreadsheetId = created.spreadsheetId;
-    sheetUrl = created.url;
+    const createRes = await sheets.spreadsheets.create({
+      requestBody: { properties: { title: sheetTitle } },
+    });
+    spreadsheetId = createRes.data.spreadsheetId!;
+    sheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
     console.log("[extract] Spreadsheet created:", spreadsheetId);
 
     // Écrire les données
-    const rows = [
-      SHEET_HEADERS,
-      ...finalPeople.map(formatPersonRow),
-    ];
+    const rows = [SHEET_HEADERS, ...finalPeople.map(formatPersonRow)];
     console.log("[extract] Writing", rows.length - 1, "rows to sheet");
-    await writeSheetData(token, spreadsheetId, rows);
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: "A1",
+      valueInputOption: "RAW",
+      requestBody: { values: rows },
+    });
     console.log("[extract] Sheet data written");
 
     // Partager avec l'adresse Lidmeo
     console.log("[extract] Sharing sheet with contact@lidmeo.com");
-    await shareSheet(token, spreadsheetId, "contact@lidmeo.com");
+    await drive.permissions.create({
+      fileId: spreadsheetId,
+      requestBody: {
+        type: "user",
+        role: "writer",
+        emailAddress: "contact@lidmeo.com",
+      },
+    });
     console.log("[extract] Sheet shared");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
