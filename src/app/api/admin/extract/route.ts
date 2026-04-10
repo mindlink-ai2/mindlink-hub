@@ -351,7 +351,7 @@ export async function POST(request: Request) {
 
   console.log(`[extract] Enrichissement terminé: ${totalEnriched}/${finalPeople.length} leads enrichis`);
 
-  // ── Écrire dans le sheet maître (un onglet par extraction) ───────────────
+  // ── Écrire dans le sheet maître (un onglet par client, avec append si existant) ──
   const MASTER_SHEET_ID = process.env.GOOGLE_MASTER_SHEET_ID;
   if (!MASTER_SHEET_ID) {
     return NextResponse.json({ error: "GOOGLE_MASTER_SHEET_ID non configurée" }, { status: 500 });
@@ -366,34 +366,53 @@ export async function POST(request: Request) {
 
     const company = (clientRow as Record<string, unknown>).company_name as string | null;
     const clientEmail = clientRow.email as string | null;
-    const baseLabel = company ?? clientEmail ?? `Client ${org_id}`;
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    // Les noms d'onglets Google Sheets : max 100 chars, pas de \ / ? * [ ] :
-    tabName = `${baseLabel} — ${today}`
+    // Tab name = company name (1 onglet permanent par client, sans date)
+    tabName = (company ?? clientEmail ?? `Client ${org_id}`)
       .replace(/[\\/?*[\]:]/g, "-")
       .slice(0, 100);
 
-    console.log("[extract] Adding tab:", tabName, "to master sheet:", MASTER_SHEET_ID);
-    const batchRes = await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: MASTER_SHEET_ID,
-      requestBody: {
-        requests: [{ addSheet: { properties: { title: tabName } } }],
-      },
-    });
-    const newSheetId = batchRes.data.replies![0].addSheet!.properties!.sheetId!;
-    sheetUrl = `https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}/edit#gid=${newSheetId}`;
-    console.log("[extract] Tab created, gid:", newSheetId);
+    // Vérifier si l'onglet existe déjà dans le master sheet
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: MASTER_SHEET_ID });
+    const existingTab = (spreadsheet.data.sheets ?? []).find(
+      (s) => s.properties?.title === tabName
+    );
 
-    // Écrire les données dans le nouvel onglet
-    const rows = [SHEET_HEADERS, ...enrichedPeople.map(formatPersonRow)];
-    console.log("[extract] Writing", rows.length - 1, "rows to tab:", tabName);
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: MASTER_SHEET_ID,
-      range: `'${tabName}'!A1`,
-      valueInputOption: "RAW",
-      requestBody: { values: rows },
-    });
-    console.log("[extract] Sheet data written");
+    const dataRows = enrichedPeople.map(formatPersonRow);
+    console.log("[extract] Tab:", tabName, "| existing:", !!existingTab, "| leads:", dataRows.length);
+
+    if (!existingTab) {
+      // Créer l'onglet et écrire headers + données
+      const batchRes = await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: MASTER_SHEET_ID,
+        requestBody: {
+          requests: [{ addSheet: { properties: { title: tabName } } }],
+        },
+      });
+      const newSheetId = batchRes.data.replies![0].addSheet!.properties!.sheetId!;
+      sheetUrl = `https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}/edit#gid=${newSheetId}`;
+      console.log("[extract] Tab created, gid:", newSheetId);
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: MASTER_SHEET_ID,
+        range: `'${tabName}'!A1`,
+        valueInputOption: "RAW",
+        requestBody: { values: [SHEET_HEADERS, ...dataRows] },
+      });
+      console.log("[extract] Headers + data written");
+    } else {
+      // Onglet existant : appendre les nouvelles lignes à la suite
+      const gid = existingTab.properties!.sheetId!;
+      sheetUrl = `https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}/edit#gid=${gid}`;
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: MASTER_SHEET_ID,
+        range: `'${tabName}'!A:A`,
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values: dataRows },
+      });
+      console.log("[extract] Leads appended to existing tab");
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[extract] Google Sheets step failed:", msg);
