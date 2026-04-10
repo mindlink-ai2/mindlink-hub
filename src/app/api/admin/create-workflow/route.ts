@@ -30,6 +30,7 @@ function buildWorkflowJson(params: {
   quotaPerDay: number;
   startDate: string;
   googleSheetId: string;
+  tabName: string;
   clientId: number;
   unipileAccountId: string;
   promptSystems: string;
@@ -45,6 +46,7 @@ function buildWorkflowJson(params: {
     .replace(/\{\{QUOTA_PER_DAY\}\}/g, String(params.quotaPerDay))
     .replace(/\{\{START_DATE\}\}/g, jsonEscape(params.startDate))
     .replace(/\{\{GOOGLE_SHEET_ID\}\}/g, jsonEscape(params.googleSheetId))
+    .replace(/\{\{TAB_NAME\}\}/g, jsonEscape(params.tabName))
     .replace(/\{\{CLIENT_ID\}\}/g, String(params.clientId))
     .replace(/\{\{UNIPILE_ACCOUNT_ID\}\}/g, jsonEscape(params.unipileAccountId))
     .replace(/\{\{PROMPT_SYSTEME\}\}/g, jsonEscape(params.promptSystems));
@@ -135,9 +137,8 @@ function getWorkflowTemplate(): Record<string, unknown> {
           documentId: { __rl: true, value: "{{GOOGLE_SHEET_ID}}", mode: "id" },
           sheetName: {
             __rl: true,
-            value: "gid=0",
-            mode: "list",
-            cachedResultName: "Feuille 1",
+            value: "{{TAB_NAME}}",
+            mode: "name",
           },
           options: {},
         },
@@ -615,6 +616,7 @@ export async function POST(request: Request) {
     org_id: number;
     prompt_systeme: string;
     google_sheet_id: string;
+    tab_name: string;
     extraction_log_id?: string;
   };
   try {
@@ -623,10 +625,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Corps de requête invalide" }, { status: 400 });
   }
 
-  const { org_id, prompt_systeme, google_sheet_id, extraction_log_id } = body;
-  if (!org_id || !prompt_systeme || !google_sheet_id) {
+  const { org_id, prompt_systeme, google_sheet_id, tab_name, extraction_log_id } = body;
+  if (!org_id || !prompt_systeme || !google_sheet_id || !tab_name) {
     return NextResponse.json(
-      { error: "org_id, prompt_systeme et google_sheet_id sont requis" },
+      { error: "org_id, prompt_systeme, google_sheet_id et tab_name sont requis" },
       { status: 400 }
     );
   }
@@ -705,6 +707,7 @@ export async function POST(request: Request) {
       quotaPerDay,
       startDate,
       googleSheetId: google_sheet_id,
+      tabName: tab_name,
       clientId: clientRow.id as number,
       unipileAccountId,
       promptSystems: prompt_systeme,

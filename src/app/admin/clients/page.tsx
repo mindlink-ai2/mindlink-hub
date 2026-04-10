@@ -228,6 +228,7 @@ function IcpModal({
 type ExtractionData = {
   sheetUrl: string;
   sheetId: string;
+  tabName: string;
   leadsCount: number;
   logId: string;
 };
@@ -303,6 +304,7 @@ function ExtractModal({
       setExtractionData({
         sheetUrl: data.google_sheet_url ?? "",
         sheetId: data.google_sheet_id ?? "",
+        tabName: data.tab_name ?? "",
         leadsCount: data.leads_count ?? 0,
         logId: data.extraction_log_id ?? "",
       });
@@ -386,6 +388,7 @@ function ExtractModal({
           org_id: client.id,
           prompt_systeme: generatedPrompt,
           google_sheet_id: extractionData.sheetId,
+          tab_name: extractionData.tabName,
           extraction_log_id: extractionData.logId,
         }),
       });

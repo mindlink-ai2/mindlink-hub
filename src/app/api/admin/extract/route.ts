@@ -117,10 +117,7 @@ function getGoogleAuth() {
   console.log("[extract] SA email:", credentials.client_email);
   return new google.auth.GoogleAuth({
     credentials,
-    scopes: [
-      "https://www.googleapis.com/auth/spreadsheets",
-      "https://www.googleapis.com/auth/drive",
-    ],
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 }
 
@@ -264,49 +261,49 @@ export async function POST(request: Request) {
 
   const finalPeople = allPeople.slice(0, quota);
 
-  // ── Créer le Google Sheet ──────────────────────────────────────────────────
-  let spreadsheetId: string;
+  // ── Écrire dans le sheet maître (un onglet par extraction) ───────────────
+  const MASTER_SHEET_ID = process.env.GOOGLE_MASTER_SHEET_ID;
+  if (!MASTER_SHEET_ID) {
+    return NextResponse.json({ error: "GOOGLE_MASTER_SHEET_ID non configurée" }, { status: 500 });
+  }
+
   let sheetUrl: string;
+  let tabName: string;
 
   try {
     const auth = getGoogleAuth();
     const sheets = google.sheets({ version: "v4", auth });
-    const drive = google.drive({ version: "v3", auth });
 
     const company = (clientRow as Record<string, unknown>).company_name as string | null;
     const clientEmail = clientRow.email as string | null;
-    const sheetTitle = company ?? clientEmail ?? `Client ${org_id}`;
+    const baseLabel = company ?? clientEmail ?? `Client ${org_id}`;
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    // Les noms d'onglets Google Sheets : max 100 chars, pas de \ / ? * [ ] :
+    tabName = `${baseLabel} — ${today}`
+      .replace(/[\\/?*[\]:]/g, "-")
+      .slice(0, 100);
 
-    console.log("[extract] Creating spreadsheet:", sheetTitle);
-    const createRes = await sheets.spreadsheets.create({
-      requestBody: { properties: { title: sheetTitle } },
+    console.log("[extract] Adding tab:", tabName, "to master sheet:", MASTER_SHEET_ID);
+    const batchRes = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: MASTER_SHEET_ID,
+      requestBody: {
+        requests: [{ addSheet: { properties: { title: tabName } } }],
+      },
     });
-    spreadsheetId = createRes.data.spreadsheetId!;
-    sheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
-    console.log("[extract] Spreadsheet created:", spreadsheetId);
+    const newSheetId = batchRes.data.replies![0].addSheet!.properties!.sheetId!;
+    sheetUrl = `https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}/edit#gid=${newSheetId}`;
+    console.log("[extract] Tab created, gid:", newSheetId);
 
-    // Écrire les données
+    // Écrire les données dans le nouvel onglet
     const rows = [SHEET_HEADERS, ...finalPeople.map(formatPersonRow)];
-    console.log("[extract] Writing", rows.length - 1, "rows to sheet");
+    console.log("[extract] Writing", rows.length - 1, "rows to tab:", tabName);
     await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: "A1",
+      spreadsheetId: MASTER_SHEET_ID,
+      range: `'${tabName}'!A1`,
       valueInputOption: "RAW",
       requestBody: { values: rows },
     });
     console.log("[extract] Sheet data written");
-
-    // Partager avec l'adresse Lidmeo
-    console.log("[extract] Sharing sheet with contact@lidmeo.com");
-    await drive.permissions.create({
-      fileId: spreadsheetId,
-      requestBody: {
-        type: "user",
-        role: "writer",
-        emailAddress: "contact@lidmeo.com",
-      },
-    });
-    console.log("[extract] Sheet shared");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[extract] Google Sheets step failed:", msg);
@@ -324,7 +321,7 @@ export async function POST(request: Request) {
       status: "completed",
       leads_count: finalPeople.length,
       google_sheet_url: sheetUrl,
-      google_sheet_id: spreadsheetId,
+      google_sheet_id: MASTER_SHEET_ID,
       completed_at: new Date().toISOString(),
     })
     .eq("id", logId);
@@ -333,7 +330,8 @@ export async function POST(request: Request) {
     success: true,
     leads_count: finalPeople.length,
     google_sheet_url: sheetUrl,
-    google_sheet_id: spreadsheetId,
+    google_sheet_id: MASTER_SHEET_ID,
+    tab_name: tabName,
     extraction_log_id: logId,
   });
 }
