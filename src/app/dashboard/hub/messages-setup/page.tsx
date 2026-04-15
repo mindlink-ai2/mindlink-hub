@@ -10,7 +10,6 @@ import {
   MessageSquare,
   Pencil,
   Send,
-  Sparkles,
 } from "lucide-react";
 import { HubButton } from "@/components/ui/hub-button";
 import { cn } from "@/lib/utils";
@@ -33,8 +32,10 @@ type Screen = "loading" | "existing" | "chat" | "saved";
 
 type MessageKind = "linkedin" | "relance";
 
+const ASSISTANT_NAME = "Assistant Lidmeo";
+
 const WELCOME_MESSAGE =
-  "Bonjour ! Je vais t'aider à créer tes messages de prospection LinkedIn. Je vais te poser 6 questions pour bien comprendre ton offre, puis on construit ensemble ton message LinkedIn, puis ta relance. C'est parti ?";
+  "Bonjour ! Je suis l'Assistant Lidmeo. Je vais t'aider à créer tes messages de prospection LinkedIn. Je vais te poser 6 questions pour bien comprendre ton offre, puis on construit ensemble ton message LinkedIn, puis ta relance. C'est parti ?";
 
 function extractTag(raw: string, tag: string): string {
   const re = new RegExp(`\\[${tag}\\]([\\s\\S]*?)\\[/${tag}\\]`, "i");
@@ -50,10 +51,17 @@ function stripTags(raw: string): string {
     .trim();
 }
 
-function AiAvatar() {
+function AssistantAvatar() {
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#2563EB] to-[#1d4ed8] text-white shadow-sm">
-      <Sparkles className="h-4 w-4" />
+    <div
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[#1f5eff] text-[10px] font-bold tracking-tight text-white shadow-[0_10px_18px_-12px_rgba(31,94,255,0.9)]"
+      style={{
+        background: "linear-gradient(135deg, #1f5eff 0%, #2f70ff 55%, #1254ec 100%)",
+      }}
+      aria-label="Assistant Lidmeo"
+      title="Assistant Lidmeo"
+    >
+      LM
     </div>
   );
 }
@@ -93,7 +101,7 @@ function MessageRow({
 
   return (
     <div className="flex items-start gap-2.5">
-      <AiAvatar />
+      <AssistantAvatar />
       <div className="flex max-w-[85%] flex-col gap-2">
         {preamble ? (
           <div className="rounded-2xl rounded-tl-sm border border-[#e1e8f5] bg-white px-4 py-2.5 text-sm text-[#0b1c33] shadow-sm whitespace-pre-wrap">
@@ -410,7 +418,7 @@ export default function MessagesSetupPage() {
               Configuration de vos messages
             </h1>
             <p className="mt-0.5 text-sm text-[#51627b]">
-              Un échange avec l&apos;IA pour créer vos messages de prospection.
+              Un échange avec l&apos;Assistant Lidmeo pour créer vos messages de prospection.
             </p>
           </div>
           {screen === "existing" && (
@@ -489,11 +497,11 @@ export default function MessagesSetupPage() {
             ))}
             {sending && (
               <div className="flex items-start gap-2.5">
-                <AiAvatar />
+                <AssistantAvatar />
                 <div className="rounded-2xl rounded-tl-sm border border-[#e1e8f5] bg-white px-4 py-3 text-sm text-[#51627b] shadow-sm">
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    L&apos;IA rédige…
+                    {ASSISTANT_NAME} rédige…
                   </span>
                 </div>
               </div>
