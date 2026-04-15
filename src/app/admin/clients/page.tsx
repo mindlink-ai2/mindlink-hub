@@ -9,8 +9,10 @@ import {
   ExternalLink,
   Eye,
   Loader2,
+  MessageSquare,
   Play,
   RefreshCw,
+  Save,
   X,
 } from "lucide-react";
 import { HubButton } from "@/components/ui/hub-button";
@@ -266,10 +268,11 @@ function ExtractModal({
   const [renewalLoading, setRenewalLoading] = useState(false);
   const [renewalError, setRenewalError] = useState<string | null>(null);
 
-  // ── Phase 2 — Génération du prompt (nouveau workflow) ───────────────────
+  // ── Phase 2 — Prompt client (chargé depuis client_messages) ─────────────
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [promptLoading, setPromptLoading] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
+  const [promptLoaded, setPromptLoaded] = useState(false);
 
   // ── Phase 3 — Création du workflow ──────────────────────────────────────
   const [workflowResult, setWorkflowResult] = useState<WorkflowResult | null>(null);
@@ -353,27 +356,49 @@ function ExtractModal({
     }
   };
 
-  const handleGeneratePrompt = async () => {
+  // Charge le prompt système que le client a validé via le chat.
+  // Si absent, fallback sur la génération serveur classique (legacy).
+  const loadClientPrompt = useCallback(async () => {
     setPromptLoading(true);
     setPromptError(null);
     try {
-      const res = await fetch("/api/admin/generate-prompt", {
+      const res = await fetch(`/api/admin/messages/${client.id}`);
+      const data = await res.json();
+      if (res.ok && data?.messages?.system_prompt) {
+        setGeneratedPrompt(data.messages.system_prompt);
+        setPromptLoaded(true);
+        return;
+      }
+      // Fallback : aucun prompt stocké → on le génère à la volée.
+      const genRes = await fetch("/api/admin/generate-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ org_id: client.id }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setPromptError(data.error ?? "Erreur lors de la génération du prompt.");
+      const genData = await genRes.json();
+      if (!genRes.ok) {
+        setPromptError(
+          genData.error ??
+            "Le client n'a pas encore validé ses messages et la génération automatique a échoué."
+        );
         return;
       }
-      setGeneratedPrompt(data.prompt ?? "");
+      setGeneratedPrompt(genData.prompt ?? "");
+      setPromptLoaded(true);
     } catch {
-      setPromptError("Impossible de générer le prompt. Réessayez.");
+      setPromptError("Impossible de charger le prompt. Réessayez.");
     } finally {
       setPromptLoading(false);
     }
-  };
+  }, [client.id]);
+
+  // Auto-charge le prompt dès qu'on entre en phase 2 en mode création.
+  useEffect(() => {
+    if (phase !== 2) return;
+    if (flowMode === "renewal") return;
+    if (promptLoaded || promptLoading) return;
+    void loadClientPrompt();
+  }, [phase, flowMode, promptLoaded, promptLoading, loadClientPrompt]);
 
   const handleCreateWorkflow = async () => {
     if (!extractionData) return;
@@ -611,45 +636,45 @@ function ExtractModal({
               {/* ── Nouveau workflow ou workflow supprimé → flow complet ── */}
               {!isRenewal && (
                 <>
-                  {/* Génération du prompt */}
-                  {!generatedPrompt && (
+                  {flowMode === "renewal-new" && (
+                    <div className="rounded-xl border border-[#fff3e0] bg-[#fffbf2] px-4 py-3 flex items-start gap-2 text-sm text-[#92400e]">
+                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                      Le workflow n8n n&apos;existe plus. Un nouveau workflow va être créé.
+                    </div>
+                  )}
+
+                  {/* Chargement du prompt pré-validé par le client */}
+                  {promptLoading && !generatedPrompt && (
+                    <div className="flex items-center gap-2 rounded-xl border border-[#e8f0fe] bg-[#f4f8ff] px-4 py-3 text-sm text-[#1f5eff]">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Chargement du prompt validé par le client…
+                    </div>
+                  )}
+
+                  {!promptLoading && !generatedPrompt && promptError && (
                     <>
-                      {flowMode === "renewal-new" && (
-                        <div className="rounded-xl border border-[#fff3e0] bg-[#fffbf2] px-4 py-3 flex items-start gap-2 text-sm text-[#92400e]">
-                          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                          Le workflow n8n n&apos;existe plus. Un nouveau workflow va être créé.
-                        </div>
-                      )}
-                      {promptError && (
-                        <div className="rounded-xl border border-[#fecdd3] bg-[#fff5f5] px-4 py-3 flex items-start gap-2 text-sm text-[#b91c1c]">
-                          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                          {promptError}
-                        </div>
-                      )}
+                      <div className="rounded-xl border border-[#fecdd3] bg-[#fff5f5] px-4 py-3 flex items-start gap-2 text-sm text-[#b91c1c]">
+                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                        {promptError}
+                      </div>
                       <HubButton
                         variant="primary"
-                        onClick={handleGeneratePrompt}
+                        onClick={loadClientPrompt}
                         disabled={promptLoading}
                         className="w-full gap-2"
                       >
-                        {promptLoading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Génération du prompt…
-                          </>
-                        ) : (
-                          "Générer le prompt IA"
-                        )}
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Réessayer
                       </HubButton>
                     </>
                   )}
 
-                  {/* Textarea éditable */}
+                  {/* Textarea éditable (prompt chargé ou régénéré) */}
                   {generatedPrompt && (
                     <>
                       <div>
                         <label className="text-xs font-semibold text-[#7a9abf] uppercase tracking-wide block mb-1.5">
-                          Prompt système généré — relisez et modifiez si besoin
+                          Prompt système (validé par le client) — relisez et modifiez si besoin
                         </label>
                         <textarea
                           className="w-full rounded-xl border border-[#c8d6ea] px-3.5 py-2.5 text-sm focus:border-[#1f5eff] focus:outline-none resize-none font-mono"
@@ -667,17 +692,6 @@ function ExtractModal({
                       )}
 
                       <div className="flex gap-3">
-                        <HubButton
-                          variant="ghost"
-                          onClick={handleGeneratePrompt}
-                          disabled={promptLoading}
-                          className="gap-1.5"
-                        >
-                          <RefreshCw
-                            className={`w-3.5 h-3.5 ${promptLoading ? "animate-spin" : ""}`}
-                          />
-                          Régénérer
-                        </HubButton>
                         <HubButton
                           variant="primary"
                           onClick={handleCreateWorkflow}
@@ -782,6 +796,217 @@ function ExtractModal({
 }
 
 // ─── Ligne client ─────────────────────────────────────────────────────────────
+
+type ClientMessagesData = {
+  id: number;
+  org_id: number;
+  message_linkedin: string | null;
+  relance_linkedin: string | null;
+  message_email: string | null;
+  system_prompt: string | null;
+  status: string | null;
+  updated_at: string | null;
+  created_at?: string | null;
+};
+
+function ClientMessagesSection({ clientId }: { clientId: number }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<ClientMessagesData | null>(null);
+
+  const [messageLinkedin, setMessageLinkedin] = useState("");
+  const [relanceLinkedin, setRelanceLinkedin] = useState("");
+  const [messageEmail, setMessageEmail] = useState("");
+  const [systemPrompt, setSystemPrompt] = useState("");
+
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/messages/${clientId}`);
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload?.error ?? "Erreur de chargement.");
+      }
+      const row = (payload?.messages ?? null) as ClientMessagesData | null;
+      setData(row);
+      setMessageLinkedin(row?.message_linkedin ?? "");
+      setRelanceLinkedin(row?.relance_linkedin ?? "");
+      setMessageEmail(row?.message_email ?? "");
+      setSystemPrompt(row?.system_prompt ?? "");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inconnue.");
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+    try {
+      const res = await fetch(`/api/admin/messages/${clientId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message_linkedin: messageLinkedin,
+          relance_linkedin: relanceLinkedin,
+          message_email: messageEmail,
+          system_prompt: systemPrompt,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload?.error ?? "Erreur de sauvegarde.");
+      }
+      setData((payload?.messages ?? null) as ClientMessagesData | null);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Erreur inconnue.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-[#eef1f8] pt-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-[#9ab0c8] uppercase tracking-wide flex items-center gap-1.5">
+          <MessageSquare className="w-3.5 h-3.5" />
+          Messages de prospection
+        </p>
+        {data?.status ? (
+          <span className="inline-flex items-center rounded-full bg-[#eef3ff] text-[#2c466d] text-[10px] font-semibold px-2 py-0.5 uppercase tracking-wide">
+            {data.status}
+          </span>
+        ) : null}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-[#7a9abf]">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          Chargement…
+        </div>
+      ) : error ? (
+        <div className="flex items-center gap-2 text-xs text-red-600">
+          <AlertCircle className="w-3.5 h-3.5" />
+          {error}
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="ml-2 text-[#1f5eff] hover:underline"
+          >
+            Réessayer
+          </button>
+        </div>
+      ) : !data ? (
+        <p className="text-xs text-[#9ab0c8]">
+          Aucun message créé pour ce client.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[11px] font-semibold text-[#51627b] mb-1">
+              Message LinkedIn (opener)
+              <span className="ml-1 text-[#9ab0c8]">{messageLinkedin.length}/250</span>
+            </label>
+            <textarea
+              value={messageLinkedin}
+              onChange={(e) => setMessageLinkedin(e.target.value)}
+              rows={3}
+              className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-[#51627b] mb-1">
+              Relance LinkedIn
+              <span className="ml-1 text-[#9ab0c8]">{relanceLinkedin.length}/150</span>
+            </label>
+            <textarea
+              value={relanceLinkedin}
+              onChange={(e) => setRelanceLinkedin(e.target.value)}
+              rows={2}
+              className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-[#51627b] mb-1">
+              Email
+              <span className="ml-1 text-[#9ab0c8]">{messageEmail.length}</span>
+            </label>
+            <textarea
+              value={messageEmail}
+              onChange={(e) => setMessageEmail(e.target.value)}
+              rows={5}
+              className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-[#51627b] mb-1">
+              Prompt technique (système)
+              <span className="ml-1 text-[#9ab0c8]">{systemPrompt.length}</span>
+            </label>
+            <textarea
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              rows={10}
+              className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs font-mono text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <HubButton
+              variant="primary"
+              size="sm"
+              onClick={() => void handleSave()}
+              disabled={saving}
+            >
+              {saving ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
+              Sauvegarder les modifications
+            </HubButton>
+
+            {saveSuccess ? (
+              <span className="inline-flex items-center gap-1 text-xs text-emerald-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Sauvegardé
+              </span>
+            ) : null}
+            {saveError ? (
+              <span className="inline-flex items-center gap-1 text-xs text-red-600">
+                <AlertCircle className="w-3.5 h-3.5" />
+                {saveError}
+              </span>
+            ) : null}
+          </div>
+
+          {data.updated_at ? (
+            <p className="text-[10px] text-[#9ab0c8]">
+              Dernière mise à jour :{" "}
+              {new Date(data.updated_at).toLocaleString("fr-FR")}
+            </p>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ClientTableRow({
   client,
@@ -981,6 +1206,9 @@ function ClientTableRow({
                 </span>
               )}
             </div>
+
+            {/* Messages de prospection */}
+            <ClientMessagesSection clientId={client.id} />
 
             {/* Historique des extractions */}
             {client.extraction_history.length > 0 && (

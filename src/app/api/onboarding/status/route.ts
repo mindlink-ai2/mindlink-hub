@@ -69,16 +69,18 @@ export async function GET() {
       await markClientOnboardingLinkedinConnected(supabase, clientContext.clientId);
     }
 
-    const finalState = connected
-      ? onboarding.state === "completed"
-        ? "completed"
-        : "linkedin_connected"
-      : "created";
+    // Preserve progression: once icp_submitted or completed, don't regress.
+    const preservedState =
+      onboarding.state === "completed" || onboarding.state === "icp_submitted"
+        ? onboarding.state
+        : connected
+          ? "linkedin_connected"
+          : "created";
 
     return NextResponse.json({
-      state: finalState,
+      state: preservedState,
       linkedinConnected: connected,
-      completed: finalState === "completed",
+      completed: preservedState === "completed",
     });
   } catch (error) {
     console.error("ONBOARDING_STATUS_GET_ERROR:", error);

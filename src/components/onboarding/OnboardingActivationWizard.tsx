@@ -2,11 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronRight, Linkedin, Loader2, Sparkles } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronRight,
+  Linkedin,
+  Loader2,
+  MessageSquare,
+  Sparkles,
+  Target,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type WizardStatus = {
-  state: "created" | "linkedin_connected" | "completed" | null;
+  state: "created" | "linkedin_connected" | "icp_submitted" | "completed" | null;
   linkedinConnected: boolean;
   completed: boolean;
 };
@@ -20,8 +28,12 @@ export default function OnboardingActivationWizard({
 }: OnboardingActivationWizardProps) {
   const router = useRouter();
   const [status, setStatus] = useState<WizardStatus>(initialStatus);
-  const [step, setStep] = useState<1 | 2>(
-    initialStatus.linkedinConnected || initialStatus.state === "linkedin_connected" ? 2 : 1
+  const [step, setStep] = useState<1 | 2 | 3>(
+    initialStatus.state === "icp_submitted"
+      ? 3
+      : initialStatus.linkedinConnected || initialStatus.state === "linkedin_connected"
+        ? 2
+        : 1
   );
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -49,6 +61,7 @@ export default function OnboardingActivationWizard({
           state:
             data?.state === "created" ||
             data?.state === "linkedin_connected" ||
+            data?.state === "icp_submitted" ||
             data?.state === "completed"
               ? data.state
               : null,
@@ -67,7 +80,12 @@ export default function OnboardingActivationWizard({
           return;
         }
 
-        if (nextStatus.linkedinConnected || nextStatus.state === "linkedin_connected") {
+        if (nextStatus.state === "icp_submitted") {
+          setStep(3);
+        } else if (
+          nextStatus.linkedinConnected ||
+          nextStatus.state === "linkedin_connected"
+        ) {
           setStep(2);
         }
       } catch (err) {
@@ -142,21 +160,22 @@ export default function OnboardingActivationWizard({
             </div>
 
             <h1 className="mt-4 text-2xl font-semibold tracking-tight text-[#102a50] sm:text-3xl">
-              Finalisons votre démarrage en 2 étapes
+              Finalisons votre démarrage en 3 étapes
             </h1>
             <p className="mt-2 text-sm text-[#5f779e]">
-              Connectez LinkedIn, puis complétez votre questionnaire onboarding.
+              Connectez LinkedIn, définissez votre ciblage, puis créez vos messages de
+              prospection.
             </p>
 
             <div className="mt-6">
               <div className="mb-2 flex items-center justify-between text-xs text-[#5f779e]">
                 <span>Progression</span>
-                <span>{step}/2</span>
+                <span>{step}/3</span>
               </div>
               <div className="h-2 w-full rounded-full bg-[#e6efff]">
                 <div
                   className="h-2 rounded-full bg-[#316ded] transition-all"
-                  style={{ width: `${step === 1 ? 50 : 100}%` }}
+                  style={{ width: `${(step / 3) * 100}%` }}
                 />
               </div>
             </div>
@@ -245,46 +264,106 @@ export default function OnboardingActivationWizard({
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-[#5f779e]">Étape 2</p>
               <h2 className="mt-1 text-lg font-semibold text-[#102a50]">
+                <Target className="mr-1 inline h-4 w-4 align-[-2px] text-[#316ded]" />
                 Définissez votre ciblage
               </h2>
               <p className="mt-1 text-sm text-[#5f779e]">
                 Répondez à quelques questions pour que notre équipe puisse lancer votre prospection.
               </p>
             </div>
+            {status.state === "icp_submitted" || status.state === "completed" ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Validé
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+                  step === 2
+                    ? "border-[#9cc0ff] bg-[#edf4ff] text-[#1f4f96]"
+                    : "border-[#d7e3f4] bg-white text-[#6f84a6]"
+                )}
+              >
+                {step === 2 ? "Active" : "Verrouillée"}
+              </span>
+            )}
+          </div>
+
+          {status.state !== "icp_submitted" && status.state !== "completed" && (
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard/hub/icp-builder")}
+                disabled={!isLinkedinConnected || loadingStatus}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition",
+                  isLinkedinConnected
+                    ? "border-[#1f5eff] bg-[#316ded] text-white hover:bg-[#245dd9]"
+                    : "cursor-not-allowed border-[#d7e3f4] bg-white text-[#8ba0bf]"
+                )}
+              >
+                {loadingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Définir mon ciblage
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void refreshStatus()}
+                className="rounded-2xl border border-[#d7e3f4] bg-white px-4 py-2.5 text-sm font-medium text-[#51627b] transition hover:bg-[#f3f8ff]"
+              >
+                Rafraîchir le statut
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section
+          className={cn(
+            "space-y-4 rounded-3xl border p-5 sm:p-6",
+            step === 3
+              ? "border-[#dbe7ff] bg-white"
+              : "border-[#e4ebf7] bg-[#f8fbff]"
+          )}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-[#5f779e]">Étape 3</p>
+              <h2 className="mt-1 text-lg font-semibold text-[#102a50]">
+                <MessageSquare className="mr-1 inline h-4 w-4 align-[-2px] text-[#316ded]" />
+                Créez vos messages de prospection
+              </h2>
+              <p className="mt-1 text-sm text-[#5f779e]">
+                Discutez avec l&apos;IA pour générer vos 3 messages (LinkedIn, relance,
+                email) sur-mesure.
+              </p>
+            </div>
             <span
               className={cn(
                 "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
-                step === 2
+                step === 3
                   ? "border-[#9cc0ff] bg-[#edf4ff] text-[#1f4f96]"
                   : "border-[#d7e3f4] bg-white text-[#6f84a6]"
               )}
             >
-              {step === 2 ? "Active" : "Verrouillée"}
+              {step === 3 ? "Active" : "Verrouillée"}
             </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => router.push("/dashboard/hub/icp-builder")}
-              disabled={!isLinkedinConnected || loadingStatus}
+              onClick={() => router.push("/dashboard/hub/messages-setup")}
+              disabled={status.state !== "icp_submitted" || loadingStatus}
               className={cn(
                 "inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition",
-                isLinkedinConnected
+                status.state === "icp_submitted"
                   ? "border-[#1f5eff] bg-[#316ded] text-white hover:bg-[#245dd9]"
                   : "cursor-not-allowed border-[#d7e3f4] bg-white text-[#8ba0bf]"
               )}
             >
               {loadingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Définir mon ciblage
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void refreshStatus()}
-              className="rounded-2xl border border-[#d7e3f4] bg-white px-4 py-2.5 text-sm font-medium text-[#51627b] transition hover:bg-[#f3f8ff]"
-            >
-              Rafraîchir le statut
+              Créer mes messages
             </button>
           </div>
         </section>

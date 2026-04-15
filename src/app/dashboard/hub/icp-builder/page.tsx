@@ -516,9 +516,11 @@ export default function IcpBuilderPage() {
       } else {
         setIcpStatus("submitted");
         if (onboardingPending) {
-          // Valider le step 2 de l'onboarding et rediriger vers le dashboard
-          await fetch("/api/onboarding/complete", { method: "POST" }).catch(() => null);
-          router.replace("/");
+          // Valider le step 2 et envoyer le client vers le step 3 (messages).
+          await fetch("/api/onboarding/mark-icp-submitted", { method: "POST" }).catch(
+            () => null
+          );
+          router.replace("/dashboard/hub/messages-setup");
         } else {
           setScreen("submitted");
         }

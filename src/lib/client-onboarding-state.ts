@@ -2,7 +2,11 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type ClientOnboardingState = "created" | "linkedin_connected" | "completed";
+export type ClientOnboardingState =
+  | "created"
+  | "linkedin_connected"
+  | "icp_submitted"
+  | "completed";
 
 export type ClientOnboardingRow = {
   id: number;
@@ -10,6 +14,7 @@ export type ClientOnboardingRow = {
   state: ClientOnboardingState;
   created_at: string;
   linkedin_connected_at: string | null;
+  icp_submitted_at: string | null;
   completed_at: string | null;
 };
 
@@ -87,7 +92,9 @@ export async function getClientOnboardingStateRow(
 ): Promise<ClientOnboardingRow | null> {
   const { data, error } = await supabase
     .from("client_onboarding_state")
-    .select("id, client_id, state, created_at, linkedin_connected_at, completed_at")
+    .select(
+      "id, client_id, state, created_at, linkedin_connected_at, icp_submitted_at, completed_at"
+    )
     .eq("client_id", clientId)
     .maybeSingle();
 
@@ -115,6 +122,25 @@ export async function markClientOnboardingLinkedinConnected(
 
   if (error) {
     throw new Error(`client_onboarding_mark_linkedin_failed:${error.message}`);
+  }
+}
+
+export async function markClientOnboardingIcpSubmitted(
+  supabase: SupabaseClient,
+  clientId: number
+): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const { error } = await supabase
+    .from("client_onboarding_state")
+    .update({
+      state: "icp_submitted",
+      icp_submitted_at: nowIso,
+    })
+    .eq("client_id", clientId)
+    .neq("state", "completed");
+
+  if (error) {
+    throw new Error(`client_onboarding_mark_icp_submitted_failed:${error.message}`);
   }
 }
 
