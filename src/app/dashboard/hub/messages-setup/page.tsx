@@ -20,12 +20,6 @@ type ChatMessage = {
   content: string;
 };
 
-type ParsedMessages = {
-  message_linkedin: string;
-  relance_linkedin: string;
-  message_email: string;
-};
-
 type SavedMessages = {
   id: string;
   message_linkedin: string;
@@ -37,25 +31,15 @@ type SavedMessages = {
 
 type Screen = "loading" | "existing" | "chat" | "saved";
 
+type MessageKind = "linkedin" | "relance";
+
 const WELCOME_MESSAGE =
-  "Bonjour ! Je vais t'aider à créer tes messages de prospection LinkedIn et email. Je vais te poser quelques questions pour bien comprendre ton offre et ta cible. C'est parti ?";
+  "Bonjour ! Je vais t'aider à créer tes messages de prospection LinkedIn. Je vais te poser 6 questions pour bien comprendre ton offre, puis on construit ensemble ton message LinkedIn, puis ta relance. C'est parti ?";
 
 function extractTag(raw: string, tag: string): string {
   const re = new RegExp(`\\[${tag}\\]([\\s\\S]*?)\\[/${tag}\\]`, "i");
   const m = raw.match(re);
   return m ? m[1].trim() : "";
-}
-
-function parseReply(raw: string): ParsedMessages | null {
-  const linkedin = extractTag(raw, "MESSAGE_LINKEDIN");
-  const relance = extractTag(raw, "RELANCE_LINKEDIN");
-  const email = extractTag(raw, "EMAIL");
-  if (!linkedin || !relance || !email) return null;
-  return {
-    message_linkedin: linkedin,
-    relance_linkedin: relance,
-    message_email: email,
-  };
 }
 
 function stripTags(raw: string): string {
@@ -74,10 +58,24 @@ function AiAvatar() {
   );
 }
 
-function MessageRow({ message }: { message: ChatMessage }) {
+type MessageRowProps = {
+  message: ChatMessage;
+  onValidate: (kind: MessageKind, text: string) => void;
+  validatedLinkedin: string | null;
+  validatedRelance: string | null;
+  isLatestAssistant: boolean;
+  sending: boolean;
+};
+
+function MessageRow({
+  message,
+  onValidate,
+  validatedLinkedin,
+  validatedRelance,
+  isLatestAssistant,
+  sending,
+}: MessageRowProps) {
   const isUser = message.role === "user";
-  const parsed = !isUser ? parseReply(message.content) : null;
-  const preamble = parsed ? stripTags(message.content) : message.content;
 
   if (isUser) {
     return (
@@ -89,6 +87,10 @@ function MessageRow({ message }: { message: ChatMessage }) {
     );
   }
 
+  const linkedinText = extractTag(message.content, "MESSAGE_LINKEDIN");
+  const relanceText = extractTag(message.content, "RELANCE_LINKEDIN");
+  const preamble = stripTags(message.content);
+
   return (
     <div className="flex items-start gap-2.5">
       <AiAvatar />
@@ -98,62 +100,100 @@ function MessageRow({ message }: { message: ChatMessage }) {
             {preamble}
           </div>
         ) : null}
-        {parsed ? <MessagesPreview parsed={parsed} /> : null}
+
+        {linkedinText ? (
+          <MessagePreviewCard
+            kind="linkedin"
+            label="Message LinkedIn"
+            icon={<MessageSquare className="h-4 w-4 text-[#2563EB]" />}
+            content={linkedinText}
+            maxChars={250}
+            validatedText={validatedLinkedin}
+            onValidate={onValidate}
+            canValidate={isLatestAssistant && !sending}
+          />
+        ) : null}
+
+        {relanceText ? (
+          <MessagePreviewCard
+            kind="relance"
+            label="Relance LinkedIn"
+            icon={<MessageSquare className="h-4 w-4 text-[#7c3aed]" />}
+            content={relanceText}
+            maxChars={150}
+            validatedText={validatedRelance}
+            onValidate={onValidate}
+            canValidate={isLatestAssistant && !sending}
+          />
+        ) : null}
       </div>
     </div>
   );
 }
 
-function MessagesPreview({ parsed }: { parsed: ParsedMessages }) {
-  return (
-    <div className="space-y-3 rounded-2xl rounded-tl-sm border border-[#c8d6ea] bg-white p-4 shadow-sm">
-      <MessageBlock
-        icon={<MessageSquare className="h-4 w-4 text-[#2563EB]" />}
-        label="Message LinkedIn"
-        sub={`${parsed.message_linkedin.length} car.`}
-        content={parsed.message_linkedin}
-      />
-      <MessageBlock
-        icon={<MessageSquare className="h-4 w-4 text-[#7c3aed]" />}
-        label="Relance LinkedIn"
-        sub={`${parsed.relance_linkedin.length} car.`}
-        content={parsed.relance_linkedin}
-      />
-      <MessageBlock
-        icon={<Mail className="h-4 w-4 text-[#0891b2]" />}
-        label="Email de prospection"
-        sub={`${parsed.message_email.length} car.`}
-        content={parsed.message_email}
-      />
-    </div>
-  );
-}
-
-function MessageBlock({
-  icon,
+function MessagePreviewCard({
+  kind,
   label,
-  sub,
+  icon,
   content,
+  maxChars,
+  validatedText,
+  onValidate,
+  canValidate,
 }: {
-  icon: React.ReactNode;
+  kind: MessageKind;
   label: string;
-  sub: string;
+  icon: React.ReactNode;
   content: string;
+  maxChars: number;
+  validatedText: string | null;
+  onValidate: (kind: MessageKind, text: string) => void;
+  canValidate: boolean;
 }) {
+  const isValidated = validatedText === content;
+  const overLimit = content.length > maxChars;
+
   return (
-    <div className="rounded-xl border border-[#eef1f8] bg-[#fafcff] p-3">
-      <div className="mb-1.5 flex items-center justify-between">
+    <div className="rounded-2xl rounded-tl-sm border border-[#c8d6ea] bg-white p-4 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           {icon}
           <span className="text-xs font-semibold uppercase tracking-wide text-[#51627b]">
             {label}
           </span>
         </div>
-        <span className="text-[11px] text-[#7a9abf]">{sub}</span>
+        <span
+          className={cn(
+            "text-[11px]",
+            overLimit ? "font-semibold text-red-600" : "text-[#7a9abf]"
+          )}
+        >
+          {content.length}/{maxChars} car.
+        </span>
       </div>
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#0b1c33]">
-        {content}
-      </p>
+      <div className="rounded-xl border border-[#eef1f8] bg-[#fafcff] p-3">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#0b1c33]">
+          {content}
+        </p>
+      </div>
+      <div className="mt-2.5 flex items-center justify-end">
+        {isValidated ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Validé
+          </span>
+        ) : canValidate ? (
+          <HubButton
+            variant="primary"
+            size="sm"
+            onClick={() => onValidate(kind, content)}
+            className="gap-1.5"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Je valide ce message
+          </HubButton>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -172,10 +212,12 @@ export default function MessagesSetupPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [validatedLinkedin, setValidatedLinkedin] = useState<string | null>(null);
+  const [validatedRelance, setValidatedRelance] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Charger l'état initial
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -218,21 +260,17 @@ export default function MessagesSetupPage() {
     };
   }, []);
 
-  // Auto-scroll vers le bas à chaque nouveau message
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [history, sending]);
 
-  const latestAssistantWithMessages = useMemo(() => {
+  const latestAssistantIndex = useMemo(() => {
     for (let i = history.length - 1; i >= 0; i--) {
-      const m = history[i];
-      if (m.role !== "assistant") continue;
-      const parsed = parseReply(m.content);
-      if (parsed) return { index: i, parsed, raw: m.content };
+      if (history[i].role === "assistant") return i;
     }
-    return null;
+    return -1;
   }, [history]);
 
   const sendMessage = useCallback(
@@ -279,8 +317,23 @@ export default function MessagesSetupPage() {
     [history, sending]
   );
 
-  const handleValidate = useCallback(async () => {
-    if (!latestAssistantWithMessages || saving) return;
+  const handleValidateMessage = useCallback(
+    (kind: MessageKind, text: string) => {
+      if (kind === "linkedin") {
+        setValidatedLinkedin(text);
+        void sendMessage(
+          "Parfait, ce message LinkedIn me va. Génère maintenant la relance LinkedIn."
+        );
+      } else {
+        setValidatedRelance(text);
+        void sendMessage("Parfait, la relance me va aussi.");
+      }
+    },
+    [sendMessage]
+  );
+
+  const handleFinalize = useCallback(async () => {
+    if (!validatedLinkedin || !validatedRelance || saving) return;
     setSaving(true);
     setError(null);
     try {
@@ -288,7 +341,8 @@ export default function MessagesSetupPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          assistantReply: latestAssistantWithMessages.raw,
+          messageLinkedin: validatedLinkedin,
+          relanceLinkedin: validatedRelance,
           history,
         }),
       });
@@ -305,7 +359,6 @@ export default function MessagesSetupPage() {
         return;
       }
       setScreen("saved");
-      // Refresh existing messages
       try {
         const refreshed = await fetch("/api/messages/get", { cache: "no-store" });
         if (refreshed.ok) {
@@ -322,12 +375,14 @@ export default function MessagesSetupPage() {
     } finally {
       setSaving(false);
     }
-  }, [latestAssistantWithMessages, saving, onboardingPending, history, router]);
+  }, [validatedLinkedin, validatedRelance, saving, onboardingPending, history, router]);
 
   const relaunchChat = useCallback(() => {
     setHistory([{ role: "assistant", content: WELCOME_MESSAGE }]);
     setInput("");
     setError(null);
+    setValidatedLinkedin(null);
+    setValidatedRelance(null);
     setScreen("chat");
   }, []);
 
@@ -344,9 +399,10 @@ export default function MessagesSetupPage() {
     return 3;
   }, [onboardingPending, onboardingState]);
 
+  const canFinalize = Boolean(validatedLinkedin && validatedRelance);
+
   return (
     <div className="min-h-screen bg-[#eef1f8]">
-      {/* Header */}
       <div className="border-b border-[#c8d6ea] bg-white px-6 py-4">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
           <div>
@@ -386,21 +442,19 @@ export default function MessagesSetupPage() {
         )}
       </div>
 
-      {/* Loading */}
       {screen === "loading" && (
         <div className="flex min-h-[60vh] items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
         </div>
       )}
 
-      {/* Saved confirmation */}
       {screen === "saved" && existingMessages && (
         <div className="mx-auto max-w-3xl px-4 py-10">
           <div className="rounded-2xl border border-[#c8d6ea] bg-white p-8 text-center">
             <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-[#22c55e]" />
             <h2 className="text-xl font-bold text-[#0b1c33]">Messages enregistrés !</h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-[#51627b]">
-              Vos messages sont prêts. Notre équipe s&apos;en servira pour lancer votre
+              Tes messages sont prêts. Notre équipe s&apos;en servira pour lancer ta
               prospection.
             </p>
           </div>
@@ -410,14 +464,12 @@ export default function MessagesSetupPage() {
         </div>
       )}
 
-      {/* Existing messages — read mode with edit button */}
       {screen === "existing" && existingMessages && (
         <div className="mx-auto max-w-3xl px-4 py-8">
           <SavedMessagesPanel messages={existingMessages} onEdit={relaunchChat} />
         </div>
       )}
 
-      {/* Chat */}
       {screen === "chat" && (
         <div className="mx-auto flex h-[calc(100vh-180px)] max-w-3xl flex-col px-4 py-6">
           <div
@@ -425,7 +477,15 @@ export default function MessagesSetupPage() {
             className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-[#c8d6ea] bg-[#f8fafc] p-5"
           >
             {history.map((m, i) => (
-              <MessageRow key={i} message={m} />
+              <MessageRow
+                key={i}
+                message={m}
+                onValidate={handleValidateMessage}
+                validatedLinkedin={validatedLinkedin}
+                validatedRelance={validatedRelance}
+                isLatestAssistant={i === latestAssistantIndex}
+                sending={sending}
+              />
             ))}
             {sending && (
               <div className="flex items-start gap-2.5">
@@ -447,15 +507,14 @@ export default function MessagesSetupPage() {
             </div>
           )}
 
-          {latestAssistantWithMessages && !saving && (
+          {canFinalize && !saving && (
             <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[#9cc0ff] bg-[#edf4ff] px-4 py-3">
               <p className="text-sm text-[#1f4f96]">
-                Les 3 messages sont prêts. Tu peux les ajuster en discutant, ou les
-                valider maintenant.
+                Tes deux messages sont validés. L&apos;email sera généré automatiquement.
               </p>
               <HubButton
                 variant="primary"
-                onClick={() => void handleValidate()}
+                onClick={() => void handleFinalize()}
                 className="gap-2 whitespace-nowrap"
               >
                 <CheckCircle2 className="h-4 w-4" />
@@ -467,7 +526,7 @@ export default function MessagesSetupPage() {
           {saving && (
             <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#9cc0ff] bg-[#edf4ff] px-4 py-3 text-sm text-[#1f4f96]">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Enregistrement en cours, génération du prompt technique…
+              Enregistrement, génération de l&apos;email et du prompt technique en cours…
             </div>
           )}
 
@@ -514,9 +573,9 @@ function SavedMessagesPanel({
       <div className="rounded-2xl border border-[#c8d6ea] bg-white p-6">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-bold text-[#0b1c33]">Vos messages actuels</h2>
+            <h2 className="text-base font-bold text-[#0b1c33]">Tes messages actuels</h2>
             <p className="mt-0.5 text-xs text-[#51627b]">
-              Utilisés pour votre prospection en cours.
+              Utilisés pour ta prospection en cours.
             </p>
           </div>
           <HubButton variant="secondary" onClick={onEdit} className="gap-2">
@@ -525,26 +584,55 @@ function SavedMessagesPanel({
           </HubButton>
         </div>
         <div className="space-y-3">
-          <MessageBlock
+          <SavedMessageBlock
             icon={<MessageSquare className="h-4 w-4 text-[#2563EB]" />}
             label="Message LinkedIn"
             sub={`${messages.message_linkedin.length} car.`}
             content={messages.message_linkedin}
           />
-          <MessageBlock
+          <SavedMessageBlock
             icon={<MessageSquare className="h-4 w-4 text-[#7c3aed]" />}
             label="Relance LinkedIn"
             sub={`${messages.relance_linkedin.length} car.`}
             content={messages.relance_linkedin}
           />
-          <MessageBlock
+          <SavedMessageBlock
             icon={<Mail className="h-4 w-4 text-[#0891b2]" />}
-            label="Email de prospection"
+            label="Email de prospection (généré automatiquement)"
             sub={`${messages.message_email.length} car.`}
             content={messages.message_email}
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+function SavedMessageBlock({
+  icon,
+  label,
+  sub,
+  content,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  sub: string;
+  content: string;
+}) {
+  return (
+    <div className="rounded-xl border border-[#eef1f8] bg-[#fafcff] p-3">
+      <div className="mb-1.5 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          {icon}
+          <span className="text-xs font-semibold uppercase tracking-wide text-[#51627b]">
+            {label}
+          </span>
+        </div>
+        <span className="text-[11px] text-[#7a9abf]">{sub}</span>
+      </div>
+      <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#0b1c33]">
+        {content}
+      </p>
     </div>
   );
 }

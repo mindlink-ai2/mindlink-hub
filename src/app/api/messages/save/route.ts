@@ -8,8 +8,8 @@ import {
 import {
   buildConversationDigest,
   buildIcpDigest,
+  finalizeMessagesFromChat,
   generateSystemPromptFromMessages,
-  parseGeneratedMessages,
 } from "@/lib/messages-prompt";
 
 export const runtime = "nodejs";
@@ -29,6 +29,11 @@ function sanitizeHistory(input: unknown): ChatMessage[] {
     out.push({ role, content: content.slice(0, 8000) });
   }
   return out.slice(-100);
+}
+
+function safeString(v: unknown, max: number): string {
+  if (typeof v !== "string") return "";
+  return v.trim().slice(0, max);
 }
 
 export async function POST(req: Request) {
@@ -51,13 +56,13 @@ export async function POST(req: Request) {
     }
 
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-    const rawAssistantReply = typeof body?.assistantReply === "string" ? body.assistantReply : "";
+    const validatedLinkedin = safeString(body?.messageLinkedin, 2000);
+    const validatedRelance = safeString(body?.relanceLinkedin, 2000);
     const history = sanitizeHistory(body?.history);
 
-    const parsed = parseGeneratedMessages(rawAssistantReply);
-    if (!parsed.message_linkedin || !parsed.relance_linkedin || !parsed.message_email) {
+    if (!validatedLinkedin || !validatedRelance) {
       return NextResponse.json(
-        { error: "messages_not_found_in_reply" },
+        { error: "missing_validated_messages" },
         { status: 400 }
       );
     }
@@ -77,36 +82,65 @@ export async function POST(req: Request) {
       .limit(1)
       .maybeSingle();
 
-    // Génération du prompt technique (synchrone, ~5-15s). Si ça échoue on sauvegarde
-    // quand même les messages — l'admin pourra régénérer depuis le panel.
-    let systemPrompt: string | null = null;
+    const companyName =
+      (clientRow?.company_name as string | null) ?? user?.firstName ?? "Inconnue";
+    const clientFirstName = user?.firstName ?? "";
+    const conversationDigest = buildConversationDigest(history);
+
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (apiKey) {
-      try {
-        systemPrompt = await generateSystemPromptFromMessages(apiKey, {
-          companyName:
-            (clientRow?.company_name as string | null) ??
-            user?.firstName ??
-            "Inconnue",
-          messageLinkedin: parsed.message_linkedin,
-          relanceLinkedin: parsed.relance_linkedin,
-          messageEmail: parsed.message_email,
-          conversationDigest: buildConversationDigest(history),
-          icpDigest: buildIcpDigest(
-            (icpConfig?.filters ?? null) as Record<string, unknown> | null
-          ),
-        });
-      } catch (promptErr) {
-        console.error("[messages/save] prompt generation failed:", promptErr);
-      }
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "ANTHROPIC_API_KEY_missing" },
+        { status: 500 }
+      );
+    }
+
+    // 1) Remplace les exemples concrets par les variables + génère l'email
+    let finalizedLinkedin = validatedLinkedin;
+    let finalizedRelance = validatedRelance;
+    let finalizedEmail = "";
+    try {
+      const finalized = await finalizeMessagesFromChat(apiKey, {
+        companyName,
+        clientFirstName,
+        validatedLinkedin,
+        validatedRelance,
+        conversationDigest,
+      });
+      finalizedLinkedin = finalized.message_linkedin;
+      finalizedRelance = finalized.relance_linkedin;
+      finalizedEmail = finalized.message_email;
+    } catch (finalizeErr) {
+      console.error("[messages/save] finalize failed:", finalizeErr);
+      return NextResponse.json(
+        { error: "finalize_failed" },
+        { status: 502 }
+      );
+    }
+
+    // 2) Génère le prompt technique (best-effort)
+    let systemPrompt: string | null = null;
+    try {
+      systemPrompt = await generateSystemPromptFromMessages(apiKey, {
+        companyName,
+        messageLinkedin: finalizedLinkedin,
+        relanceLinkedin: finalizedRelance,
+        messageEmail: finalizedEmail,
+        conversationDigest,
+        icpDigest: buildIcpDigest(
+          (icpConfig?.filters ?? null) as Record<string, unknown> | null
+        ),
+      });
+    } catch (promptErr) {
+      console.error("[messages/save] prompt generation failed:", promptErr);
     }
 
     const nowIso = new Date().toISOString();
     const row = {
       org_id: clientContext.clientId,
-      message_linkedin: parsed.message_linkedin,
-      relance_linkedin: parsed.relance_linkedin,
-      message_email: parsed.message_email,
+      message_linkedin: finalizedLinkedin,
+      relance_linkedin: finalizedRelance,
+      message_email: finalizedEmail,
       system_prompt: systemPrompt,
       status: "submitted" as const,
       conversation_history: history,
@@ -122,7 +156,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "save_failed" }, { status: 500 });
     }
 
-    // Mark onboarding as completed (Option A: messages validation = final step)
     try {
       await markClientOnboardingCompleted(supabase, clientContext.clientId);
     } catch (stateErr) {

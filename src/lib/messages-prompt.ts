@@ -209,6 +209,85 @@ export async function generateSystemPromptFromMessages(
   return text;
 }
 
+const FINALIZE_MESSAGES_SYSTEM = `Tu reçois deux messages de prospection validés par un client (message LinkedIn d'ouverture + relance LinkedIn) contenant des exemples concrets (un prénom et une entreprise de démonstration). Ta mission :
+
+1. Remplace le prénom concret utilisé dans le MESSAGE_LINKEDIN par la variable \${firstName} et l'entreprise concrète par \${company}. Garde le reste du message identique au mot près.
+2. Remplace le prénom concret utilisé dans la RELANCE_LINKEDIN par la variable {{prenom}}. Si une entreprise apparaît dans la relance, remplace-la par {{company}}. Garde le reste identique.
+3. Génère un EMAIL de prospection dans le même angle, ton et style que le message LinkedIn (400-800 caractères, corps uniquement + un objet). Utilise {{prenom}} et {{company}} pour les variables. Inclus un objet (ligne "Objet : ..."), le corps, puis une signature "— <Prénom du client> — <Entreprise du client>".
+
+RÈGLES ABSOLUES :
+- N'ajoute aucun commentaire, aucune explication, aucun préambule.
+- Pas d'emoji, pas de tirets de formatage — texte brut avec sauts de ligne.
+- Retourne EXACTEMENT ce format, rien d'autre :
+
+[MESSAGE_LINKEDIN]
+(message LinkedIn avec \${firstName} et \${company})
+[/MESSAGE_LINKEDIN]
+
+[RELANCE_LINKEDIN]
+(relance avec {{prenom}} et éventuellement {{company}})
+[/RELANCE_LINKEDIN]
+
+[EMAIL]
+Objet : ...
+...
+[/EMAIL]`;
+
+type FinalizeInput = {
+  companyName: string;
+  clientFirstName: string;
+  validatedLinkedin: string;
+  validatedRelance: string;
+  conversationDigest: string;
+};
+
+export async function finalizeMessagesFromChat(
+  apiKey: string,
+  input: FinalizeInput
+): Promise<{ message_linkedin: string; relance_linkedin: string; message_email: string }> {
+  const userMessage = [
+    `Entreprise du client : ${input.companyName || "Inconnue"}`,
+    `Prénom du client (pour signature email) : ${input.clientFirstName || "Inconnu"}`,
+    "",
+    "MESSAGE LINKEDIN VALIDÉ (avec exemple concret) :",
+    input.validatedLinkedin,
+    "",
+    "RELANCE LINKEDIN VALIDÉE (avec exemple concret) :",
+    input.validatedRelance,
+    "",
+    "CONTEXTE CONVERSATION (6 réponses aux questions d'onboarding) :",
+    input.conversationDigest || "(aucun)",
+  ].join("\n");
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2000,
+      system: FINALIZE_MESSAGES_SYSTEM,
+      messages: [{ role: "user", content: userMessage }],
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`anthropic_finalize_error_${res.status}:${errBody.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const text: string = data.content?.[0]?.text ?? "";
+  const parsed = parseGeneratedMessages(text);
+  if (!parsed.message_linkedin || !parsed.relance_linkedin || !parsed.message_email) {
+    throw new Error("finalize_missing_tags");
+  }
+  return parsed;
+}
+
 export function extractTag(raw: string, tag: string): string {
   const re = new RegExp(`\\[${tag}\\]([\\s\\S]*?)\\[/${tag}\\]`, "i");
   const m = raw.match(re);
