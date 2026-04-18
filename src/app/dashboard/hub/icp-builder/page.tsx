@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -9,9 +9,12 @@ import {
   Building2,
   CheckCircle2,
   Loader2,
+  MessageCircleQuestion,
   Pencil,
   Search,
+  Send,
   Sparkles,
+  X,
 } from "lucide-react";
 import { HubButton } from "@/components/ui/hub-button";
 import { cn } from "@/lib/utils";
@@ -145,6 +148,23 @@ const STEPS: StepDef[] = [
 ];
 
 const STEP_COUNT = STEPS.length;
+
+const HELP_OPENING_MESSAGES: Record<string, string> = {
+  q1_titles:
+    "Listez les titres exacts tels qu'ils apparaissent sur LinkedIn. Par exemple : CEO, Directeur Commercial, Responsable Marketing. Si vous ne savez pas, décrivez-moi votre client idéal et je vous aiderai à trouver les bons titres.",
+  q2_exclusions:
+    "Y a-t-il des postes qui ressemblent à votre cible mais que vous ne voulez pas contacter ? Par exemple si vous ciblez les CEO, vous voudrez peut-être exclure les CEO de startups en phase d'amorçage. Si vous n'avez pas d'exclusion, passez cette question.",
+  q3_sector:
+    "Soyez précis sur le secteur. 'Digital' est trop large. Préférez 'Agences de communication', 'Éditeurs de logiciels SaaS', 'Cabinets de recrutement'. Si vous ciblez plusieurs secteurs, listez-les tous.",
+  q4_company_sizes:
+    "La taille d'entreprise est importante pour cibler les bonnes structures. Les très petites entreprises (1-10) sont souvent des indépendants, les 11-50 sont des PME structurées, les 51-200 des ETI. Choisissez en fonction de votre offre.",
+  q5_locations:
+    "Indiquez les zones géographiques que vous voulez cibler. Vous pouvez mettre un pays entier (France) ou être plus précis (Paris, Lyon, Bordeaux). Si vous travaillez en remote, mettez le pays entier.",
+  q6_commercial_promise:
+    "Décrivez concrètement ce que vous apportez à vos clients. Pas de jargon marketing, parlez comme si vous expliquiez à un ami. Qu'est-ce qui change concrètement pour votre client après avoir travaillé avec vous ?",
+};
+
+type HelpMessage = { role: "user" | "assistant"; content: string };
 
 function emptyAnswers(): QuestionnaireAnswers {
   return {
@@ -287,6 +307,86 @@ export default function IcpBuilderPage() {
   const [reopening, setReopening] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // ── Help chat state ──
+  const [helpOpenFor, setHelpOpenFor] = useState<string | null>(null);
+  const [helpMessages, setHelpMessages] = useState<HelpMessage[]>([]);
+  const [helpInput, setHelpInput] = useState("");
+  const [helpSending, setHelpSending] = useState(false);
+  const helpEndRef = useRef<HTMLDivElement>(null);
+
+  const openHelpChat = useCallback((questionKey: string) => {
+    const opening = HELP_OPENING_MESSAGES[questionKey];
+    if (!opening) return;
+    setHelpOpenFor(questionKey);
+    setHelpMessages([{ role: "assistant", content: opening }]);
+    setHelpInput("");
+    setHelpSending(false);
+  }, []);
+
+  const closeHelpChat = useCallback(() => {
+    setHelpOpenFor(null);
+    setHelpMessages([]);
+    setHelpInput("");
+    setHelpSending(false);
+  }, []);
+
+  const sendHelpMessage = useCallback(async () => {
+    const text = helpInput.trim();
+    if (!text || helpSending || !helpOpenFor) return;
+
+    const userMsg: HelpMessage = { role: "user", content: text };
+    const updatedMessages = [...helpMessages, userMsg];
+    setHelpMessages(updatedMessages);
+    setHelpInput("");
+    setHelpSending(true);
+
+    try {
+      const res = await fetch("/api/chat/icp-helper", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: updatedMessages,
+          question_context: helpOpenFor,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.reply) {
+        setHelpMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: data.reply },
+        ]);
+      } else {
+        setHelpMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "Désolé, une erreur est survenue. Réessaie.",
+          },
+        ]);
+      }
+    } catch {
+      setHelpMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Impossible de contacter le serveur. Réessaie.",
+        },
+      ]);
+    } finally {
+      setHelpSending(false);
+    }
+  }, [helpInput, helpSending, helpOpenFor, helpMessages]);
+
+  // Auto-scroll help chat
+  useEffect(() => {
+    helpEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [helpMessages]);
+
+  // Close help chat when changing steps
+  useEffect(() => {
+    closeHelpChat();
+  }, [currentStep, closeHelpChat]);
 
   // Charger la config existante + crédits + statut onboarding au montage
   useEffect(() => {
@@ -709,6 +809,92 @@ export default function IcpBuilderPage() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+
+            {/* ── Help chat ── */}
+            {helpOpenFor !== currentStepDef.key ? (
+              <button
+                type="button"
+                onClick={() => openHelpChat(currentStepDef.key)}
+                className="mt-4 flex items-center gap-1.5 text-xs text-[#2563EB] hover:text-[#1d4ed8] font-medium transition-colors"
+              >
+                <MessageCircleQuestion className="w-3.5 h-3.5" />
+                Besoin d&apos;aide pour répondre ?
+              </button>
+            ) : (
+              <div className="mt-4 rounded-xl border border-[#c8d6ea] bg-[#f8fafc] overflow-hidden animate-in slide-in-from-top-2 duration-200">
+                {/* Chat header */}
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#c8d6ea] bg-white">
+                  <span className="text-xs font-semibold text-[#0b1c33]">
+                    Assistant Lidmeo
+                  </span>
+                  <button
+                    type="button"
+                    onClick={closeHelpChat}
+                    className="text-[#7a9abf] hover:text-[#51627b] transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Messages */}
+                <div className="max-h-60 overflow-y-auto px-4 py-3 space-y-3">
+                  {helpMessages.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "flex",
+                        msg.role === "user" ? "justify-end" : "justify-start"
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap",
+                          msg.role === "user"
+                            ? "bg-[#2563EB] text-white"
+                            : "bg-white border border-[#c8d6ea] text-[#0b1c33]"
+                        )}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  {helpSending && (
+                    <div className="flex justify-start">
+                      <div className="bg-white border border-[#c8d6ea] rounded-xl px-3 py-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#7a9abf]" />
+                      </div>
+                    </div>
+                  )}
+                  <div ref={helpEndRef} />
+                </div>
+
+                {/* Input */}
+                <div className="flex items-center gap-2 px-3 py-2.5 border-t border-[#c8d6ea] bg-white">
+                  <input
+                    type="text"
+                    value={helpInput}
+                    onChange={(e) => setHelpInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendHelpMessage();
+                      }
+                    }}
+                    placeholder="Posez votre question..."
+                    className="flex-1 text-sm bg-transparent text-[#0b1c33] placeholder:text-[#a0b0c0] outline-none"
+                    disabled={helpSending}
+                  />
+                  <button
+                    type="button"
+                    onClick={sendHelpMessage}
+                    disabled={helpSending || !helpInput.trim()}
+                    className="shrink-0 w-7 h-7 rounded-full bg-[#2563EB] text-white flex items-center justify-center disabled:opacity-40 hover:bg-[#1d4ed8] transition-colors"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             )}
           </div>
