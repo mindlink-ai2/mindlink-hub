@@ -1,12 +1,10 @@
 -- Migration: Credits auto-reset every 31 days
 -- Set credits_total to 5 for all existing rows
--- Ensure period_start is populated
+-- Ensure period_start is populated from search_credits.created_at
 
 UPDATE search_credits SET credits_total = 5;
 
--- For rows missing period_start, populate from clients.created_at
-UPDATE search_credits sc
-SET period_start = c.created_at
-FROM clients c
-WHERE sc.org_id = c.id
-  AND sc.period_start IS NULL;
+-- For rows missing period_start, use the row's own created_at as anchor
+UPDATE search_credits
+SET period_start = created_at
+WHERE period_start IS NULL;

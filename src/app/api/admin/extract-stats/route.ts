@@ -76,7 +76,7 @@ export async function GET(request: Request) {
 
   // Fetch client + ICP in parallel
   const [clientRes, icpRes] = await Promise.all([
-    supabase.from("clients").select("id, email, company_name, quota, created_at").eq("id", orgId).single(),
+    supabase.from("clients").select("id, email, company_name, quota").eq("id", orgId).single(),
     supabase
       .from("icp_configs")
       .select("filters")
@@ -196,10 +196,17 @@ export async function GET(request: Request) {
 
   // ── Calcul du quota recommandé ──
   const quotaPerDay = Number(clientRow.quota) || 10;
-  const clientCreatedAt = clientRow.created_at
-    ? new Date(clientRow.created_at as string)
+
+  // Utiliser search_credits.created_at comme ancre de période
+  const { data: creditRow } = await supabase
+    .from("search_credits")
+    .select("created_at")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  const periodAnchor = creditRow?.created_at
+    ? new Date(creditRow.created_at as string)
     : new Date();
-  const { periodEnd } = computePeriod(clientCreatedAt);
+  const { periodEnd } = computePeriod(periodAnchor);
   const today = new Date();
   const businessDaysRemaining = countBusinessDays(today, periodEnd);
   const recommendedQuota = quotaPerDay * businessDaysRemaining;

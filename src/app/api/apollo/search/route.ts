@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   // Résoudre l'org_id depuis le clerk_user_id
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id, created_at")
+    .select("id")
     .eq("clerk_user_id", userId)
     .single();
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   const orgId: number = clientRow.id;
 
   // ── ÉTAPE 1 : Vérifier les crédits (auto-reset par période de 31 jours) ──
-  const credits = await resolveCredits(supabase, orgId, clientRow.created_at);
+  const credits = await resolveCredits(supabase, orgId);
   const creditsUsedBefore = credits.creditsUsed;
   const creditsTotal = credits.creditsTotal;
   const creditsBeforeSearch = credits.creditsRemaining;

@@ -1,8 +1,9 @@
 /**
  * Search credits: 31-day auto-reset logic.
  *
- * Each client gets 5 credits per 31-day period, starting from their account
- * creation date. When a new period starts, credits_used is reset to 0.
+ * Each client gets 5 credits per 31-day period. The period anchor is
+ * search_credits.created_at (when the credits row was first created).
+ * When a new period starts, credits_used is reset to 0.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -17,11 +18,11 @@ export interface CreditPeriod {
   periodNumber: number;
 }
 
-/** Calculate the current 31-day period for a given account creation date. */
-export function computePeriod(createdAt: Date, now: Date = new Date()): CreditPeriod {
-  const diffMs = now.getTime() - createdAt.getTime();
+/** Calculate the current 31-day period for a given anchor date. */
+export function computePeriod(anchorDate: Date, now: Date = new Date()): CreditPeriod {
+  const diffMs = now.getTime() - anchorDate.getTime();
   const periodNumber = Math.max(0, Math.floor(diffMs / PERIOD_MS));
-  const periodStart = new Date(createdAt.getTime() + periodNumber * PERIOD_MS);
+  const periodStart = new Date(anchorDate.getTime() + periodNumber * PERIOD_MS);
   const periodEnd = new Date(periodStart.getTime() + PERIOD_MS);
   return { periodStart, periodEnd, periodNumber };
 }
@@ -37,28 +38,25 @@ export interface ResolvedCredits {
 /**
  * Resolve credits for a client, auto-resetting if the period has changed.
  *
- * - If no search_credits row exists, creates one.
+ * - If no search_credits row exists, creates one (anchor = now).
+ * - Period is computed from search_credits.created_at (the row anchor).
  * - If the stored period_start doesn't match the current period, resets credits_used to 0.
  * - Returns the current credit state.
- *
- * Requires `clientCreatedAt` (from clients.created_at) to compute periods.
  */
 export async function resolveCredits(
   supabase: SupabaseClient,
-  orgId: number,
-  clientCreatedAt: string | Date
+  orgId: number
 ): Promise<ResolvedCredits> {
-  const createdAt = new Date(clientCreatedAt);
-  const { periodStart, periodEnd } = computePeriod(createdAt);
-
   const { data: creditRow } = await supabase
     .from("search_credits")
-    .select("id, credits_total, credits_used, period_start")
+    .select("id, credits_total, credits_used, period_start, created_at")
     .eq("org_id", orgId)
     .maybeSingle();
 
   if (!creditRow) {
-    // First time — create the row
+    // First time — create the row; anchor = now
+    const now = new Date();
+    const { periodStart, periodEnd } = computePeriod(now, now);
     await supabase.from("search_credits").insert({
       org_id: orgId,
       credits_total: CREDITS_TOTAL,
@@ -74,6 +72,10 @@ export async function resolveCredits(
       periodEnd,
     };
   }
+
+  // Use the row's created_at as anchor for period computation
+  const anchor = new Date(creditRow.created_at);
+  const { periodStart, periodEnd } = computePeriod(anchor);
 
   // Check if we need to reset (new period)
   const storedPeriodStart = creditRow.period_start
