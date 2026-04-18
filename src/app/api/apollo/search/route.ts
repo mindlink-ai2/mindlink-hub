@@ -266,8 +266,6 @@ function buildSearchPayload(filters: Record<string, unknown>): Record<string, un
   payload.include_similar_titles = true;
   if (arr(filters.person_seniorities)) payload.person_seniorities = filters.person_seniorities;
   if (arr(filters.person_locations)) payload.person_locations = filters.person_locations;
-
-  // ── Mots-clés ──
   if (str(filters.q_keywords)) payload.q_keywords = (filters.q_keywords as string).trim();
 
   // ── Entreprise ──
@@ -336,3 +334,4 @@ function arr(v: unknown): v is unknown[] {
 function str(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
+

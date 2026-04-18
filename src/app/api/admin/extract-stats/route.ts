@@ -126,6 +126,7 @@ export async function GET(request: Request) {
       });
 
       const data = await res.json();
+      console.log("[extract-stats] Apollo raw body (500 chars):", JSON.stringify(data).substring(0, 500));
       console.log("[extract-stats] Apollo response:", res.status, JSON.stringify({
         total_entries: data.pagination?.total_entries,
         unique_enriched_records: data.unique_enriched_records,

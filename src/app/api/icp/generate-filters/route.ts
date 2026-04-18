@@ -21,7 +21,16 @@ VOICI LES SEULS PARAMÈTRES ACCEPTÉS PAR L'API APOLLO — n'utilise QUE ceux-l�
 
 6. "organization_num_employees_ranges" (array de strings) : Taille entreprise. Format STRICT "min,max". Exemples valides UNIQUEMENT : "1,10", "11,20", "21,50", "51,100", "101,200", "201,500", "501,1000", "1001,2000", "2001,5000", "5001,10000", "10001,20000". AUCUN autre format.
 
-7. "q_keywords" (string) : Mot-clé général. UTILISE CE CHAMP pour les secteurs d'activité et les mots-clés entreprise que le client mentionne. Combine le secteur et les mots-clés en une seule string séparée par des espaces. Ex : si le client dit secteur "Industrie, logiciel, ESN" → q_keywords: "industrie manufacturing logiciel ESN ingénierie production". NE METS PAS de mots trop génériques comme "b2b" ou "entreprise". Si le client mentionne aussi des mots à exclure, NE LES METS PAS dans q_keywords (il n'y a pas de filtre d'exclusion sur cet endpoint).
+7. "q_keywords" (string) : Utilise ce champ pour le secteur d'activité du client. Mets UN SEUL mot-clé simple et large, pas une expression composée.
+Exemples :
+- Client dit "Agence de communication" → q_keywords: "communication"
+- Client dit "Agence de marketing digital" → q_keywords: "marketing"
+- Client dit "Cabinet de conseil en stratégie" → q_keywords: "conseil"
+- Client dit "E-commerce mode" → q_keywords: "ecommerce"
+- Client dit "SaaS B2B" → q_keywords: "software"
+- Client dit "Industrie agroalimentaire" → q_keywords: "agroalimentaire"
+NE JAMAIS mettre plusieurs mots comme "agence communication" ou "cabinet conseil stratégie". UN SEUL mot-clé.
+Si le secteur est trop vague ou générique, OMETS ce champ.
 
 8. "revenue_range" (objet {"min": integer, "max": integer}) : Chiffre d'affaires en dollars, sans symboles. UNIQUEMENT si le client mentionne un CA.
 
