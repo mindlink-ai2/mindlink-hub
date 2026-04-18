@@ -196,7 +196,14 @@ export async function POST(req: Request) {
       (l): l is Record<string, unknown> =>
         l != null && typeof l === "object" && typeof l.id === "string"
     )
-    .slice(0, 500);
+    .slice(0, 500)
+    .map((l) => ({
+      id: l.id as string,
+      first_name: typeof l.first_name === "string" ? l.first_name : undefined,
+      last_name: typeof l.last_name === "string" ? l.last_name : undefined,
+      title: typeof l.title === "string" ? l.title : undefined,
+      organization: l.organization as LeadInput["organization"],
+    }));
 
   if (leads.length === 0) {
     return NextResponse.json(
