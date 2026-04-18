@@ -742,6 +742,18 @@ export async function POST(request: Request) {
         `[create-workflow] Update: sheetUpdated=${sheetUpdated} dateUpdated=${dateUpdated}`
       );
 
+      // Retirer les propriétés read-only avant le PUT
+      delete existingWorkflow.id;
+      delete existingWorkflow.createdAt;
+      delete existingWorkflow.updatedAt;
+      delete existingWorkflow.active;
+      delete existingWorkflow.tags;
+      delete existingWorkflow.versionId;
+      delete existingWorkflow.triggerCount;
+      delete existingWorkflow.sharedWithProjects;
+      delete existingWorkflow.homeProject;
+      delete existingWorkflow.usedCredentials;
+
       // PUT le workflow mis à jour
       try {
         const putRes = await fetch(`${n8nBaseUrl}/api/v1/workflows/${existingWorkflowId}`, {

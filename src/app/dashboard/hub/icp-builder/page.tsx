@@ -816,31 +816,18 @@ export default function IcpBuilderPage() {
       {/* ── Écran : résultats ── */}
       {screen === "results" && (
         <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-          {/* Stats */}
+          {/* Crédits restants */}
           <div className="bg-white rounded-2xl border border-[#c8d6ea] px-6 py-5">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[#51627b]">Résultats estimés</p>
-                <p className="text-2xl font-bold text-[#0b1c33] mt-0.5">
-                  {totalResults !== null
-                    ? totalResults.toLocaleString("fr-FR")
-                    : "—"}
-                </p>
-                <p className="text-xs text-[#7a9abf] mt-0.5">
-                  prospects correspondant à vos critères
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-[#7a9abf]">Crédits restants</p>
-                <p
-                  className={cn(
-                    "text-xl font-bold",
-                    creditsRemaining === 0 ? "text-red-500" : "text-[#2563EB]"
-                  )}
-                >
-                  {creditsRemaining ?? "—"}
-                </p>
-              </div>
+              <p className="text-sm text-[#51627b]">Crédits restants</p>
+              <p
+                className={cn(
+                  "text-xl font-bold",
+                  creditsRemaining === 0 ? "text-red-500" : "text-[#2563EB]"
+                )}
+              >
+                {creditsRemaining ?? "—"}
+              </p>
             </div>
           </div>
 

@@ -11,6 +11,7 @@ type ApolloPersonRaw = Record<string, unknown>;
 interface ExtractRequestBody {
   org_id: number;
   quota: number;
+  filters_override?: Record<string, unknown>;
 }
 
 // ── Helpers Apollo ────────────────────────────────────────────────────────────
@@ -341,7 +342,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Corps de requête invalide" }, { status: 400 });
   }
 
-  const { org_id, quota } = body;
+  const { org_id, quota, filters_override } = body;
   const orgId = Number(org_id);
   if (!orgId || !quota || quota < 1) {
     return NextResponse.json({ error: "org_id et quota requis" }, { status: 400 });
@@ -418,7 +419,10 @@ export async function POST(request: Request) {
   }
   const logId: string = extractionLog.id;
 
-  const filters = (icpConfig.filters ?? {}) as Record<string, unknown>;
+  // Utiliser les filtres override si fournis, sinon ceux de la DB
+  const filters = filters_override
+    ? ({ apollo_filters: filters_override } as Record<string, unknown>)
+    : ((icpConfig.filters ?? {}) as Record<string, unknown>);
 
   // ── Extraction Apollo par pages (avec déduplication) ───────────────────────
   const newPeople: ApolloPersonRaw[] = [];

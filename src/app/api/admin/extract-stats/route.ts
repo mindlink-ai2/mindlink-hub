@@ -98,7 +98,22 @@ export async function GET(request: Request) {
   }
 
   const clientRow = clientRes.data;
-  const filters = (icpRes.data.filters ?? {}) as Record<string, unknown>;
+
+  // Utiliser les filtres override si fournis, sinon ceux de la DB
+  const filtersOverrideRaw = url.searchParams.get("filters_override");
+  let filters: Record<string, unknown>;
+  if (filtersOverrideRaw) {
+    try {
+      const parsed = JSON.parse(filtersOverrideRaw) as Record<string, unknown>;
+      // Wrap dans apollo_filters pour que buildApolloPayload le détecte
+      filters = { apollo_filters: parsed };
+      console.log("[extract-stats] Using filters_override from query params");
+    } catch {
+      return NextResponse.json({ error: "filters_override JSON invalide" }, { status: 400 });
+    }
+  } else {
+    filters = (icpRes.data.filters ?? {}) as Record<string, unknown>;
+  }
 
   console.log("[extract-stats] Raw icp_configs.filters keys:", Object.keys(filters));
   if (filters.apollo_filters) {

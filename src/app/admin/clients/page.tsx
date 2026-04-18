@@ -255,6 +255,57 @@ function ExtractModal({
   onClose: () => void;
   onSuccess: (url: string, count: number) => void;
 }) {
+  // ── Phase 1 — Filtres Apollo éditables ──────────────────────────────────
+  const rawFilters = client.icp.filters ?? {};
+  const apolloSrc = (
+    (rawFilters as Record<string, unknown>).apollo_filters &&
+    typeof (rawFilters as Record<string, unknown>).apollo_filters === "object"
+      ? (rawFilters as Record<string, unknown>).apollo_filters
+      : rawFilters
+  ) as Record<string, unknown>;
+
+  const [fPersonTitles, setFPersonTitles] = useState(
+    Array.isArray(apolloSrc.person_titles) ? (apolloSrc.person_titles as string[]).join("\n") : ""
+  );
+  const [fPersonSeniorities, setFPersonSeniorities] = useState(
+    Array.isArray(apolloSrc.person_seniorities) ? (apolloSrc.person_seniorities as string[]).join("\n") : ""
+  );
+  const [fPersonLocations, setFPersonLocations] = useState(
+    Array.isArray(apolloSrc.person_locations) ? (apolloSrc.person_locations as string[]).join("\n") : ""
+  );
+  const [fOrgLocations, setFOrgLocations] = useState(
+    Array.isArray(apolloSrc.organization_locations) ? (apolloSrc.organization_locations as string[]).join("\n") : ""
+  );
+  const [fOrgSizes, setFOrgSizes] = useState(
+    Array.isArray(apolloSrc.organization_num_employees_ranges) ? (apolloSrc.organization_num_employees_ranges as string[]).join("\n") : ""
+  );
+  const [fQKeywords, setFQKeywords] = useState(
+    typeof apolloSrc.q_keywords === "string" ? (apolloSrc.q_keywords as string) : ""
+  );
+  const [fIncludeSimilar, setFIncludeSimilar] = useState(
+    apolloSrc.include_similar_titles !== false
+  );
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+
+  /** Build the current apollo_filters object from state */
+  const buildCurrentFilters = useCallback((): Record<string, unknown> => {
+    const f: Record<string, unknown> = {};
+    const lines = (s: string) => s.split("\n").map((l) => l.trim()).filter(Boolean);
+    const titles = lines(fPersonTitles);
+    if (titles.length) f.person_titles = titles;
+    f.include_similar_titles = fIncludeSimilar;
+    const seniorities = lines(fPersonSeniorities);
+    if (seniorities.length) f.person_seniorities = seniorities;
+    const pLocs = lines(fPersonLocations);
+    if (pLocs.length) f.person_locations = pLocs;
+    const oLocs = lines(fOrgLocations);
+    if (oLocs.length) f.organization_locations = oLocs;
+    const sizes = lines(fOrgSizes);
+    if (sizes.length) f.organization_num_employees_ranges = sizes;
+    if (fQKeywords.trim()) f.q_keywords = fQKeywords.trim();
+    return f;
+  }, [fPersonTitles, fPersonSeniorities, fPersonLocations, fOrgLocations, fOrgSizes, fQKeywords, fIncludeSimilar]);
+
   // ── Phase 1 — Stats pré-extraction ──────────────────────────────────────
   const [stats, setStats] = useState<{
     total_available: number;
@@ -263,22 +314,29 @@ function ExtractModal({
   } | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/admin/extract-stats?org_id=${client.id}`);
-        if (res.ok && !cancelled) {
-          setStats(await res.json());
-        }
-      } catch {
-        // Non-blocking
-      } finally {
-        if (!cancelled) setStatsLoading(false);
+  const fetchStats = useCallback(async (filtersObj: Record<string, unknown>) => {
+    setStatsLoading(true);
+    try {
+      const qs = new URLSearchParams({
+        org_id: String(client.id),
+        filters_override: JSON.stringify(filtersObj),
+      });
+      const res = await fetch(`/api/admin/extract-stats?${qs}`);
+      if (res.ok) {
+        setStats(await res.json());
       }
-    })();
-    return () => { cancelled = true; };
+    } catch {
+      // Non-blocking
+    } finally {
+      setStatsLoading(false);
+    }
   }, [client.id]);
+
+  // Charger les stats au montage
+  useEffect(() => {
+    void fetchStats(buildCurrentFilters());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Phase 1 — Extraction ────────────────────────────────────────────────
   const [quota, setQuota] = useState(500);
@@ -328,7 +386,7 @@ function ExtractModal({
       const res = await fetch("/api/admin/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ org_id: client.id, quota }),
+        body: JSON.stringify({ org_id: client.id, quota, filters_override: buildCurrentFilters() }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -523,6 +581,110 @@ function ExtractModal({
                   value={quota}
                   onChange={(e) => setQuota(Number(e.target.value))}
                 />
+              </div>
+
+              {/* Filtres Apollo éditables */}
+              <div className="rounded-xl border border-[#c8d6ea] bg-white">
+                <button
+                  type="button"
+                  onClick={() => setFiltersExpanded((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-[#0b1c33] hover:bg-[#f8fafc] rounded-xl transition-colors"
+                >
+                  Filtres Apollo
+                  {filtersExpanded ? <ChevronUp className="w-4 h-4 text-[#7a9abf]" /> : <ChevronDown className="w-4 h-4 text-[#7a9abf]" />}
+                </button>
+                {filtersExpanded && (
+                  <div className="px-4 pb-4 space-y-3 border-t border-[#eef1f8]">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#51627b] mb-1 mt-3">
+                        person_titles <span className="text-[#9ab0c8] font-normal">(un par ligne)</span>
+                      </label>
+                      <textarea
+                        value={fPersonTitles}
+                        onChange={(e) => setFPersonTitles(e.target.value)}
+                        rows={4}
+                        className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#51627b] mb-1">
+                        person_seniorities <span className="text-[#9ab0c8] font-normal">(un par ligne)</span>
+                      </label>
+                      <textarea
+                        value={fPersonSeniorities}
+                        onChange={(e) => setFPersonSeniorities(e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#51627b] mb-1">
+                        person_locations <span className="text-[#9ab0c8] font-normal">(une par ligne)</span>
+                      </label>
+                      <textarea
+                        value={fPersonLocations}
+                        onChange={(e) => setFPersonLocations(e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#51627b] mb-1">
+                        organization_locations <span className="text-[#9ab0c8] font-normal">(une par ligne)</span>
+                      </label>
+                      <textarea
+                        value={fOrgLocations}
+                        onChange={(e) => setFOrgLocations(e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#51627b] mb-1">
+                        organization_num_employees_ranges <span className="text-[#9ab0c8] font-normal">(un par ligne, ex: 1,10)</span>
+                      </label>
+                      <textarea
+                        value={fOrgSizes}
+                        onChange={(e) => setFOrgSizes(e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#51627b] mb-1">
+                        q_keywords
+                      </label>
+                      <input
+                        type="text"
+                        value={fQKeywords}
+                        onChange={(e) => setFQKeywords(e.target.value)}
+                        className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="include-similar"
+                        checked={fIncludeSimilar}
+                        onChange={(e) => setFIncludeSimilar(e.target.checked)}
+                        className="rounded border-[#d7e3f4]"
+                      />
+                      <label htmlFor="include-similar" className="text-[11px] font-semibold text-[#51627b]">
+                        include_similar_titles
+                      </label>
+                    </div>
+                    <HubButton
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void fetchStats(buildCurrentFilters())}
+                      disabled={statsLoading}
+                      className="gap-1.5"
+                    >
+                      <RefreshCw className={cn("w-3.5 h-3.5", statsLoading && "animate-spin")} />
+                      Recalculer les stats
+                    </HubButton>
+                  </div>
+                )}
               </div>
 
               {/* Stats pré-extraction */}
