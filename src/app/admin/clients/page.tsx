@@ -332,22 +332,18 @@ function ExtractModal({
     setRenewalLoading(true);
     setRenewalError(null);
     try {
-      const res = await fetch("/api/admin/update-workflow", {
+      const res = await fetch("/api/admin/create-workflow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           org_id: client.id,
           google_sheet_id: extractionData.sheetId,
+          tab_name: extractionData.tabName,
+          extraction_log_id: extractionData.logId,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        // Workflow supprimé dans n8n → basculer vers le flow de création complet
-        if (data.code === "WORKFLOW_NOT_FOUND" || data.code === "NO_WORKFLOW") {
-          setFlowMode("renewal-new");
-          setRenewalError(null);
-          return;
-        }
         setRenewalError(data.error ?? "Erreur lors de la mise à jour du workflow.");
         return;
       }
