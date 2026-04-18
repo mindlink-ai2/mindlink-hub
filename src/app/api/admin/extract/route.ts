@@ -363,19 +363,19 @@ export async function POST(request: Request) {
     );
   }
 
-  // Récupérer la config ICP validée
+  // Récupérer la config ICP (draft ou submitted, tant que les filtres existent)
   const { data: icpConfig, error: icpErr } = await supabase
     .from("icp_configs")
     .select("id, filters, status")
     .eq("org_id", orgId)
-    .in("status", ["submitted", "reviewed", "active"])
+    .in("status", ["draft", "submitted", "reviewed", "active"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (icpErr || !icpConfig) {
     return NextResponse.json(
-      { error: "Aucun ICP validé trouvé pour ce client." },
+      { error: "Aucun ICP trouvé pour ce client." },
       { status: 404 }
     );
   }

@@ -390,24 +390,33 @@ export async function POST(req: Request) {
   // Always mark ICP config as submitted after successful lead selection
   console.log("[leads/select] org_id:", orgId, "— updating icp_configs to submitted");
 
-  const { error: icpUpdateErr, count: icpUpdateCount } = await supabase
+  const { data: updatedRows, error: icpUpdateErr } = await supabase
     .from("icp_configs")
     .update({ status: "submitted", submitted_at: new Date().toISOString() })
-    .eq("org_id", orgId);
+    .eq("org_id", orgId)
+    .select("id");
+
+  const updatedCount = updatedRows?.length ?? 0;
 
   console.log(
     "[leads/select] icp_configs update result:",
-    JSON.stringify({ count: icpUpdateCount, error: icpUpdateErr?.message ?? null })
+    JSON.stringify({
+      org_id: orgId,
+      rows_updated: updatedCount,
+      ids: updatedRows?.map((r) => r.id) ?? [],
+      error: icpUpdateErr?.message ?? null,
+    })
   );
 
-  if ((icpUpdateCount ?? 0) === 0 && !icpUpdateErr) {
+  if (updatedCount === 0 && !icpUpdateErr) {
     console.warn(
       "[leads/select] No icp_configs row found for org_id:",
       orgId,
-      "— upserting one"
+      "— inserting one"
     );
-    const { error: upsertErr } = await supabase.from("icp_configs").upsert(
-      {
+    const { data: inserted, error: insertErr } = await supabase
+      .from("icp_configs")
+      .insert({
         org_id: orgId,
         status: "submitted",
         submitted_at: new Date().toISOString(),
@@ -416,13 +425,14 @@ export async function POST(req: Request) {
           apollo_filters: {},
           commercial_promise: "",
         },
-      },
-      { onConflict: "org_id" }
-    );
-    if (upsertErr) {
-      console.error("[leads/select] icp_configs upsert error:", upsertErr.message);
+      })
+      .select("id")
+      .single();
+
+    if (insertErr) {
+      console.error("[leads/select] icp_configs insert error:", insertErr.message);
     } else {
-      console.log("[leads/select] icp_configs upsert ok for org_id:", orgId);
+      console.log("[leads/select] icp_configs inserted id:", inserted?.id, "for org_id:", orgId);
     }
   }
 

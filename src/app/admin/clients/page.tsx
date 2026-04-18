@@ -1224,7 +1224,12 @@ function ClientTableRow({
   const effectiveStripeStatus = stripeSub?.status ?? client.subscription_status;
   const isStripeOk =
     effectiveStripeStatus === "active" || effectiveStripeStatus === "trialing";
-  const isIcpOk = client.icp.status !== "none" && client.icp.status !== "draft";
+  const hasApolloFilters =
+    client.icp.status !== "none" &&
+    client.icp.filters?.apollo_filters != null &&
+    typeof client.icp.filters.apollo_filters === "object" &&
+    Object.keys(client.icp.filters.apollo_filters as Record<string, unknown>).length > 0;
+  const isIcpOk = hasApolloFilters;
   const canExtract = isStripeOk && isIcpOk;
 
   const displayName = client.name || client.email || `Client #${client.id}`;
@@ -1329,7 +1334,7 @@ function ClientTableRow({
             <div
               title={
                 !isIcpOk
-                  ? "ICP non validé"
+                  ? "Aucun filtre Apollo configuré"
                   : !isStripeOk
                   ? "Paiement inactif"
                   : "Lancer l'extraction"
