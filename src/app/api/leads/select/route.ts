@@ -388,16 +388,43 @@ export async function POST(req: Request) {
   }
 
   // Always mark ICP config as submitted after successful lead selection
+  console.log("[leads/select] org_id:", orgId, "— updating icp_configs to submitted");
+
   const { error: icpUpdateErr, count: icpUpdateCount } = await supabase
     .from("icp_configs")
     .update({ status: "submitted", submitted_at: new Date().toISOString() })
-    .eq("org_id", orgId)
-    .in("status", ["draft"]);
+    .eq("org_id", orgId);
 
   console.log(
-    `[leads/select] org_id=${orgId} icp_configs update: rows=${icpUpdateCount ?? 0}`,
-    icpUpdateErr ? `error=${icpUpdateErr.message}` : "ok"
+    "[leads/select] icp_configs update result:",
+    JSON.stringify({ count: icpUpdateCount, error: icpUpdateErr?.message ?? null })
   );
+
+  if ((icpUpdateCount ?? 0) === 0 && !icpUpdateErr) {
+    console.warn(
+      "[leads/select] No icp_configs row found for org_id:",
+      orgId,
+      "— upserting one"
+    );
+    const { error: upsertErr } = await supabase.from("icp_configs").upsert(
+      {
+        org_id: orgId,
+        status: "submitted",
+        submitted_at: new Date().toISOString(),
+        filters: {
+          questionnaire: {},
+          apollo_filters: {},
+          commercial_promise: "",
+        },
+      },
+      { onConflict: "org_id" }
+    );
+    if (upsertErr) {
+      console.error("[leads/select] icp_configs upsert error:", upsertErr.message);
+    } else {
+      console.log("[leads/select] icp_configs upsert ok for org_id:", orgId);
+    }
+  }
 
   return NextResponse.json({
     success: true,
