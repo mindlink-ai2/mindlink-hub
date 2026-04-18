@@ -673,7 +673,9 @@ export async function POST(request: Request) {
   // ── Étape 1 : Créer le dossier n8n ───────────────────────────────────────
   let folderId: string;
   try {
-    const folderRes = await fetch(`${n8nBaseUrl}/api/v1/folders`, {
+    const folderUrl = `${n8nBaseUrl}/api/v1/folders`;
+    console.log(`[create-workflow] Creating folder — URL: ${folderUrl}`);
+    const folderRes = await fetch(folderUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
