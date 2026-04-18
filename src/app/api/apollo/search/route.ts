@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
+import { resolveCredits } from "@/lib/search-credits";
 
 export const runtime = "nodejs";
 
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   // Résoudre l'org_id depuis le clerk_user_id
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id")
+    .select("id, created_at")
     .eq("clerk_user_id", userId)
     .single();
 
@@ -32,34 +33,11 @@ export async function POST(request: Request) {
   }
   const orgId: number = clientRow.id;
 
-  // ── ÉTAPE 1 : Vérifier les crédits (lecture seule, PAS de décrémentation encore) ──
-  const { data: creditRow } = await supabase
-    .from("search_credits")
-    .select("id, credits_total, credits_used")
-    .eq("org_id", orgId)
-    .maybeSingle();
-
-  let creditsUsedBefore: number;
-  let creditsTotal: number;
-
-  if (!creditRow) {
-    // Première recherche : initialiser les crédits
-    const { error: insertErr } = await supabase.from("search_credits").insert({
-      org_id: orgId,
-      credits_total: 15,
-      credits_used: 0,
-    });
-    if (insertErr) {
-      console.error("[search] failed to init credits for org", orgId, insertErr.message);
-    }
-    creditsUsedBefore = 0;
-    creditsTotal = 15;
-  } else {
-    creditsUsedBefore = creditRow.credits_used;
-    creditsTotal = creditRow.credits_total;
-  }
-
-  const creditsBeforeSearch = creditsTotal - creditsUsedBefore;
+  // ── ÉTAPE 1 : Vérifier les crédits (auto-reset par période de 31 jours) ──
+  const credits = await resolveCredits(supabase, orgId, clientRow.created_at);
+  const creditsUsedBefore = credits.creditsUsed;
+  const creditsTotal = credits.creditsTotal;
+  const creditsBeforeSearch = credits.creditsRemaining;
   console.log(`[search] org_id=${orgId} crédits avant=${creditsBeforeSearch}/${creditsTotal}`);
 
   if (creditsBeforeSearch <= 0) {

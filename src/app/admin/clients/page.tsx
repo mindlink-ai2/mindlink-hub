@@ -301,6 +301,10 @@ function ExtractModal({
     total_available: number;
     already_extracted: number;
     remaining: number;
+    recommended_quota: number;
+    quota_per_day: number;
+    business_days_remaining: number;
+    period_end: string;
   } | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
@@ -313,7 +317,12 @@ function ExtractModal({
       });
       const res = await fetch(`/api/admin/extract-stats?${qs}`);
       if (res.ok) {
-        setStats(await res.json());
+        const data = await res.json();
+        setStats(data);
+        // Pré-remplir le quota avec la recommandation
+        if (typeof data.recommended_quota === "number" && data.recommended_quota > 0) {
+          setQuota(data.recommended_quota);
+        }
       }
     } catch {
       // Non-blocking
@@ -571,6 +580,13 @@ function ExtractModal({
                   value={quota}
                   onChange={(e) => setQuota(Number(e.target.value))}
                 />
+                {stats && stats.recommended_quota > 0 && (
+                  <div className="mt-1.5 text-xs text-[#51627b] space-y-0.5">
+                    <p>Quota journalier : <span className="font-semibold">{stats.quota_per_day} leads/jour</span></p>
+                    <p>Jours ouvrés restants : <span className="font-semibold">{stats.business_days_remaining} jours</span> (jusqu&apos;au {stats.period_end})</p>
+                    <p>Total recommandé : <span className="font-semibold">{stats.quota_per_day} × {stats.business_days_remaining} = {stats.recommended_quota} leads</span></p>
+                  </div>
+                )}
               </div>
 
               {/* Filtres Apollo éditables */}

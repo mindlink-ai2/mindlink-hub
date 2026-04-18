@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
+import { resolveCredits } from "@/lib/search-credits";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,7 @@ export async function GET() {
 
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id")
+    .select("id, created_at")
     .eq("clerk_user_id", userId)
     .single();
 
@@ -22,20 +23,12 @@ export async function GET() {
     return NextResponse.json({ credits_remaining: null });
   }
 
-  const { data: credits } = await supabase
-    .from("search_credits")
-    .select("credits_total, credits_used")
-    .eq("org_id", clientRow.id)
-    .maybeSingle();
-
-  if (!credits) {
-    // Pas encore initialisé → retourner le quota par défaut
-    return NextResponse.json({ credits_remaining: 15, credits_total: 15, credits_used: 0 });
-  }
+  const credits = await resolveCredits(supabase, clientRow.id, clientRow.created_at);
 
   return NextResponse.json({
-    credits_remaining: credits.credits_total - credits.credits_used,
-    credits_total: credits.credits_total,
-    credits_used: credits.credits_used,
+    credits_remaining: credits.creditsRemaining,
+    credits_total: credits.creditsTotal,
+    credits_used: credits.creditsUsed,
+    period_end: credits.periodEnd.toISOString(),
   });
 }

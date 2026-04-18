@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import { google } from "googleapis";
+import { computePeriod, countBusinessDays } from "@/lib/search-credits";
 
 export const runtime = "nodejs";
 
@@ -75,7 +76,7 @@ export async function GET(request: Request) {
 
   // Fetch client + ICP in parallel
   const [clientRes, icpRes] = await Promise.all([
-    supabase.from("clients").select("id, email, company_name").eq("id", orgId).single(),
+    supabase.from("clients").select("id, email, company_name, quota, created_at").eq("id", orgId).single(),
     supabase
       .from("icp_configs")
       .select("filters")
@@ -193,9 +194,23 @@ export async function GET(request: Request) {
 
   const remaining = Math.max(0, totalAvailable - alreadyExtracted);
 
+  // ── Calcul du quota recommandé ──
+  const quotaPerDay = Number(clientRow.quota) || 10;
+  const clientCreatedAt = clientRow.created_at
+    ? new Date(clientRow.created_at as string)
+    : new Date();
+  const { periodEnd } = computePeriod(clientCreatedAt);
+  const today = new Date();
+  const businessDaysRemaining = countBusinessDays(today, periodEnd);
+  const recommendedQuota = quotaPerDay * businessDaysRemaining;
+
   return NextResponse.json({
     total_available: totalAvailable,
     already_extracted: alreadyExtracted,
     remaining,
+    recommended_quota: recommendedQuota,
+    quota_per_day: quotaPerDay,
+    business_days_remaining: businessDaysRemaining,
+    period_end: periodEnd.toISOString().split("T")[0],
   });
 }
