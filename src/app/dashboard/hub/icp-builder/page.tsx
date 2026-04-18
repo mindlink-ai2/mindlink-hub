@@ -11,10 +11,8 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Crown,
   Loader2,
   MessageCircleQuestion,
-  MousePointerClick,
   Pencil,
   Search,
   Send,
@@ -347,10 +345,15 @@ export default function IcpBuilderPage() {
   const [quotaUsed, setQuotaUsed] = useState(0);
   const [validatingSelection, setValidatingSelection] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [monthlyQuota, setMonthlyQuota] = useState(0);
+  const [autoSelecting, setAutoSelecting] = useState(false);
 
   const quotaRemaining = Math.max(0, quotaTotal - quotaUsed);
   const selectedCount = selectedLeadIds.size;
   const canSelectMore = selectedCount < quotaRemaining;
+  const allPageSelected =
+    browseLeads.length > 0 &&
+    browseLeads.every((l) => selectedLeadIds.has(l.id));
 
   // ── Help chat state ──
   const [helpOpenFor, setHelpOpenFor] = useState<string | null>(null);
@@ -715,6 +718,7 @@ export default function IcpBuilderPage() {
         const data = await res.json();
         setQuotaTotal(data.quota_remaining ?? 0);
         setQuotaUsed(0); // quota_remaining already accounts for used
+        setMonthlyQuota(data.monthly_quota ?? 0);
       }
     } catch {
       // silencieux
@@ -787,10 +791,28 @@ export default function IcpBuilderPage() {
   );
 
   const selectAllOnPage = useCallback(() => {
-    setBrowseLeads((leads) => {
+    const allSelected =
+      browseLeads.length > 0 &&
+      browseLeads.every((l) => selectedLeadIds.has(l.id));
+
+    if (allSelected) {
+      // Deselect all on page
+      const pageIds = new Set(browseLeads.map((l) => l.id));
+      setSelectedLeadIds((prev) => {
+        const next = new Set(prev);
+        for (const id of pageIds) next.delete(id);
+        return next;
+      });
+      setSelectedLeadsMap((prev) => {
+        const next = new Map(prev);
+        for (const id of pageIds) next.delete(id);
+        return next;
+      });
+    } else {
+      // Select all on page
       const newIds = new Set(selectedLeadIds);
       const newMap = new Map(selectedLeadsMap);
-      for (const lead of leads) {
+      for (const lead of browseLeads) {
         if (newIds.size >= quotaRemaining) break;
         if (!newIds.has(lead.id)) {
           newIds.add(lead.id);
@@ -799,9 +821,43 @@ export default function IcpBuilderPage() {
       }
       setSelectedLeadIds(newIds);
       setSelectedLeadsMap(newMap);
-      return leads;
-    });
-  }, [selectedLeadIds, selectedLeadsMap, quotaRemaining]);
+    }
+  }, [browseLeads, selectedLeadIds, selectedLeadsMap, quotaRemaining]);
+
+  const handleAutoSelect = useCallback(async () => {
+    const target = Math.min(monthlyQuota, quotaRemaining);
+    if (target <= 0) return;
+
+    setAutoSelecting(true);
+    const newIds = new Set(selectedLeadIds);
+    const newMap = new Map(selectedLeadsMap);
+
+    let page = 1;
+    try {
+      while (newIds.size < target) {
+        const res = await fetch(`/api/apollo/browse?page=${page}`);
+        const data = await res.json();
+        if (!res.ok || !data.people?.length) break;
+
+        for (const lead of data.people as BrowseProfile[]) {
+          if (newIds.size >= target) break;
+          if (!newIds.has(lead.id)) {
+            newIds.add(lead.id);
+            newMap.set(lead.id, lead);
+          }
+        }
+
+        if (page >= (data.total_pages ?? 1)) break;
+        page++;
+      }
+    } catch {
+      // stop here
+    }
+
+    setSelectedLeadIds(newIds);
+    setSelectedLeadsMap(newMap);
+    setAutoSelecting(false);
+  }, [monthlyQuota, quotaRemaining, selectedLeadIds, selectedLeadsMap]);
 
   const handleValidateSelection = useCallback(async () => {
     setValidatingSelection(true);
@@ -1150,44 +1206,10 @@ export default function IcpBuilderPage() {
             </div>
           )}
 
-          {/* Mode selection */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Option A — Lidmeo s'occupe de tout */}
-            <button
-              type="button"
-              onClick={handleGenerateAndSearch}
-              disabled={generatingFilters || searching || creditsRemaining === 0}
-              className="relative bg-white rounded-2xl border-2 border-[#2563EB] p-6 text-left hover:shadow-md transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-[#2563EB] px-2 py-0.5 text-[10px] font-semibold text-white">
-                <Crown className="w-3 h-3" />
-                Recommandé
-              </span>
-              <Sparkles className="w-8 h-8 text-[#2563EB] mb-3" />
-              <h3 className="text-sm font-bold text-[#0b1c33] mb-1">
-                {generatingFilters
-                  ? "Analyse en cours…"
-                  : searching
-                  ? "Recherche en cours…"
-                  : "Lidmeo s'occupe de tout"}
-              </h3>
-              <p className="text-xs text-[#51627b] leading-relaxed">
-                Nous sélectionnons les meilleurs profils pour vous selon vos
-                critères.
-              </p>
-              {creditsRemaining !== null && creditsRemaining > 0 && (
-                <p className="text-[10px] text-[#7a9abf] mt-2">
-                  Consomme 1 crédit ({creditsRemaining} restant
-                  {creditsRemaining > 1 ? "s" : ""})
-                </p>
-              )}
-            </button>
-
-            {/* Option B — Je choisis mes leads */}
-            <button
-              type="button"
+          <div className="flex justify-center">
+            <HubButton
+              variant="primary"
               onClick={async () => {
-                // Generate filters first if not done yet
                 if (!generatedFilters) {
                   setGeneratingFilters(true);
                   try {
@@ -1208,25 +1230,22 @@ export default function IcpBuilderPage() {
                 }
                 handleEnterBrowseMode();
               }}
-              disabled={generatingFilters || searching}
-              className="bg-white rounded-2xl border border-[#c8d6ea] p-6 text-left hover:border-[#2563EB] hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={generatingFilters}
+              className="gap-2"
             >
-              <MousePointerClick className="w-8 h-8 text-[#51627b] mb-3" />
-              <h3 className="text-sm font-bold text-[#0b1c33] mb-1">
-                Je choisis mes leads
-              </h3>
-              <p className="text-xs text-[#51627b] leading-relaxed">
-                Parcourez les profils disponibles et sélectionnez ceux que vous
-                souhaitez contacter.
-              </p>
-            </button>
+              {generatingFilters ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Préparation…
+                </>
+              ) : (
+                <>
+                  <Search className="w-4 h-4" />
+                  Parcourir et sélectionner mes leads
+                </>
+              )}
+            </HubButton>
           </div>
-
-          {creditsRemaining === 0 && (
-            <p className="text-sm text-red-500 text-center mt-3">
-              {"Vous n'avez plus de crédits de recherche."}
-            </p>
-          )}
         </div>
       )}
 
@@ -1385,13 +1404,41 @@ export default function IcpBuilderPage() {
             <HubButton
               variant="secondary"
               onClick={selectAllOnPage}
-              disabled={!canSelectMore || browseLoading}
+              disabled={(!canSelectMore && !allPageSelected) || browseLoading}
               className="gap-2"
             >
               <Check className="w-4 h-4" />
-              Tout sélectionner
+              {allPageSelected ? "Tout désélectionner" : "Tout sélectionner"}
             </HubButton>
           </div>
+
+          {/* Auto-select */}
+          {monthlyQuota > 0 && (
+            <div className="flex justify-center mb-4">
+              <HubButton
+                variant="secondary"
+                onClick={handleAutoSelect}
+                disabled={autoSelecting || quotaRemaining === 0 || selectedCount >= Math.min(monthlyQuota, quotaRemaining)}
+                className="gap-2"
+              >
+                {autoSelecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Sélection en cours…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Sélectionner{" "}
+                    {Math.min(monthlyQuota, quotaRemaining).toLocaleString(
+                      "fr-FR"
+                    )}{" "}
+                    leads automatiquement
+                  </>
+                )}
+              </HubButton>
+            </div>
+          )}
 
           {browseError && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-sm text-red-700">

@@ -62,6 +62,7 @@ export async function GET() {
     quota_used: quotaUsed,
     quota_remaining: quotaRemaining,
     quota_per_day: quotaPerDay,
+    monthly_quota: quotaPerDay * 22,
     business_days_remaining: businessDaysRemaining,
     period_end: periodEnd.toISOString().split("T")[0],
   });
