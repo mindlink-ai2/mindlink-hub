@@ -151,17 +151,17 @@ const STEP_COUNT = STEPS.length;
 
 const HELP_OPENING_MESSAGES: Record<string, string> = {
   q1_titles:
-    "Listez les titres exacts tels qu'ils apparaissent sur LinkedIn. Par exemple : CEO, Directeur Commercial, Responsable Marketing. Si vous ne savez pas, décrivez-moi votre client idéal et je vous aiderai à trouver les bons titres.",
+    "Qui tu veux contacter exactement ? Dis-moi juste ce que font tes clients au quotidien et je t'aide à trouver les bons titres de poste.",
   q2_exclusions:
-    "Y a-t-il des postes qui ressemblent à votre cible mais que vous ne voulez pas contacter ? Par exemple si vous ciblez les CEO, vous voudrez peut-être exclure les CEO de startups en phase d'amorçage. Si vous n'avez pas d'exclusion, passez cette question.",
+    "Il y a des gens que tu ne veux surtout pas contacter ? Si non, passe cette question, c'est optionnel.",
   q3_sector:
-    "Soyez précis sur le secteur. 'Digital' est trop large. Préférez 'Agences de communication', 'Éditeurs de logiciels SaaS', 'Cabinets de recrutement'. Si vous ciblez plusieurs secteurs, listez-les tous.",
+    "Tes clients ils font quoi comme activité ? Dis-moi en quelques mots et je t'aide à bien formuler.",
   q4_company_sizes:
-    "La taille d'entreprise est importante pour cibler les bonnes structures. Les très petites entreprises (1-10) sont souvent des indépendants, les 11-50 sont des PME structurées, les 51-200 des ETI. Choisissez en fonction de votre offre.",
+    "Tes clients c'est plutôt des petites boîtes ou des grosses structures ? Dis-moi combien de personnes il y a en général.",
   q5_locations:
-    "Indiquez les zones géographiques que vous voulez cibler. Vous pouvez mettre un pays entier (France) ou être plus précis (Paris, Lyon, Bordeaux). Si vous travaillez en remote, mettez le pays entier.",
+    "Tu travailles avec des clients partout en France ou dans des villes précises ?",
   q6_commercial_promise:
-    "Décrivez concrètement ce que vous apportez à vos clients. Pas de jargon marketing, parlez comme si vous expliquiez à un ami. Qu'est-ce qui change concrètement pour votre client après avoir travaillé avec vous ?",
+    "Explique-moi simplement ce que tu fais pour tes clients. Qu'est-ce qui change pour eux après avoir bossé avec toi ?",
 };
 
 type HelpMessage = { role: "user" | "assistant"; content: string };
@@ -314,6 +314,7 @@ export default function IcpBuilderPage() {
   const [helpInput, setHelpInput] = useState("");
   const [helpSending, setHelpSending] = useState(false);
   const helpEndRef = useRef<HTMLDivElement>(null);
+  const helpInputRef = useRef<HTMLInputElement>(null);
 
   const openHelpChat = useCallback((questionKey: string) => {
     const opening = HELP_OPENING_MESSAGES[questionKey];
@@ -382,6 +383,13 @@ export default function IcpBuilderPage() {
   useEffect(() => {
     helpEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [helpMessages]);
+
+  // Auto-focus input when chat opens
+  useEffect(() => {
+    if (helpOpenFor) {
+      setTimeout(() => helpInputRef.current?.focus(), 100);
+    }
+  }, [helpOpenFor]);
 
   // Close help chat when changing steps
   useEffect(() => {
@@ -873,6 +881,7 @@ export default function IcpBuilderPage() {
                 {/* Input */}
                 <div className="flex items-center gap-2 px-3 py-2.5 border-t border-[#c8d6ea] bg-white">
                   <input
+                    ref={helpInputRef}
                     type="text"
                     value={helpInput}
                     onChange={(e) => setHelpInput(e.target.value)}
@@ -882,7 +891,7 @@ export default function IcpBuilderPage() {
                         sendHelpMessage();
                       }
                     }}
-                    placeholder="Posez votre question..."
+                    placeholder="Écris ta question ici..."
                     className="flex-1 text-sm bg-transparent text-[#0b1c33] placeholder:text-[#a0b0c0] outline-none"
                     disabled={helpSending}
                   />
