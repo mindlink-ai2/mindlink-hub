@@ -105,7 +105,7 @@ const STEPS: StepDef[] = [
     number: 3,
     title: "Dans quel secteur d'activité travaillent vos clients idéaux ?",
     subtitle:
-      "Précisez le secteur, pas juste « digital ». Plus c'est précis, meilleurs seront les résultats.",
+      "Précisez le secteur, pas simplement « digital ». Plus c'est précis, meilleurs seront les résultats.",
     placeholder:
       "Ex : Agences de communication, SaaS B2B, E-commerce mode, Cabinets de conseil en stratégie",
     type: "textarea",
@@ -151,17 +151,17 @@ const STEP_COUNT = STEPS.length;
 
 const HELP_OPENING_MESSAGES: Record<string, string> = {
   q1_titles:
-    "Qui tu veux contacter exactement ? Dis-moi juste ce que font tes clients au quotidien et je t'aide à trouver les bons titres de poste.",
+    "Qui souhaites-tu contacter ? Dis-moi ce que font tes clients au quotidien et je t'aide à trouver les bons titres de poste.",
   q2_exclusions:
-    "Il y a des gens que tu ne veux surtout pas contacter ? Si non, passe cette question, c'est optionnel.",
+    "Y a-t-il des personnes que tu ne souhaites pas contacter ? Si non, passe cette question, elle est optionnelle.",
   q3_sector:
-    "Tes clients ils font quoi comme activité ? Dis-moi en quelques mots et je t'aide à bien formuler.",
+    "Quelle est l'activité de tes clients ? Dis-moi en quelques mots et je t'aide à bien formuler.",
   q4_company_sizes:
-    "Tes clients c'est plutôt des petites boîtes ou des grosses structures ? Dis-moi combien de personnes il y a en général.",
+    "Tes clients, ce sont plutôt des petites entreprises ou des grandes structures ? Dis-moi combien de personnes il y a en général.",
   q5_locations:
-    "Tu travailles avec des clients partout en France ou dans des villes précises ?",
+    "Travailles-tu avec des clients partout en France ou dans des villes précises ?",
   q6_commercial_promise:
-    "Explique-moi simplement ce que tu fais pour tes clients. Qu'est-ce qui change pour eux après avoir bossé avec toi ?",
+    "Explique-moi simplement ce que tu fais pour tes clients. Qu'est-ce qui change pour eux après avoir travaillé avec toi ?",
 };
 
 type HelpMessage = { role: "user" | "assistant"; content: string };

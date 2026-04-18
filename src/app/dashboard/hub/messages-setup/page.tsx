@@ -35,7 +35,7 @@ type MessageKind = "linkedin" | "relance";
 const ASSISTANT_NAME = "Assistant Lidmeo";
 
 const WELCOME_MESSAGE =
-  "Bonjour ! Je suis l'Assistant Lidmeo. Je vais t'aider à créer tes messages de prospection LinkedIn. Je vais te poser 6 questions pour bien comprendre ton offre, puis on construit ensemble ton message LinkedIn, puis ta relance. C'est parti ?";
+  "Bonjour ! Je suis l'Assistant Lidmeo. Je vais t'aider à créer tes messages de prospection LinkedIn. Je vais te poser 6 questions pour bien comprendre ton offre, puis nous construirons ensemble ton message LinkedIn et ta relance. On commence ?";
 
 function extractTag(raw: string, tag: string): string {
   const re = new RegExp(`\\[${tag}\\]([\\s\\S]*?)\\[/${tag}\\]`, "i");
