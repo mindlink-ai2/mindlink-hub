@@ -165,5 +165,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  console.log("[icp] apollo_filters generated:", JSON.stringify(filters).slice(0, 500));
   return NextResponse.json({ filters });
 }

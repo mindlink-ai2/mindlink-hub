@@ -81,7 +81,7 @@ export async function GET(request: Request) {
       .from("icp_configs")
       .select("filters")
       .eq("org_id", orgId)
-      .in("status", ["submitted", "reviewed", "active"])
+      .in("status", ["draft", "submitted", "reviewed", "active"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),

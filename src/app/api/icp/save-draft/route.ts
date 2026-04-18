@@ -34,26 +34,27 @@ export async function POST(request: Request) {
   }
   const orgId: number = clientRow.id;
 
-  // Ne pas écraser un ICP déjà soumis/validé
   const { data: existing } = await supabase
     .from("icp_configs")
     .select("id, status")
     .eq("org_id", orgId)
     .maybeSingle();
 
-  if (existing && existing.status !== "draft") {
-    return NextResponse.json(
-      { error: "Ce ciblage a déjà été soumis et ne peut pas être modifié." },
-      { status: 409 }
-    );
-  }
+  const apolloFilters = (body.filters as Record<string, unknown>)?.apollo_filters;
+  console.log(
+    "[icp/save-draft] org_id:", orgId,
+    "existing:", existing ? `id=${existing.id} status=${existing.status}` : "none",
+    "apollo_filters keys:", apolloFilters ? Object.keys(apolloFilters as Record<string, unknown>) : "null"
+  );
 
   if (existing?.id) {
+    // Always allow saving filters (status reset to draft if needed)
     const { error: updateErr } = await supabase
       .from("icp_configs")
       .update({
         filters: body.filters,
         preview_profiles: body.preview_profiles ?? [],
+        status: "draft",
         updated_at: new Date().toISOString(),
       })
       .eq("id", existing.id);
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
       console.error("[icp/save-draft] update error", updateErr);
       return NextResponse.json({ error: "Erreur lors de la sauvegarde" }, { status: 500 });
     }
+    console.log("[icp/save-draft] updated id:", existing.id, "apollo_filters saved:", JSON.stringify(apolloFilters).slice(0, 300));
   } else {
     const { error: insertErr } = await supabase.from("icp_configs").insert({
       org_id: orgId,
@@ -74,6 +76,7 @@ export async function POST(request: Request) {
       console.error("[icp/save-draft] insert error", insertErr);
       return NextResponse.json({ error: "Erreur lors de la sauvegarde" }, { status: 500 });
     }
+    console.log("[icp/save-draft] inserted new row for org_id:", orgId);
   }
 
   return NextResponse.json({ success: true });
