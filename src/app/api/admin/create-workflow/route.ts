@@ -666,7 +666,7 @@ export async function POST(request: Request) {
   const startDate = getTomorrowDate();
   const existingWorkflowId = (clientRow.n8n_workflow_id as string | null) ?? null;
 
-  let workflowId: string;
+  let workflowId = "";
   let updated = false;
 
   // ── Workflow existant ? Tenter une mise à jour ────────────────────────────
