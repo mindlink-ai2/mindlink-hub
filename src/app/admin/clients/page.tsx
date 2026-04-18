@@ -255,6 +255,31 @@ function ExtractModal({
   onClose: () => void;
   onSuccess: (url: string, count: number) => void;
 }) {
+  // ── Phase 1 — Stats pré-extraction ──────────────────────────────────────
+  const [stats, setStats] = useState<{
+    total_available: number;
+    already_extracted: number;
+    remaining: number;
+  } | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/extract-stats?org_id=${client.id}`);
+        if (res.ok && !cancelled) {
+          setStats(await res.json());
+        }
+      } catch {
+        // Non-blocking
+      } finally {
+        if (!cancelled) setStatsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [client.id]);
+
   // ── Phase 1 — Extraction ────────────────────────────────────────────────
   const [quota, setQuota] = useState(500);
   const [extractLoading, setExtractLoading] = useState(false);
@@ -498,6 +523,33 @@ function ExtractModal({
                   value={quota}
                   onChange={(e) => setQuota(Number(e.target.value))}
                 />
+              </div>
+
+              {/* Stats pré-extraction */}
+              <div className="rounded-xl border border-[#e8f0fe] bg-[#f4f8ff] px-4 py-3 text-sm space-y-1.5">
+                {statsLoading ? (
+                  <div className="flex items-center gap-2 text-[#51627b]">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Chargement des stats…
+                  </div>
+                ) : stats ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-[#51627b]">Leads disponibles (Apollo)</span>
+                      <span className="font-semibold text-[#0b1c33]">{stats.total_available.toLocaleString("fr-FR")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#51627b]">Leads déjà extraits</span>
+                      <span className="font-semibold text-[#0b1c33]">{stats.already_extracted.toLocaleString("fr-FR")}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-[#d4e0f4] pt-1.5">
+                      <span className="text-[#51627b] font-medium">Restants à extraire</span>
+                      <span className="font-bold text-[#1f5eff]">{stats.remaining.toLocaleString("fr-FR")}</span>
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-[#9ab0c8]">Stats indisponibles</span>
+                )}
               </div>
 
               {extractError && (

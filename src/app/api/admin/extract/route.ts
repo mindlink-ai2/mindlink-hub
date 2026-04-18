@@ -276,6 +276,58 @@ const SHEET_HEADERS = [
   "Apollo Contact Id", "Apollo Account Id",
 ];
 
+// ── Helpers pour déduplication ───────────────────────────────────────────────
+
+/** Derive tab name from client data — must stay in sync with the sheet-write logic below. */
+function deriveTabName(companyName: string | null, email: string | null, orgId: number): string {
+  return (companyName ?? email ?? `Client ${orgId}`)
+    .replace(/[\\/?*[\]:]/g, "-")
+    .slice(0, 100);
+}
+
+const COL_LINKEDIN_URL = 14; // "Person Linkedin Url" — 0-based index in SHEET_HEADERS
+const COL_APOLLO_ID = 26;    // "Apollo Contact Id"
+
+/**
+ * Read existing leads from the client's Google Sheet tab.
+ * Returns a Set of known identifiers (Apollo ID or LinkedIn URL) for dedup.
+ */
+async function loadExistingLeadIds(
+  sheets: ReturnType<typeof google.sheets>,
+  masterSheetId: string,
+  tabName: string
+): Promise<Set<string>> {
+  const ids = new Set<string>();
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: masterSheetId,
+      range: `'${tabName}'`,
+    });
+    const rows = res.data.values;
+    if (!rows || rows.length < 2) return ids;
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const apolloId = (row[COL_APOLLO_ID] ?? "").toString().trim();
+      const linkedinUrl = (row[COL_LINKEDIN_URL] ?? "").toString().trim().toLowerCase();
+      if (apolloId) ids.add(apolloId);
+      if (linkedinUrl) ids.add(linkedinUrl);
+    }
+  } catch {
+    // Tab doesn't exist yet — no existing leads
+  }
+  return ids;
+}
+
+/** Check if a person is already in the existing set (by Apollo ID or LinkedIn URL). */
+function isDuplicate(person: ApolloPersonRaw, existingIds: Set<string>): boolean {
+  const apolloId = typeof person.id === "string" ? person.id.trim() : "";
+  if (apolloId && existingIds.has(apolloId)) return true;
+  const linkedinUrl = typeof person.linkedin_url === "string" ? person.linkedin_url.trim().toLowerCase() : "";
+  if (linkedinUrl && existingIds.has(linkedinUrl)) return true;
+  return false;
+}
+
 // ── Handler principal ─────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
@@ -292,7 +344,6 @@ export async function POST(request: Request) {
   }
 
   const { org_id, quota } = body;
-  // Forcer la coercion en nombre (client.id peut arriver en string selon la version supabase-js)
   const orgId = Number(org_id);
   if (!orgId || !quota || quota < 1) {
     return NextResponse.json({ error: "org_id et quota requis" }, { status: 400 });
@@ -300,7 +351,7 @@ export async function POST(request: Request) {
 
   const supabase = createServiceSupabase();
 
-  // Récupérer les infos client (nom, prénom, entreprise)
+  // Récupérer les infos client
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
     .select("id, email, company_name")
@@ -337,6 +388,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Clé Apollo non configurée" }, { status: 500 });
   }
 
+  const MASTER_SHEET_ID = process.env.GOOGLE_MASTER_SHEET_ID;
+  if (!MASTER_SHEET_ID) {
+    return NextResponse.json({ error: "GOOGLE_MASTER_SHEET_ID non configurée" }, { status: 500 });
+  }
+
+  // ── Charger les leads existants pour déduplication ──────────────────────────
+  const company = (clientRow as Record<string, unknown>).company_name as string | null;
+  const clientEmail = clientRow.email as string | null;
+  const tabName = deriveTabName(company, clientEmail, orgId);
+
+  const auth = getGoogleAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const existingIds = await loadExistingLeadIds(sheets, MASTER_SHEET_ID, tabName);
+  console.log(`[extract] Existing leads in sheet: ${existingIds.size / 2}`); // each lead adds ~2 entries (id + url)
+
   // Créer le log d'extraction avec statut "running"
   const { data: extractionLog, error: logErr } = await supabase
     .from("extraction_logs")
@@ -356,16 +422,37 @@ export async function POST(request: Request) {
 
   const filters = (icpConfig.filters ?? {}) as Record<string, unknown>;
 
-  // ── Extraction Apollo par pages ────────────────────────────────────────────
-  const allPeople: ApolloPersonRaw[] = [];
+  // ── Extraction Apollo par pages (avec déduplication) ───────────────────────
+  const newPeople: ApolloPersonRaw[] = [];
   let page = 1;
+  let totalDuplicates = 0;
+  const MAX_PAGES = 20;
 
   try {
-    while (allPeople.length < quota) {
+    while (newPeople.length < quota && page <= MAX_PAGES) {
       const { people, total } = await apolloFetchPage(filters, page, apolloKey);
       if (people.length === 0) break;
-      allPeople.push(...people);
-      if (allPeople.length >= total) break;
+
+      let pageDuplicates = 0;
+      for (const person of people) {
+        if (isDuplicate(person, existingIds)) {
+          pageDuplicates++;
+          continue;
+        }
+        // Ajouter à existingIds pour éviter les doublons intra-extraction
+        const pid = typeof person.id === "string" ? person.id.trim() : "";
+        if (pid) existingIds.add(pid);
+        const purl = typeof person.linkedin_url === "string" ? person.linkedin_url.trim().toLowerCase() : "";
+        if (purl) existingIds.add(purl);
+
+        newPeople.push(person);
+        if (newPeople.length >= quota) break;
+      }
+
+      totalDuplicates += pageDuplicates;
+      console.log(`[extract] Page ${page}: ${people.length} leads returned, ${people.length - pageDuplicates} new (${pageDuplicates} duplicates filtered)`);
+
+      if (page * 100 >= total) break; // plus de résultats Apollo
       page++;
     }
   } catch (err) {
@@ -377,7 +464,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Erreur Apollo: ${msg}` }, { status: 502 });
   }
 
-  const finalPeople = allPeople.slice(0, quota);
+  if (newPeople.length < quota) {
+    console.warn(`[extract] Only ${newPeople.length} new leads found out of ${quota} requested — Apollo base exhausted for these filters`);
+  }
+  console.log(`[extract] Final: ${newPeople.length} new leads extracted (${totalDuplicates} duplicates skipped)`);
+
+  const finalPeople = newPeople;
 
   // ── Phase 2 : Enrichissement via people/bulk_match ────────────────────────
   const BATCH_SIZE = 10;
@@ -453,25 +545,9 @@ export async function POST(request: Request) {
   console.log(`[extract] Enrichment done: ${totalEnriched} via bulk_match, ${totalFallbackSingle} via single_match, ${finalPeople.length - totalEnriched - totalFallbackSingle} raw fallback, total=${enrichedPeople.length}`);
 
   // ── Écrire dans le sheet maître (un onglet par client, avec append si existant) ──
-  const MASTER_SHEET_ID = process.env.GOOGLE_MASTER_SHEET_ID;
-  if (!MASTER_SHEET_ID) {
-    return NextResponse.json({ error: "GOOGLE_MASTER_SHEET_ID non configurée" }, { status: 500 });
-  }
-
   let sheetUrl: string;
-  let tabName: string;
 
   try {
-    const auth = getGoogleAuth();
-    const sheets = google.sheets({ version: "v4", auth });
-
-    const company = (clientRow as Record<string, unknown>).company_name as string | null;
-    const clientEmail = clientRow.email as string | null;
-    // Tab name = company name (1 onglet permanent par client, sans date)
-    tabName = (company ?? clientEmail ?? `Client ${org_id}`)
-      .replace(/[\\/?*[\]:]/g, "-")
-      .slice(0, 100);
-
     // Vérifier si l'onglet existe déjà dans le master sheet
     const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: MASTER_SHEET_ID });
     const existingTab = (spreadsheet.data.sheets ?? []).find(
