@@ -35,10 +35,6 @@ function buildApolloPayload(rawFilters: Record<string, unknown>): Record<string,
   if (Array.isArray(filters.person_titles) && filters.person_titles.length > 0)
     payload.person_titles = filters.person_titles;
   payload.include_similar_titles = true;
-  if (Array.isArray(filters.person_seniorities) && filters.person_seniorities.length > 0)
-    payload.person_seniorities = filters.person_seniorities;
-  if (Array.isArray(filters.person_locations) && filters.person_locations.length > 0)
-    payload.person_locations = filters.person_locations;
   if (typeof filters.q_keywords === "string" && filters.q_keywords.trim())
     payload.q_keywords = (filters.q_keywords as string).trim();
   if (Array.isArray(filters.organization_num_employees_ranges) && filters.organization_num_employees_ranges.length > 0)

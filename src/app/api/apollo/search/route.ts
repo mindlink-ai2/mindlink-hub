@@ -264,8 +264,6 @@ function buildSearchPayload(filters: Record<string, unknown>): Record<string, un
   // ── Personne ──
   if (arr(filters.person_titles)) payload.person_titles = filters.person_titles;
   payload.include_similar_titles = true;
-  if (arr(filters.person_seniorities)) payload.person_seniorities = filters.person_seniorities;
-  if (arr(filters.person_locations)) payload.person_locations = filters.person_locations;
   if (str(filters.q_keywords)) payload.q_keywords = (filters.q_keywords as string).trim();
 
   // ── Entreprise ──
@@ -318,11 +316,7 @@ function buildRetryPayloads(
   // Retry 3 : garder uniquement titres + include_similar_titles + localisation principale
   const r3: Record<string, unknown> = { include_similar_titles: true };
   if (base.person_titles) r3.person_titles = base.person_titles;
-  if (base.person_locations) {
-    r3.person_locations = base.person_locations;
-  } else if (base.organization_locations) {
-    r3.organization_locations = base.organization_locations;
-  }
+  if (base.organization_locations) r3.organization_locations = base.organization_locations;
 
   return [base, r1, r2, r3];
 }

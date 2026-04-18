@@ -267,12 +267,6 @@ function ExtractModal({
   const [fPersonTitles, setFPersonTitles] = useState(
     Array.isArray(apolloSrc.person_titles) ? (apolloSrc.person_titles as string[]).join("\n") : ""
   );
-  const [fPersonSeniorities, setFPersonSeniorities] = useState(
-    Array.isArray(apolloSrc.person_seniorities) ? (apolloSrc.person_seniorities as string[]).join("\n") : ""
-  );
-  const [fPersonLocations, setFPersonLocations] = useState(
-    Array.isArray(apolloSrc.person_locations) ? (apolloSrc.person_locations as string[]).join("\n") : ""
-  );
   const [fOrgLocations, setFOrgLocations] = useState(
     Array.isArray(apolloSrc.organization_locations) ? (apolloSrc.organization_locations as string[]).join("\n") : ""
   );
@@ -294,17 +288,13 @@ function ExtractModal({
     const titles = lines(fPersonTitles);
     if (titles.length) f.person_titles = titles;
     f.include_similar_titles = fIncludeSimilar;
-    const seniorities = lines(fPersonSeniorities);
-    if (seniorities.length) f.person_seniorities = seniorities;
-    const pLocs = lines(fPersonLocations);
-    if (pLocs.length) f.person_locations = pLocs;
     const oLocs = lines(fOrgLocations);
     if (oLocs.length) f.organization_locations = oLocs;
     const sizes = lines(fOrgSizes);
     if (sizes.length) f.organization_num_employees_ranges = sizes;
     if (fQKeywords.trim()) f.q_keywords = fQKeywords.trim();
     return f;
-  }, [fPersonTitles, fPersonSeniorities, fPersonLocations, fOrgLocations, fOrgSizes, fQKeywords, fIncludeSimilar]);
+  }, [fPersonTitles, fOrgLocations, fOrgSizes, fQKeywords, fIncludeSimilar]);
 
   // ── Phase 1 — Stats pré-extraction ──────────────────────────────────────
   const [stats, setStats] = useState<{
@@ -603,28 +593,6 @@ function ExtractModal({
                         value={fPersonTitles}
                         onChange={(e) => setFPersonTitles(e.target.value)}
                         rows={4}
-                        className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-[#51627b] mb-1">
-                        person_seniorities <span className="text-[#9ab0c8] font-normal">(un par ligne)</span>
-                      </label>
-                      <textarea
-                        value={fPersonSeniorities}
-                        onChange={(e) => setFPersonSeniorities(e.target.value)}
-                        rows={2}
-                        className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-[#51627b] mb-1">
-                        person_locations <span className="text-[#9ab0c8] font-normal">(une par ligne)</span>
-                      </label>
-                      <textarea
-                        value={fPersonLocations}
-                        onChange={(e) => setFPersonLocations(e.target.value)}
-                        rows={2}
                         className="w-full rounded-lg border border-[#d7e3f4] bg-white px-3 py-2 text-xs text-[#0b1c33] focus:border-[#1f5eff] focus:outline-none font-mono"
                       />
                     </div>

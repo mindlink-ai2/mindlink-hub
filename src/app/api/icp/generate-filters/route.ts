@@ -26,15 +26,11 @@ Toujours en français ET en anglais, avec toutes les abréviations et synonymes.
 
 2. "include_similar_titles" : Mets TOUJOURS à true.
 
-3. "person_seniorities" (array de strings) : Valeurs acceptées UNIQUEMENT : "owner", "founder", "c_suite", "partner", "vp", "head", "director", "manager", "senior", "entry", "intern". AUCUNE autre valeur. Sélectionne toutes les seniority cohérentes avec les titres.
+3. "organization_locations" (array de strings) : Localisation du siège de l'entreprise. Format : nom de ville, région, département ou pays. Exemples : "France", "Paris", "Marseille", "California", "Var, France". Si le client donne des numéros de département français, traduis-les en noms : "13" → "Bouches-du-Rhône, France", "83" → "Var, France", "84" → "Vaucluse, France", etc.
 
-4. "person_locations" (array de strings) : Localisation de la personne. Format : nom de ville, région, département ou pays. Exemples : "France", "Paris", "Marseille", "California", "Var, France". Si le client donne des numéros de département français, traduis-les en noms : "13" → "Bouches-du-Rhône, France", "83" → "Var, France", "84" → "Vaucluse, France", etc.
+4. "organization_num_employees_ranges" (array de strings) : Taille entreprise. Format STRICT "min,max". Exemples valides UNIQUEMENT : "1,10", "11,20", "21,50", "51,100", "101,200", "201,500", "501,1000", "1001,2000", "2001,5000", "5001,10000", "10001,20000". AUCUN autre format.
 
-5. "organization_locations" (array de strings) : Localisation du siège de l'entreprise. Même format que person_locations.
-
-6. "organization_num_employees_ranges" (array de strings) : Taille entreprise. Format STRICT "min,max". Exemples valides UNIQUEMENT : "1,10", "11,20", "21,50", "51,100", "101,200", "201,500", "501,1000", "1001,2000", "2001,5000", "5001,10000", "10001,20000". AUCUN autre format.
-
-7. "q_keywords" (string) : Utilise ce champ pour le secteur d'activité du client. Mets UN SEUL mot-clé simple et large, pas une expression composée.
+5. "q_keywords" (string) : Utilise ce champ pour le secteur d'activité du client. Mets UN SEUL mot-clé simple et large, pas une expression composée.
 Exemples :
 - Client dit "Agence de communication" → q_keywords: "communication"
 - Client dit "Agence de marketing digital" → q_keywords: "marketing"
@@ -45,12 +41,14 @@ Exemples :
 NE JAMAIS mettre plusieurs mots comme "agence communication" ou "cabinet conseil stratégie". UN SEUL mot-clé.
 Si le secteur est trop vague ou générique, OMETS ce champ.
 
-8. "revenue_range" (objet {"min": integer, "max": integer}) : Chiffre d'affaires en dollars, sans symboles. UNIQUEMENT si le client mentionne un CA.
+6. "revenue_range" (objet {"min": integer, "max": integer}) : Chiffre d'affaires en dollars, sans symboles. UNIQUEMENT si le client mentionne un CA.
 
-9. "currently_using_any_of_technology_uids" (array de strings) : Technologies. Format : underscores à la place des espaces et points. Ex : "salesforce", "google_analytics", "hubspot", "wordpress_org". UNIQUEMENT si le client mentionne des technologies.
+7. "currently_using_any_of_technology_uids" (array de strings) : Technologies. Format : underscores à la place des espaces et points. Ex : "salesforce", "google_analytics", "hubspot", "wordpress_org". UNIQUEMENT si le client mentionne des technologies.
 
 PARAMÈTRES QUI N'EXISTENT PAS SUR CET ENDPOINT (ne les génère JAMAIS) :
 - PAS de organization_industry_tag_ids
+- PAS de person_seniorities
+- PAS de person_locations
 - PAS de organization_not_locations
 - PAS de person_departments
 - PAS de person_not_titles

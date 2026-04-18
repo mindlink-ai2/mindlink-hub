@@ -40,8 +40,6 @@ function buildApolloPayload(
   // ── Personne ──
   if (arr(filters.person_titles)) payload.person_titles = filters.person_titles;
   payload.include_similar_titles = true;
-  if (arr(filters.person_seniorities)) payload.person_seniorities = filters.person_seniorities;
-  if (arr(filters.person_locations)) payload.person_locations = filters.person_locations;
   if (str(filters.q_keywords)) payload.q_keywords = (filters.q_keywords as string).trim();
 
   // ── Entreprise ──
