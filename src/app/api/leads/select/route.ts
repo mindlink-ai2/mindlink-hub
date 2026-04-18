@@ -387,14 +387,17 @@ export async function POST(req: Request) {
       .eq("id", logId);
   }
 
-  // Update ICP status if during onboarding
-  if (body?.mark_submitted) {
-    await supabase
-      .from("icp_configs")
-      .update({ status: "submitted", submitted_at: new Date().toISOString() })
-      .eq("org_id", orgId)
-      .in("status", ["draft"]);
-  }
+  // Always mark ICP config as submitted after successful lead selection
+  const { error: icpUpdateErr, count: icpUpdateCount } = await supabase
+    .from("icp_configs")
+    .update({ status: "submitted", submitted_at: new Date().toISOString() })
+    .eq("org_id", orgId)
+    .in("status", ["draft"]);
+
+  console.log(
+    `[leads/select] org_id=${orgId} icp_configs update: rows=${icpUpdateCount ?? 0}`,
+    icpUpdateErr ? `error=${icpUpdateErr.message}` : "ok"
+  );
 
   return NextResponse.json({
     success: true,
