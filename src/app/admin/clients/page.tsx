@@ -141,33 +141,39 @@ function IcpModal({
   onClose: () => void;
 }) {
   const filters = client.icp.filters ?? {};
-  const renderList = (arr: unknown) =>
-    Array.isArray(arr) && arr.length > 0
-      ? (arr as string[]).join(", ")
-      : "—";
+  // Nouveau format : { questionnaire: {...}, apollo_filters: {...}, commercial_promise: "..." }
+  // Ancien format : filtres Apollo directement à la racine
+  const questionnaire = (filters.questionnaire ?? {}) as Record<string, unknown>;
+  const hasQuestionnaire = Object.keys(questionnaire).length > 0;
 
-  const rr = filters.revenue_range as { min: number | null; max: number | null } | null;
-  const revenueLabel =
-    rr && (rr.min !== null || rr.max !== null)
-      ? `${rr.min !== null ? `${(rr.min / 1_000_000).toFixed(0)}M€` : ""} → ${rr.max !== null ? `${(rr.max / 1_000_000).toFixed(0)}M€` : "∞"}`
-      : "—";
+  const renderValue = (v: unknown) => {
+    if (Array.isArray(v) && v.length > 0) return (v as string[]).join(", ");
+    if (typeof v === "string" && v.trim()) return v;
+    return "—";
+  };
 
-  const filterItems = [
-    { label: "Titres de poste", value: renderList(filters.person_titles) },
-    { label: "Titres exclus", value: renderList(filters.person_not_titles) },
-    { label: "Séniorité", value: renderList(filters.person_seniorities) },
-    { label: "Département", value: renderList(filters.person_departments) },
-    { label: "Localisation personne", value: renderList(filters.person_locations) },
-    { label: "Mots-clés", value: (filters.q_keywords as string) || "—" },
-    { label: "Secteur", value: renderList(filters.organization_industry_tag_ids) },
-    { label: "Taille entreprise", value: renderList(filters.organization_num_employees_ranges) },
-    { label: "Localisation entreprise", value: renderList(filters.organization_locations) },
-    { label: "Localisations exclues", value: renderList(filters.organization_not_locations) },
-    { label: "Technologies", value: renderList(filters.currently_using_any_of_technology_uids) },
-    { label: "Chiffre d'affaires", value: revenueLabel },
-  ];
+  const filterItems = hasQuestionnaire
+    ? [
+        { label: "Postes ciblés", value: renderValue(questionnaire.q1_titles) },
+        { label: "Postes exclus", value: renderValue(questionnaire.q2_exclusions) },
+        { label: "Secteur d'activité", value: renderValue(questionnaire.q3_sector) },
+        { label: "Taille entreprise", value: renderValue(questionnaire.q4_company_sizes) },
+        { label: "Zone géographique", value: renderValue(questionnaire.q5_locations) },
+      ]
+    : [
+        // Ancien format : filtres Apollo à la racine
+        { label: "Titres de poste", value: renderValue(filters.person_titles) },
+        { label: "Séniorité", value: renderValue(filters.person_seniorities) },
+        { label: "Localisation", value: renderValue(filters.person_locations) },
+        { label: "Secteur", value: renderValue(filters.organization_industry_tag_ids) },
+        { label: "Taille entreprise", value: renderValue(filters.organization_num_employees_ranges) },
+        { label: "Localisation entreprise", value: renderValue(filters.organization_locations) },
+      ];
 
-  const commercialPromise = (filters.commercial_promise as string | null) || null;
+  const commercialPromise =
+    (hasQuestionnaire
+      ? (questionnaire.q6_commercial_promise as string | null) ?? (filters.commercial_promise as string | null)
+      : (filters.commercial_promise as string | null)) || null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

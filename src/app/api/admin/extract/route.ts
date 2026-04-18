@@ -108,16 +108,78 @@ async function apolloFetchPage(
 
 async function apolloBulkMatch(
   ids: string[],
-  apiKey: string
+  apiKey: string,
+  batchLabel: string = ""
 ): Promise<ApolloPersonRaw[]> {
-  const res = await fetch("https://api.apollo.io/api/v1/people/bulk_match", {
+  const url = "https://api.apollo.io/api/v1/people/bulk_match";
+  const requestBody = {
+    details: ids.map((id) => ({ id })),
+    reveal_personal_emails: true,
+    reveal_phone_number: true,
+  };
+  console.log(`[extract][bulk_match]${batchLabel} URL: ${url}`);
+  console.log(`[extract][bulk_match]${batchLabel} Request body:`, JSON.stringify(requestBody).slice(0, 500));
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Api-Key": apiKey,
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  console.log(`[extract][bulk_match]${batchLabel} Response status: ${res.status}`);
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    console.error(`[extract][bulk_match]${batchLabel} Error body:`, errText.slice(0, 500));
+    throw new Error(`Apollo bulk_match HTTP ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  console.log(`[extract][bulk_match]${batchLabel} Response keys:`, Object.keys(data));
+  const matches = Array.isArray(data.matches)
+    ? data.matches
+    : Array.isArray(data.people)
+    ? data.people
+    : [];
+  console.log(`[extract][bulk_match]${batchLabel} Raw matches count: ${matches.length}, non-null: ${(matches as (ApolloPersonRaw | null)[]).filter(Boolean).length}`);
+
+  // Log first match sample to check enrichment fields
+  const firstMatch = (matches as (ApolloPersonRaw | null)[])[0];
+  if (firstMatch) {
+    console.log(`[extract][bulk_match]${batchLabel} Sample enriched lead:`, JSON.stringify({
+      name: firstMatch.first_name,
+      email: firstMatch.email,
+      email_status: firstMatch.email_status,
+      seniority: firstMatch.seniority,
+      departments: firstMatch.departments,
+      phone_numbers: firstMatch.phone_numbers,
+      work_direct_phone: firstMatch.work_direct_phone,
+      mobile_phone: firstMatch.mobile_phone,
+    }).slice(0, 500));
+  }
+
+  return (matches as (ApolloPersonRaw | null)[]).filter(Boolean) as ApolloPersonRaw[];
+}
+
+/**
+ * Fallback: enrichissement un par un via people/match si bulk_match échoue.
+ */
+async function apolloSingleMatch(
+  id: string,
+  apiKey: string
+): Promise<ApolloPersonRaw | null> {
+  const url = "https://api.apollo.io/api/v1/people/match";
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Api-Key": apiKey,
     },
     body: JSON.stringify({
-      details: ids.map((id) => ({ id })),
+      id,
       reveal_personal_emails: true,
       reveal_phone_number: true,
     }),
@@ -125,16 +187,12 @@ async function apolloBulkMatch(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    throw new Error(`Apollo bulk_match HTTP ${res.status}: ${errText.slice(0, 200)}`);
+    console.error(`[extract][single_match] id=${id} HTTP ${res.status}:`, errText.slice(0, 200));
+    return null;
   }
 
   const data = await res.json();
-  const matches = Array.isArray(data.matches)
-    ? data.matches
-    : Array.isArray(data.people)
-    ? data.people
-    : [];
-  return (matches as (ApolloPersonRaw | null)[]).filter(Boolean) as ApolloPersonRaw[];
+  return (data.person ?? data.match ?? null) as ApolloPersonRaw | null;
 }
 
 // ── Helpers Google Sheets (googleapis SDK) ───────────────────────────────────
@@ -326,30 +384,74 @@ export async function POST(request: Request) {
   const BATCH_SIZE = 10;
   const enrichedPeople: ApolloPersonRaw[] = [];
   let totalEnriched = 0;
+  let totalFallbackSingle = 0;
+  let bulkMatchFailed = false;
+
+  console.log(`[extract] Starting enrichment: ${finalPeople.length} leads, batch size ${BATCH_SIZE}`);
+  console.log(`[extract] Sample raw lead before enrichment:`, JSON.stringify({
+    id: finalPeople[0]?.id,
+    email: finalPeople[0]?.email,
+    seniority: finalPeople[0]?.seniority,
+    departments: finalPeople[0]?.departments,
+  }).slice(0, 300));
 
   for (let i = 0; i < finalPeople.length; i += BATCH_SIZE) {
     const batch = finalPeople.slice(i, i + BATCH_SIZE);
     const batchIds = batch.map((p) => p.id as string).filter(Boolean);
     const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+    const batchLabel = ` batch-${batchNum}`;
 
     if (batchIds.length === 0) {
+      console.warn(`[extract]${batchLabel}: no valid IDs, keeping raw data`);
       enrichedPeople.push(...batch);
       continue;
     }
 
-    try {
-      const enriched = await apolloBulkMatch(batchIds, apolloKey);
-      enrichedPeople.push(...enriched);
-      totalEnriched += enriched.length;
-      console.log(`[extract] Batch ${batchNum}: enriched ${enriched.length}/${batchIds.length}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[extract] Batch ${batchNum} enrichment failed — using raw data:`, msg);
-      enrichedPeople.push(...batch);
+    // Essayer bulk_match d'abord (sauf si déjà échoué systématiquement)
+    if (!bulkMatchFailed) {
+      try {
+        const enriched = await apolloBulkMatch(batchIds, apolloKey, batchLabel);
+        enrichedPeople.push(...enriched);
+        totalEnriched += enriched.length;
+        console.log(`[extract]${batchLabel}: bulk_match OK — ${enriched.length}/${batchIds.length} enrichis`);
+        continue;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[extract]${batchLabel}: bulk_match FAILED — ${msg}`);
+        if (batchNum === 1) {
+          console.warn(`[extract] bulk_match failed on first batch, switching to single match fallback`);
+          bulkMatchFailed = true;
+        } else {
+          // Fallback pour ce batch uniquement
+          enrichedPeople.push(...batch);
+          continue;
+        }
+      }
+    }
+
+    // Fallback : people/match one-by-one
+    console.log(`[extract]${batchLabel}: using single match fallback for ${batchIds.length} leads`);
+    for (const person of batch) {
+      const pid = person.id as string;
+      if (!pid) {
+        enrichedPeople.push(person);
+        continue;
+      }
+      try {
+        const enriched = await apolloSingleMatch(pid, apolloKey);
+        if (enriched) {
+          enrichedPeople.push(enriched);
+          totalFallbackSingle++;
+        } else {
+          enrichedPeople.push(person);
+        }
+      } catch {
+        enrichedPeople.push(person);
+      }
     }
   }
 
-  console.log(`[extract] Enrichissement terminé: ${totalEnriched}/${finalPeople.length} leads enrichis`);
+  console.log(`[extract] Enrichment done: ${totalEnriched} via bulk_match, ${totalFallbackSingle} via single_match, ${finalPeople.length - totalEnriched - totalFallbackSingle} raw fallback, total=${enrichedPeople.length}`);
 
   // ── Écrire dans le sheet maître (un onglet par client, avec append si existant) ──
   const MASTER_SHEET_ID = process.env.GOOGLE_MASTER_SHEET_ID;
