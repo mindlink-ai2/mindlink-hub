@@ -744,27 +744,31 @@ export default function IcpBuilderPage() {
     }
   }, []);
 
-  const handleEnterBrowseMode = useCallback(async () => {
-    // Save draft first
-    if (generatedFilters) {
-      await fetch("/api/icp/save-draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filters: {
-            questionnaire: answers,
-            apollo_filters: generatedFilters,
-            commercial_promise: answers.q6_commercial_promise,
-          },
-        }),
-      });
-      setIcpStatus("draft");
-    }
-    setScreen("browse");
-    setSelectedLeadIds(new Set());
-    setSelectedLeadsMap(new Map());
-    await Promise.all([fetchQuota(), fetchBrowsePage(1)]);
-  }, [generatedFilters, answers, fetchQuota, fetchBrowsePage]);
+  const handleEnterBrowseMode = useCallback(
+    async (filtersOverride?: ApolloFilters) => {
+      const filters = filtersOverride ?? generatedFilters;
+      // Save draft first
+      if (filters) {
+        await fetch("/api/icp/save-draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filters: {
+              questionnaire: answers,
+              apollo_filters: filters,
+              commercial_promise: answers.q6_commercial_promise,
+            },
+          }),
+        });
+        setIcpStatus("draft");
+      }
+      setScreen("browse");
+      setSelectedLeadIds(new Set());
+      setSelectedLeadsMap(new Map());
+      await Promise.all([fetchQuota(), fetchBrowsePage(1)]);
+    },
+    [generatedFilters, answers, fetchQuota, fetchBrowsePage]
+  );
 
   const toggleLeadSelection = useCallback(
     (lead: BrowseProfile) => {
@@ -1195,25 +1199,25 @@ export default function IcpBuilderPage() {
             <HubButton
               variant="primary"
               onClick={async () => {
-                if (!generatedFilters) {
-                  setGeneratingFilters(true);
-                  try {
-                    const genRes = await fetch("/api/icp/generate-filters", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ answers }),
-                    });
-                    const genData = await genRes.json();
-                    if (genRes.ok && genData.filters) {
-                      setGeneratedFilters(genData.filters);
-                    }
-                  } catch {
-                    // continue anyway
-                  } finally {
-                    setGeneratingFilters(false);
+                setGeneratingFilters(true);
+                let newFilters: ApolloFilters | null = null;
+                try {
+                  const genRes = await fetch("/api/icp/generate-filters", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ answers }),
+                  });
+                  const genData = await genRes.json();
+                  if (genRes.ok && genData.filters) {
+                    newFilters = genData.filters as ApolloFilters;
+                    setGeneratedFilters(newFilters);
                   }
+                } catch {
+                  // continue with existing filters if any
+                } finally {
+                  setGeneratingFilters(false);
                 }
-                handleEnterBrowseMode();
+                handleEnterBrowseMode(newFilters ?? undefined);
               }}
               disabled={generatingFilters}
               className="gap-2"
