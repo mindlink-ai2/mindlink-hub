@@ -190,23 +190,23 @@ function getWorkflowTemplate(): Record<string, unknown> {
             "  const data = $input.item.json;\n" +
             "  return {\n" +
             "    properties: {\n" +
-            "      firstname: data.FirstName || data.firstName || data.firstname || data['First Name'] || '',\n" +
-            "      lastname: data.LastName || data.lastName || data.lastname || data['Last Name'] || '',\n" +
-            "      company: data.Company || data.company || data['Company Name'] || '',\n" +
-            "      location: data.location || data.Location || [data['City'], data['State'], data['Country']].filter(Boolean).join(', ') || '',\n" +
-            "      linkedin_profile: data.LinkedInURL || data.linkedin_profile || data.linkedinUrl || data.linkedin || data['Person Linkedin Url'] || '',\n" +
-            "      linkedin_message_propose: data.internal_message || data.message_linkedin || data.linkedin_message_propose || '',\n" +
-            "      relance_linkedin: data.relance_linkedin || '',\n" +
-            "      message_mail: data.message_mail || '',\n" +
-            "      resume_profil: data.resume_profil || '',\n" +
-            "      linkedinHeadline: data.linkedinHeadline || '',\n" +
-            "      linkedinJobTitle: data.linkedinJobTitle || data['Title'] || '',\n" +
-            "      companyIndustry: data.companyIndustry || data['Industry'] || '',\n" +
-            "      linkedinDescription: data.linkedinDescription || '',\n" +
-            "      linkedinSkillsLabel: data.linkedinSkillsLabel || data['Keywords'] || data['Technologies'] || '',\n" +
-            "      email: data.email || data.Email || data['Email'] || data['Work Email'] || '',\n" +
-            "      phone: data.phone || data.Phone || data['Mobile Phone'] || data['Work Direct Phone'] || data['Corporate Phone'] || data['Other Phone'] || '',\n" +
-            "      website: data.website || data.Website || ''\n" +
+            "      firstname: data['First Name'] || '',\n" +
+            "      lastname: data['Last Name'] || '',\n" +
+            "      company: data['Company Name'] || '',\n" +
+            "      linkedin_profile: data['Person Linkedin Url'] || '',\n" +
+            "      location: [data['City'], data['State'], data['Country']].filter(Boolean).join(', ') || '',\n" +
+            "      linkedin_message_propose: '',\n" +
+            "      relance_linkedin: '',\n" +
+            "      message_mail: '',\n" +
+            "      resume_profil: '',\n" +
+            "      linkedinHeadline: '',\n" +
+            "      linkedinJobTitle: data['Title'] || '',\n" +
+            "      companyIndustry: data['Industry'] || '',\n" +
+            "      linkedinDescription: '',\n" +
+            "      linkedinSkillsLabel: data['Keywords'] || data['Technologies'] || '',\n" +
+            "      email: data['Email'] || '',\n" +
+            "      phone: data['Work Direct Phone'] || data['Mobile Phone'] || data['Corporate Phone'] || '',\n" +
+            "      website: data['Website'] || ''\n" +
             "    }\n" +
             "  };\n" +
             "})()}}",
@@ -421,7 +421,7 @@ function getWorkflowTemplate(): Record<string, unknown> {
                 id: "field-phone",
                 name: "phone",
                 value:
-                  "={{ $('Get row(s) in sheet').item.json['Mobile Phone'] || $('Get row(s) in sheet').item.json['Work Direct Phone'] || $('Get row(s) in sheet').item.json['Corporate Phone'] || '' }}",
+                  "={{ $('Get row(s) in sheet').item.json['Work Direct Phone'] || $('Get row(s) in sheet').item.json['Mobile Phone'] || $('Get row(s) in sheet').item.json['Corporate Phone'] || '' }}",
                 type: "string",
               },
               {

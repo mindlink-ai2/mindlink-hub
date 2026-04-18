@@ -29,12 +29,15 @@ function getGoogleAuth() {
   });
 }
 
+/** Derive tab name — format: "CompanyName — email@example.com" */
 function deriveTabName(
   companyName: string | null,
   email: string | null,
   orgId: number
 ): string {
-  return (companyName ?? email ?? `Client ${orgId}`)
+  const name = companyName ?? `Client ${orgId}`;
+  const suffix = email ? ` — ${email}` : "";
+  return `${name}${suffix}`
     .replace(/[\\/?*[\]:]/g, "-")
     .slice(0, 100);
 }
@@ -317,9 +320,12 @@ export async function POST(req: Request) {
     const spreadsheet = await sheets.spreadsheets.get({
       spreadsheetId: MASTER_SHEET_ID,
     });
-    const existingTab = (spreadsheet.data.sheets ?? []).find(
-      (s) => s.properties?.title === tabName
-    );
+    // Chercher l'onglet existant par email dans le titre (robuste au renommage)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sheetsList: any[] = spreadsheet.data.sheets ?? [];
+    const existingTab = clientEmail
+      ? sheetsList.find((s: any) => s.properties?.title?.includes(clientEmail))
+      : sheetsList.find((s: any) => s.properties?.title === tabName);
 
     if (!existingTab) {
       const batchRes = await sheets.spreadsheets.batchUpdate({
@@ -341,10 +347,11 @@ export async function POST(req: Request) {
     } else {
       const gid = existingTab.properties!.sheetId!;
       sheetUrl = `https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}/edit#gid=${gid}`;
+      const rangeTab = existingTab.properties!.title!;
 
       await sheets.spreadsheets.values.append({
         spreadsheetId: MASTER_SHEET_ID,
-        range: `'${tabName}'!A:A`,
+        range: `'${rangeTab}'!A:A`,
         valueInputOption: "RAW",
         insertDataOption: "INSERT_ROWS",
         requestBody: { values: dataRows },
@@ -352,7 +359,7 @@ export async function POST(req: Request) {
     }
 
     console.log(
-      `[leads/select] Wrote ${dataRows.length} leads to sheet tab "${tabName}"`
+      `[leads/select] Wrote ${dataRows.length} leads to sheet tab "${existingTab?.properties?.title ?? tabName}"`
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

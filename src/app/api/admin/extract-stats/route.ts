@@ -17,8 +17,11 @@ function getGoogleAuth() {
   });
 }
 
+/** Derive tab name — format: "CompanyName — email@example.com" */
 function deriveTabName(companyName: string | null, email: string | null, orgId: number): string {
-  return (companyName ?? email ?? `Client ${orgId}`)
+  const name = companyName ?? `Client ${orgId}`;
+  const suffix = email ? ` — ${email}` : "";
+  return `${name}${suffix}`
     .replace(/[\\/?*[\]:]/g, "-")
     .slice(0, 100);
 }
@@ -172,20 +175,31 @@ export async function GET(request: Request) {
     try {
       const auth = getGoogleAuth();
       const sheetsApi = google.sheets({ version: "v4", auth });
+      const clientEmail = clientRow.email as string | null;
       const tabName = deriveTabName(
         clientRow.company_name as string | null,
-        clientRow.email as string | null,
+        clientEmail,
         orgId
       );
 
-      const readRes = await sheetsApi.spreadsheets.values.get({
-        spreadsheetId: MASTER_SHEET_ID,
-        range: `'${tabName}'!A:A`,
-      });
+      // Chercher l'onglet par email dans le titre (robuste au renommage)
+      const spreadsheet = await sheetsApi.spreadsheets.get({ spreadsheetId: MASTER_SHEET_ID });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sheetsList: any[] = spreadsheet.data.sheets ?? [];
+      const existingTab = clientEmail
+        ? sheetsList.find((s: any) => s.properties?.title?.includes(clientEmail))
+        : sheetsList.find((s: any) => s.properties?.title === tabName);
 
-      const rows = readRes.data.values;
-      if (rows && rows.length > 1) {
-        alreadyExtracted = rows.length - 1; // minus header
+      if (existingTab?.properties?.title) {
+        const readRes = await sheetsApi.spreadsheets.values.get({
+          spreadsheetId: MASTER_SHEET_ID,
+          range: `'${existingTab.properties.title}'!A:A`,
+        });
+
+        const rows = readRes.data.values;
+        if (rows && rows.length > 1) {
+          alreadyExtracted = rows.length - 1; // minus header
+        }
       }
     } catch {
       // Tab doesn't exist — 0 extracted

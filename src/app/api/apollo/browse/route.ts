@@ -1,8 +1,81 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
+import { google } from "googleapis";
 
 export const runtime = "nodejs";
+
+// ── Google Sheets helpers ─────────────────────────────────────────────────────
+
+function getGoogleAuth() {
+  const raw = process.env.GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY;
+  if (!raw) return null;
+  const credentials = JSON.parse(raw) as Record<string, string>;
+  credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
+  return new google.auth.GoogleAuth({
+    credentials,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+  });
+}
+
+const COL_APOLLO_ID = 26; // "Apollo Contact Id" — 0-based index
+
+/**
+ * Load existing Apollo Contact IDs from the client's Google Sheet tab.
+ * Returns empty Set if no tab exists or no sheet configured.
+ */
+async function loadExistingApolloIds(
+  clientEmail: string | null,
+  companyName: string | null,
+  orgId: number
+): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const MASTER_SHEET_ID = process.env.GOOGLE_MASTER_SHEET_ID;
+  if (!MASTER_SHEET_ID) return ids;
+
+  const auth = getGoogleAuth();
+  if (!auth) return ids;
+
+  try {
+    const sheets = google.sheets({ version: "v4", auth });
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: MASTER_SHEET_ID });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sheetsList: any[] = spreadsheet.data.sheets ?? [];
+
+    // Find tab by email in title (robust to company name changes)
+    const tabName = clientEmail
+      ? `${companyName ?? `Client ${orgId}`} — ${clientEmail}`.replace(/[\\/?*[\]:]/g, "-").slice(0, 100)
+      : null;
+    const existingTab = clientEmail
+      ? sheetsList.find((s: any) => s.properties?.title?.includes(clientEmail))
+      : tabName
+      ? sheetsList.find((s: any) => s.properties?.title === tabName)
+      : null;
+
+    if (!existingTab?.properties?.title) return ids;
+
+    const readRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: MASTER_SHEET_ID,
+      range: `'${existingTab.properties.title}'`,
+    });
+
+    const rows = readRes.data.values;
+    if (!rows || rows.length < 2) return ids;
+
+    for (let i = 1; i < rows.length; i++) {
+      const apolloId = (rows[i][COL_APOLLO_ID] ?? "").toString().trim();
+      if (apolloId) ids.add(apolloId);
+    }
+
+    console.log(`[browse] Loaded ${ids.size} existing Apollo IDs from sheet tab "${existingTab.properties.title}"`);
+  } catch {
+    // Sheet not accessible or tab doesn't exist — no exclusions
+  }
+
+  return ids;
+}
+
+// ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function GET(request: Request) {
   const { userId } = await auth();
@@ -14,7 +87,7 @@ export async function GET(request: Request) {
 
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id")
+    .select("id, email, company_name")
     .eq("clerk_user_id", userId)
     .single();
 
@@ -22,6 +95,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
   }
   const orgId: number = clientRow.id;
+  const clientEmail = clientRow.email as string | null;
+  const companyName = clientRow.company_name as string | null;
 
   // Fetch ICP filters
   const { data: icpConfig } = await supabase
@@ -49,12 +124,24 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
+  let page = Math.max(1, Number(url.searchParams.get("page")) || 1);
 
   const filters = icpConfig.filters as Record<string, unknown>;
-  const payload = buildBrowsePayload(filters, page);
+  const perPage = 25;
 
-  try {
+  // Load existing Apollo IDs from Google Sheet for dedup
+  const existingIds = await loadExistingApolloIds(clientEmail, companyName, orgId);
+  const existingCount = existingIds.size;
+
+  // Fetch pages from Apollo, skipping already-extracted leads
+  const MAX_CONSECUTIVE_EMPTY = 3;
+  let consecutiveEmpty = 0;
+  let finalProfiles: ReturnType<typeof mapProfile>[] = [];
+  let apolloTotalEntries = 0;
+
+  while (finalProfiles.length === 0 && consecutiveEmpty < MAX_CONSECUTIVE_EMPTY) {
+    const payload = buildBrowsePayload(filters, page);
+
     const res = await fetch(
       "https://api.apollo.io/api/v1/mixed_people/api_search",
       {
@@ -86,22 +173,7 @@ export async function GET(request: Request) {
         : []
     ) as Array<Record<string, unknown>>;
 
-    if (people.length > 0) {
-      console.log(
-        "[browse] Sample lead fields:",
-        Object.keys(people[0])
-      );
-      console.log(
-        "[browse] Sample lead location:",
-        people[0].city,
-        people[0].state,
-        people[0].country,
-        (people[0].organization as Record<string, unknown> | undefined)?.city,
-        (people[0].organization as Record<string, unknown> | undefined)?.country
-      );
-    }
-
-    const totalEntries =
+    apolloTotalEntries =
       typeof data.total_entries === "number"
         ? data.total_entries
         : typeof data.pagination?.total_entries === "number"
@@ -110,55 +182,73 @@ export async function GET(request: Request) {
         ? data.unique_enriched_records
         : 0;
 
-    const perPage = 25;
-    const totalPages = Math.max(1, Math.ceil(totalEntries / perPage));
+    if (people.length === 0) break;
 
-    const profiles = people.slice(0, perPage).map((p) => {
-      const org = (p.organization as Record<string, unknown>) ?? {};
+    // Filter out already-extracted leads
+    const newPeople = existingIds.size > 0
+      ? people.filter((p) => {
+          const id = typeof p.id === "string" ? p.id.trim() : "";
+          return !id || !existingIds.has(id);
+        })
+      : people;
 
-      // Location: prefer person-level, fallback to org-level
-      const city = (p.city as string | null) ?? (org.city as string | null) ?? null;
-      const state = (p.state as string | null) ?? (org.state as string | null) ?? null;
-      const country = (p.country as string | null) ?? (org.country as string | null) ?? null;
+    if (newPeople.length === 0) {
+      // Entire page was duplicates — try next page
+      consecutiveEmpty++;
+      const apolloTotalPages = Math.ceil(apolloTotalEntries / perPage);
+      if (page >= apolloTotalPages) break;
+      page++;
+      continue;
+    }
 
-      // Apollo may expose has_city/has_country flags without actual values
-      const locationAvailable =
-        !city && !country && (p.has_city === true || p.has_country === true);
+    consecutiveEmpty = 0;
 
-      return {
-        id: p.id ?? null,
-        first_name: p.first_name ?? null,
-        last_name: maskLastName(p.last_name as string | null),
-        title: p.title ?? null,
-        linkedin_url: p.linkedin_url ?? null,
-        organization: p.organization
-          ? {
-              name: org.name ?? null,
-              industry: org.industry ?? null,
-              estimated_num_employees: org.estimated_num_employees ?? null,
-            }
-          : null,
-        city,
-        state,
-        country,
-        location_available: locationAvailable,
-      };
-    });
-
-    return NextResponse.json({
-      people: profiles,
-      total_entries: totalEntries,
-      page,
-      per_page: perPage,
-      total_pages: totalPages,
-    });
-  } catch (err) {
-    console.error("[apollo/browse] fetch error:", err);
-    return NextResponse.json(
-      { error: "Impossible de contacter le service de recherche." },
-      { status: 502 }
-    );
+    finalProfiles = newPeople.slice(0, perPage).map(mapProfile);
   }
+
+  // Adjusted total: Apollo total minus already extracted
+  const adjustedTotal = Math.max(0, apolloTotalEntries - existingCount);
+  const totalPages = Math.max(1, Math.ceil(adjustedTotal / perPage));
+
+  return NextResponse.json({
+    people: finalProfiles,
+    total_entries: adjustedTotal,
+    page,
+    per_page: perPage,
+    total_pages: totalPages,
+  });
+}
+
+function mapProfile(p: Record<string, unknown>) {
+  const org = (p.organization as Record<string, unknown>) ?? {};
+
+  // Location: prefer person-level, fallback to org-level
+  const city = (p.city as string | null) ?? (org.city as string | null) ?? null;
+  const state = (p.state as string | null) ?? (org.state as string | null) ?? null;
+  const country = (p.country as string | null) ?? (org.country as string | null) ?? null;
+
+  // Apollo may expose has_city/has_country flags without actual values
+  const locationAvailable =
+    !city && !country && (p.has_city === true || p.has_country === true);
+
+  return {
+    id: p.id ?? null,
+    first_name: p.first_name ?? null,
+    last_name: maskLastName(p.last_name as string | null),
+    title: p.title ?? null,
+    linkedin_url: p.linkedin_url ?? null,
+    organization: p.organization
+      ? {
+          name: org.name ?? null,
+          industry: org.industry ?? null,
+          estimated_num_employees: org.estimated_num_employees ?? null,
+        }
+      : null,
+    city,
+    state,
+    country,
+    location_available: locationAvailable,
+  };
 }
 
 /** Mask last name like Apollo does: first 2 chars + *** */

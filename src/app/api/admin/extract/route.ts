@@ -275,9 +275,11 @@ const SHEET_HEADERS = [
 
 // ── Helpers pour déduplication ───────────────────────────────────────────────
 
-/** Derive tab name from client data — must stay in sync with the sheet-write logic below. */
+/** Derive tab name from client data — format: "CompanyName — email@example.com" */
 function deriveTabName(companyName: string | null, email: string | null, orgId: number): string {
-  return (companyName ?? email ?? `Client ${orgId}`)
+  const name = companyName ?? `Client ${orgId}`;
+  const suffix = email ? ` — ${email}` : "";
+  return `${name}${suffix}`
     .replace(/[\\/?*[\]:]/g, "-")
     .slice(0, 100);
 }
@@ -397,8 +399,24 @@ export async function POST(request: Request) {
 
   const auth = getGoogleAuth();
   const sheets = google.sheets({ version: "v4", auth });
-  const existingIds = await loadExistingLeadIds(sheets, MASTER_SHEET_ID, tabName);
-  console.log(`[extract] Existing leads in sheet: ${existingIds.size / 2}`); // each lead adds ~2 entries (id + url)
+
+  // Chercher l'onglet existant par email dans le titre (robuste au renommage)
+  let existingTabTitle: string | null = null;
+  try {
+    const spreadsheetMeta = await sheets.spreadsheets.get({ spreadsheetId: MASTER_SHEET_ID });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sheetsList: any[] = spreadsheetMeta.data.sheets ?? [];
+    const foundTab = clientEmail
+      ? sheetsList.find((s: any) => s.properties?.title?.includes(clientEmail))
+      : sheetsList.find((s: any) => s.properties?.title === tabName);
+    existingTabTitle = foundTab?.properties?.title ?? null;
+  } catch {
+    // Sheet not accessible — will create new tab
+  }
+
+  const dedupTabName = existingTabTitle ?? tabName;
+  const existingIds = await loadExistingLeadIds(sheets, MASTER_SHEET_ID, dedupTabName);
+  console.log(`[extract] Existing leads in sheet (tab="${dedupTabName}"): ${existingIds.size / 2}`);
 
   // Créer le log d'extraction avec statut "running"
   const { data: extractionLog, error: logErr } = await supabase
@@ -546,16 +564,20 @@ export async function POST(request: Request) {
 
   // ── Écrire dans le sheet maître (un onglet par client, avec append si existant) ──
   let sheetUrl: string;
+  let actualTabName = tabName; // Will be updated if we find/use an existing tab
 
   try {
-    // Vérifier si l'onglet existe déjà dans le master sheet
+    // Re-fetch sheet metadata (may have changed since dedup check)
     const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: MASTER_SHEET_ID });
-    const existingTab = (spreadsheet.data.sheets ?? []).find(
-      (s) => s.properties?.title === tabName
-    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sheetsList: any[] = spreadsheet.data.sheets ?? [];
+    const existingTab = clientEmail
+      ? sheetsList.find((s: any) => s.properties?.title?.includes(clientEmail))
+      : sheetsList.find((s: any) => s.properties?.title === tabName);
 
     const dataRows = enrichedPeople.map(formatPersonRow);
-    console.log("[extract] Tab:", tabName, "| existing:", !!existingTab, "| leads:", dataRows.length);
+    const foundTabTitle = existingTab?.properties?.title ?? null;
+    console.log("[extract] Tab:", tabName, "| existing:", foundTabTitle, "| leads:", dataRows.length);
 
     if (!existingTab) {
       // Créer l'onglet et écrire headers + données
@@ -580,10 +602,12 @@ export async function POST(request: Request) {
       // Onglet existant : appendre les nouvelles lignes à la suite
       const gid = existingTab.properties!.sheetId!;
       sheetUrl = `https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}/edit#gid=${gid}`;
+      actualTabName = foundTabTitle!;
+      const rangeTab = foundTabTitle!;
 
       await sheets.spreadsheets.values.append({
         spreadsheetId: MASTER_SHEET_ID,
-        range: `'${tabName}'!A:A`,
+        range: `'${rangeTab}'!A:A`,
         valueInputOption: "RAW",
         insertDataOption: "INSERT_ROWS",
         requestBody: { values: dataRows },
@@ -617,7 +641,7 @@ export async function POST(request: Request) {
     leads_count: enrichedPeople.length,
     google_sheet_url: sheetUrl,
     google_sheet_id: MASTER_SHEET_ID,
-    tab_name: tabName,
+    tab_name: actualTabName,
     extraction_log_id: logId,
   });
 }

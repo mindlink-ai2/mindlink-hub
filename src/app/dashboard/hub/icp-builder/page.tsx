@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Building2,
@@ -1426,6 +1427,39 @@ export default function IcpBuilderPage() {
                   </>
                 )}
               </HubButton>
+            </div>
+          )}
+
+          {/* Alerte leads insuffisants */}
+          {!browseLoading && monthlyQuota > 0 && browseTotalEntries > 0 && browseTotalEntries < monthlyQuota && (
+            <div className="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mb-4 text-sm text-orange-800">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-orange-500" />
+              <div>
+                <p className="font-medium">
+                  Attention : seulement{" "}
+                  {browseTotalEntries.toLocaleString("fr-FR")} leads
+                  correspondent à vos critères, alors que votre quota mensuel est
+                  de {monthlyQuota.toLocaleString("fr-FR")} leads.
+                </p>
+                <p className="mt-1 text-orange-700">
+                  Une fois tous les leads sélectionnés, vous pourrez modifier
+                  votre ciblage pour élargir votre recherche et trouver davantage
+                  de profils.
+                </p>
+                {selectedCount > 0 && selectedCount >= browseTotalEntries && selectedCount < quotaRemaining && (
+                  <HubButton
+                    variant="secondary"
+                    onClick={() => {
+                      setScreen("summary");
+                      setBrowseLeads([]);
+                    }}
+                    className="mt-3 gap-2 text-orange-800 border-orange-300 hover:bg-orange-100"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Modifier mon ciblage pour trouver plus de leads
+                  </HubButton>
+                )}
+              </div>
             </div>
           )}
 
