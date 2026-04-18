@@ -100,33 +100,52 @@ export async function GET(request: Request) {
   const clientRow = clientRes.data;
   const filters = (icpRes.data.filters ?? {}) as Record<string, unknown>;
 
+  console.log("[extract-stats] Raw icp_configs.filters keys:", Object.keys(filters));
+  if (filters.apollo_filters) {
+    console.log("[extract-stats] apollo_filters keys:", Object.keys(filters.apollo_filters as Record<string, unknown>));
+  } else {
+    console.log("[extract-stats] No apollo_filters found — full filters:", JSON.stringify(filters).slice(0, 500));
+  }
+
   // ── Apollo: total_entries with per_page=1 ──
   const apolloKey = process.env.APOLLO_API_KEY;
   let totalAvailable = 0;
 
   if (apolloKey) {
     try {
+      const payload = buildApolloPayload(filters);
+      console.log("[extract-stats] Apollo payload:", JSON.stringify(payload));
+
       const res = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Api-Key": apolloKey,
         },
-        body: JSON.stringify(buildApolloPayload(filters)),
+        body: JSON.stringify(payload),
       });
 
+      const data = await res.json();
+      console.log("[extract-stats] Apollo response:", res.status, JSON.stringify({
+        total_entries: data.pagination?.total_entries,
+        unique_enriched_records: data.unique_enriched_records,
+      }));
+
       if (res.ok) {
-        const data = await res.json();
         totalAvailable =
           typeof data.pagination?.total_entries === "number"
             ? data.pagination.total_entries
             : typeof data.unique_enriched_records === "number"
             ? data.unique_enriched_records
             : 0;
+      } else {
+        console.error("[extract-stats] Apollo error body:", JSON.stringify(data).slice(0, 300));
       }
-    } catch {
-      // Non-blocking — return 0
+    } catch (err) {
+      console.error("[extract-stats] Apollo fetch error:", err);
     }
+  } else {
+    console.warn("[extract-stats] APOLLO_API_KEY not set");
   }
 
   // ── Google Sheet: count existing rows ──
