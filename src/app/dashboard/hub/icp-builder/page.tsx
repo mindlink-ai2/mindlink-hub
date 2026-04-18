@@ -7,9 +7,14 @@ import {
   ArrowLeft,
   ArrowRight,
   Building2,
+  Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Crown,
   Loader2,
   MessageCircleQuestion,
+  MousePointerClick,
   Pencil,
   Search,
   Send,
@@ -49,8 +54,29 @@ type ApolloProfile = {
   country: string | null;
 };
 
+type BrowseProfile = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  title: string | null;
+  organization: {
+    name: string | null;
+    industry: string | null;
+    estimated_num_employees: number | null;
+  } | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+};
+
 type IcpStatus = "none" | "draft" | "submitted";
-type Screen = "questionnaire" | "summary" | "results" | "submitted";
+type Screen =
+  | "questionnaire"
+  | "summary"
+  | "mode-select"
+  | "results"
+  | "browse"
+  | "submitted";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -307,6 +333,24 @@ export default function IcpBuilderPage() {
   const [reopening, setReopening] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // ── Browse mode state ──
+  const [browseLeads, setBrowseLeads] = useState<BrowseProfile[]>([]);
+  const [browsePage, setBrowsePage] = useState(1);
+  const [browseTotalPages, setBrowseTotalPages] = useState(1);
+  const [browseTotalEntries, setBrowseTotalEntries] = useState(0);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [browseError, setBrowseError] = useState<string | null>(null);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+  const [selectedLeadsMap, setSelectedLeadsMap] = useState<Map<string, BrowseProfile>>(new Map());
+  const [quotaTotal, setQuotaTotal] = useState(0);
+  const [quotaUsed, setQuotaUsed] = useState(0);
+  const [validatingSelection, setValidatingSelection] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  const quotaRemaining = Math.max(0, quotaTotal - quotaUsed);
+  const selectedCount = selectedLeadIds.size;
+  const canSelectMore = selectedCount < quotaRemaining;
 
   // ── Help chat state ──
   const [helpOpenFor, setHelpOpenFor] = useState<string | null>(null);
@@ -662,6 +706,148 @@ export default function IcpBuilderPage() {
     }
   };
 
+  // ── Browse mode handlers ──
+
+  const fetchQuota = useCallback(async () => {
+    try {
+      const res = await fetch("/api/leads/quota");
+      if (res.ok) {
+        const data = await res.json();
+        setQuotaTotal(data.quota_remaining ?? 0);
+        setQuotaUsed(0); // quota_remaining already accounts for used
+      }
+    } catch {
+      // silencieux
+    }
+  }, []);
+
+  const fetchBrowsePage = useCallback(async (page: number) => {
+    setBrowseLoading(true);
+    setBrowseError(null);
+    try {
+      const res = await fetch(`/api/apollo/browse?page=${page}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setBrowseError(data.error ?? "Erreur lors du chargement.");
+        return;
+      }
+      setBrowseLeads(data.people ?? []);
+      setBrowsePage(data.page ?? page);
+      setBrowseTotalPages(data.total_pages ?? 1);
+      setBrowseTotalEntries(data.total_entries ?? 0);
+    } catch {
+      setBrowseError("Impossible de contacter le serveur.");
+    } finally {
+      setBrowseLoading(false);
+    }
+  }, []);
+
+  const handleEnterBrowseMode = useCallback(async () => {
+    // Save draft first
+    if (generatedFilters) {
+      await fetch("/api/icp/save-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filters: {
+            questionnaire: answers,
+            apollo_filters: generatedFilters,
+            commercial_promise: answers.q6_commercial_promise,
+          },
+        }),
+      });
+      setIcpStatus("draft");
+    }
+    setScreen("browse");
+    setSelectedLeadIds(new Set());
+    setSelectedLeadsMap(new Map());
+    await Promise.all([fetchQuota(), fetchBrowsePage(1)]);
+  }, [generatedFilters, answers, fetchQuota, fetchBrowsePage]);
+
+  const toggleLeadSelection = useCallback(
+    (lead: BrowseProfile) => {
+      setSelectedLeadIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(lead.id)) {
+          next.delete(lead.id);
+          setSelectedLeadsMap((m) => {
+            const nm = new Map(m);
+            nm.delete(lead.id);
+            return nm;
+          });
+        } else {
+          if (next.size >= quotaRemaining) return prev;
+          next.add(lead.id);
+          setSelectedLeadsMap((m) => new Map(m).set(lead.id, lead));
+        }
+        return next;
+      });
+    },
+    [quotaRemaining]
+  );
+
+  const selectAllOnPage = useCallback(() => {
+    setBrowseLeads((leads) => {
+      const newIds = new Set(selectedLeadIds);
+      const newMap = new Map(selectedLeadsMap);
+      for (const lead of leads) {
+        if (newIds.size >= quotaRemaining) break;
+        if (!newIds.has(lead.id)) {
+          newIds.add(lead.id);
+          newMap.set(lead.id, lead);
+        }
+      }
+      setSelectedLeadIds(newIds);
+      setSelectedLeadsMap(newMap);
+      return leads;
+    });
+  }, [selectedLeadIds, selectedLeadsMap, quotaRemaining]);
+
+  const handleValidateSelection = useCallback(async () => {
+    setValidatingSelection(true);
+    setShowConfirmModal(false);
+    try {
+      const leadsToSend = Array.from(selectedLeadsMap.values()).map((l) => ({
+        id: l.id,
+        first_name: l.first_name,
+        last_name: l.last_name,
+        title: l.title,
+        organization: l.organization,
+        city: l.city,
+        state: l.state,
+        country: l.country,
+      }));
+
+      const res = await fetch("/api/leads/select", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leads: leadsToSend,
+          mark_submitted: onboardingPending,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSubmitError(data.error ?? "Erreur lors de la validation.");
+        return;
+      }
+
+      setIcpStatus("submitted");
+      if (onboardingPending) {
+        await fetch("/api/onboarding/mark-icp-submitted", {
+          method: "POST",
+        }).catch(() => null);
+        router.replace("/dashboard/hub/messages-setup");
+      } else {
+        setScreen("submitted");
+      }
+    } catch {
+      setSubmitError("Impossible de valider la sélection.");
+    } finally {
+      setValidatingSelection(false);
+    }
+  }, [selectedLeadsMap, onboardingPending, router]);
+
   // ─── Rendu ────────────────────────────────────────────────────────────────────
 
   return (
@@ -964,47 +1150,83 @@ export default function IcpBuilderPage() {
             </div>
           )}
 
-          <div className="flex flex-col items-center gap-3">
-            <HubButton
-              variant="primary"
+          {/* Mode selection */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Option A — Lidmeo s'occupe de tout */}
+            <button
+              type="button"
               onClick={handleGenerateAndSearch}
-              disabled={
-                generatingFilters ||
-                searching ||
-                creditsRemaining === 0
-              }
-              className="w-full gap-2 justify-center"
+              disabled={generatingFilters || searching || creditsRemaining === 0}
+              className="relative bg-white rounded-2xl border-2 border-[#2563EB] p-6 text-left hover:shadow-md transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {generatingFilters ? (
-                <>
-                  <Sparkles className="w-4 h-4 animate-pulse" />
-                  Analyse de votre ciblage…
-                </>
-              ) : searching ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Recherche en cours…
-                </>
-              ) : (
-                <>
-                  <Search className="w-4 h-4" />
-                  Voir des exemples de profils
-                </>
+              <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-[#2563EB] px-2 py-0.5 text-[10px] font-semibold text-white">
+                <Crown className="w-3 h-3" />
+                Recommandé
+              </span>
+              <Sparkles className="w-8 h-8 text-[#2563EB] mb-3" />
+              <h3 className="text-sm font-bold text-[#0b1c33] mb-1">
+                {generatingFilters
+                  ? "Analyse en cours…"
+                  : searching
+                  ? "Recherche en cours…"
+                  : "Lidmeo s'occupe de tout"}
+              </h3>
+              <p className="text-xs text-[#51627b] leading-relaxed">
+                Nous sélectionnons les meilleurs profils pour vous selon vos
+                critères.
+              </p>
+              {creditsRemaining !== null && creditsRemaining > 0 && (
+                <p className="text-[10px] text-[#7a9abf] mt-2">
+                  Consomme 1 crédit ({creditsRemaining} restant
+                  {creditsRemaining > 1 ? "s" : ""})
+                </p>
               )}
-            </HubButton>
+            </button>
 
-            {creditsRemaining === 0 && (
-              <p className="text-sm text-red-500">
-                {"Vous n'avez plus de crédits de recherche."}
+            {/* Option B — Je choisis mes leads */}
+            <button
+              type="button"
+              onClick={async () => {
+                // Generate filters first if not done yet
+                if (!generatedFilters) {
+                  setGeneratingFilters(true);
+                  try {
+                    const genRes = await fetch("/api/icp/generate-filters", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ answers }),
+                    });
+                    const genData = await genRes.json();
+                    if (genRes.ok && genData.filters) {
+                      setGeneratedFilters(genData.filters);
+                    }
+                  } catch {
+                    // continue anyway
+                  } finally {
+                    setGeneratingFilters(false);
+                  }
+                }
+                handleEnterBrowseMode();
+              }}
+              disabled={generatingFilters || searching}
+              className="bg-white rounded-2xl border border-[#c8d6ea] p-6 text-left hover:border-[#2563EB] hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <MousePointerClick className="w-8 h-8 text-[#51627b] mb-3" />
+              <h3 className="text-sm font-bold text-[#0b1c33] mb-1">
+                Je choisis mes leads
+              </h3>
+              <p className="text-xs text-[#51627b] leading-relaxed">
+                Parcourez les profils disponibles et sélectionnez ceux que vous
+                souhaitez contacter.
               </p>
-            )}
-            {creditsRemaining !== null && creditsRemaining > 0 && (
-              <p className="text-xs text-[#7a9abf]">
-                Consomme 1 crédit ({creditsRemaining} restant
-                {creditsRemaining > 1 ? "s" : ""})
-              </p>
-            )}
+            </button>
           </div>
+
+          {creditsRemaining === 0 && (
+            <p className="text-sm text-red-500 text-center mt-3">
+              {"Vous n'avez plus de crédits de recherche."}
+            </p>
+          )}
         </div>
       )}
 
@@ -1106,6 +1328,297 @@ export default function IcpBuilderPage() {
               </HubButton>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Écran : navigation et sélection de leads ── */}
+      {screen === "browse" && (
+        <div className="max-w-4xl mx-auto px-4 py-6 pb-28">
+          {/* Bannière quota sticky */}
+          <div className="sticky top-0 z-10 -mx-4 px-4 pb-4">
+            <div className="bg-[#2563EB] rounded-2xl px-6 py-4 text-white">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium">
+                  Leads restants à sélectionner :{" "}
+                  <span className="font-bold">
+                    {Math.max(0, quotaRemaining - selectedCount)}
+                  </span>{" "}
+                  / {quotaRemaining}
+                </p>
+                <p className="text-sm">
+                  <span className="font-bold">{selectedCount}</span>{" "}
+                  sélectionné{selectedCount > 1 ? "s" : ""}
+                </p>
+              </div>
+              <div className="h-2 w-full rounded-full bg-white/20">
+                <div
+                  className="h-2 rounded-full bg-white transition-all"
+                  style={{
+                    width: `${
+                      quotaRemaining > 0
+                        ? Math.min(100, (selectedCount / quotaRemaining) * 100)
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+              <p className="text-xs text-white/80 mt-2">
+                Validez votre sélection pour recevoir vos leads. Sans
+                validation, aucun lead ne sera envoyé.
+              </p>
+            </div>
+          </div>
+
+          {/* Contrôles */}
+          <div className="flex items-center justify-between mb-4">
+            <HubButton
+              variant="ghost"
+              onClick={() => {
+                setScreen("summary");
+                setBrowseLeads([]);
+              }}
+              className="gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Retour
+            </HubButton>
+            <HubButton
+              variant="secondary"
+              onClick={selectAllOnPage}
+              disabled={!canSelectMore || browseLoading}
+              className="gap-2"
+            >
+              <Check className="w-4 h-4" />
+              Tout sélectionner
+            </HubButton>
+          </div>
+
+          {browseError && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-sm text-red-700">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              {browseError}
+            </div>
+          )}
+
+          {submitError && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-sm text-red-700">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              {submitError}
+            </div>
+          )}
+
+          {/* Grille de leads */}
+          {browseLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-[#2563EB]" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+              {browseLeads.map((lead) => {
+                const isSelected = selectedLeadIds.has(lead.id);
+                const location = [lead.city, lead.country]
+                  .filter(Boolean)
+                  .join(", ");
+                return (
+                  <button
+                    key={lead.id}
+                    type="button"
+                    onClick={() => toggleLeadSelection(lead)}
+                    disabled={!isSelected && !canSelectMore}
+                    className={cn(
+                      "relative rounded-2xl border p-4 text-left transition-all",
+                      isSelected
+                        ? "border-[#2563EB] bg-[#f0f5ff] shadow-sm"
+                        : "border-[#c8d6ea] bg-white hover:border-[#a5bfe0]",
+                      !isSelected &&
+                        !canSelectMore &&
+                        "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    {/* Checkbox */}
+                    <div
+                      className={cn(
+                        "absolute top-3 right-3 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
+                        isSelected
+                          ? "bg-[#2563EB] border-[#2563EB]"
+                          : "border-[#c8d6ea] bg-white"
+                      )}
+                    >
+                      {isSelected && (
+                        <Check className="w-3 h-3 text-white" />
+                      )}
+                    </div>
+
+                    <div className="pr-8">
+                      <p className="text-sm font-semibold text-[#0b1c33] truncate">
+                        {lead.first_name ?? ""} {lead.last_name ?? ""}
+                      </p>
+                      <p className="text-xs text-[#51627b] truncate mt-0.5">
+                        {lead.title ?? "—"}
+                      </p>
+                    </div>
+
+                    {lead.organization && (
+                      <div className="flex items-center gap-1.5 text-xs text-[#51627b] mt-2">
+                        <Building2 className="w-3.5 h-3.5 shrink-0 text-[#7a9abf]" />
+                        <span className="truncate font-medium text-[#0b1c33]">
+                          {lead.organization.name ?? "—"}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[#7a9abf] mt-1.5">
+                      {lead.organization?.industry && (
+                        <span className="truncate">
+                          {lead.organization.industry}
+                        </span>
+                      )}
+                      {lead.organization?.estimated_num_employees && (
+                        <span>
+                          {lead.organization.estimated_num_employees.toLocaleString(
+                            "fr-FR"
+                          )}{" "}
+                          emp.
+                        </span>
+                      )}
+                      {location && <span>{location}</span>}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {!browseLoading && browseTotalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <button
+                type="button"
+                onClick={() => fetchBrowsePage(browsePage - 1)}
+                disabled={browsePage <= 1}
+                className="p-2 rounded-lg border border-[#c8d6ea] bg-white text-[#51627b] disabled:opacity-30 hover:bg-[#f8fafc] transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {Array.from({ length: Math.min(5, browseTotalPages) }, (_, i) => {
+                let pageNum: number;
+                if (browseTotalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (browsePage <= 3) {
+                  pageNum = i + 1;
+                } else if (browsePage >= browseTotalPages - 2) {
+                  pageNum = browseTotalPages - 4 + i;
+                } else {
+                  pageNum = browsePage - 2 + i;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    onClick={() => fetchBrowsePage(pageNum)}
+                    className={cn(
+                      "w-9 h-9 rounded-lg text-sm font-medium transition-colors",
+                      pageNum === browsePage
+                        ? "bg-[#2563EB] text-white"
+                        : "border border-[#c8d6ea] bg-white text-[#51627b] hover:bg-[#f8fafc]"
+                    )}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={() => fetchBrowsePage(browsePage + 1)}
+                disabled={browsePage >= browseTotalPages}
+                className="p-2 rounded-lg border border-[#c8d6ea] bg-white text-[#51627b] disabled:opacity-30 hover:bg-[#f8fafc] transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {!browseLoading && (
+            <p className="text-center text-xs text-[#7a9abf] mb-6">
+              Page {browsePage} sur {browseTotalPages} —{" "}
+              {browseTotalEntries.toLocaleString("fr-FR")} leads disponibles
+            </p>
+          )}
+
+          {/* Bouton de validation fixe */}
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#c8d6ea] px-4 py-4 z-20">
+            <div className="max-w-4xl mx-auto flex items-center justify-between">
+              <p className="text-sm text-[#51627b]">
+                {selectedCount > 0
+                  ? `${selectedCount} lead${selectedCount > 1 ? "s" : ""} sélectionné${selectedCount > 1 ? "s" : ""}`
+                  : "Aucun lead sélectionné"}
+              </p>
+              <HubButton
+                variant="primary"
+                onClick={() => setShowConfirmModal(true)}
+                disabled={selectedCount === 0 || validatingSelection}
+                className="gap-2"
+              >
+                {validatingSelection ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Validation…
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Valider ma sélection ({selectedCount})
+                  </>
+                )}
+              </HubButton>
+            </div>
+          </div>
+
+          {/* Modal de confirmation */}
+          {showConfirmModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+              <div className="bg-white rounded-2xl border border-[#c8d6ea] p-8 max-w-md mx-4 shadow-xl">
+                <h3 className="text-lg font-bold text-[#0b1c33] mb-2">
+                  Confirmer la sélection
+                </h3>
+                <p className="text-sm text-[#51627b] mb-6">
+                  Vous avez sélectionné{" "}
+                  <span className="font-semibold text-[#0b1c33]">
+                    {selectedCount} lead{selectedCount > 1 ? "s" : ""}
+                  </span>{" "}
+                  sur un quota de{" "}
+                  <span className="font-semibold text-[#0b1c33]">
+                    {quotaRemaining}
+                  </span>
+                  . Souhaitez-vous valider ?
+                </p>
+                <div className="flex gap-3">
+                  <HubButton
+                    variant="secondary"
+                    onClick={() => setShowConfirmModal(false)}
+                    className="flex-1 justify-center"
+                  >
+                    Annuler
+                  </HubButton>
+                  <HubButton
+                    variant="primary"
+                    onClick={handleValidateSelection}
+                    disabled={validatingSelection}
+                    className="flex-1 gap-2 justify-center"
+                  >
+                    {validatingSelection ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4" />
+                    )}
+                    Confirmer
+                  </HubButton>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
