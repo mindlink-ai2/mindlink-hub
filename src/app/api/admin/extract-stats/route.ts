@@ -128,13 +128,16 @@ export async function GET(request: Request) {
       const data = await res.json();
       console.log("[extract-stats] Apollo raw body (500 chars):", JSON.stringify(data).substring(0, 500));
       console.log("[extract-stats] Apollo response:", res.status, JSON.stringify({
-        total_entries: data.pagination?.total_entries,
+        total_entries: data.total_entries,
+        "pagination.total_entries": data.pagination?.total_entries,
         unique_enriched_records: data.unique_enriched_records,
       }));
 
       if (res.ok) {
         totalAvailable =
-          typeof data.pagination?.total_entries === "number"
+          typeof data.total_entries === "number"
+            ? data.total_entries
+            : typeof data.pagination?.total_entries === "number"
             ? data.pagination.total_entries
             : typeof data.unique_enriched_records === "number"
             ? data.unique_enriched_records

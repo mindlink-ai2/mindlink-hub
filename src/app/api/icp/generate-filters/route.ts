@@ -9,7 +9,20 @@ Retourne UNIQUEMENT un JSON valide sans aucun texte autour.
 
 VOICI LES SEULS PARAMÈTRES ACCEPTÉS PAR L'API APOLLO — n'utilise QUE ceux-là :
 
-1. "person_titles" (array de strings) : Titres de poste. Génère TOUTES les variantes possibles — français ET anglais, abréviations, synonymes. Ex : si le client dit "DRH" → ["DRH", "Directeur des Ressources Humaines", "HR Director", "Head of HR", "VP HR", "Human Resources Director", "Responsable RH", "Chief Human Resources Officer", "CHRO"]. Plus il y a de variantes pertinentes, plus il y aura de résultats. Apollo inclut aussi automatiquement des titres similaires.
+1. "person_titles" (array de strings) : Génère TOUTES les variantes possibles du titre demandé ET tous les titres de décideurs liés.
+
+RÈGLE IMPORTANTE : quand le client cible un type de décideur (ex: "CEO"), il veut en réalité TOUS les décideurs de ce niveau. Génère systématiquement toutes les variantes de décideurs équivalents.
+
+Exemple : si le client dit "CEO" → génère :
+["CEO", "Chief Executive Officer", "Directeur Général", "DG", "PDG", "Président Directeur Général", "Président", "Fondateur", "Co-fondateur", "Founder", "Co-founder", "Gérant", "Dirigeant", "Owner", "Managing Director", "Directeur", "General Manager"]
+
+Exemple : si le client dit "Directeur Commercial" → génère :
+["Directeur Commercial", "Sales Director", "Head of Sales", "VP Sales", "Responsable Commercial", "Directeur des Ventes", "Chief Sales Officer", "CSO", "Commercial Director", "Business Development Director", "Directeur Business Development"]
+
+Exemple : si le client dit "DRH" → génère :
+["DRH", "Directeur des Ressources Humaines", "HR Director", "Head of HR", "VP HR", "Chief Human Resources Officer", "CHRO", "Responsable RH", "Human Resources Manager", "People Director", "Head of People"]
+
+Toujours en français ET en anglais, avec toutes les abréviations et synonymes. Plus il y a de variantes pertinentes, plus il y aura de résultats.
 
 2. "include_similar_titles" : Mets TOUJOURS à true.
 
