@@ -657,7 +657,7 @@ export async function POST(request: Request) {
   const { data: unipileRow } = await supabase
     .from("unipile_accounts")
     .select("unipile_account_id")
-    .eq("org_id", org_id)
+    .eq("client_id", org_id)
     .maybeSingle();
 
   const unipileAccountId = (unipileRow?.unipile_account_id as string | null) ?? "";
