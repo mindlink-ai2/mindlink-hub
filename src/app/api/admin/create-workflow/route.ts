@@ -34,7 +34,6 @@ function buildWorkflowJson(params: {
   clientId: number;
   unipileAccountId: string;
   promptSystems: string;
-  folderId: string;
 }): Record<string, unknown> {
   // Serialize the template to a string, inject params, then parse back.
   // jsonEscape() ensures each value is safely embedded in the JSON string.
@@ -51,10 +50,7 @@ function buildWorkflowJson(params: {
     .replace(/\{\{UNIPILE_ACCOUNT_ID\}\}/g, jsonEscape(params.unipileAccountId))
     .replace(/\{\{PROMPT_SYSTEME\}\}/g, jsonEscape(params.promptSystems));
 
-  const workflow = JSON.parse(result) as Record<string, unknown>;
-  // Place workflow in the created folder
-  workflow.folderId = params.folderId;
-  return workflow;
+  return JSON.parse(result) as Record<string, unknown>;
 }
 
 /**
@@ -670,37 +666,7 @@ export async function POST(request: Request) {
   const quotaPerDay = Number(clientRow.quota) || 10;
   const startDate = getTomorrowDate();
 
-  // ── Étape 1 : Créer le dossier n8n ───────────────────────────────────────
-  let folderId: string;
-  try {
-    const folderUrl = `${n8nBaseUrl}/api/v1/folders`;
-    console.log(`[create-workflow] Creating folder — URL: ${folderUrl}`);
-    const folderRes = await fetch(folderUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-N8N-API-KEY": n8nApiKey,
-      },
-      body: JSON.stringify({ name: `${clientName} — ${companyName}`.trim() }),
-    });
-
-    if (!folderRes.ok) {
-      const errText = await folderRes.text().catch(() => "");
-      throw new Error(`n8n folder creation failed ${folderRes.status}: ${errText.slice(0, 200)}`);
-    }
-
-    const folderData = await folderRes.json();
-    folderId = folderData.id as string;
-    console.log(`[create-workflow] Folder created: ${folderId}`);
-  } catch (err) {
-    console.error("[create-workflow] folder error:", err);
-    return NextResponse.json(
-      { error: "Impossible de créer le dossier n8n. Vérifiez la clé API." },
-      { status: 502 }
-    );
-  }
-
-  // ── Étape 2 : Créer le workflow avec les paramètres injectés ──────────────
+  // ── Étape 1 : Créer le workflow avec les paramètres injectés ──────────────
   let workflowId: string;
   try {
     const workflowPayload = buildWorkflowJson({
@@ -713,7 +679,6 @@ export async function POST(request: Request) {
       clientId: clientRow.id as number,
       unipileAccountId,
       promptSystems: prompt_systeme,
-      folderId,
     });
 
     const workflowRes = await fetch(`${n8nBaseUrl}/api/v1/workflows`, {
@@ -743,7 +708,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // ── Étape 3 : Activer le workflow ─────────────────────────────────────────
+  // ── Étape 2 : Activer le workflow ─────────────────────────────────────────
   try {
     const activateRes = await fetch(`${n8nBaseUrl}/api/v1/workflows/${workflowId}`, {
       method: "PATCH",
@@ -767,12 +732,12 @@ export async function POST(request: Request) {
     console.warn("[create-workflow] activation error (non-blocking):", err);
   }
 
-  // ── Étape 4 : Sauvegarder le workflow_id dans clients + extraction_logs ────
+  // ── Étape 3 : Sauvegarder le workflow_id dans clients + extraction_logs ────
   const { error: clientUpdateErr } = await supabase
     .from("clients")
     .update({
       n8n_workflow_id: workflowId,
-      n8n_folder_id: folderId,
+      n8n_folder_id: null,
     })
     .eq("id", org_id);
 
@@ -785,7 +750,7 @@ export async function POST(request: Request) {
       .from("extraction_logs")
       .update({
         workflow_id: workflowId,
-        folder_id: folderId,
+        folder_id: null,
       })
       .eq("id", extraction_log_id);
 
@@ -798,7 +763,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     workflow_id: workflowId,
-    folder_id: folderId,
     workflow_url: workflowUrl,
   });
 }
