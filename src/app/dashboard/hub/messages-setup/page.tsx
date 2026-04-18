@@ -35,7 +35,7 @@ type MessageKind = "linkedin" | "relance";
 const ASSISTANT_NAME = "Assistant Lidmeo";
 
 const WELCOME_MESSAGE =
-  "Bonjour ! Je suis l'Assistant Lidmeo. Je vais t'aider à créer tes messages de prospection LinkedIn. Je vais te poser 6 questions pour bien comprendre ton offre, puis nous construirons ensemble ton message LinkedIn et ta relance. On commence ?";
+  "Bonjour ! Je vais t'aider à créer tes messages de prospection LinkedIn. On commence ?";
 
 function extractTag(raw: string, tag: string): string {
   const re = new RegExp(`\\[${tag}\\]([\\s\\S]*?)\\[/${tag}\\]`, "i");
@@ -104,7 +104,7 @@ function MessageRow({
       <AssistantAvatar />
       <div className="flex max-w-[85%] flex-col gap-2">
         {preamble ? (
-          <div className="rounded-2xl rounded-tl-sm border border-[#e1e8f5] bg-white px-4 py-2.5 text-sm text-[#0b1c33] shadow-sm whitespace-pre-wrap">
+          <div className="rounded-2xl border border-[#e1e8f5] bg-white px-4 py-2.5 text-sm text-[#0b1c33] shadow-sm whitespace-pre-wrap">
             {preamble}
           </div>
         ) : null}
@@ -415,13 +415,17 @@ export default function MessagesSetupPage() {
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
           <div>
             <h1 className="text-lg font-bold text-[#0b1c33]">
-              Configuration de vos messages
+              {screen === "existing" || screen === "saved"
+                ? "Vos messages LinkedIn"
+                : "Créons vos messages de prospection"}
             </h1>
             <p className="mt-0.5 text-sm text-[#51627b]">
-              Un échange avec l&apos;Assistant Lidmeo pour créer vos messages de prospection.
+              {screen === "existing" || screen === "saved"
+                ? "Vos messages validés pour la prospection."
+                : "L\u2019Assistant Lidmeo vous aide à créer vos messages."}
             </p>
           </div>
-          {screen === "existing" && (
+          {(screen === "existing" || screen === "saved") && (
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
               <CheckCircle2 className="h-3.5 w-3.5" />
               Validés
@@ -482,7 +486,12 @@ export default function MessagesSetupPage() {
         <div className="mx-auto flex h-[calc(100vh-180px)] max-w-3xl flex-col px-4 py-6">
           <div
             ref={scrollRef}
-            className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-[#c8d6ea] bg-[#f8fafc] p-5"
+            className={cn(
+              "flex-1 overflow-y-auto rounded-2xl border border-[#c8d6ea] bg-[#f8fafc] p-5",
+              history.length <= 3 && !sending
+                ? "flex flex-col justify-center space-y-4"
+                : "space-y-4"
+            )}
           >
             {history.map((m, i) => (
               <MessageRow
@@ -498,7 +507,7 @@ export default function MessagesSetupPage() {
             {sending && (
               <div className="flex items-start gap-2.5">
                 <AssistantAvatar />
-                <div className="rounded-2xl rounded-tl-sm border border-[#e1e8f5] bg-white px-4 py-3 text-sm text-[#51627b] shadow-sm">
+                <div className="rounded-2xl border border-[#e1e8f5] bg-white px-4 py-3 text-sm text-[#51627b] shadow-sm">
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     {ASSISTANT_NAME} rédige…
@@ -538,30 +547,35 @@ export default function MessagesSetupPage() {
             </div>
           )}
 
-          <div className="mt-3 flex items-end gap-2">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Écris ta réponse…"
-              rows={2}
-              disabled={sending}
-              className="flex-1 resize-none rounded-2xl border border-[#c8d6ea] bg-white px-4 py-3 text-sm text-[#0b1c33] placeholder:text-[#a0b0c0] focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
-            />
-            <HubButton
-              variant="primary"
-              onClick={() => void sendMessage(input)}
-              disabled={sending || !input.trim()}
-              className="h-11 w-11 shrink-0 p-0"
-              aria-label="Envoyer"
-            >
-              {sending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </HubButton>
+          <div className="mt-3">
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Écris ta réponse…"
+                rows={2}
+                disabled={sending}
+                className="flex-1 resize-none rounded-2xl border border-[#c8d6ea] bg-white px-4 py-3 text-sm text-[#0b1c33] placeholder:text-[#a0b0c0] focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
+              />
+              <button
+                type="button"
+                onClick={() => void sendMessage(input)}
+                disabled={sending || !input.trim()}
+                className="shrink-0 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2563EB] text-white disabled:opacity-40 hover:bg-[#1d4ed8] transition-colors"
+                aria-label="Envoyer"
+              >
+                {sending ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+            <p className="mt-1.5 text-center text-[11px] text-[#a0b0c0]">
+              Appuyez sur Entrée pour envoyer
+            </p>
           </div>
         </div>
       )}
@@ -578,39 +592,34 @@ function SavedMessagesPanel({
 }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[#c8d6ea] bg-white p-6">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-bold text-[#0b1c33]">Tes messages actuels</h2>
-            <p className="mt-0.5 text-xs text-[#51627b]">
-              Utilisés pour ta prospection en cours.
-            </p>
-          </div>
-          <HubButton variant="secondary" onClick={onEdit} className="gap-2">
-            <Pencil className="h-4 w-4" />
-            Modifier
-          </HubButton>
-        </div>
-        <div className="space-y-3">
-          <SavedMessageBlock
-            icon={<MessageSquare className="h-4 w-4 text-[#2563EB]" />}
-            label="Message LinkedIn"
-            sub={`${messages.message_linkedin.length} car.`}
-            content={messages.message_linkedin}
-          />
-          <SavedMessageBlock
-            icon={<MessageSquare className="h-4 w-4 text-[#7c3aed]" />}
-            label="Relance LinkedIn"
-            sub={`${messages.relance_linkedin.length} car.`}
-            content={messages.relance_linkedin}
-          />
-          <SavedMessageBlock
-            icon={<Mail className="h-4 w-4 text-[#0891b2]" />}
-            label="Email de prospection (généré automatiquement)"
-            sub={`${messages.message_email.length} car.`}
-            content={messages.message_email}
-          />
-        </div>
+      <div className="space-y-3">
+        <SavedMessageBlock
+          icon={<MessageSquare className="h-4 w-4 text-[#2563EB]" />}
+          label="Message LinkedIn"
+          sub={`${messages.message_linkedin.length} car.`}
+          content={messages.message_linkedin}
+          showBadge
+        />
+        <SavedMessageBlock
+          icon={<MessageSquare className="h-4 w-4 text-[#7c3aed]" />}
+          label="Relance LinkedIn"
+          sub={`${messages.relance_linkedin.length} car.`}
+          content={messages.relance_linkedin}
+          showBadge
+        />
+        <SavedMessageBlock
+          icon={<Mail className="h-4 w-4 text-[#0891b2]" />}
+          label="Email de prospection (généré automatiquement)"
+          sub={`${messages.message_email.length} car.`}
+          content={messages.message_email}
+          showBadge
+        />
+      </div>
+      <div className="flex justify-center">
+        <HubButton variant="secondary" onClick={onEdit} className="gap-2">
+          <Pencil className="h-4 w-4" />
+          Modifier mes messages
+        </HubButton>
       </div>
     </div>
   );
@@ -621,26 +630,38 @@ function SavedMessageBlock({
   label,
   sub,
   content,
+  showBadge,
 }: {
   icon: React.ReactNode;
   label: string;
   sub: string;
   content: string;
+  showBadge?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-[#eef1f8] bg-[#fafcff] p-3">
-      <div className="mb-1.5 flex items-center justify-between">
+    <div className="rounded-2xl border border-[#c8d6ea] bg-white p-5 shadow-sm">
+      <div className="mb-2.5 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           {icon}
           <span className="text-xs font-semibold uppercase tracking-wide text-[#51627b]">
             {label}
           </span>
         </div>
-        <span className="text-[11px] text-[#7a9abf]">{sub}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-[#7a9abf]">{sub}</span>
+          {showBadge && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+              <CheckCircle2 className="h-3 w-3" />
+              Validé
+            </span>
+          )}
+        </div>
       </div>
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#0b1c33]">
-        {content}
-      </p>
+      <div className="rounded-xl border border-[#eef1f8] bg-[#fafcff] p-3">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#0b1c33]">
+          {content}
+        </p>
+      </div>
     </div>
   );
 }

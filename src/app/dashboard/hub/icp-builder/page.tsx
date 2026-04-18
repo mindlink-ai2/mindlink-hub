@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Gem,
   Loader2,
   MessageCircleQuestion,
   Pencil,
@@ -66,7 +67,6 @@ type BrowseProfile = {
   city: string | null;
   state: string | null;
   country: string | null;
-  location_available?: boolean;
 };
 
 type IcpStatus = "none" | "draft" | "submitted";
@@ -97,6 +97,7 @@ type StepDef = {
   id: string;
   number: number;
   title: string;
+  summaryLabel: string;
   subtitle: string;
   placeholder: string;
   type: "textarea" | "multiselect";
@@ -109,6 +110,7 @@ const STEPS: StepDef[] = [
     id: "q1",
     number: 1,
     title: "Quel est le poste exact des personnes que vous souhaitez contacter ?",
+    summaryLabel: "Postes ciblés",
     subtitle:
       "Soyez le plus précis possible. Listez les intitulés exacts tels qu'ils apparaissent sur LinkedIn.",
     placeholder: "Ex : CEO, Directeur Commercial, Head of Marketing, Fondateur",
@@ -120,6 +122,7 @@ const STEPS: StepDef[] = [
     id: "q2",
     number: 2,
     title: "Y a-t-il des postes que vous souhaitez absolument exclure ?",
+    summaryLabel: "Postes exclus",
     subtitle: "Si certains titres proches ne vous intéressent pas, listez-les ici.",
     placeholder: "Ex : Stagiaire, Assistant, Freelance",
     type: "textarea",
@@ -130,6 +133,7 @@ const STEPS: StepDef[] = [
     id: "q3",
     number: 3,
     title: "Dans quel secteur d'activité travaillent vos clients idéaux ?",
+    summaryLabel: "Secteur d'activité",
     subtitle:
       "Précisez le secteur, pas simplement « digital ». Plus c'est précis, meilleurs seront les résultats.",
     placeholder:
@@ -142,6 +146,7 @@ const STEPS: StepDef[] = [
     id: "q4",
     number: 4,
     title: "Quelle taille d'entreprise visez-vous ?",
+    summaryLabel: "Taille d'entreprise",
     subtitle: "Indiquez une fourchette de nombre d'employés.",
     placeholder: "",
     type: "multiselect",
@@ -152,6 +157,7 @@ const STEPS: StepDef[] = [
     id: "q5",
     number: 5,
     title: "Dans quels pays ou villes se trouvent vos cibles ?",
+    summaryLabel: "Zone géographique",
     subtitle: "Soyez précis : un pays entier ou des villes/régions spécifiques ?",
     placeholder: "Ex : France entière, ou Paris + Lyon + Bordeaux uniquement",
     type: "textarea",
@@ -163,6 +169,7 @@ const STEPS: StepDef[] = [
     number: 6,
     title:
       "Quelle est votre promesse commerciale ? Qu'est-ce que vous vendez et pourquoi vous choisir plutôt qu'un autre ?",
+    summaryLabel: "Promesse commerciale",
     subtitle:
       "Cette information nous aide à personnaliser les messages d'approche. Soyez concret sur votre valeur ajoutée.",
     placeholder:
@@ -299,7 +306,7 @@ function SummaryItem({
       </div>
       <button
         onClick={onEdit}
-        className="shrink-0 flex items-center gap-1 text-xs text-[#2563EB] hover:text-[#1d4ed8] font-medium mt-0.5 transition-colors"
+        className="shrink-0 flex items-center gap-1 text-xs text-[#2563EB] hover:text-[#1d4ed8] hover:underline font-medium mt-0.5 transition-colors"
       >
         <Pencil className="w-3 h-3" />
         Modifier
@@ -909,21 +916,23 @@ export default function IcpBuilderPage() {
               Répondez aux questions pour configurer votre prospection.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-[#51627b]">Crédits :</span>
-            {loadingCredits ? (
-              <Loader2 className="w-4 h-4 animate-spin text-[#7a9abf]" />
-            ) : (
-              <span
-                className={cn(
-                  "font-semibold",
-                  creditsRemaining === 0 ? "text-red-500" : "text-[#2563EB]"
-                )}
-              >
-                {creditsRemaining ?? "—"}
-              </span>
-            )}
-          </div>
+          {loadingCredits ? (
+            <div className="h-7 w-16 animate-pulse rounded-full bg-[#eef1f8]" />
+          ) : (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
+                creditsRemaining === 0
+                  ? "bg-red-50 text-red-600 border border-red-200"
+                  : creditsRemaining === 1
+                  ? "bg-orange-50 text-orange-600 border border-orange-200"
+                  : "bg-[#eef1f8] text-[#2563EB] border border-[#c8d6ea]"
+              )}
+            >
+              <Gem className="w-3.5 h-3.5" />
+              {creditsRemaining ?? "—"} crédit{(creditsRemaining ?? 0) > 1 ? "s" : ""}
+            </span>
+          )}
         </div>
       </div>
 
@@ -965,21 +974,21 @@ export default function IcpBuilderPage() {
         <div className="max-w-2xl mx-auto px-4 py-8">
           {/* Barre de progression */}
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-[#51627b]">
-                Étape {currentStep + 1} sur {STEP_COUNT}
-              </span>
-              <span className="text-sm text-[#7a9abf]">
-                {Math.round(((currentStep + 1) / STEP_COUNT) * 100)}%
-              </span>
-            </div>
+            <p className="text-sm font-semibold text-[#51627b] mb-2">
+              {currentStep + 1} / {STEP_COUNT}
+            </p>
             <div className="flex gap-1.5">
               {STEPS.map((_, i) => (
-                <div
+                <button
                   key={i}
+                  type="button"
+                  onClick={() => { if (i < currentStep) { setCurrentStep(i); } }}
+                  disabled={i > currentStep}
                   className={cn(
-                    "h-1.5 flex-1 rounded-full transition-all duration-300",
-                    i <= currentStep ? "bg-[#2563EB]" : "bg-[#c8d6ea]"
+                    "h-2 flex-1 rounded-full transition-all duration-300",
+                    i <= currentStep ? "bg-[#2563EB]" : "bg-[#c8d6ea]",
+                    i < currentStep && "cursor-pointer hover:bg-[#1d4ed8]",
+                    i > currentStep && "cursor-default"
                   )}
                 />
               ))}
@@ -987,10 +996,13 @@ export default function IcpBuilderPage() {
           </div>
 
           {/* Carte question */}
-          <div className="bg-white rounded-2xl border border-[#c8d6ea] p-8 mb-6">
+          <div
+            key={currentStepDef.id}
+            className="bg-white rounded-2xl border border-[#c8d6ea] p-8 mb-6 animate-in fade-in slide-in-from-right-4 duration-300"
+          >
             <div className="mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#2563EB] text-white text-xs font-bold shrink-0">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#2563EB] text-white text-[11px] font-bold shrink-0">
                   {currentStep + 1}
                 </span>
                 {!currentStepDef.required && (
@@ -999,10 +1011,10 @@ export default function IcpBuilderPage() {
                   </span>
                 )}
               </div>
-              <h2 className="text-lg font-bold text-[#0b1c33] leading-snug mb-2">
+              <h2 className="text-base font-bold text-[#0b1c33] leading-snug mb-1.5">
                 {currentStepDef.title}
               </h2>
-              <p className="text-sm text-[#51627b] leading-relaxed">
+              <p className="text-sm text-[#51627b] leading-relaxed italic">
                 {currentStepDef.subtitle}
               </p>
             </div>
@@ -1010,15 +1022,19 @@ export default function IcpBuilderPage() {
             {currentStepDef.type === "textarea" && (
               <textarea
                 className="w-full rounded-xl border border-[#c8d6ea] bg-[#f8fafc] px-4 py-3 text-sm text-[#0b1c33] placeholder:text-[#a0b0c0] resize-none focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-colors"
-                rows={4}
+                rows={2}
+                style={{ minHeight: "80px", height: "auto" }}
                 placeholder={currentStepDef.placeholder}
                 value={answers[currentStepDef.key] as string}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const el = e.target;
+                  el.style.height = "auto";
+                  el.style.height = `${Math.max(80, el.scrollHeight)}px`;
                   setAnswers((prev) => ({
                     ...prev,
-                    [currentStepDef.key]: e.target.value,
-                  }))
-                }
+                    [currentStepDef.key]: el.value,
+                  }));
+                }}
               />
             )}
 
@@ -1182,12 +1198,19 @@ export default function IcpBuilderPage() {
               {STEPS.map((step, i) => (
                 <SummaryItem
                   key={step.id}
-                  label={`${step.number}. ${step.title}`}
+                  label={step.summaryLabel}
                   value={answers[step.key] as string | string[]}
                   optional={!step.required}
                   onEdit={() => handleEditFromSummary(i)}
                 />
               ))}
+            </div>
+            <div className="px-8 pb-6 pt-2">
+              <div className="rounded-xl bg-[#f8fafc] border border-[#c8d6ea] px-4 py-3">
+                <p className="text-sm text-[#51627b] italic">
+                  Vérifiez bien vos réponses. Plus votre ciblage est précis, meilleurs seront vos résultats.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -1345,25 +1368,54 @@ export default function IcpBuilderPage() {
       {/* ── Écran : navigation et sélection de leads ── */}
       {screen === "browse" && (
         <div className="max-w-4xl mx-auto px-4 py-6 pb-28">
-          {/* Bannière quota sticky */}
+          {/* Bannière quota sticky — compact */}
           <div className="sticky top-0 z-10 -mx-4 px-4 pb-4">
-            <div className="bg-[#2563EB] rounded-2xl px-6 py-4 text-white">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium">
-                  Leads restants à sélectionner :{" "}
-                  <span className="font-bold">
-                    {Math.max(0, quotaRemaining - selectedCount).toLocaleString("fr-FR")}
-                  </span>{" "}
-                  / {monthlyQuota.toLocaleString("fr-FR")}
-                </p>
-                <p className="text-sm">
-                  <span className="font-bold">{selectedCount}</span>{" "}
-                  sélectionné{selectedCount > 1 ? "s" : ""}
-                </p>
+            <div className="bg-[#2563EB] rounded-xl px-5 py-3 text-white">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 text-sm min-w-0">
+                  <span>
+                    <span className="font-bold">{Math.max(0, quotaRemaining - selectedCount).toLocaleString("fr-FR")}</span> restants sur {monthlyQuota.toLocaleString("fr-FR")}
+                  </span>
+                  <span className="text-white/60">|</span>
+                  <span>
+                    <span className="font-bold">{selectedCount}</span> sélectionné{selectedCount > 1 ? "s" : ""}
+                  </span>
+                  {quotaUsed > 0 && (
+                    <>
+                      <span className="text-white/60">|</span>
+                      <span className="text-white/80 text-xs">{quotaUsed.toLocaleString("fr-FR")} déjà extraits</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    disabled={(!canSelectMore && selectedCount === 0) || browseLoading}
+                    className="text-xs font-medium text-white/90 hover:text-white disabled:text-white/40 transition-colors whitespace-nowrap"
+                  >
+                    {selectedCount > 0 ? "Tout désélectionner" : "Tout sélectionner"}
+                  </button>
+                  {quotaRemaining > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleAutoSelect}
+                      disabled={autoSelecting || selectedCount >= autoSelectTarget}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 disabled:opacity-40 px-3 py-1.5 text-xs font-medium text-white transition-colors whitespace-nowrap"
+                    >
+                      {autoSelecting ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5" />
+                      )}
+                      {autoSelecting ? "Sélection…" : `Auto-sélectionner ${autoSelectTarget.toLocaleString("fr-FR")}`}
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="h-2 w-full rounded-full bg-white/20">
+              <div className="h-1.5 w-full rounded-full bg-white/20 mt-2.5">
                 <div
-                  className="h-2 rounded-full bg-white transition-all"
+                  className="h-1.5 rounded-full bg-white transition-all"
                   style={{
                     width: `${
                       monthlyQuota > 0
@@ -1373,98 +1425,30 @@ export default function IcpBuilderPage() {
                   }}
                 />
               </div>
-              {quotaUsed > 0 && (
-                <p className="text-xs text-white/80 mt-2">
-                  {quotaUsed.toLocaleString("fr-FR")} leads déjà extraits ce mois-ci.
-                </p>
-              )}
-              <p className="text-xs text-white/80 mt-1">
-                Validez votre sélection pour recevoir vos leads. Sans
-                validation, aucun lead ne sera envoyé.
-              </p>
             </div>
           </div>
 
-          {/* Contrôles */}
-          <div className="flex items-center justify-between mb-4">
-            <HubButton
-              variant="ghost"
+          {/* Retour — lien discret */}
+          <div className="mb-4">
+            <button
+              type="button"
               onClick={() => {
                 setScreen("summary");
                 setBrowseLeads([]);
               }}
-              className="gap-2"
+              className="text-sm text-[#7a9abf] hover:text-[#2563EB] transition-colors"
             >
-              <ArrowLeft className="w-4 h-4" />
-              Retour
-            </HubButton>
-            <HubButton
-              variant="secondary"
-              onClick={toggleSelectAll}
-              disabled={(!canSelectMore && selectedCount === 0) || browseLoading}
-              className="gap-2"
-            >
-              <Check className="w-4 h-4" />
-              {selectedCount > 0 ? "Tout désélectionner" : "Tout sélectionner"}
-            </HubButton>
+              ← Retour au ciblage
+            </button>
           </div>
-
-          {/* Auto-select */}
-          {quotaRemaining > 0 && (
-            <div className="flex justify-center mb-4">
-              <HubButton
-                variant="secondary"
-                onClick={handleAutoSelect}
-                disabled={autoSelecting || selectedCount >= autoSelectTarget}
-                className="gap-2"
-              >
-                {autoSelecting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Sélection en cours…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    Sélectionner{" "}
-                    {autoSelectTarget.toLocaleString("fr-FR")}{" "}
-                    leads automatiquement
-                  </>
-                )}
-              </HubButton>
-            </div>
-          )}
 
           {/* Alerte leads insuffisants */}
           {!browseLoading && monthlyQuota > 0 && browseTotalEntries > 0 && browseTotalEntries < monthlyQuota && (
-            <div className="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mb-4 text-sm text-orange-800">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-orange-500" />
-              <div>
-                <p className="font-medium">
-                  Attention : seulement{" "}
-                  {browseTotalEntries.toLocaleString("fr-FR")} leads
-                  correspondent à vos critères, alors que votre quota mensuel est
-                  de {monthlyQuota.toLocaleString("fr-FR")} leads.
-                </p>
-                <p className="mt-1 text-orange-700">
-                  Une fois tous les leads sélectionnés, vous pourrez modifier
-                  votre ciblage pour élargir votre recherche et trouver davantage
-                  de profils.
-                </p>
-                {selectedCount > 0 && selectedCount >= browseTotalEntries && selectedCount < quotaRemaining && (
-                  <HubButton
-                    variant="secondary"
-                    onClick={() => {
-                      setScreen("summary");
-                      setBrowseLeads([]);
-                    }}
-                    className="mt-3 gap-2 text-orange-800 border-orange-300 hover:bg-orange-100"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    Modifier mon ciblage pour trouver plus de leads
-                  </HubButton>
-                )}
-              </div>
+            <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mb-4 text-sm text-orange-800">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-orange-500" />
+              <p>
+                Seulement <span className="font-semibold">{browseTotalEntries.toLocaleString("fr-FR")} leads</span> disponibles pour vos critères (quota : {monthlyQuota.toLocaleString("fr-FR")}). Vous pourrez élargir votre ciblage une fois la sélection validée.
+              </p>
             </div>
           )}
 
@@ -1503,24 +1487,24 @@ export default function IcpBuilderPage() {
                     className={cn(
                       "relative rounded-2xl border p-4 text-left transition-all",
                       isSelected
-                        ? "border-[#2563EB] bg-[#f0f5ff] shadow-sm"
-                        : "border-[#c8d6ea] bg-white hover:border-[#a5bfe0]",
+                        ? "border-[#2563EB] bg-[#EBF5FF] shadow-sm ring-1 ring-[#2563EB]"
+                        : "border-[#c8d6ea] bg-white hover:border-[#2563EB]/40 hover:shadow-md",
                       !isSelected &&
                         !canSelectMore &&
-                        "opacity-50 cursor-not-allowed"
+                        "opacity-50 cursor-not-allowed hover:shadow-none"
                     )}
                   >
                     {/* Checkbox */}
                     <div
                       className={cn(
-                        "absolute top-3 right-3 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
+                        "absolute top-3 right-3 w-[20px] h-[20px] rounded border-2 flex items-center justify-center transition-colors",
                         isSelected
                           ? "bg-[#2563EB] border-[#2563EB]"
-                          : "border-[#c8d6ea] bg-white"
+                          : "border-[#b0c4de] bg-white"
                       )}
                     >
                       {isSelected && (
-                        <Check className="w-3 h-3 text-white" />
+                        <Check className="w-3.5 h-3.5 text-white" />
                       )}
                     </div>
 
@@ -1534,11 +1518,18 @@ export default function IcpBuilderPage() {
                     </div>
 
                     {lead.organization && (
-                      <div className="flex items-center gap-1.5 text-xs text-[#51627b] mt-2">
-                        <Building2 className="w-3.5 h-3.5 shrink-0 text-[#7a9abf]" />
-                        <span className="truncate font-medium text-[#0b1c33]">
-                          {lead.organization.name ?? "—"}
-                        </span>
+                      <div className="mt-2">
+                        <div className="flex items-center gap-1.5 text-xs text-[#51627b]">
+                          <Building2 className="w-3.5 h-3.5 shrink-0 text-[#7a9abf]" />
+                          <span className="truncate font-medium text-[#0b1c33]">
+                            {lead.organization.name ?? "—"}
+                          </span>
+                        </div>
+                        {lead.organization.estimated_num_employees != null && (
+                          <p className="text-[11px] text-[#7a9abf] ml-5 mt-0.5">
+                            {lead.organization.estimated_num_employees.toLocaleString("fr-FR")} employés
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -1548,19 +1539,7 @@ export default function IcpBuilderPage() {
                           {lead.organization.industry}
                         </span>
                       )}
-                      {lead.organization?.estimated_num_employees && (
-                        <span>
-                          {lead.organization.estimated_num_employees.toLocaleString(
-                            "fr-FR"
-                          )}{" "}
-                          emp.
-                        </span>
-                      )}
-                      {location ? (
-                        <span>{location}</span>
-                      ) : lead.location_available ? (
-                        <span className="italic">Localisation disponible</span>
-                      ) : null}
+                      {location && <span>{location}</span>}
                     </div>
                   </button>
                 );
@@ -1570,75 +1549,93 @@ export default function IcpBuilderPage() {
 
           {/* Pagination */}
           {!browseLoading && browseTotalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mb-6">
-              <button
-                type="button"
-                onClick={() => fetchBrowsePage(browsePage - 1)}
-                disabled={browsePage <= 1}
-                className="p-2 rounded-lg border border-[#c8d6ea] bg-white text-[#51627b] disabled:opacity-30 hover:bg-[#f8fafc] transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
+            <div className="flex flex-col items-center gap-2 mb-6">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchBrowsePage(browsePage - 1)}
+                  disabled={browsePage <= 1}
+                  className="p-2 rounded-lg border border-[#c8d6ea] bg-white text-[#51627b] disabled:opacity-30 hover:bg-[#f8fafc] transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
 
-              {Array.from({ length: Math.min(5, browseTotalPages) }, (_, i) => {
-                let pageNum: number;
-                if (browseTotalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (browsePage <= 3) {
-                  pageNum = i + 1;
-                } else if (browsePage >= browseTotalPages - 2) {
-                  pageNum = browseTotalPages - 4 + i;
-                } else {
-                  pageNum = browsePage - 2 + i;
-                }
-                return (
-                  <button
-                    key={pageNum}
-                    type="button"
-                    onClick={() => fetchBrowsePage(pageNum)}
-                    className={cn(
-                      "w-9 h-9 rounded-lg text-sm font-medium transition-colors",
-                      pageNum === browsePage
-                        ? "bg-[#2563EB] text-white"
-                        : "border border-[#c8d6ea] bg-white text-[#51627b] hover:bg-[#f8fafc]"
-                    )}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
+                {Array.from({ length: Math.min(5, browseTotalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (browseTotalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (browsePage <= 3) {
+                    pageNum = i + 1;
+                  } else if (browsePage >= browseTotalPages - 2) {
+                    pageNum = browseTotalPages - 4 + i;
+                  } else {
+                    pageNum = browsePage - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => fetchBrowsePage(pageNum)}
+                      className={cn(
+                        "w-9 h-9 rounded-lg text-sm font-medium transition-colors",
+                        pageNum === browsePage
+                          ? "bg-[#2563EB] text-white"
+                          : "border border-[#c8d6ea] bg-white text-[#51627b] hover:bg-[#f8fafc]"
+                      )}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
 
-              <button
-                type="button"
-                onClick={() => fetchBrowsePage(browsePage + 1)}
-                disabled={browsePage >= browseTotalPages}
-                className="p-2 rounded-lg border border-[#c8d6ea] bg-white text-[#51627b] disabled:opacity-30 hover:bg-[#f8fafc] transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => fetchBrowsePage(browsePage + 1)}
+                  disabled={browsePage >= browseTotalPages}
+                  className="p-2 rounded-lg border border-[#c8d6ea] bg-white text-[#51627b] disabled:opacity-30 hover:bg-[#f8fafc] transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-xs text-[#7a9abf]">
+                Page {browsePage} sur {browseTotalPages} — {browseTotalEntries.toLocaleString("fr-FR")} leads disponibles
+              </p>
             </div>
           )}
 
-          {!browseLoading && (
+          {!browseLoading && browseTotalPages <= 1 && browseTotalEntries > 0 && (
             <p className="text-center text-xs text-[#7a9abf] mb-6">
-              Page {browsePage} sur {browseTotalPages} —{" "}
               {browseTotalEntries.toLocaleString("fr-FR")} leads disponibles
             </p>
           )}
 
           {/* Bouton de validation fixe */}
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#c8d6ea] px-4 py-4 z-20">
+          <div className={cn(
+            "fixed bottom-0 left-0 right-0 border-t px-4 py-4 z-20 transition-colors",
+            selectedCount > 0
+              ? "bg-[#2563EB] border-[#1d4ed8]"
+              : "bg-white border-[#c8d6ea]"
+          )}>
             <div className="max-w-4xl mx-auto flex items-center justify-between">
-              <p className="text-sm text-[#51627b]">
+              <p className={cn(
+                "text-sm font-medium",
+                selectedCount > 0 ? "text-white" : "text-[#51627b]"
+              )}>
                 {selectedCount > 0
                   ? `${selectedCount} lead${selectedCount > 1 ? "s" : ""} sélectionné${selectedCount > 1 ? "s" : ""}`
-                  : "Aucun lead sélectionné"}
+                  : "Sélectionnez des leads pour continuer"}
               </p>
-              <HubButton
-                variant="primary"
+              <button
+                type="button"
                 onClick={() => setShowConfirmModal(true)}
                 disabled={selectedCount === 0 || validatingSelection}
-                className="gap-2"
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all",
+                  selectedCount > 0
+                    ? "bg-white text-[#2563EB] hover:bg-white/90 shadow-sm"
+                    : "bg-[#eef1f8] text-[#a0b0c0] cursor-not-allowed"
+                )}
               >
                 {validatingSelection ? (
                   <>
@@ -1648,10 +1645,10 @@ export default function IcpBuilderPage() {
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    Valider ma sélection ({selectedCount})
+                    Valider ma sélection{selectedCount > 0 ? ` (${selectedCount})` : ""}
                   </>
                 )}
-              </HubButton>
+              </button>
             </div>
           </div>
 
