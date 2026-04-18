@@ -343,16 +343,18 @@ export default function IcpBuilderPage() {
   const [browseError, setBrowseError] = useState<string | null>(null);
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
   const [selectedLeadsMap, setSelectedLeadsMap] = useState<Map<string, BrowseProfile>>(new Map());
-  const [quotaTotal, setQuotaTotal] = useState(0);
+  const [monthlyQuota, setMonthlyQuota] = useState(0);
   const [quotaUsed, setQuotaUsed] = useState(0);
+  const [quotaRemaining, setQuotaRemaining] = useState(0);
   const [validatingSelection, setValidatingSelection] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [monthlyQuota, setMonthlyQuota] = useState(0);
   const [autoSelecting, setAutoSelecting] = useState(false);
 
-  const quotaRemaining = Math.max(0, quotaTotal - quotaUsed);
   const selectedCount = selectedLeadIds.size;
   const canSelectMore = selectedCount < quotaRemaining;
+  const autoSelectTarget = browseTotalEntries > 0
+    ? Math.min(quotaRemaining, browseTotalEntries)
+    : quotaRemaining;
 
   // ── Help chat state ──
   const [helpOpenFor, setHelpOpenFor] = useState<string | null>(null);
@@ -715,9 +717,9 @@ export default function IcpBuilderPage() {
       const res = await fetch("/api/leads/quota");
       if (res.ok) {
         const data = await res.json();
-        setQuotaTotal(data.quota_remaining ?? 0);
-        setQuotaUsed(0); // quota_remaining already accounts for used
         setMonthlyQuota(data.monthly_quota ?? 0);
+        setQuotaUsed(data.quota_used ?? 0);
+        setQuotaRemaining(data.quota_remaining ?? 0);
       }
     } catch {
       // silencieux
@@ -815,7 +817,7 @@ export default function IcpBuilderPage() {
   }, [browseLeads, selectedLeadIds, selectedLeadsMap, quotaRemaining, selectedCount]);
 
   const handleAutoSelect = useCallback(async () => {
-    const target = Math.min(monthlyQuota, quotaRemaining);
+    const target = quotaRemaining;
     if (target <= 0) return;
 
     setAutoSelecting(true);
@@ -847,7 +849,7 @@ export default function IcpBuilderPage() {
     setSelectedLeadIds(newIds);
     setSelectedLeadsMap(newMap);
     setAutoSelecting(false);
-  }, [monthlyQuota, quotaRemaining, selectedLeadIds, selectedLeadsMap]);
+  }, [quotaRemaining, selectedLeadIds, selectedLeadsMap]);
 
   const handleValidateSelection = useCallback(async () => {
     setValidatingSelection(true);
@@ -1350,9 +1352,9 @@ export default function IcpBuilderPage() {
                 <p className="text-sm font-medium">
                   Leads restants à sélectionner :{" "}
                   <span className="font-bold">
-                    {Math.max(0, quotaRemaining - selectedCount)}
+                    {Math.max(0, quotaRemaining - selectedCount).toLocaleString("fr-FR")}
                   </span>{" "}
-                  / {quotaRemaining}
+                  / {monthlyQuota.toLocaleString("fr-FR")}
                 </p>
                 <p className="text-sm">
                   <span className="font-bold">{selectedCount}</span>{" "}
@@ -1364,14 +1366,19 @@ export default function IcpBuilderPage() {
                   className="h-2 rounded-full bg-white transition-all"
                   style={{
                     width: `${
-                      quotaRemaining > 0
-                        ? Math.min(100, (selectedCount / quotaRemaining) * 100)
+                      monthlyQuota > 0
+                        ? Math.min(100, ((quotaUsed + selectedCount) / monthlyQuota) * 100)
                         : 0
                     }%`,
                   }}
                 />
               </div>
-              <p className="text-xs text-white/80 mt-2">
+              {quotaUsed > 0 && (
+                <p className="text-xs text-white/80 mt-2">
+                  {quotaUsed.toLocaleString("fr-FR")} leads déjà extraits ce mois-ci.
+                </p>
+              )}
+              <p className="text-xs text-white/80 mt-1">
                 Validez votre sélection pour recevoir vos leads. Sans
                 validation, aucun lead ne sera envoyé.
               </p>
@@ -1403,12 +1410,12 @@ export default function IcpBuilderPage() {
           </div>
 
           {/* Auto-select */}
-          {monthlyQuota > 0 && (
+          {quotaRemaining > 0 && (
             <div className="flex justify-center mb-4">
               <HubButton
                 variant="secondary"
                 onClick={handleAutoSelect}
-                disabled={autoSelecting || quotaRemaining === 0 || selectedCount >= Math.min(monthlyQuota, quotaRemaining)}
+                disabled={autoSelecting || selectedCount >= autoSelectTarget}
                 className="gap-2"
               >
                 {autoSelecting ? (
@@ -1420,9 +1427,7 @@ export default function IcpBuilderPage() {
                   <>
                     <Sparkles className="w-4 h-4" />
                     Sélectionner{" "}
-                    {Math.min(monthlyQuota, quotaRemaining).toLocaleString(
-                      "fr-FR"
-                    )}{" "}
+                    {autoSelectTarget.toLocaleString("fr-FR")}{" "}
                     leads automatiquement
                   </>
                 )}
@@ -1662,9 +1667,9 @@ export default function IcpBuilderPage() {
                   <span className="font-semibold text-[#0b1c33]">
                     {selectedCount} lead{selectedCount > 1 ? "s" : ""}
                   </span>{" "}
-                  sur un quota de{" "}
+                  sur un quota mensuel de{" "}
                   <span className="font-semibold text-[#0b1c33]">
-                    {quotaRemaining}
+                    {monthlyQuota.toLocaleString("fr-FR")}
                   </span>
                   . Souhaitez-vous valider ?
                 </p>

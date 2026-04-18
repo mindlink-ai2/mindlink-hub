@@ -1,9 +1,20 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
-import { computePeriod, countBusinessDays } from "@/lib/search-credits";
+import { google } from "googleapis";
 
 export const runtime = "nodejs";
+
+function getGoogleAuth() {
+  const raw = process.env.GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY;
+  if (!raw) return null;
+  const credentials = JSON.parse(raw) as Record<string, string>;
+  credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
+  return new google.auth.GoogleAuth({
+    credentials,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+  });
+}
 
 export async function GET() {
   const { userId } = await auth();
@@ -15,7 +26,7 @@ export async function GET() {
 
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id, quota")
+    .select("id, quota, email, company_name")
     .eq("clerk_user_id", userId)
     .single();
 
@@ -25,45 +36,47 @@ export async function GET() {
 
   const orgId: number = clientRow.id;
   const quotaPerDay = Number(clientRow.quota) || 10;
+  const monthlyQuota = quotaPerDay * 22;
+  const clientEmail = clientRow.email as string | null;
 
-  // Compute period from search_credits anchor
-  const { data: creditRow } = await supabase
-    .from("search_credits")
-    .select("created_at")
-    .eq("org_id", orgId)
-    .maybeSingle();
+  // Count leads already in the client's Google Sheet tab
+  let quotaUsed = 0;
+  const MASTER_SHEET_ID = process.env.GOOGLE_MASTER_SHEET_ID;
 
-  const periodAnchor = creditRow?.created_at
-    ? new Date(creditRow.created_at as string)
-    : new Date();
-  const { periodStart, periodEnd } = computePeriod(periodAnchor);
+  if (MASTER_SHEET_ID) {
+    const auth = getGoogleAuth();
+    if (auth) {
+      try {
+        const sheets = google.sheets({ version: "v4", auth });
+        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: MASTER_SHEET_ID });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sheetsList: any[] = spreadsheet.data.sheets ?? [];
+        const existingTab = clientEmail
+          ? sheetsList.find((s: any) => s.properties?.title?.includes(clientEmail))
+          : null;
 
-  const today = new Date();
-  const businessDaysRemaining = countBusinessDays(today, periodEnd);
-  const quotaTotal = quotaPerDay * businessDaysRemaining;
+        if (existingTab?.properties?.title) {
+          const readRes = await sheets.spreadsheets.values.get({
+            spreadsheetId: MASTER_SHEET_ID,
+            range: `'${existingTab.properties.title}'!A:A`,
+          });
+          const rows = readRes.data.values;
+          if (rows && rows.length > 1) {
+            quotaUsed = rows.length - 1; // minus header
+          }
+        }
+      } catch {
+        // Sheet not accessible — 0 used
+      }
+    }
+  }
 
-  // Count leads already extracted in this period (from extraction_logs)
-  const { data: logs } = await supabase
-    .from("extraction_logs")
-    .select("leads_count")
-    .eq("org_id", orgId)
-    .eq("status", "completed")
-    .gte("started_at", periodStart.toISOString())
-    .lte("started_at", periodEnd.toISOString());
-
-  const quotaUsed = (logs ?? []).reduce(
-    (sum, log) => sum + (Number(log.leads_count) || 0),
-    0
-  );
-  const quotaRemaining = Math.max(0, quotaTotal - quotaUsed);
+  const quotaRemaining = Math.max(0, monthlyQuota - quotaUsed);
 
   return NextResponse.json({
-    quota_total: quotaTotal,
+    quota_per_day: quotaPerDay,
+    monthly_quota: monthlyQuota,
     quota_used: quotaUsed,
     quota_remaining: quotaRemaining,
-    quota_per_day: quotaPerDay,
-    monthly_quota: quotaPerDay * 22,
-    business_days_remaining: businessDaysRemaining,
-    period_end: periodEnd.toISOString().split("T")[0],
   });
 }
