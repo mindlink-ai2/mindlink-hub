@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   // Résoudre l'org_id depuis le clerk_user_id
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id")
+    .select("id, plan")
     .eq("clerk_user_id", userId)
     .single();
 
@@ -34,17 +34,24 @@ export async function POST(request: Request) {
   const orgId: number = clientRow.id;
 
   // ── ÉTAPE 1 : Vérifier les crédits (auto-reset par période de 31 jours) ──
-  const credits = await resolveCredits(supabase, orgId);
+  const credits = await resolveCredits(
+    supabase,
+    orgId,
+    (clientRow.plan as string) ?? undefined
+  );
   const creditsUsedBefore = credits.creditsUsed;
   const creditsTotal = credits.creditsTotal;
   const creditsBeforeSearch = credits.creditsRemaining;
   console.log(`[search] org_id=${orgId} crédits avant=${creditsBeforeSearch}/${creditsTotal}`);
 
   if (creditsBeforeSearch <= 0) {
+    const isEssential =
+      ((clientRow.plan as string) ?? "").toLowerCase() === "essential";
     return NextResponse.json(
       {
-        error:
-          "Vous n'avez plus de crédits de recherche. Contactez-nous pour en obtenir davantage.",
+        error: isEssential
+          ? "Vous avez utilisé votre crédit de prévisualisation. Pour sélectionner plus de leads, contactez-nous."
+          : "Vous n'avez plus de crédits de recherche. Contactez-nous pour en obtenir davantage.",
         credits_remaining: 0,
       },
       { status: 402 }

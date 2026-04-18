@@ -1,14 +1,19 @@
 /**
  * Search credits: 31-day auto-reset logic.
  *
- * Each client gets 5 credits per 31-day period. The period anchor is
- * search_credits.created_at (when the credits row was first created).
- * When a new period starts, credits_used is reset to 0.
+ * Credits per period depend on the client plan:
+ *   - Essential → 1 credit
+ *   - Full      → 4 credits
+ *
+ * The period anchor is search_credits.created_at (when the credits
+ * row was first created). When a new period starts, credits_used
+ * is reset to 0.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const CREDITS_TOTAL = 5;
+const CREDITS_DEFAULT = 4;
+const CREDITS_ESSENTIAL = 1;
 const PERIOD_DAYS = 31;
 const PERIOD_MS = PERIOD_DAYS * 24 * 60 * 60 * 1000;
 
@@ -45,8 +50,12 @@ export interface ResolvedCredits {
  */
 export async function resolveCredits(
   supabase: SupabaseClient,
-  orgId: number
+  orgId: number,
+  plan?: string
 ): Promise<ResolvedCredits> {
+  const total =
+    plan?.toLowerCase() === "essential" ? CREDITS_ESSENTIAL : CREDITS_DEFAULT;
+
   const { data: creditRow } = await supabase
     .from("search_credits")
     .select("id, credits_total, credits_used, period_start, created_at")
@@ -59,15 +68,15 @@ export async function resolveCredits(
     const { periodStart, periodEnd } = computePeriod(now, now);
     await supabase.from("search_credits").insert({
       org_id: orgId,
-      credits_total: CREDITS_TOTAL,
+      credits_total: total,
       credits_used: 0,
       period_start: periodStart.toISOString(),
       period_end: periodEnd.toISOString(),
     });
     return {
-      creditsTotal: CREDITS_TOTAL,
+      creditsTotal: total,
       creditsUsed: 0,
-      creditsRemaining: CREDITS_TOTAL,
+      creditsRemaining: total,
       periodStart,
       periodEnd,
     };
@@ -90,7 +99,7 @@ export async function resolveCredits(
     await supabase
       .from("search_credits")
       .update({
-        credits_total: CREDITS_TOTAL,
+        credits_total: total,
         credits_used: 0,
         period_start: periodStart.toISOString(),
         period_end: periodEnd.toISOString(),
@@ -99,9 +108,9 @@ export async function resolveCredits(
       .eq("id", creditRow.id);
 
     return {
-      creditsTotal: CREDITS_TOTAL,
+      creditsTotal: total,
       creditsUsed: 0,
-      creditsRemaining: CREDITS_TOTAL,
+      creditsRemaining: total,
       periodStart,
       periodEnd,
     };
@@ -109,9 +118,9 @@ export async function resolveCredits(
 
   const used = creditRow.credits_used as number;
   return {
-    creditsTotal: CREDITS_TOTAL,
+    creditsTotal: total,
     creditsUsed: used,
-    creditsRemaining: Math.max(0, CREDITS_TOTAL - used),
+    creditsRemaining: Math.max(0, total - used),
     periodStart,
     periodEnd,
   };

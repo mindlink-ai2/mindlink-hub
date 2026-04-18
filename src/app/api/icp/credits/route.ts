@@ -15,7 +15,7 @@ export async function GET() {
 
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id")
+    .select("id, plan")
     .eq("clerk_user_id", userId)
     .single();
 
@@ -23,7 +23,11 @@ export async function GET() {
     return NextResponse.json({ credits_remaining: null });
   }
 
-  const credits = await resolveCredits(supabase, clientRow.id);
+  const credits = await resolveCredits(
+    supabase,
+    clientRow.id,
+    (clientRow.plan as string) ?? undefined
+  );
 
   return NextResponse.json({
     credits_remaining: credits.creditsRemaining,

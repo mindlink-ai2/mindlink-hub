@@ -86,6 +86,21 @@ export async function GET(request: Request) {
         : []
     ) as Array<Record<string, unknown>>;
 
+    if (people.length > 0) {
+      console.log(
+        "[browse] Sample lead fields:",
+        Object.keys(people[0])
+      );
+      console.log(
+        "[browse] Sample lead location:",
+        people[0].city,
+        people[0].state,
+        people[0].country,
+        (people[0].organization as Record<string, unknown> | undefined)?.city,
+        (people[0].organization as Record<string, unknown> | undefined)?.country
+      );
+    }
+
     const totalEntries =
       typeof data.total_entries === "number"
         ? data.total_entries
@@ -98,26 +113,37 @@ export async function GET(request: Request) {
     const perPage = 25;
     const totalPages = Math.max(1, Math.ceil(totalEntries / perPage));
 
-    const profiles = people.slice(0, perPage).map((p) => ({
-      id: p.id ?? null,
-      first_name: p.first_name ?? null,
-      last_name: maskLastName(p.last_name as string | null),
-      title: p.title ?? null,
-      linkedin_url: p.linkedin_url ?? null,
-      organization: p.organization
-        ? {
-            name: (p.organization as Record<string, unknown>).name ?? null,
-            industry:
-              (p.organization as Record<string, unknown>).industry ?? null,
-            estimated_num_employees:
-              (p.organization as Record<string, unknown>)
-                .estimated_num_employees ?? null,
-          }
-        : null,
-      city: p.city ?? null,
-      state: p.state ?? null,
-      country: p.country ?? null,
-    }));
+    const profiles = people.slice(0, perPage).map((p) => {
+      const org = (p.organization as Record<string, unknown>) ?? {};
+
+      // Location: prefer person-level, fallback to org-level
+      const city = (p.city as string | null) ?? (org.city as string | null) ?? null;
+      const state = (p.state as string | null) ?? (org.state as string | null) ?? null;
+      const country = (p.country as string | null) ?? (org.country as string | null) ?? null;
+
+      // Apollo may expose has_city/has_country flags without actual values
+      const locationAvailable =
+        !city && !country && (p.has_city === true || p.has_country === true);
+
+      return {
+        id: p.id ?? null,
+        first_name: p.first_name ?? null,
+        last_name: maskLastName(p.last_name as string | null),
+        title: p.title ?? null,
+        linkedin_url: p.linkedin_url ?? null,
+        organization: p.organization
+          ? {
+              name: org.name ?? null,
+              industry: org.industry ?? null,
+              estimated_num_employees: org.estimated_num_employees ?? null,
+            }
+          : null,
+        city,
+        state,
+        country,
+        location_available: locationAvailable,
+      };
+    });
 
     return NextResponse.json({
       people: profiles,

@@ -65,6 +65,7 @@ type BrowseProfile = {
   city: string | null;
   state: string | null;
   country: string | null;
+  location_available?: boolean;
 };
 
 type IcpStatus = "none" | "draft" | "submitted";
@@ -351,9 +352,6 @@ export default function IcpBuilderPage() {
   const quotaRemaining = Math.max(0, quotaTotal - quotaUsed);
   const selectedCount = selectedLeadIds.size;
   const canSelectMore = selectedCount < quotaRemaining;
-  const allPageSelected =
-    browseLeads.length > 0 &&
-    browseLeads.every((l) => selectedLeadIds.has(l.id));
 
   // ── Help chat state ──
   const [helpOpenFor, setHelpOpenFor] = useState<string | null>(null);
@@ -790,26 +788,13 @@ export default function IcpBuilderPage() {
     [quotaRemaining]
   );
 
-  const selectAllOnPage = useCallback(() => {
-    const allSelected =
-      browseLeads.length > 0 &&
-      browseLeads.every((l) => selectedLeadIds.has(l.id));
-
-    if (allSelected) {
-      // Deselect all on page
-      const pageIds = new Set(browseLeads.map((l) => l.id));
-      setSelectedLeadIds((prev) => {
-        const next = new Set(prev);
-        for (const id of pageIds) next.delete(id);
-        return next;
-      });
-      setSelectedLeadsMap((prev) => {
-        const next = new Map(prev);
-        for (const id of pageIds) next.delete(id);
-        return next;
-      });
+  const toggleSelectAll = useCallback(() => {
+    if (selectedCount > 0) {
+      // Deselect ALL (every page, not just current)
+      setSelectedLeadIds(new Set());
+      setSelectedLeadsMap(new Map());
     } else {
-      // Select all on page
+      // Select all on current page
       const newIds = new Set(selectedLeadIds);
       const newMap = new Map(selectedLeadsMap);
       for (const lead of browseLeads) {
@@ -822,7 +807,7 @@ export default function IcpBuilderPage() {
       setSelectedLeadIds(newIds);
       setSelectedLeadsMap(newMap);
     }
-  }, [browseLeads, selectedLeadIds, selectedLeadsMap, quotaRemaining]);
+  }, [browseLeads, selectedLeadIds, selectedLeadsMap, quotaRemaining, selectedCount]);
 
   const handleAutoSelect = useCallback(async () => {
     const target = Math.min(monthlyQuota, quotaRemaining);
@@ -1403,12 +1388,12 @@ export default function IcpBuilderPage() {
             </HubButton>
             <HubButton
               variant="secondary"
-              onClick={selectAllOnPage}
-              disabled={(!canSelectMore && !allPageSelected) || browseLoading}
+              onClick={toggleSelectAll}
+              disabled={(!canSelectMore && selectedCount === 0) || browseLoading}
               className="gap-2"
             >
               <Check className="w-4 h-4" />
-              {allPageSelected ? "Tout désélectionner" : "Tout sélectionner"}
+              {selectedCount > 0 ? "Tout désélectionner" : "Tout sélectionner"}
             </HubButton>
           </div>
 
@@ -1528,7 +1513,11 @@ export default function IcpBuilderPage() {
                           emp.
                         </span>
                       )}
-                      {location && <span>{location}</span>}
+                      {location ? (
+                        <span>{location}</span>
+                      ) : lead.location_available ? (
+                        <span className="italic">Localisation disponible</span>
+                      ) : null}
                     </div>
                   </button>
                 );
