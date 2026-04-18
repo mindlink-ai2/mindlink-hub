@@ -596,7 +596,6 @@ function getWorkflowTemplate(): Record<string, unknown> {
       },
     },
     settings: { executionOrder: "v1" },
-    tags: [],
   };
 }
 
