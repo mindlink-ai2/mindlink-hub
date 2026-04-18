@@ -115,7 +115,6 @@ async function apolloBulkMatch(
   const requestBody = {
     details: ids.map((id) => ({ id })),
     reveal_personal_emails: true,
-    reveal_phone_number: true,
   };
   console.log(`[extract][bulk_match]${batchLabel} URL: ${url}`);
   console.log(`[extract][bulk_match]${batchLabel} Request body:`, JSON.stringify(requestBody).slice(0, 500));
@@ -172,17 +171,17 @@ async function apolloSingleMatch(
   apiKey: string
 ): Promise<ApolloPersonRaw | null> {
   const url = "https://api.apollo.io/api/v1/people/match";
+  const requestBody = {
+    id,
+    reveal_personal_emails: true,
+  };
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Api-Key": apiKey,
     },
-    body: JSON.stringify({
-      id,
-      reveal_personal_emails: true,
-      reveal_phone_number: true,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!res.ok) {
