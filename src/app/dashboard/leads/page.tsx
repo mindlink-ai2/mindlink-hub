@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import LeadsSkeleton from "./loading";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { queryKeys } from "@/lib/query-keys";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -1691,6 +1692,14 @@ export default function LeadsPage() {
     { key: "connected", label: "Connecté", count: segmentCounts.connected },
     { key: "sent", label: "Envoyé", count: segmentCounts.sent },
   ];
+
+  const isInitialLoading =
+    (paginatedLeadsQuery.isPending && !paginatedLeadsQuery.data) ||
+    (summaryQuery.isPending && !summaryQuery.data);
+
+  if (isInitialLoading) {
+    return <LeadsSkeleton />;
+  }
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">

@@ -6,7 +6,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { Check, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
 import MobileLayout from "@/components/mobile/MobileLayout";
 import MobilePageHeader from "@/components/mobile/MobilePageHeader";
-import { SkeletonBillingCard } from "@/components/ui/Skeleton";
+import BillingSkeleton from "./loading";
 
 type BillingStatus = {
   plan: string | null; // "essential" | "full"
@@ -184,14 +184,7 @@ export default function BillingPage() {
   }, [selectedEssentialQuota]);
 
   if (statusLoading) {
-    return (
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-        <MobileLayout className="gap-4">
-          <MobilePageHeader title="Facturation" subtitle="Chargement de votre abonnement..." />
-          <SkeletonBillingCard />
-        </MobileLayout>
-      </div>
-    );
+    return <BillingSkeleton />;
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import IcpBuilderSkeleton from "./loading";
 import {
   AlertCircle,
   AlertTriangle,
@@ -939,6 +940,10 @@ export default function IcpBuilderPage() {
   }, [selectedLeadsMap, onboardingPending, router]);
 
   // ─── Rendu ────────────────────────────────────────────────────────────────────
+
+  if (loadingCredits) {
+    return <IcpBuilderSkeleton />;
+  }
 
   return (
     <div className="min-h-screen bg-[#eef1f8]">

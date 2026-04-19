@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import MessagesSetupSkeleton from "./loading";
 import {
   AlertCircle,
   CheckCircle2,
@@ -409,6 +410,10 @@ export default function MessagesSetupPage() {
 
   const canFinalize = Boolean(validatedLinkedin && validatedRelance);
 
+  if (screen === "loading") {
+    return <MessagesSetupSkeleton />;
+  }
+
   return (
     <div className="min-h-screen bg-[#eef1f8]">
       <div className="border-b border-[#c8d6ea] bg-white px-6 py-4">
@@ -454,11 +459,6 @@ export default function MessagesSetupPage() {
         )}
       </div>
 
-      {screen === "loading" && (
-        <div className="flex min-h-[60vh] items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
-        </div>
-      )}
 
       {screen === "saved" && existingMessages && (
         <div className="mx-auto max-w-3xl px-4 py-10">

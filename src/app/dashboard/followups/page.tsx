@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import FollowupsSkeleton from "./loading";
 import { queryKeys } from "@/lib/query-keys";
 import {
   CalendarDays,
@@ -1168,6 +1169,13 @@ export default function FollowupsPage() {
   // =========================================================================
   // RENDER principal
   // =========================================================================
+
+  const isInitialLoading =
+    !planLoaded || (plan === "full" ? !fullLoaded : !loaded);
+
+  if (isInitialLoading) {
+    return <FollowupsSkeleton />;
+  }
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import DashboardSkeleton from "./loading";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { trackBusinessEvent } from "@/lib/analytics/business-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -230,6 +231,10 @@ export default function DashboardPage() {
       );
     });
   }, [drilldownData, q]);
+
+  if (loadingStats && !statsData) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
