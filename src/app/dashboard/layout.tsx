@@ -6,6 +6,7 @@ import {
   isLinkedinConnectedInAccounts,
   resolveClientContextForUser,
 } from "@/lib/client-onboarding-state";
+import DashboardGateClient from "./DashboardGateClient";
 
 function getPrimaryEmail(user: Awaited<ReturnType<typeof currentUser>>): string | null {
   return (
@@ -43,15 +44,17 @@ export default async function DashboardLayout({
     .eq("client_id", clientContext.clientId)
     .limit(25);
 
+  let needsOnboarding = false;
   if (!accountErr) {
     const linkedinConnected = isLinkedinConnectedInAccounts(
       Array.isArray(accountRows) ? (accountRows as Array<Record<string, unknown>>) : []
     );
-
-    if (!linkedinConnected) {
-      redirect("/onboarding");
-    }
+    needsOnboarding = !linkedinConnected;
   }
 
-  return <>{children}</>;
+  return (
+    <DashboardGateClient needsOnboarding={needsOnboarding}>
+      {children}
+    </DashboardGateClient>
+  );
 }
