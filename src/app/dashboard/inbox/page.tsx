@@ -982,17 +982,17 @@ export default function InboxPage() {
                             className={[
                               "max-w-[88%] rounded-2xl border px-3 py-2 text-sm",
                               outbound
-                                ? "ml-auto border-[#9cc0ff] bg-[#edf5ff] text-[#14345e]"
-                                : "mr-auto border-[#d7e3f4] bg-[#f7fbff] text-[#1e3551]",
+                                ? "ml-auto border-transparent bg-blue-600 text-white"
+                                : "mr-auto border-transparent bg-gray-100 text-gray-900",
                             ].join(" ")}
                           >
-                            <div className="mb-1 text-[11px] text-[#6a7f9f]">
+                            <div className={["mb-1 text-[11px]", outbound ? "text-blue-100" : "text-gray-500"].join(" ")}>
                               {message.sender_name || (outbound ? "Vous" : "Prospect")}
                             </div>
                             <div className="whitespace-pre-wrap">
                               {isDeleted ? "Message supprimé" : message.text || "—"}
                             </div>
-                            <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-[#7a8ea9]">
+                            <div className={["mt-1 flex items-center justify-between gap-2 text-[10px]", outbound ? "text-blue-100" : "text-gray-500"].join(" ")}>
                               <span>{formatDateTime(message.sent_at)}</span>
                               <span>{statusLabel ?? ""}</span>
                             </div>
@@ -1107,10 +1107,11 @@ export default function InboxPage() {
                             onClick={() => handleDesktopThreadOpen(thread.id)}
                             className={[
                               "w-full rounded-xl border px-3 py-3 text-left transition-colors duration-150",
-                              active ? "border-[#9cc0ff]" : "border-[#d7e3f4] hover:border-[#b9d0f2]",
-                              unreadCount > 0
-                                ? "bg-blue-50 hover:bg-blue-100"
-                                : "bg-transparent hover:bg-gray-50",
+                              active
+                                ? "border-blue-200 bg-blue-50"
+                                : unreadCount > 0
+                                  ? "border-gray-100 bg-blue-50/60 hover:bg-blue-50"
+                                  : "border-gray-100 bg-white hover:bg-gray-50",
                             ].join(" ")}
                           >
                             <div className="flex items-start gap-3">
@@ -1223,11 +1224,11 @@ export default function InboxPage() {
                             className={[
                               "max-w-[82%] rounded-2xl border px-3 py-2 text-sm",
                               outbound
-                                ? "ml-auto border-[#9cc0ff] bg-[#edf5ff] text-[#14345e]"
-                                : "mr-auto border-[#d7e3f4] bg-[#f7fbff] text-[#1e3551]",
+                                ? "ml-auto border-transparent bg-blue-600 text-white"
+                                : "mr-auto border-transparent bg-gray-100 text-gray-900",
                             ].join(" ")}
                           >
-                            <div className="mb-1 text-[11px] text-[#6a7f9f]">
+                            <div className={["mb-1 text-[11px]", outbound ? "text-blue-100" : "text-gray-500"].join(" ")}>
                               {message.sender_name || (outbound ? "Vous" : "Prospect")}
                             </div>
 
@@ -1235,7 +1236,7 @@ export default function InboxPage() {
                               {isDeleted ? "Message supprimé" : message.text || "—"}
                             </div>
 
-                            <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-[#7a8ea9]">
+                            <div className={["mt-1 flex items-center justify-between gap-2 text-[10px]", outbound ? "text-blue-100" : "text-gray-500"].join(" ")}>
                               <span>{formatDateTime(message.sent_at)}</span>
                               <span>{statusLabel ?? ""}</span>
                             </div>

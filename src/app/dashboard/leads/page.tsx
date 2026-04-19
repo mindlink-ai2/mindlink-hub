@@ -1797,30 +1797,12 @@ export default function LeadsPage() {
               </div>
 
               <div className="relative min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#1f5eff]" />
-                    Espace client Lidmeo
-                  </span>
-
-                  <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] tabular-nums">
-                    {filteredLeads.length}/{filteredCount} affichés
-                  </span>
-
-                  <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] whitespace-nowrap">
-                    {plan || "essential"}
-                  </span>
-                </div>
-
-                <h1 className="hub-page-title mt-2">
-                  Pilotage de la prospection
-                </h1>
-                <p className="mt-2 max-w-3xl text-xs text-[#51627b] sm:text-sm">
-                  Centralisez vos leads, priorisez vos actions et suivez votre pipeline
-                  de manière structurée, avec une vue opérationnelle compacte.
+                <h1 className="hub-page-title">Pilotage de la prospection</h1>
+                <p className="mt-1 text-sm text-gray-500">
+                  Centralisez vos leads, priorisez vos actions et suivez votre pipeline.
                 </p>
-                <div className="mt-3 inline-flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[11px] text-amber-800 sm:text-xs">
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <div className="mt-2 inline-flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                   <span>
                     Rappel sécurité: évitez les connexions trop rapides et ne dépassez pas 30
                     invitations LinkedIn par jour.
@@ -2822,31 +2804,13 @@ function Metric({
   value: ReactNode;
   tone: "default" | "success" | "warning" | "info";
 }) {
-  const valueColor =
-    tone === "success"
-      ? "text-emerald-700"
-      : tone === "warning"
-        ? "text-amber-700"
-        : tone === "info"
-          ? "text-[#1f5eff]"
-          : "text-[#0b1c33]";
-
-  const chipColor =
-    tone === "success"
-      ? "bg-emerald-500"
-      : tone === "warning"
-        ? "bg-amber-500"
-        : tone === "info"
-          ? "bg-[#1f5eff]"
-          : "bg-[#8aa2c2]";
-
+  void tone;
   return (
-    <div className="overflow-hidden rounded-xl border border-[#d7e3f4] bg-white px-4 py-3 shadow-[0_16px_26px_-24px_rgba(18,43,86,0.75)]">
-      <div className="flex items-center gap-2 whitespace-nowrap text-[10px] uppercase tracking-wide text-[#51627b]">
-        <span className={["h-1.5 w-1.5 rounded-full", chipColor].join(" ")} />
+    <div className="overflow-hidden rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md">
+      <div className="whitespace-nowrap text-xs font-medium uppercase tracking-wider text-gray-500">
         {title}
       </div>
-      <div className={["hub-kpi-number mt-1 truncate whitespace-nowrap text-4xl leading-none tabular-nums", valueColor].join(" ")}>
+      <div className="hub-kpi-number mt-1 truncate whitespace-nowrap text-2xl font-bold leading-none tabular-nums text-gray-900">
         {value}
       </div>
     </div>

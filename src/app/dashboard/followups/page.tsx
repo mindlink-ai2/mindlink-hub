@@ -671,7 +671,7 @@ export default function FollowupsPage() {
           <span className={["h-2 w-2 rounded-full", dotStyles].join(" ")} />
         </div>
         <div className="mt-2 flex items-end justify-between">
-          <p className="text-2xl font-semibold tabular-nums text-[#0b1c33]">{value}</p>
+          <p className="text-xl font-bold tabular-nums text-gray-900">{value}</p>
           <span
             className={[
               "rounded-full border px-2 py-0.5 text-[11px] font-semibold",
@@ -802,7 +802,7 @@ export default function FollowupsPage() {
           <span className={["h-2 w-2 rounded-full", dotColor].join(" ")} />
         </div>
         <div className="mt-2 flex items-end justify-between">
-          <p className="text-2xl font-semibold tabular-nums text-[#0b1c33]">{value}</p>
+          <p className="text-xl font-bold tabular-nums text-gray-900">{value}</p>
           <span className={["rounded-full border px-2 py-0.5 text-[11px] font-semibold", chipClass].join(" ")}>
             {value}
           </span>
