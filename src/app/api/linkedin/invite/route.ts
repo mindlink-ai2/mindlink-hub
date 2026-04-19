@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { createClient } from "@supabase/supabase-js";
 import { extractLinkedInProfileSlug } from "@/lib/linkedin-url";
+import { buildInvitationRawPatch, buildInvitationTargetMetadata } from "@/lib/linkedin-invitations";
+import { createServiceSupabase, getLinkedinUnipileAccountId } from "@/lib/inbox-server";
 
 type JsonLike = Record<string, unknown> | string | null;
 
@@ -26,6 +27,34 @@ async function readResponseBody(res: Response): Promise<JsonLike> {
   }
 }
 
+function toJsonRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function extractProviderId(payload: unknown): string {
+  const obj = toJsonRecord(payload);
+  const data = toJsonRecord(obj.data);
+
+  const direct =
+    typeof obj.provider_id === "string" && obj.provider_id.trim()
+      ? obj.provider_id.trim()
+      : typeof obj.providerId === "string" && obj.providerId.trim()
+        ? obj.providerId.trim()
+        : "";
+  if (direct) return direct;
+
+  if (typeof data.provider_id === "string" && data.provider_id.trim()) {
+    return data.provider_id.trim();
+  }
+  if (typeof data.providerId === "string" && data.providerId.trim()) {
+    return data.providerId.trim();
+  }
+
+  return "";
+}
+
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();
@@ -46,10 +75,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const supabase = createClient(
-      requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-      requireEnv("SUPABASE_SERVICE_ROLE_KEY")
-    );
+    const supabase = createServiceSupabase();
 
     const { data: client, error: clientErr } = await supabase
       .from("clients")
@@ -105,22 +131,12 @@ export async function POST(req: Request) {
       );
     }
 
-    const { data: unipileAccount, error: accountErr } = await supabase
-      .from("unipile_accounts")
-      .select("unipile_account_id")
-      .eq("client_id", client.id)
-      .eq("provider", "linkedin")
-      .limit(1)
-      .maybeSingle();
+    const unipileAccountId = await getLinkedinUnipileAccountId(
+      supabase,
+      String(client.id)
+    );
 
-    if (accountErr) {
-      return NextResponse.json(
-        { success: false, error: "account_lookup_failed" },
-        { status: 500 }
-      );
-    }
-
-    if (!unipileAccount?.unipile_account_id) {
+    if (!unipileAccountId) {
       return NextResponse.json(
         { success: false, error: "linkedin_account_not_connected" },
         { status: 404 }
@@ -170,8 +186,6 @@ export async function POST(req: Request) {
     const UNIPILE_DSN = requireEnv("UNIPILE_DSN");
     const UNIPILE_API_KEY = requireEnv("UNIPILE_API_KEY");
     const BASE = normalizeUnipileBase(UNIPILE_DSN);
-    const unipileAccountId = unipileAccount.unipile_account_id;
-
     const profileRes = await fetch(
       `${BASE}/api/v1/users/${encodeURIComponent(
         profileIdentifier
@@ -197,12 +211,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const providerId =
-      profilePayload &&
-      typeof profilePayload === "object" &&
-      "provider_id" in profilePayload
-        ? String(profilePayload.provider_id ?? "")
-        : "";
+    const providerId = extractProviderId(profilePayload);
 
     if (!providerId) {
       return NextResponse.json(
@@ -232,6 +241,19 @@ export async function POST(req: Request) {
       );
     }
 
+    const invitationMetadata = buildInvitationTargetMetadata({
+      leadLinkedInUrl: String(lead.LinkedInURL ?? "").trim() || null,
+      profileSlug: profileIdentifier,
+      providerId,
+      invitePayload,
+    });
+    const rawPatch = buildInvitationRawPatch({
+      leadLinkedInUrl: String(lead.LinkedInURL ?? "").trim() || null,
+      profileSlug: profileIdentifier,
+      providerId,
+      invitePayload,
+    });
+
     const { error: invitationInsertErr } = await supabase
       .from("linkedin_invitations")
       .upsert(
@@ -241,12 +263,36 @@ export async function POST(req: Request) {
           unipile_account_id: unipileAccountId,
           status: "sent",
           sent_at: new Date().toISOString(),
-          raw: invitePayload,
+          raw: rawPatch,
+          target_linkedin_provider_id: invitationMetadata.targetProviderId,
+          target_profile_slug: invitationMetadata.targetProfileSlug,
+          target_linkedin_url_normalized:
+            invitationMetadata.targetLinkedInUrlNormalized,
+          unipile_invitation_id: invitationMetadata.unipileInvitationId,
         },
         { onConflict: "client_id,lead_id,unipile_account_id" }
       );
 
     if (invitationInsertErr) {
+      await supabase.from("automation_logs").insert({
+        client_id: client.id,
+        runner: "essential-manual-invite",
+        action: "send_invitation",
+        status: "error",
+        lead_id: lead.id,
+        unipile_account_id: unipileAccountId,
+        details: {
+          error_code: "invitation_log_failed",
+          error_message: invitationInsertErr.message ?? String(invitationInsertErr),
+          target_provider_id: invitationMetadata.targetProviderId,
+          target_profile_slug: invitationMetadata.targetProfileSlug,
+          target_linkedin_url_normalized: invitationMetadata.targetLinkedInUrlNormalized,
+          unipile_invitation_id: invitationMetadata.unipileInvitationId,
+        },
+      }).then(({ error }) => {
+        if (error) console.error("LINKEDIN_INVITE_LOG_INSERT_ERROR:", error);
+      });
+
       return NextResponse.json(
         { success: false, error: "invitation_log_failed" },
         { status: 500 }
@@ -262,6 +308,37 @@ export async function POST(req: Request) {
     if (updateLeadStatusErr) {
       console.error("LINKEDIN_INVITE_STATUS_UPDATE_ERROR:", updateLeadStatusErr);
     }
+
+    await supabase.from("automation_logs").insert({
+      client_id: client.id,
+      runner: "essential-manual-invite",
+      action: "send_invitation",
+      status: "success",
+      lead_id: lead.id,
+      unipile_account_id: unipileAccountId,
+      details: {
+        target_provider_id: invitationMetadata.targetProviderId,
+        target_profile_slug: invitationMetadata.targetProfileSlug,
+        target_linkedin_url_normalized: invitationMetadata.targetLinkedInUrlNormalized,
+        unipile_invitation_id: invitationMetadata.unipileInvitationId,
+        lead_status_update_error: updateLeadStatusErr
+          ? (updateLeadStatusErr.message ?? String(updateLeadStatusErr))
+          : null,
+      },
+    }).then(({ error }) => {
+      if (error) console.error("LINKEDIN_INVITE_LOG_INSERT_ERROR:", error);
+    });
+
+    console.info("LINKEDIN_INVITE_SENT", {
+      client_id: String(client.id),
+      lead_id: String(lead.id),
+      unipile_account_id: unipileAccountId,
+      target_provider_id: invitationMetadata.targetProviderId,
+      target_profile_slug: invitationMetadata.targetProfileSlug,
+      target_linkedin_url_normalized:
+        invitationMetadata.targetLinkedInUrlNormalized,
+      unipile_invitation_id: invitationMetadata.unipileInvitationId,
+    });
 
     return NextResponse.json({ success: true, invitationStatus: "sent" });
   } catch (error: unknown) {

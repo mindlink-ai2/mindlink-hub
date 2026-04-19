@@ -85,6 +85,26 @@ function normalizeLinkedInUrl(value: string | null): string | null {
   }
 }
 
+function normalizeTextForComparison(value: string | null | undefined): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  return raw
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function normalizeInvitationId(value: string | null | undefined): string | null {
+  const raw = String(value ?? "").trim();
+  return raw || null;
+}
+
+function normalizeProviderId(value: string | null | undefined): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw || !raw.startsWith("ACoA")) return null;
+  return raw;
+}
+
 function truncatePreview(text: string | null | undefined, maxLength = 160): string | null {
   const value = String(text ?? "").trim();
   if (!value) return null;
@@ -151,16 +171,19 @@ async function findLeadIdByIdentity(params: {
     .eq("client_id", clientId)
     .not("LinkedInURL", "is", null);
 
+  const matchedIds = new Set<string>();
   for (const lead of leads ?? []) {
     const leadId = String(lead.id ?? "");
     const leadUrl = normalizeLinkedInUrl(String(lead.LinkedInURL ?? ""));
-    const leadSlug = extractLinkedInProfileSlug(String(lead.LinkedInURL ?? ""));
+    const leadSlug = normalizeTextForComparison(
+      extractLinkedInProfileSlug(String(lead.LinkedInURL ?? ""))
+    );
 
-    if (linkedinUrl && leadUrl === linkedinUrl) return leadId;
-    if (slug && leadSlug === slug) return leadId;
+    if (linkedinUrl && leadUrl === linkedinUrl) matchedIds.add(leadId);
+    if (slug && leadSlug === normalizeTextForComparison(slug)) matchedIds.add(leadId);
   }
 
-  return null;
+  return matchedIds.size === 1 ? Array.from(matchedIds)[0] : null;
 }
 
 async function buildDraftPayload(params: {
@@ -203,6 +226,138 @@ async function isClientFullActivePlan(
     .trim()
     .toLowerCase();
   return plan === "full" && subscriptionStatus === "active";
+}
+
+function extractAcceptedIdentity(payload: JsonObject) {
+  const linkedinUrl = normalizeLinkedInUrl(
+    firstString(payload, [
+      ["user_profile_url"],
+      ["profile_url"],
+      ["linkedin_url"],
+      ["data", "user_profile_url"],
+      ["data", "profile_url"],
+      ["data", "linkedin_url"],
+      ["contact", "profile_url"],
+      ["contact", "linkedin_url"],
+      ["relation", "profile_url"],
+      ["relation", "linkedin_url"],
+    ])
+  );
+
+  const publicIdentifier =
+    normalizeTextForComparison(
+      firstString(payload, [
+        ["user_public_identifier"],
+        ["public_identifier"],
+        ["data", "user_public_identifier"],
+        ["data", "public_identifier"],
+        ["contact", "public_identifier"],
+        ["relation", "public_identifier"],
+      ])
+    ) ?? null;
+
+  return {
+    linkedinUrl,
+    slug: publicIdentifier ?? normalizeTextForComparison(extractLinkedInProfileSlug(linkedinUrl)),
+    providerId:
+      normalizeProviderId(
+        firstString(payload, [
+          ["user_provider_id"],
+          ["provider_id"],
+          ["data", "user_provider_id"],
+          ["data", "provider_id"],
+          ["contact", "provider_id"],
+          ["relation", "provider_id"],
+        ])
+      ) ?? null,
+    invitationId:
+      normalizeInvitationId(
+        firstString(payload, [
+          ["invitation_id"],
+          ["invitationId"],
+          ["data", "invitation_id"],
+          ["data", "invitationId"],
+          ["relation", "invitation_id"],
+          ["relation", "invitationId"],
+        ])
+      ) ?? null,
+  };
+}
+
+async function findInvitationForAccepted(params: {
+  supabase: ReturnType<typeof createClient>;
+  clientId: string;
+  unipileAccountId: string;
+  payload: JsonObject;
+}): Promise<{ invitationId: string; leadId: string } | null> {
+  const { supabase, clientId, unipileAccountId, payload } = params;
+  const identity = extractAcceptedIdentity(payload);
+
+  const selectFields =
+    "id, lead_id, raw, target_linkedin_provider_id, target_profile_slug, target_linkedin_url_normalized, unipile_invitation_id";
+  const directLookups: Array<{
+    field:
+      | "unipile_invitation_id"
+      | "target_linkedin_provider_id"
+      | "target_linkedin_url_normalized"
+      | "target_profile_slug";
+    value: string | null;
+  }> = [
+    { field: "unipile_invitation_id", value: identity.invitationId },
+    { field: "target_linkedin_provider_id", value: identity.providerId },
+    { field: "target_linkedin_url_normalized", value: identity.linkedinUrl },
+    { field: "target_profile_slug", value: identity.slug },
+  ];
+
+  for (const lookup of directLookups) {
+    if (!lookup.value) continue;
+
+    const { data, error } = await supabase
+      .from("linkedin_invitations")
+      .select(selectFields)
+      .eq("client_id", clientId)
+      .eq("unipile_account_id", unipileAccountId)
+      .eq(lookup.field, lookup.value)
+      .in("status", ["queued", "pending", "sent", "accepted"])
+      .limit(2);
+
+    if (error) continue;
+
+    const rows = Array.isArray(data) ? data : [];
+    if (rows.length !== 1) {
+      if (rows.length > 1) return null;
+      continue;
+    }
+
+    const row = rows[0] as Record<string, unknown>;
+    const invitationId = String(row.id ?? "").trim();
+    const leadId = String(row.lead_id ?? "").trim();
+    if (invitationId && leadId) return { invitationId, leadId };
+  }
+
+  const leadId = await findLeadIdByIdentity({
+    supabase,
+    clientId,
+    linkedinUrl: identity.linkedinUrl,
+    slug: identity.slug,
+  });
+  if (!leadId) return null;
+
+  const { data: invitations, error } = await supabase
+    .from("linkedin_invitations")
+    .select("id, lead_id")
+    .eq("client_id", clientId)
+    .eq("lead_id", leadId)
+    .eq("unipile_account_id", unipileAccountId)
+    .in("status", ["queued", "pending", "sent", "accepted"])
+    .limit(2);
+
+  if (error) return null;
+  const rows = Array.isArray(invitations) ? invitations : [];
+  if (rows.length !== 1) return null;
+
+  const invitationId = String((rows[0] as Record<string, unknown>).id ?? "").trim();
+  return invitationId ? { invitationId, leadId } : null;
 }
 
 async function resolveThreadForAutoSend(params: {
@@ -497,126 +652,52 @@ async function handleAccepted(params: {
   payload: JsonObject;
 }): Promise<AcceptedResolution | null> {
   const { supabase, clientId, unipileAccountId, payload } = params;
-
-  const identityUrl = normalizeLinkedInUrl(
-    firstString(payload, [
-      ["user_profile_url"],
-      ["profile_url"],
-      ["linkedin_url"],
-      ["data", "profile_url"],
-      ["data", "linkedin_url"],
-      ["contact", "profile_url"],
-      ["contact", "linkedin_url"],
-    ])
-  );
-
-  const identitySlug =
-    extractLinkedInProfileSlug(
-      firstString(payload, [
-        ["user_public_identifier"],
-        ["provider_id"],
-        ["data", "provider_id"],
-        ["contact", "provider_id"],
-      ])
-    ) ?? null;
-
-  let leadId = await findLeadIdByIdentity({
+  const matched = await findInvitationForAccepted({
     supabase,
     clientId,
-    linkedinUrl: identityUrl,
-    slug: identitySlug,
+    unipileAccountId,
+    payload,
   });
+  if (!matched) return null;
 
-  let invitationId: string | null = null;
-  let previousRaw: unknown = null;
-
-  if (leadId) {
-    const { data: invitation } = await supabase
-      .from("linkedin_invitations")
-      .select("id, raw")
-      .eq("client_id", clientId)
-      .eq("lead_id", leadId)
-      .eq("unipile_account_id", unipileAccountId)
-      .in("status", ["queued", "pending", "sent", "accepted"])
-      .order("sent_at", { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle();
-
-    invitationId = invitation?.id ? String(invitation.id) : null;
-    previousRaw = invitation?.raw ?? null;
-  }
-
-  if (!invitationId) {
-    const { data: fallback } = await supabase
-      .from("linkedin_invitations")
-      .select("id, lead_id, raw")
-      .eq("client_id", clientId)
-      .eq("unipile_account_id", unipileAccountId)
-      .in("status", ["queued", "pending", "sent"])
-      .order("sent_at", { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (fallback?.id) {
-      invitationId = String(fallback.id);
-      previousRaw = fallback.raw ?? null;
-      if (!leadId && fallback.lead_id !== null && fallback.lead_id !== undefined) {
-        leadId = String(fallback.lead_id);
-      }
-    }
-  }
-
-  const acceptedAt = new Date().toISOString();
-  const draftPayload =
-    leadId !== null ? await buildDraftPayload({ supabase, clientId, leadId }) : {
-      dm_draft_text: null,
-      dm_draft_status: "none",
-      last_error: null,
-    };
-
-  if (invitationId) {
-    await supabase
-      .from("linkedin_invitations")
-      .update({
-        status: "accepted",
-        accepted_at: acceptedAt,
-        raw: {
-          invitation: previousRaw,
-          acceptance: payload,
-        },
-        ...draftPayload,
-      })
-      .eq("id", invitationId)
-      .eq("client_id", clientId);
-
-    if (leadId) {
-      return {
-        invitationId,
-        leadId,
-      };
-    }
-    return null;
-  }
-
-  if (!leadId) return null;
-
-  const { data: inserted } = await supabase
+  const { data: invitation } = await supabase
     .from("linkedin_invitations")
-    .insert({
-      client_id: clientId,
-      lead_id: leadId,
-      unipile_account_id: unipileAccountId,
-      status: "accepted",
-      accepted_at: acceptedAt,
-      raw: { acceptance: payload },
-      ...draftPayload,
-    })
-    .select("id")
+    .select("id, raw, accepted_at")
+    .eq("id", matched.invitationId)
+    .eq("client_id", clientId)
     .limit(1)
     .maybeSingle();
 
-  if (!inserted?.id) return null;
-  return { invitationId: String(inserted.id), leadId };
+  if (!invitation?.id) return null;
+
+  const acceptedAt =
+    typeof invitation.accepted_at === "string" && invitation.accepted_at.trim()
+      ? invitation.accepted_at
+      : new Date().toISOString();
+  const draftPayload = await buildDraftPayload({
+    supabase,
+    clientId,
+    leadId: matched.leadId,
+  });
+
+  await supabase
+    .from("linkedin_invitations")
+    .update({
+      status: "accepted",
+      accepted_at: acceptedAt,
+      raw: {
+        invitation: invitation.raw ?? null,
+        acceptance: payload,
+      },
+      ...draftPayload,
+    })
+    .eq("id", matched.invitationId)
+    .eq("client_id", clientId);
+
+  return {
+    invitationId: matched.invitationId,
+    leadId: matched.leadId,
+  };
 }
 
 async function handleInvitationSent(params: {
@@ -626,34 +707,13 @@ async function handleInvitationSent(params: {
   payload: JsonObject;
 }) {
   const { supabase, clientId, unipileAccountId, payload } = params;
-
-  const identityUrl = normalizeLinkedInUrl(
-    firstString(payload, [
-      ["user_profile_url"],
-      ["profile_url"],
-      ["linkedin_url"],
-      ["data", "profile_url"],
-      ["data", "linkedin_url"],
-      ["contact", "profile_url"],
-      ["contact", "linkedin_url"],
-    ])
-  );
-
-  const identitySlug =
-    extractLinkedInProfileSlug(
-      firstString(payload, [
-        ["user_public_identifier"],
-        ["provider_id"],
-        ["data", "provider_id"],
-        ["contact", "provider_id"],
-      ])
-    ) ?? null;
+  const identity = extractAcceptedIdentity(payload);
 
   const leadId = await findLeadIdByIdentity({
     supabase,
     clientId,
-    linkedinUrl: identityUrl,
-    slug: identitySlug,
+    linkedinUrl: identity.linkedinUrl,
+    slug: identity.slug,
   });
 
   if (!leadId) return;
@@ -667,7 +727,15 @@ async function handleInvitationSent(params: {
       unipile_account_id: unipileAccountId,
       status: "sent",
       sent_at: sentAt,
+      target_linkedin_provider_id: identity.providerId,
+      target_profile_slug: identity.slug,
+      target_linkedin_url_normalized: identity.linkedinUrl,
+      unipile_invitation_id: identity.invitationId,
       raw: {
+        provider_id: identity.providerId,
+        profile_slug: identity.slug,
+        normalized_linkedin_url: identity.linkedinUrl,
+        unipile_invitation_id: identity.invitationId,
         sent_webhook: payload,
       },
     },

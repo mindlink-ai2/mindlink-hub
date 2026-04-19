@@ -4,6 +4,7 @@ import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
 import "./globals.css";
 import DashboardContainer from "@/components/DashboardContainer";
+import PrefetchNavLink from "@/components/PrefetchNavLink";
 import InboxBackgroundSync from "@/components/InboxBackgroundSync";
 import RightHitboxDebug from "@/components/dev/RightHitboxDebug";
 import InboxNavLink from "@/components/InboxNavLink";
@@ -14,6 +15,7 @@ import BusinessTracker from "@/components/analytics/BusinessTracker";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
 import { PLAYBOOK_ALLOWED_CLIENT_IDS } from "@/lib/playbook-auth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import QueryProvider from "@/components/QueryProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -128,6 +130,7 @@ export default async function RootLayout({
     <ClerkProvider>
       <html lang="fr">
         <body className="bg-[#ecf2fa] text-[#0f213c]">
+          <QueryProvider>
           <div className="min-h-screen flex flex-col relative">
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
               <div className="absolute -top-40 left-1/2 h-[500px] w-[1120px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(31,94,255,0.14),rgba(31,94,255,0.01)_62%,transparent_78%)]" />
@@ -160,24 +163,24 @@ export default async function RootLayout({
                 <div className="flex items-center gap-4 text-xs">
                   <SignedIn>
                     <nav className="hidden items-center gap-2 text-[11px] text-[#51627b] sm:flex">
-                      <Link
+                      <PrefetchNavLink
                         href={dashboardHref}
                         className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                       >
                         Dashboard
-                      </Link>
-                      <Link
+                      </PrefetchNavLink>
+                      <PrefetchNavLink
                         href="/dashboard/leads"
                         className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                       >
                         Prospection
-                      </Link>
-                      <Link
+                      </PrefetchNavLink>
+                      <PrefetchNavLink
                         href="/dashboard/followups"
                         className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                       >
                         Relances
-                      </Link>
+                      </PrefetchNavLink>
                       <InboxNavLink />
                       <IcpBuilderNavLink />
                       <Link
@@ -186,12 +189,12 @@ export default async function RootLayout({
                       >
                         Mes messages
                       </Link>
-                      <Link
+                      <PrefetchNavLink
                         href="/dashboard/hub/billing"
                         className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
                       >
                         Abonnement
-                      </Link>
+                      </PrefetchNavLink>
                       {showSupportAdminLink ? (
                         <>
                           <Link
@@ -285,6 +288,7 @@ export default async function RootLayout({
 
           {/* ✅ PAYWALL : si connecté mais email absent dans public.clients */}
           {user && !hasAccess ? <PaywallOverlay /> : null}
+          </QueryProvider>
         </body>
       </html>
     </ClerkProvider>

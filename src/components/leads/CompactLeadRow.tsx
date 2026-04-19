@@ -1,26 +1,12 @@
 import { memo, type MouseEvent } from "react";
 import { ChevronRight, Linkedin } from "lucide-react";
 
-import { getLeadStatusKey, type LeadCardLead, type LeadCardStatusKey } from "./LeadCard";
-
-function getStatusLabel(status: LeadCardStatusKey): string {
-  if (status === "sent") return "Envoye";
-  if (status === "connected") return "Connecte";
-  if (status === "pending") return "En attente";
-  return "A faire";
-}
-
-function getStatusClassName(status: LeadCardStatusKey): string {
-  if (status === "sent" || status === "connected") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  if (status === "pending") {
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  }
-
-  return "border-[#d7e3f4] bg-[#f5f9ff] text-[#4b647f]";
-}
+import { getLeadStatusKey, type LeadCardLead } from "./LeadCard";
+import {
+  getProspectionInvitationState,
+  getProspectionStatusClasses,
+  getProspectionStatusLabel,
+} from "@/lib/prospection-status";
 
 function formatCompactDate(createdAt: string | null | undefined): string | null {
   if (!createdAt) return null;
@@ -55,6 +41,7 @@ export type CompactLeadRowProps = {
   onOpenLead: (lead: LeadCardLead) => void;
   onInviteLinkedIn: (lead: LeadCardLead) => void;
   isInviteLoading: boolean;
+  isAutomationManaged?: boolean;
   inviteError?: string;
 };
 
@@ -63,10 +50,11 @@ function CompactLeadRowComponent({
   onOpenLead,
   onInviteLinkedIn,
   isInviteLoading,
+  isAutomationManaged = false,
   inviteError,
 }: CompactLeadRowProps) {
   const status = getLeadStatusKey(lead);
-  const statusLabel = getStatusLabel(status);
+  const statusLabel = getProspectionStatusLabel(status);
   const displayName = `${lead.FirstName ?? ""} ${lead.LastName ?? ""}`.trim() || lead.Name || "Lead";
   const jobTitle = (lead.linkedinJobTitle ?? "").trim();
   const company = (lead.Company ?? "").trim();
@@ -74,17 +62,11 @@ function CompactLeadRowComponent({
     .filter(Boolean)
     .join(" - ");
   const dateLabel = formatCompactDate(lead.created_at);
-  const invitationStatus =
-    lead.linkedin_invitation_status === "accepted"
-      ? "accepted"
-      : lead.linkedin_invitation_status === "sent"
-        ? "sent"
-        : lead.linkedin_invitation_sent
-          ? "sent"
-          : null;
+  const invitationStatus = getProspectionInvitationState(lead);
   const isInviteAccepted = invitationStatus === "accepted";
   const isInviteSent = invitationStatus === "sent";
   const canInvite =
+    !isAutomationManaged &&
     Boolean((lead.LinkedInURL ?? "").trim()) &&
     !isInviteLoading &&
     !isInviteAccepted &&
@@ -93,6 +75,8 @@ function CompactLeadRowComponent({
     ? "Connecte"
     : isInviteSent
       ? "Invitation envoyee"
+      : isAutomationManaged
+        ? "Pilotage auto"
       : isInviteLoading
         ? "Connexion..."
         : "Se connecter";
@@ -119,7 +103,7 @@ function CompactLeadRowComponent({
               <span
                 className={[
                   "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                  getStatusClassName(status),
+                  getProspectionStatusClasses(status, "compact"),
                 ].join(" ")}
               >
                 {statusLabel}
@@ -146,13 +130,23 @@ function CompactLeadRowComponent({
               ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700"
               : isInviteSent
                 ? "cursor-default border-amber-200 bg-amber-50 text-amber-700"
+                : isAutomationManaged
+                  ? "cursor-not-allowed border-[#d7e3f4] bg-[#f5f9ff] text-[#6b7f9b]"
                 : inviteError
                   ? "border-red-200 bg-red-50 text-red-700"
                   : "border-[#d7e3f4] bg-white text-[#4b647f] hover:bg-[#f5f9ff]",
             !canInvite ? "cursor-not-allowed opacity-60" : "",
           ].join(" ")}
-          aria-label="Se connecter sur LinkedIn"
-          title="Se connecter sur LinkedIn"
+          aria-label={
+            isAutomationManaged
+              ? "Statut LinkedIn pilote automatiquement"
+              : "Se connecter sur LinkedIn"
+          }
+          title={
+            isAutomationManaged
+              ? "Statut LinkedIn pilote automatiquement"
+              : "Se connecter sur LinkedIn"
+          }
         >
           <Linkedin className="h-3.5 w-3.5 text-[#0A66C2]" />
           <span>{inviteButtonLabel}</span>

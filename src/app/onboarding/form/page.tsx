@@ -95,6 +95,12 @@ function OnboardingForm() {
           router.replace(linkedinConnected ? "/" : "/dashboard");
           return;
         }
+
+        // Already submitted the form — go to step 3
+        if (state === "form_submitted") {
+          router.replace("/onboarding/video");
+          return;
+        }
       } catch {
         router.replace("/dashboard");
         return;
@@ -185,9 +191,8 @@ function OnboardingForm() {
         ok: true,
         msg: "Merci, c’est bien reçu ✅ Notre équipe va pouvoir lancer la configuration sur des bases claires.",
       });
-      await fetch("/api/onboarding/complete", { method: "POST" }).catch(() => null);
       await user?.reload().catch(() => {});
-      router.replace("/");
+      router.replace("/onboarding/video");
     } catch {
       setStatus({ ok: false, msg: "Erreur réseau. Réessaie dans 30 secondes." });
     } finally {

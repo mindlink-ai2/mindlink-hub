@@ -12,6 +12,7 @@ import MobileSheet from "@/components/mobile/MobileSheet";
 import MobileSheetHeader from "@/components/mobile/MobileSheetHeader";
 import MobileEmptyState from "@/components/mobile/MobileEmptyState";
 import MobileSkeleton from "@/components/mobile/MobileSkeleton";
+import { SkeletonMessages, SkeletonThreadList } from "@/components/ui/Skeleton";
 
 type InboxThread = {
   id: string;
@@ -952,7 +953,7 @@ export default function InboxPage() {
                   className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
                 >
                   {loadingMessages ? (
-                    <div className="text-sm text-[#51627b]">Chargement des messages…</div>
+                    <SkeletonMessages rows={5} />
                   ) : messages.length === 0 ? (
                     <MobileEmptyState
                       title="Aucun message"
@@ -1083,7 +1084,7 @@ export default function InboxPage() {
 
                 <div className="min-h-0 flex-1 overflow-y-auto p-3">
                   {loadingThreads ? (
-                    <div className="p-3 text-sm text-[#51627b]">Chargement des threads…</div>
+                    <SkeletonThreadList rows={8} />
                   ) : threads.length === 0 ? (
                     <div className="p-3 text-sm text-[#51627b]">
                       Aucune conversation synchronisée pour le moment.
@@ -1194,7 +1195,7 @@ export default function InboxPage() {
                       Sélectionne une conversation pour afficher l’historique.
                     </div>
                   ) : loadingMessages ? (
-                    <div className="text-sm text-[#51627b]">Chargement des messages…</div>
+                    <SkeletonMessages rows={5} />
                   ) : messages.length === 0 ? (
                     <div className="text-sm text-[#51627b]">
                       Aucun message dans ce thread.

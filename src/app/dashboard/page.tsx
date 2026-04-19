@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { trackBusinessEvent } from "@/lib/analytics/business-client";
+import { queryKeys } from "@/lib/query-keys";
+import { SkeletonTable } from "@/components/ui/Skeleton";
 
 type DrilldownType =
   | "leads_today"
@@ -55,43 +58,29 @@ const EMPTY_STATS: DashboardStats = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
-  const [loadingStats, setLoadingStats] = useState(true);
-  const [statsError, setStatsError] = useState<string | null>(null);
-
   const [active, setActive] = useState<DrilldownType | null>(null);
-  const [items, setItems] = useState<DrilldownItem[]>([]);
-  const [loadingItems, setLoadingItems] = useState(false);
-  const [itemsError, setItemsError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const drilldownRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    trackBusinessEvent("dashboard_viewed", "navigation");
-  }, []);
-
-  const loadStats = useCallback(async () => {
-    setLoadingStats(true);
-    setStatsError(null);
-
-    try {
+  // ── Stats — mis en cache 5 min par TanStack Query ──
+  const {
+    data: statsData,
+    isLoading: loadingStats,
+    isError: hasStatsError,
+    refetch: refetchStats,
+  } = useQuery({
+    queryKey: queryKeys.dashboardStats(),
+    queryFn: async () => {
       const res = await fetch("/api/dashboard/stats", {
         method: "GET",
         credentials: "include",
       });
-
       const data = await res.json().catch(() => ({}));
-
       if (!res.ok) {
-        console.error("DASHBOARD_STATS_HTTP_ERROR:", {
-          status: res.status,
-          body: data,
-        });
-        setStatsError("Impossible de charger les statistiques pour le moment.");
-        return;
+        console.error("DASHBOARD_STATS_HTTP_ERROR:", { status: res.status, body: data });
+        throw new Error("Impossible de charger les statistiques pour le moment.");
       }
-
-      setStats({
+      return {
         leadsToday: Number(data?.leadsToday ?? 0),
         leadsWeek: Number(data?.leadsWeek ?? 0),
         traitementRate: Number(data?.traitementRate ?? 0),
@@ -101,18 +90,42 @@ export default function DashboardPage() {
         acceptedConnections30d: Number(data?.acceptedConnections30d ?? 0),
         pendingLinkedinInvitations: Number(data?.pendingLinkedinInvitations ?? 0),
         responseRate: Number(data?.responseRate ?? 0),
+      } satisfies DashboardStats;
+    },
+  });
+
+  const stats: DashboardStats = statsData ?? EMPTY_STATS;
+  const statsError = hasStatsError
+    ? "Impossible de charger les statistiques pour le moment."
+    : null;
+
+  // ── Drilldown — activé uniquement quand un KPI est sélectionné ──
+  const {
+    data: drilldownData,
+    isLoading: loadingItems,
+    isError: hasDrilldownError,
+  } = useQuery({
+    queryKey: active ? queryKeys.dashboardDrilldown(active) : ["dashboard", "drilldown", "__none__"],
+    queryFn: async () => {
+      const res = await fetch(`/api/dashboard/drilldown?type=${active}`, {
+        method: "GET",
+        credentials: "include",
       });
-    } catch (err) {
-      console.error("DASHBOARD_STATS_LOAD_ERROR:", err);
-      setStatsError("Impossible de charger les statistiques pour le moment.");
-    } finally {
-      setLoadingStats(false);
-    }
-  }, []);
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(txt || "Erreur lors du chargement.");
+      }
+      const data = await res.json().catch(() => ({}));
+      return Array.isArray(data?.items) ? (data.items as DrilldownItem[]) : [];
+    },
+    enabled: !!active,
+  });
+
+  const itemsError = hasDrilldownError ? "Erreur lors du chargement." : null;
 
   useEffect(() => {
-    void loadStats();
-  }, [loadStats]);
+    trackBusinessEvent("dashboard_viewed", "navigation");
+  }, []);
 
   useEffect(() => {
     fetch("/api/linkedin/settings", { credentials: "include" })
@@ -150,41 +163,15 @@ export default function DashboardPage() {
     }
   }, [active]);
 
-  const loadDrilldown = async (type: DrilldownType) => {
+  // Toggle drilldown — le fetch est géré par useQuery via enabled
+  const loadDrilldown = (type: DrilldownType) => {
     if (active === type) {
       setActive(null);
-      setItems([]);
-      setItemsError(null);
       setQ("");
       return;
     }
-
     setActive(type);
-    setLoadingItems(true);
-    setItems([]);
-    setItemsError(null);
     setQ("");
-
-    try {
-      const res = await fetch(`/api/dashboard/drilldown?type=${type}`, {
-        method: "GET",
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        setItemsError(txt || "Erreur lors du chargement.");
-        return;
-      }
-
-      const data = await res.json().catch(() => ({}));
-      setItems(Array.isArray(data?.items) ? (data.items as DrilldownItem[]) : []);
-    } catch (e) {
-      console.error("DASHBOARD_DRILLDOWN_LOAD_ERROR:", e);
-      setItemsError("Erreur réseau.");
-    } finally {
-      setLoadingItems(false);
-    }
   };
 
   const openFromRow = (it: DrilldownItem) => {
@@ -212,10 +199,11 @@ export default function DashboardPage() {
     active === "followups_upcoming" || active === "followups_late";
 
   const filteredItems = useMemo(() => {
+    const allItems: DrilldownItem[] = drilldownData ?? [];
     const term = q.trim().toLowerCase();
-    if (!term) return items;
+    if (!term) return allItems;
 
-    return items.filter((it) => {
+    return allItems.filter((it: DrilldownItem) => {
       const src = it?.source === "maps" ? "maps" : "linkedin";
       const sourceTxt = src;
 
@@ -241,7 +229,7 @@ export default function DashboardPage() {
         details.toLowerCase().includes(term)
       );
     });
-  }, [items, q]);
+  }, [drilldownData, q]);
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
@@ -297,7 +285,7 @@ export default function DashboardPage() {
                 <span>{statsError}</span>
                 <button
                   type="button"
-                  onClick={() => void loadStats()}
+                  onClick={() => void refetchStats()}
                   className="rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50"
                 >
                   Réessayer
@@ -422,8 +410,6 @@ export default function DashboardPage() {
                   <button
                     onClick={() => {
                       setActive(null);
-                      setItems([]);
-                      setItemsError(null);
                       setQ("");
                     }}
                     className="rounded-xl border border-[#c8d6ea] bg-[#f5f9ff] px-3 py-2 text-[12px] font-medium text-[#0b1c33] transition hover:bg-[#edf4fd]"
@@ -434,7 +420,7 @@ export default function DashboardPage() {
               </div>
 
               {loadingItems ? (
-                <div className="px-5 py-10 text-sm text-[#51627b]">Chargement...</div>
+                <div className="px-5 py-4"><SkeletonTable rows={5} /></div>
               ) : itemsError ? (
                 <div className="px-5 py-10 text-sm text-red-700">{itemsError}</div>
               ) : filteredItems.length === 0 ? (
@@ -456,7 +442,7 @@ export default function DashboardPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredItems.map((it) => {
+                          {filteredItems.map((it: DrilldownItem) => {
                             const src = it?.source === "maps" ? "maps" : "linkedin";
                             const sourceLabel = src === "maps" ? "Maps" : "LinkedIn";
 
@@ -516,7 +502,7 @@ export default function DashboardPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredItems.map((it) => {
+                          {filteredItems.map((it: DrilldownItem) => {
                             const src = it?.source === "maps" ? "maps" : "linkedin";
                             const sourceLabel = src === "maps" ? "Maps" : "LinkedIn";
 
@@ -562,7 +548,7 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="space-y-2 p-3 md:hidden">
-                    {filteredItems.map((it) => {
+                    {filteredItems.map((it: DrilldownItem) => {
                       const src = it?.source === "maps" ? "maps" : "linkedin";
                       const sourceLabel = src === "maps" ? "Maps" : "LinkedIn";
                       const name =

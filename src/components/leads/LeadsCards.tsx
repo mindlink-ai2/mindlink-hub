@@ -16,6 +16,7 @@ type LeadsCardsProps = {
   invitingLeadIds: Set<string>;
   inviteErrors: Record<string, string>;
   onResetFilters: () => void;
+  isAutomationManaged?: boolean;
 };
 
 export function LeadsCardsSkeleton({
@@ -65,6 +66,7 @@ export default function LeadsCards({
   invitingLeadIds,
   inviteErrors,
   onResetFilters,
+  isAutomationManaged = false,
 }: LeadsCardsProps) {
   if (leads.length === 0) {
     return (
@@ -102,6 +104,7 @@ export default function LeadsCards({
               onOpenLead={onOpenLead}
               onInviteLinkedIn={onInviteLinkedIn}
               isInviteLoading={invitingLeadIds.has(id)}
+              isAutomationManaged={isAutomationManaged}
               inviteError={inviteErrors[id]}
             />
           );
@@ -116,6 +119,7 @@ export default function LeadsCards({
             onInviteLinkedIn={onInviteLinkedIn}
             isStatusUpdating={updatingStatusIds.has(id)}
             isInviteLoading={invitingLeadIds.has(id)}
+            isAutomationManaged={isAutomationManaged}
             inviteError={inviteErrors[id]}
           />
         );

@@ -424,6 +424,25 @@ export async function POST(req: Request) {
         details: sendResult.details ?? null,
       });
 
+      await supabase.from("automation_logs").insert({
+        client_id: clientId,
+        runner: "essential-manual-dm",
+        action: "send_message",
+        status: "error",
+        lead_id: leadId,
+        unipile_account_id: unipileAccountId,
+        details: {
+          error_code: getErrorCodeForSendStatus(sendResult.status),
+          error_message: sendResult.userMessage,
+          stage: sendResult.status,
+          provider_id: sendResult.providerId ?? null,
+          chat_id: sendResult.unipileThreadId ?? null,
+          details: sendResult.details ?? null,
+        },
+      }).then(({ error }) => {
+        if (error) console.error("ESSENTIAL_DM_LOG_INSERT_ERROR:", error);
+      });
+
       return buildErrorResponse({
         status: sendResult.status,
         httpStatus: getHttpStatusForSendError(sendResult.status),
@@ -448,6 +467,46 @@ export async function POST(req: Request) {
         error: chatPersist.error,
       });
     }
+
+    // Marquer l'invitation acceptée comme "DM envoyé" — même structure que le full plan
+    const { error: invitationDmUpdateErr } = await supabase
+      .from("linkedin_invitations")
+      .update({ dm_sent_at: sendResult.sentAt, dm_draft_status: "sent" })
+      .eq("client_id", clientId)
+      .eq("lead_id", leadId)
+      .eq("status", "accepted")
+      .is("dm_sent_at", null);
+
+    if (invitationDmUpdateErr) {
+      console.error("ESSENTIAL_DM_INVITATION_UPDATE_ERROR", {
+        leadId,
+        clientId,
+        error: invitationDmUpdateErr,
+      });
+    }
+
+    await supabase.from("automation_logs").insert({
+      client_id: clientId,
+      runner: "essential-manual-dm",
+      action: "send_message",
+      status: "success",
+      lead_id: leadId,
+      unipile_account_id: unipileAccountId,
+      details: {
+        provider_id: sendResult.providerId ?? null,
+        chat_id: sendResult.unipileThreadId,
+        thread_created: sendResult.threadCreated,
+        sent_at: sendResult.sentAt,
+        invitation_dm_update_error: invitationDmUpdateErr
+          ? (invitationDmUpdateErr.message ?? String(invitationDmUpdateErr))
+          : null,
+        chat_persist_error: chatPersist.error
+          ? (chatPersist.error.message ?? String(chatPersist.error))
+          : null,
+      },
+    }).then(({ error }) => {
+      if (error) console.error("ESSENTIAL_DM_LOG_INSERT_ERROR:", error);
+    });
 
     console.info("PROSPECTION_LINKEDIN_SEND_SUCCESS", {
       leadId,

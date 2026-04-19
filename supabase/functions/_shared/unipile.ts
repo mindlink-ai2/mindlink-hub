@@ -50,6 +50,33 @@ export async function readResponseBody(
   }
 }
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function extractProviderId(payload: unknown): string | null {
+  const root = toRecord(payload);
+  const data = toRecord(root?.data);
+
+  const direct =
+    typeof root?.provider_id === "string" && root.provider_id.trim()
+      ? root.provider_id.trim()
+      : typeof root?.providerId === "string" && root.providerId.trim()
+        ? root.providerId.trim()
+        : null;
+  if (direct) return direct;
+
+  if (typeof data?.provider_id === "string" && data.provider_id.trim()) {
+    return data.provider_id.trim();
+  }
+  if (typeof data?.providerId === "string" && data.providerId.trim()) {
+    return data.providerId.trim();
+  }
+
+  return null;
+}
+
 export async function resolveUnipileProviderId(params: {
   baseUrl: string;
   apiKey: string;
@@ -57,35 +84,38 @@ export async function resolveUnipileProviderId(params: {
   profileSlug: string;
 }): Promise<{ ok: true; providerId: string } | { ok: false; error: string; details?: unknown }> {
   const { baseUrl, apiKey, accountId, profileSlug } = params;
+  try {
+    const response = await fetch(
+      `${baseUrl}/api/v1/users/${encodeURIComponent(profileSlug)}?account_id=${encodeURIComponent(
+        accountId
+      )}`,
+      {
+        method: "GET",
+        headers: {
+          "X-API-KEY": apiKey,
+          accept: "application/json",
+        },
+      }
+    );
 
-  const response = await fetch(
-    `${baseUrl}/api/v1/users/${encodeURIComponent(profileSlug)}?account_id=${encodeURIComponent(
-      accountId
-    )}`,
-    {
-      method: "GET",
-      headers: {
-        "X-API-KEY": apiKey,
-        accept: "application/json",
-      },
+    const payload = await readResponseBody(response);
+    if (!response.ok) {
+      return { ok: false, error: "unipile_profile_lookup_failed", details: payload };
     }
-  );
 
-  const payload = await readResponseBody(response);
-  if (!response.ok) {
-    return { ok: false, error: "unipile_profile_lookup_failed", details: payload };
+    const providerId = extractProviderId(payload);
+    if (!providerId) {
+      return { ok: false, error: "unipile_provider_id_missing", details: payload };
+    }
+
+    return { ok: true, providerId };
+  } catch (error) {
+    return {
+      ok: false,
+      error: "unipile_profile_lookup_request_failed",
+      details: String(error),
+    };
   }
-
-  const providerId =
-    payload && typeof payload === "object" && "provider_id" in payload
-      ? String(payload.provider_id ?? "").trim()
-      : "";
-
-  if (!providerId) {
-    return { ok: false, error: "unipile_provider_id_missing", details: payload };
-  }
-
-  return { ok: true, providerId };
 }
 
 export async function sendUnipileInvitation(params: {
@@ -95,26 +125,33 @@ export async function sendUnipileInvitation(params: {
   providerId: string;
 }): Promise<{ ok: true; payload: unknown } | { ok: false; error: string; details?: unknown }> {
   const { baseUrl, apiKey, accountId, providerId } = params;
+  try {
+    const response = await fetch(`${baseUrl}/api/v1/users/invite`, {
+      method: "POST",
+      headers: {
+        "X-API-KEY": apiKey,
+        accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        account_id: accountId,
+        provider_id: providerId,
+      }),
+    });
 
-  const response = await fetch(`${baseUrl}/api/v1/users/invite`, {
-    method: "POST",
-    headers: {
-      "X-API-KEY": apiKey,
-      accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      account_id: accountId,
-      provider_id: providerId,
-    }),
-  });
+    const payload = await readResponseBody(response);
+    if (!response.ok) {
+      return { ok: false, error: "unipile_invite_failed", details: payload };
+    }
 
-  const payload = await readResponseBody(response);
-  if (!response.ok) {
-    return { ok: false, error: "unipile_invite_failed", details: payload };
+    return { ok: true, payload };
+  } catch (error) {
+    return {
+      ok: false,
+      error: "unipile_invite_request_failed",
+      details: String(error),
+    };
   }
-
-  return { ok: true, payload };
 }
 
 export async function createUnipileChatWithMessage(params: {

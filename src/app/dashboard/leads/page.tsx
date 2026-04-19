@@ -1,25 +1,61 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { queryKeys } from "@/lib/query-keys";
+import { useDebounce } from "@/hooks/useDebounce";
 import { supabase } from "@/lib/supabase";
 import { trackBusinessEvent } from "@/lib/analytics/business-client";
+import {
+  getProspectionInvitationState,
+  getProspectionStatusClasses,
+  getProspectionStatusDotClass,
+  getProspectionStatusKey,
+  getProspectionStatusLabel,
+  mergeLeadWithInvitationUpdate,
+} from "@/lib/prospection-status";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
+import dynamic from "next/dynamic";
 import LeadsCards, { type MobileLeadsViewMode } from "@/components/leads/LeadsCards";
-import { getLeadStatusKey } from "@/components/leads/LeadCard";
 import LeadsMobileFilters, {
   type MobileLeadFilterKey,
 } from "@/components/leads/LeadsMobileFilters";
-import ProspectionFilterBar, {
-  type ProspectionDatePreset,
-  type ProspectionDesktopFilters,
-  type ProspectionInvitationKey,
-  type ProspectionSegmentKey,
-  type ProspectionStatusKey,
+import type {
+  ProspectionDatePreset,
+  ProspectionContactKey,
+  ProspectionDesktopFilters,
+  ProspectionSegmentKey,
+  ProspectionStatusKey,
 } from "@/components/prospection/ProspectionFilterBar";
+
+const ProspectionFilterBar = dynamic(
+  () => import("@/components/prospection/ProspectionFilterBar"),
+  { ssr: false }
+);
 import { Button } from "@/components/ui/button";
 import { HubButton } from "@/components/ui/hub-button";
-import { AlertTriangle, Briefcase, Building2, Calendar, Globe, LayoutGrid, Linkedin, List, Mail, MapPin, MessageSquare, MoveRight, Phone, UserCircle2, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Briefcase,
+  Building2,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  LayoutGrid,
+  Linkedin,
+  List,
+  Loader2,
+  Mail,
+  MapPin,
+  MessageSquare,
+  MoveRight,
+  Phone,
+  UserCircle2,
+  X,
+} from "lucide-react";
 
 type Lead = {
   id: number | string;
@@ -59,6 +95,75 @@ type ConvMessage = {
   text: string | null;
   sent_at: string | null;
   raw: unknown;
+};
+
+type ProspectionCounts = Record<ProspectionSegmentKey, number>;
+
+type ProspectionSummaryStats = {
+  total: number;
+  treated: number;
+  pending: number;
+  connected: number;
+  sent: number;
+  remainingToTreat: number;
+};
+
+type ProspectionPagination = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+type LeadClientPayload = {
+  id: string | number;
+  plan: "full" | "essential";
+  subscription_status: string;
+  is_full: boolean;
+  is_full_active: boolean;
+  is_premium: boolean;
+  email_option: boolean;
+  phone_option: boolean;
+};
+
+type PaginatedLeadsResponse = {
+  leads: Lead[];
+  counts: ProspectionCounts;
+  pagination: ProspectionPagination;
+  client: LeadClientPayload;
+};
+
+type LeadsSummaryResponse = {
+  stats: ProspectionSummaryStats;
+  client: LeadClientPayload;
+};
+
+type LeadDetailsResponse = {
+  lead: Lead;
+  client: LeadClientPayload;
+};
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+const DEFAULT_COUNTS: ProspectionCounts = {
+  all: 0,
+  todo: 0,
+  pending: 0,
+  connected: 0,
+  sent: 0,
+};
+const DEFAULT_SUMMARY_STATS: ProspectionSummaryStats = {
+  total: 0,
+  treated: 0,
+  pending: 0,
+  connected: 0,
+  sent: 0,
+  remainingToTreat: 0,
+};
+const DEFAULT_PAGINATION: ProspectionPagination = {
+  page: 1,
+  pageSize: 25,
+  total: 0,
+  totalPages: 1,
 };
 
 const JOB_TITLE_EXACT_TRANSLATIONS: Record<string, string> = {
@@ -143,81 +248,6 @@ function translateLinkedInJobTitle(rawValue: string | null | undefined): string 
   return translated.charAt(0).toUpperCase() + translated.slice(1);
 }
 
-function filterLeads(leads: Lead[], term: string) {
-  const v = term.trim().toLowerCase();
-  if (!v) return leads;
-
-  return leads.filter((l) => {
-    const name = `${l.FirstName ?? ""} ${l.LastName ?? ""}`.toLowerCase();
-    return (
-      name.includes(v) ||
-      (l.Company ?? "").toLowerCase().includes(v) ||
-      (l.location ?? "").toLowerCase().includes(v) ||
-      (l.linkedinJobTitle ?? "").toLowerCase().includes(v) ||
-      (l.email ?? "").toLowerCase().includes(v) ||
-      (l.phone ?? "").toLowerCase().includes(v)
-    );
-  });
-}
-
-function getLeadInvitationFilterStatus(lead: Lead): ProspectionInvitationKey {
-  if (lead.linkedin_invitation_status === "accepted") return "accepted";
-  if (lead.linkedin_invitation_status === "sent" || lead.linkedin_invitation_sent) return "sent";
-  return "none";
-}
-
-function getLeadPipelineStatus(lead: Lead): ProspectionStatusKey {
-  if (lead.message_sent) return "sent";
-  if (getLeadInvitationFilterStatus(lead) === "accepted") return "connected";
-  if (lead.traite) return "pending";
-  return "todo";
-}
-
-function matchesDatePreset(
-  createdAt: string | null | undefined,
-  preset: ProspectionDatePreset,
-  customDate: string | null | undefined
-): boolean {
-  if (preset === "all") return true;
-  if (!createdAt) return false;
-
-  const createdDate = new Date(createdAt);
-  if (Number.isNaN(createdDate.getTime())) return false;
-
-  if (preset === "custom") {
-    if (!customDate) return true;
-    const endDate = new Date(`${customDate}T23:59:59.999`);
-    if (Number.isNaN(endDate.getTime())) return true;
-    return createdDate <= endDate;
-  }
-
-  const days = preset === "7d" ? 7 : preset === "30d" ? 30 : 90;
-  const threshold = new Date();
-  threshold.setDate(threshold.getDate() - days);
-
-  return createdDate >= threshold;
-}
-
-function applyDesktopFilters(leads: Lead[], filters: ProspectionDesktopFilters): Lead[] {
-  return leads.filter((lead) => {
-    const status = getLeadPipelineStatus(lead);
-
-    if (filters.segment !== "all" && status !== filters.segment) return false;
-
-    if (filters.contacts.length > 0) {
-      const hasEmail = Boolean((lead.email ?? "").trim());
-      const hasPhone = Boolean((lead.phone ?? "").trim());
-      const matchesEmail = filters.contacts.includes("email") && hasEmail;
-      const matchesPhone = filters.contacts.includes("phone") && hasPhone;
-      if (!matchesEmail && !matchesPhone) return false;
-    }
-
-    if (!matchesDatePreset(lead.created_at, filters.datePreset, filters.customDate)) return false;
-
-    return true;
-  });
-}
-
 function countActiveDesktopFilters(filters: ProspectionDesktopFilters): number {
   let count = 0;
   if (filters.segment !== "all") count += 1;
@@ -226,21 +256,70 @@ function countActiveDesktopFilters(filters: ProspectionDesktopFilters): number {
   return count;
 }
 
-function getSegmentCounts(leads: Lead[]): Record<ProspectionSegmentKey, number> {
-  const counts: Record<ProspectionSegmentKey, number> = {
-    all: leads.length,
-    todo: 0,
-    pending: 0,
-    connected: 0,
-    sent: 0,
-  };
+function serializeContacts(contacts: ProspectionContactKey[]): string {
+  return contacts.join(",");
+}
 
-  leads.forEach((lead) => {
-    const key = getLeadPipelineStatus(lead);
-    counts[key] += 1;
+function buildPaginatedLeadsUrl(params: {
+  search: string;
+  segment: "all" | ProspectionStatusKey;
+  contacts: ProspectionContactKey[];
+  datePreset: ProspectionDatePreset;
+  customDate: string | null;
+  page: number;
+  pageSize: number;
+}) {
+  const searchParams = new URLSearchParams({
+    mode: "paginated",
+    page: String(params.page),
+    pageSize: String(params.pageSize),
+    segment: params.segment,
+    datePreset: params.datePreset,
   });
 
-  return counts;
+  if (params.search.trim()) searchParams.set("search", params.search.trim());
+  if (params.contacts.length > 0) {
+    searchParams.set("contacts", serializeContacts(params.contacts));
+  }
+  if (params.customDate) searchParams.set("customDate", params.customDate);
+
+  return `/api/get-leads?${searchParams.toString()}`;
+}
+
+async function fetchPaginatedLeads(params: {
+  search: string;
+  segment: "all" | ProspectionStatusKey;
+  contacts: ProspectionContactKey[];
+  datePreset: ProspectionDatePreset;
+  customDate: string | null;
+  page: number;
+  pageSize: number;
+}): Promise<PaginatedLeadsResponse> {
+  const response = await fetch(buildPaginatedLeadsUrl(params), {
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+async function fetchLeadsSummary(): Promise<LeadsSummaryResponse> {
+  const response = await fetch("/api/get-leads?mode=summary", {
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+async function fetchLeadDetails(leadId: string | number): Promise<LeadDetailsResponse> {
+  const searchParams = new URLSearchParams({
+    mode: "lead",
+    leadId: String(leadId),
+  });
+  const response = await fetch(`/api/get-leads?${searchParams.toString()}`, {
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
 }
 
 export default function LeadsPage() {
@@ -255,9 +334,20 @@ export default function LeadsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileStatusFilter, setMobileStatusFilter] = useState<MobileLeadFilterKey>("all");
   const [mobileViewMode, setMobileViewMode] = useState<MobileLeadsViewMode>("compact");
-  const [desktopFilters, setDesktopFilters] = useState<ProspectionDesktopFilters>(defaultDesktopFilters);
+  const [desktopFilters, setDesktopFilters] = useState<ProspectionDesktopFilters>(
+    defaultDesktopFilters
+  );
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(25);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 767px)").matches;
+  });
   const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [showRelanceLinkedin, setShowRelanceLinkedin] = useState(false);
+  const [isLeadDetailsLoading, setIsLeadDetailsLoading] = useState(false);
+  const [linkedInDraft, setLinkedInDraft] = useState("");
+  const [mailDraft, setMailDraft] = useState("");
   const [clientLoaded, setClientLoaded] = useState(false);
 
   // ✅ client options (email / phone enrichment)
@@ -287,10 +377,17 @@ export default function LeadsPage() {
   const convMessagesEndRef = useRef<HTMLDivElement>(null);
   const [sidebarToast, setSidebarToast] = useState<SidebarToast | null>(null);
   const sidebarToastTimeoutRef = useRef<number | null>(null);
+  const linkedInDraftDirtyRef = useRef(false);
+  const mailDraftDirtyRef = useRef(false);
   const selectedCount = selectedIds.size;
 
   // ✅ open lead from query param (?open=ID)
+  const queryClient = useQueryClient();
   const [openFromQuery, setOpenFromQuery] = useState<string | null>(null);
+  const isAutomationManaged = plan === "full";
+  const debouncedSearch = useDebounce(searchTerm, 300);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const colCount = 8;
 
   // Tracking
   useEffect(() => {
@@ -298,62 +395,103 @@ export default function LeadsPage() {
   }, []);
 
   useEffect(() => {
-    if (openLead) {
-      trackBusinessEvent("prospect_detail_viewed", "prospects", { lead_id: openLead.id });
+    const currentOpenLeadId = openLead?.id;
+    if (currentOpenLeadId) {
+      trackBusinessEvent("prospect_detail_viewed", "prospects", {
+        lead_id: currentOpenLeadId,
+      });
       setShowRelanceLinkedin(false);
     }
   }, [openLead?.id]);
 
-  // ✅ DERIVED filtered list (no state = no desync)
-  const searchedLeads = useMemo(() => {
-    return filterLeads(safeLeads, searchTerm);
-  }, [safeLeads, searchTerm]);
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const applyViewport = () => setIsMobileViewport(mediaQuery.matches);
 
-  const filteredLeads = useMemo(() => {
-    return applyDesktopFilters(searchedLeads, desktopFilters);
-  }, [searchedLeads, desktopFilters]);
+    applyViewport();
+    mediaQuery.addEventListener("change", applyViewport);
+    return () => mediaQuery.removeEventListener("change", applyViewport);
+  }, []);
+
+  const activeSegment = isMobileViewport ? mobileStatusFilter : desktopFilters.segment;
+  const activeContacts = useMemo(
+    () => (isMobileViewport ? [] : desktopFilters.contacts),
+    [desktopFilters.contacts, isMobileViewport]
+  );
+  const activeDatePreset = isMobileViewport ? "all" : desktopFilters.datePreset;
+  const activeCustomDate = isMobileViewport ? null : desktopFilters.customDate;
+
+  const paginatedQueryParams = useMemo(
+    () => ({
+      search: debouncedSearch,
+      segment: activeSegment,
+      contacts: activeContacts,
+      datePreset: activeDatePreset,
+      customDate: activeCustomDate,
+      page,
+      pageSize,
+    }),
+    [
+      activeContacts,
+      activeCustomDate,
+      activeDatePreset,
+      activeSegment,
+      debouncedSearch,
+      page,
+      pageSize,
+    ]
+  );
+
+  const paginatedQueryKey = useMemo(
+    () =>
+      queryKeys.prospectionLeads({
+        ...paginatedQueryParams,
+        contacts: serializeContacts(paginatedQueryParams.contacts),
+      }),
+    [paginatedQueryParams]
+  );
+
+  const paginatedLeadsQuery = useQuery({
+    queryKey: paginatedQueryKey,
+    queryFn: () => fetchPaginatedLeads(paginatedQueryParams),
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+  });
+
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.leadsSummary(),
+    queryFn: fetchLeadsSummary,
+    staleTime: 60_000,
+  });
+
+  const pagination = paginatedLeadsQuery.data?.pagination ?? DEFAULT_PAGINATION;
+  const filteredLeads = safeLeads;
+  const filteredCount = pagination.total;
+  const segmentCounts = paginatedLeadsQuery.data?.counts ?? DEFAULT_COUNTS;
+  const summaryStats = summaryQuery.data?.stats ?? DEFAULT_SUMMARY_STATS;
+  const desktopActiveFiltersCount = useMemo(
+    () => countActiveDesktopFilters(desktopFilters),
+    [desktopFilters]
+  );
+
+  const rowVirtualizer = useVirtualizer({
+    count: filteredLeads.length,
+    getScrollElement: () => tableScrollRef.current,
+    estimateSize: () => 52,
+    overscan: 8,
+  });
 
   const mobileFilterOptions = useMemo(() => {
-    const counts: Record<Exclude<MobileLeadFilterKey, "all">, number> = {
-      todo: 0,
-      pending: 0,
-      connected: 0,
-      sent: 0,
-    };
-
-    searchedLeads.forEach((lead) => {
-      const key = getLeadStatusKey(lead);
-      counts[key] += 1;
-    });
-
     return [
-      { key: "all", label: "Tous", count: searchedLeads.length },
-      { key: "todo", label: "A faire", count: counts.todo },
-      { key: "pending", label: "En attente", count: counts.pending },
-      { key: "connected", label: "Connecte", count: counts.connected },
-      { key: "sent", label: "Envoye", count: counts.sent },
+      { key: "all", label: "Tous", count: segmentCounts.all },
+      { key: "todo", label: "A faire", count: segmentCounts.todo },
+      { key: "pending", label: "En attente", count: segmentCounts.pending },
+      { key: "connected", label: "Connecte", count: segmentCounts.connected },
+      { key: "sent", label: "Envoye", count: segmentCounts.sent },
     ] satisfies Array<{ key: MobileLeadFilterKey; label: string; count: number }>;
-  }, [searchedLeads]);
+  }, [segmentCounts]);
 
-  const mobileFilteredLeads = useMemo(() => {
-    if (mobileStatusFilter === "all") return searchedLeads;
-    return searchedLeads.filter((lead) => getLeadStatusKey(lead) === mobileStatusFilter);
-  }, [searchedLeads, mobileStatusFilter]);
-
-  const segmentScopeLeads = useMemo(() => {
-    return applyDesktopFilters(searchedLeads, { ...desktopFilters, segment: "all" });
-  }, [searchedLeads, desktopFilters]);
-
-  const desktopActiveFiltersCount = useMemo(() => {
-    return countActiveDesktopFilters(desktopFilters);
-  }, [desktopFilters]);
-
-  const segmentCounts = useMemo(() => {
-    return getSegmentCounts(segmentScopeLeads);
-  }, [segmentScopeLeads]);
-
-  // ✅ Column count for empty state colSpan
-  const colCount = 8;
+  const mobileFilteredLeads = filteredLeads;
 
   // ✅ Read query param once on mount
   useEffect(() => {
@@ -394,29 +532,86 @@ export default function LeadsPage() {
     };
   }, []);
 
-  // Load leads + options + plan
   useEffect(() => {
-    (async () => {
-      const res = await fetch("/api/get-leads");
-      const data = await res.json();
+    const data = paginatedLeadsQuery.data;
+    if (!data) return;
 
-      const leads = data.leads ?? [];
-      setSafeLeads(leads);
+    setSafeLeads(data.leads ?? []);
 
-      // ✅ client from API (on garde le parsing, mais email/phone sont forcés ON)
-      const client = data.client ?? data.options ?? null;
+    const client = data.client ?? null;
+    setPlan(String(client?.plan ?? "essential").toLowerCase());
+    setClientId(client?.id ? String(client.id) : null);
+    setEmailOption(true);
+    setPhoneOption(true);
+    setClientLoaded(true);
+  }, [paginatedLeadsQuery.data]);
 
-      // ✅ plan (fallback essential)
-      setPlan(String(client?.plan ?? "essential").toLowerCase());
-      if (client?.id) setClientId(String(client.id));
+  useEffect(() => {
+    if (!paginatedLeadsQuery.data) return;
+    if (page <= pagination.totalPages) return;
+    setPage(pagination.totalPages);
+  }, [page, paginatedLeadsQuery.data, pagination.totalPages]);
 
-      // ✅ Tout le monde a email + phone
-      setEmailOption(true);
-      setPhoneOption(true);
+  useEffect(() => {
+    if (!paginatedLeadsQuery.data) return;
+    if (pagination.page >= pagination.totalPages) return;
 
-      setClientLoaded(true);
-    })();
-  }, []);
+    const nextParams = {
+      ...paginatedQueryParams,
+      page: pagination.page + 1,
+    };
+
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.prospectionLeads({
+        ...nextParams,
+        contacts: serializeContacts(nextParams.contacts),
+      }),
+      queryFn: () => fetchPaginatedLeads(nextParams),
+      staleTime: 60_000,
+    });
+  }, [paginatedLeadsQuery.data, paginatedQueryParams, pagination.page, pagination.totalPages, queryClient]);
+
+  useEffect(() => {
+    if (!clientLoaded || !openFromQuery) return;
+
+    let cancelled = false;
+    setIsLeadDetailsLoading(true);
+
+    void queryClient
+      .fetchQuery({
+        queryKey: queryKeys.leadDetails(openFromQuery),
+        queryFn: () => fetchLeadDetails(openFromQuery),
+        staleTime: 5 * 60 * 1000,
+      })
+      .then((data) => {
+        if (cancelled || !data?.lead) return;
+        setOpenLead(data.lead);
+        linkedInDraftDirtyRef.current = false;
+        mailDraftDirtyRef.current = false;
+        setLinkedInDraft(String(data.lead.internal_message ?? ""));
+        setMailDraft(String(data.lead.message_mail ?? ""));
+      })
+      .catch((error) => {
+        if (!cancelled) console.error(error);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLeadDetailsLoading(false);
+      });
+
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("open");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    } catch (error) {
+      console.error(error);
+    }
+
+    setOpenFromQuery(null);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clientLoaded, openFromQuery, queryClient]);
 
   // Realtime: auto-update linkedin_invitations state in leads
   useEffect(() => {
@@ -436,11 +631,40 @@ export default function LeadsPage() {
           const row = payload.new as {
             lead_id?: string | number | null;
             status?: string | null;
+            sent_at?: string | null;
+            accepted_at?: string | null;
+            dm_sent_at?: string | null;
             dm_draft_status?: string | null;
           } | null;
           if (!row?.lead_id) return;
 
           const leadIdStr = String(row.lead_id);
+          if (plan === "full") {
+            setSafeLeads((prev) =>
+              prev.map((lead) =>
+                String(lead.id) === leadIdStr
+                  ? mergeLeadWithInvitationUpdate(lead, row)
+                  : lead
+              )
+            );
+
+            setOpenLead((prev) =>
+              prev && String(prev.id) === leadIdStr
+                ? mergeLeadWithInvitationUpdate(prev, row)
+                : prev
+            );
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.prospectionLeadsBase(),
+            });
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.leadsSummary(),
+            });
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.leadDetailsBase(),
+            });
+            return;
+          }
+
           const status = String(row.status ?? "").toLowerCase();
           const dmStatus = String(row.dm_draft_status ?? "").toLowerCase();
 
@@ -463,6 +687,16 @@ export default function LeadsPage() {
               };
             })
           );
+
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.prospectionLeadsBase(),
+          });
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.leadsSummary(),
+          });
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.leadDetailsBase(),
+          });
         }
       )
       .subscribe();
@@ -470,50 +704,103 @@ export default function LeadsPage() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [clientId]);
+  }, [clientId, plan, queryClient]);
 
-  // ✅ After leads loaded, open sidebar if query exists
   useEffect(() => {
-    if (!clientLoaded) return;
-    if (!openFromQuery) return;
-
-    const target = safeLeads.find((l) => String(l.id) === String(openFromQuery));
-    if (!target) return;
-
-    setOpenLead(target);
-
-    // ✅ clean URL (remove ?open=)
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("open");
-      window.history.replaceState({}, "", url.pathname + url.search);
-    } catch (e) {
-      console.error(e);
+    const openLeadId = openLead?.id;
+    if (!openLeadId) {
+      setIsLeadDetailsLoading(false);
+      return;
     }
 
-    setOpenFromQuery(null);
-  }, [clientLoaded, openFromQuery, safeLeads]);
+    let cancelled = false;
+    setIsLeadDetailsLoading(true);
 
-  // ✅ cleanup selection when list changes (ex: deleted)
-  useEffect(() => {
-    const existing = new Set(safeLeads.map((l) => String(l.id)));
-    setSelectedIds((prev: Set<string>) => {
-      const next = new Set<string>();
-      prev.forEach((id) => {
-        if (existing.has(id)) next.add(id);
+    void queryClient
+      .fetchQuery({
+        queryKey: queryKeys.leadDetails(openLeadId),
+        queryFn: () => fetchLeadDetails(openLeadId),
+        staleTime: 5 * 60 * 1000,
+      })
+      .then((data) => {
+        if (cancelled || !data?.lead) return;
+
+        setOpenLead((current) =>
+          current && String(current.id) === String(openLeadId)
+            ? { ...current, ...data.lead }
+            : current
+        );
+
+        if (!linkedInDraftDirtyRef.current) {
+          setLinkedInDraft(String(data.lead.internal_message ?? ""));
+        }
+        if (!mailDraftDirtyRef.current) {
+          setMailDraft(String(data.lead.message_mail ?? ""));
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) console.error(error);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLeadDetailsLoading(false);
       });
-      return next;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [openLead?.id, queryClient]);
+
+  const refreshProspectionQueries = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.prospectionLeadsBase(),
     });
-  }, [safeLeads]);
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.leadsSummary(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.leadDetailsBase(),
+    });
+  }, [queryClient]);
 
-  // SEARCH FUNCTION
-  const handleSearch = (value: string) => {
+  const handleSearch = useCallback((value: string) => {
     setSearchTerm(value);
-  };
+    setPage(1);
+  }, []);
 
-  const resetDesktopFilters = () => {
+  const handleDesktopFiltersChange = useCallback((next: ProspectionDesktopFilters) => {
+    setDesktopFilters(next);
+    setMobileStatusFilter(next.segment);
+    setPage(1);
+  }, []);
+
+  const resetDesktopFilters = useCallback(() => {
     setDesktopFilters(defaultDesktopFilters());
-  };
+    setMobileStatusFilter("all");
+    setPage(1);
+  }, []);
+
+  const handleMobileStatusFilterChange = useCallback((value: MobileLeadFilterKey) => {
+    setMobileStatusFilter(value);
+    setDesktopFilters((current) => ({ ...current, segment: value }));
+    setPage(1);
+  }, []);
+
+  const handlePageSizeChange = useCallback(
+    (value: (typeof PAGE_SIZE_OPTIONS)[number]) => {
+      setPageSize(value);
+      setPage(1);
+    },
+    []
+  );
+
+  const handleOpenLead = useCallback((lead: Lead) => {
+    linkedInDraftDirtyRef.current = false;
+    mailDraftDirtyRef.current = false;
+    setShowRelanceLinkedin(false);
+    setLinkedInDraft(String(lead.internal_message ?? ""));
+    setMailDraft(String(lead.message_mail ?? ""));
+    setOpenLead(lead);
+  }, []);
 
   const toggleSelected = (leadId: string) => {
     setSelectedIds((prev: Set<string>) => {
@@ -567,6 +854,7 @@ export default function LeadsPage() {
       setOpenLead((prev: Lead | null) =>
         prev && selectedIds.has(String(prev.id)) ? null : prev
       );
+      refreshProspectionQueries();
     } catch (e) {
       console.error(e);
       alert("Erreur réseau pendant la suppression.");
@@ -622,6 +910,8 @@ export default function LeadsPage() {
   };
 
   const handleStatusBadgeClick = async (lead: Lead) => {
+    if (plan === "full") return;
+
     const idStr = String(lead.id);
     if (lead.message_sent || updatingStatusIds.has(idStr)) return;
 
@@ -666,6 +956,7 @@ export default function LeadsPage() {
       });
 
       if (!res.ok) throw new Error("Erreur mise à jour traite");
+      refreshProspectionQueries();
     } catch (e) {
       console.error(e);
       alert("Impossible de mettre à jour le statut.");
@@ -701,6 +992,8 @@ export default function LeadsPage() {
   };
 
   const handleLinkedInInvite = async (lead: Lead) => {
+    if (plan === "full") return;
+
     const idStr = String(lead.id);
 
     if (invitingLeadIds.has(idStr) || lead.linkedin_invitation_sent) return;
@@ -777,6 +1070,7 @@ export default function LeadsPage() {
             }
           : prev
       );
+      refreshProspectionQueries();
     } catch (e: unknown) {
       const errorMessage =
         e instanceof Error ? e.message : "Impossible d'envoyer l'invitation.";
@@ -807,6 +1101,7 @@ export default function LeadsPage() {
       setOpenLead((prev: Lead | null) =>
         prev?.id === detail.leadId ? { ...prev, traite: detail.traite } : prev
       );
+      refreshProspectionQueries();
     };
 
     const onDeleted = (e: Event) => {
@@ -825,6 +1120,7 @@ export default function LeadsPage() {
         next.delete(detail.leadId);
         return next;
       });
+      refreshProspectionQueries();
     };
 
     window.addEventListener("mindlink:lead-treated", onTreated as EventListener);
@@ -834,58 +1130,109 @@ export default function LeadsPage() {
       window.removeEventListener("mindlink:lead-treated", onTreated as EventListener);
       window.removeEventListener("mindlink:lead-deleted", onDeleted as EventListener);
     };
-  }, []);
+  }, [refreshProspectionQueries]);
 
   // Auto-save internal message (LinkedIn)
   useEffect(() => {
-    if (!openLead) return;
+    const currentLeadId = openLead?.id;
+    if (!currentLeadId) return;
 
     const delay = setTimeout(async () => {
-      await fetch("/api/update-internal-message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leadId: openLead.id,
-          message: openLead.internal_message ?? "",
-        }),
-      });
+      try {
+        await fetch("/api/update-internal-message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leadId: currentLeadId,
+            message: linkedInDraft,
+          }),
+        });
 
-      setSafeLeads((prev: Lead[]) =>
-        prev.map((l) =>
-          l.id === openLead.id ? { ...l, internal_message: openLead.internal_message } : l
-        )
-      );
+        setOpenLead((prev: Lead | null) =>
+          prev && prev.id === currentLeadId
+            ? { ...prev, internal_message: linkedInDraft }
+            : prev
+        );
+
+        setSafeLeads((prev: Lead[]) =>
+          prev.map((lead) =>
+            lead.id === currentLeadId
+              ? { ...lead, internal_message: linkedInDraft }
+              : lead
+          )
+        );
+        queryClient.setQueryData(
+          queryKeys.leadDetails(currentLeadId),
+          (current: LeadDetailsResponse | undefined) =>
+            current
+              ? {
+                  ...current,
+                  lead: {
+                    ...current.lead,
+                    internal_message: linkedInDraft,
+                  },
+                }
+              : current
+        );
+      } catch (error) {
+        console.error(error);
+      }
     }, 300);
 
     return () => clearTimeout(delay);
-  }, [openLead?.internal_message]);
+  }, [linkedInDraft, openLead?.id, queryClient]);
 
   // ✅ Auto-save mail message (Email) — now for everyone (no premium gating)
   useEffect(() => {
-    if (!openLead) return;
+    const currentLeadId = openLead?.id;
+    if (!currentLeadId) return;
 
     const delay = setTimeout(async () => {
-      await fetch("/api/update-mail-message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leadId: openLead.id,
-          message: openLead.message_mail ?? "",
-        }),
-      });
+      try {
+        await fetch("/api/update-mail-message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leadId: currentLeadId,
+            message: mailDraft,
+          }),
+        });
 
-      setSafeLeads((prev: Lead[]) =>
-        prev.map((l) =>
-          l.id === openLead.id ? { ...l, message_mail: openLead.message_mail } : l
-        )
-      );
+        setOpenLead((prev: Lead | null) =>
+          prev && prev.id === currentLeadId
+            ? { ...prev, message_mail: mailDraft }
+            : prev
+        );
+
+        setSafeLeads((prev: Lead[]) =>
+          prev.map((lead) =>
+            lead.id === currentLeadId ? { ...lead, message_mail: mailDraft } : lead
+          )
+        );
+        queryClient.setQueryData(
+          queryKeys.leadDetails(currentLeadId),
+          (current: LeadDetailsResponse | undefined) =>
+            current
+              ? {
+                  ...current,
+                  lead: {
+                    ...current.lead,
+                    message_mail: mailDraft,
+                  },
+                }
+              : current
+        );
+      } catch (error) {
+        console.error(error);
+      }
     }, 300);
 
     return () => clearTimeout(delay);
-  }, [openLead?.message_mail]);
+  }, [mailDraft, openLead?.id, queryClient]);
 
   const handleSendLinkedInMessage = async () => {
     if (!openLead) return;
+    if (plan === "full") return;
     if (openLead.linkedin_invitation_status !== "accepted") return;
 
     const leadId = Number(openLead.id);
@@ -900,7 +1247,7 @@ export default function LeadsPage() {
 
     if (openLead.message_sent || sendingLinkedInMessageLeadIds.has(idStr)) return;
 
-    const content = (openLead.internal_message ?? "").trim();
+    const content = linkedInDraft.trim();
     if (!content) {
       setLinkedInMessageSendErrors((prev) => ({
         ...prev,
@@ -967,6 +1314,7 @@ export default function LeadsPage() {
             : l
         )
       );
+      refreshProspectionQueries();
       showSidebarToast("success", "Message LinkedIn envoyé ✅");
     } catch (error: unknown) {
       const errorMessage =
@@ -989,6 +1337,7 @@ export default function LeadsPage() {
   };
 
   const handleSendLinkedInMessageForLead = async (lead: Lead) => {
+    if (plan === "full") return;
     if (lead.linkedin_invitation_status !== "accepted") return;
     const leadId = Number(lead.id);
     const idStr = String(lead.id);
@@ -1021,6 +1370,7 @@ export default function LeadsPage() {
             : l
         )
       );
+      refreshProspectionQueries();
       showSidebarToast("success", "Message LinkedIn envoyé ✅");
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Erreur pendant l'envoi du message LinkedIn.";
@@ -1188,7 +1538,7 @@ export default function LeadsPage() {
     }
 
     const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
-    const body = (openLead.message_mail ?? "").trim();
+    const body = mailDraft.trim();
 
     const mailto = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
@@ -1221,7 +1571,7 @@ export default function LeadsPage() {
     }
 
     const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
-    const body = (openLead.message_mail ?? "").trim();
+    const body = mailDraft.trim();
 
     const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
       to
@@ -1240,7 +1590,7 @@ export default function LeadsPage() {
     }
 
     const subject = `Lidmeo — ${openLead.FirstName ?? ""} ${openLead.LastName ?? ""}`.trim();
-    const body = (openLead.message_mail ?? "").trim();
+    const body = mailDraft.trim();
 
     const url = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(
       to
@@ -1292,6 +1642,18 @@ export default function LeadsPage() {
   }, [isSidebarOpen]);
 
   if (!clientLoaded) {
+    if (paginatedLeadsQuery.isError) {
+      return (
+        <SubscriptionGate supportEmail="contact@lidmeo.com">
+          <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
+            <div className="mx-auto max-w-[860px] rounded-3xl border border-red-200 bg-white p-6 text-sm text-red-700 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.4)]">
+              Impossible de charger la prospection pour le moment. Rechargez la page ou réessayez dans quelques instants.
+            </div>
+          </div>
+        </SubscriptionGate>
+      );
+    }
+
     return (
       <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
         <div className="mx-auto w-full max-w-[1680px]">
@@ -1306,19 +1668,18 @@ export default function LeadsPage() {
 
             <div className="mt-6 h-12 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
             <div className="mt-4 h-72 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
-            <div className="mt-3 text-xs text-[#4B5563]">Chargement des leads…</div>
           </div>
         </div>
       </div>
     );
   }
 
-  const total = safeLeads.length;
-  const treatedCount = safeLeads.filter((l) => l.traite === true).length;
-  const pendingCount = safeLeads.filter(
-    (l) => Boolean(l.traite) && !Boolean(l.message_sent)
-  ).length;
-  const remainingToTreat = total - treatedCount;
+  const total = summaryStats.total;
+  const treatedCount = summaryStats.treated;
+  const pendingCount = summaryStats.pending;
+  const remainingToTreat = summaryStats.remainingToTreat;
+  const openLeadStatus = openLead ? getProspectionStatusKey(openLead) : null;
+  const openLeadStatusLabel = openLeadStatus ? getProspectionStatusLabel(openLeadStatus) : null;
 
   const allFilteredSelected =
     filteredLeads.length > 0 && filteredLeads.every((l) => selectedIds.has(String(l.id)));
@@ -1349,7 +1710,7 @@ export default function LeadsPage() {
                       <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">Prospects</span>
                       <div className="flex items-center gap-1.5">
                         <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 text-[11px] tabular-nums text-[#4f6784]">
-                          {mobileFilteredLeads.length}/{searchedLeads.length}
+                          {mobileFilteredLeads.length}/{filteredCount}
                         </span>
                         <button
                           type="button"
@@ -1410,7 +1771,7 @@ export default function LeadsPage() {
                 <LeadsMobileFilters
                   options={mobileFilterOptions}
                   activeKey={mobileStatusFilter}
-                  onChange={setMobileStatusFilter}
+                  onChange={handleMobileStatusFilterChange}
                 />
 
                 <div className="min-h-0 flex-1 overflow-y-auto pb-1">
@@ -1418,16 +1779,28 @@ export default function LeadsPage() {
                     leads={mobileFilteredLeads}
                     hasActiveFilters={Boolean(searchTerm.trim()) || mobileStatusFilter !== "all"}
                     viewMode={mobileViewMode}
-                    onOpenLead={(lead) => setOpenLead(lead as Lead)}
+                    onOpenLead={(lead) => handleOpenLead(lead as Lead)}
                     onToggleStatus={(lead) => handleStatusBadgeClick(lead as Lead)}
                     onInviteLinkedIn={(lead) => handleLinkedInInvite(lead as Lead)}
                     updatingStatusIds={updatingStatusIds}
                     invitingLeadIds={invitingLeadIds}
                     inviteErrors={inviteErrors}
+                    isAutomationManaged={isAutomationManaged}
                     onResetFilters={() => {
-                      setSearchTerm("");
-                      setMobileStatusFilter("all");
+                      handleSearch("");
+                      handleMobileStatusFilterChange("all");
                     }}
+                  />
+
+                  <ProspectionPaginationControls
+                    page={pagination.page}
+                    totalPages={pagination.totalPages}
+                    pageSize={pageSize}
+                    total={filteredCount}
+                    isFetching={paginatedLeadsQuery.isFetching}
+                    onPageChange={setPage}
+                    onPageSizeChange={handlePageSizeChange}
+                    className="mt-3"
                   />
                 </div>
               </div>
@@ -1448,7 +1821,7 @@ export default function LeadsPage() {
                   </span>
 
                   <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] tabular-nums">
-                    {filteredLeads.length} affichés
+                    {filteredLeads.length}/{filteredCount} affichés
                   </span>
 
                   <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] whitespace-nowrap">
@@ -1504,7 +1877,7 @@ export default function LeadsPage() {
                   </div>
 
                   <div className="mt-1.5 text-[11px] text-[#51627b]">
-                    {filteredLeads.length} résultat(s) • {pendingCount} en attente • {selectedCount} sélectionné(s)
+                    {filteredCount} résultat(s) • {pendingCount} en attente • {selectedCount} sélectionné(s)
                   </div>
                 </div>
               </div>
@@ -1513,10 +1886,10 @@ export default function LeadsPage() {
             <ProspectionFilterBar
               searchValue={searchTerm}
               onSearchChange={handleSearch}
-              resultsCount={filteredLeads.length}
+              resultsCount={filteredCount}
               activeFiltersCount={desktopActiveFiltersCount}
               currentFilters={desktopFilters}
-              onChange={setDesktopFilters}
+              onChange={handleDesktopFiltersChange}
               onReset={resetDesktopFilters}
               segmentOptions={segmentOptions}
               actions={
@@ -1572,6 +1945,12 @@ export default function LeadsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 text-[11px] text-[#51627b]">
+                  {paginatedLeadsQuery.isFetching ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-[#c8d6ea] bg-white px-3 py-1 text-[#4f6784]">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Mise à jour
+                    </span>
+                  ) : null}
                   <span className="rounded-full border border-[#c8d6ea] bg-[#f7fbff] px-3 py-1 tabular-nums">
                     {selectedCount} sélectionné(s)
                   </span>
@@ -1584,7 +1963,7 @@ export default function LeadsPage() {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 w-full overflow-auto px-2 pb-2 pt-1">
+              <div ref={tableScrollRef} className="min-h-0 flex-1 w-full overflow-auto px-2 pb-2 pt-1">
                 <table className="min-w-[1080px] w-full table-fixed border-separate [border-spacing:0_6px] text-[13px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="text-[11px] font-medium tracking-[0.02em] text-[#405770]">
@@ -1631,7 +2010,13 @@ export default function LeadsPage() {
                         </td>
                       </tr>
                     ) : (
-                      filteredLeads.map((lead, idx) => {
+                      <>
+                        {rowVirtualizer.getVirtualItems()[0]?.start > 0 && (
+                          <tr><td colSpan={colCount} style={{ height: rowVirtualizer.getVirtualItems()[0].start }} /></tr>
+                        )}
+                        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const lead = filteredLeads[virtualRow.index];
+                        const idx = virtualRow.index;
                         const fullName =
                           `${lead.FirstName ?? ""} ${lead.LastName ?? ""}`.trim() ||
                           lead.Name ||
@@ -1642,26 +2027,20 @@ export default function LeadsPage() {
                         const isSelected = selectedIds.has(idStr);
                         const isStatusUpdating = updatingStatusIds.has(idStr);
                         const isInviteLoading = invitingLeadIds.has(idStr);
-                        const invitationStatus =
-                          lead.linkedin_invitation_status === "accepted"
-                            ? "accepted"
-                            : lead.linkedin_invitation_status === "sent"
-                              ? "sent"
-                              : lead.linkedin_invitation_sent
-                                ? "sent"
-                                : null;
+                        const invitationStatus = getProspectionInvitationState(lead);
+                        const statusKey = getProspectionStatusKey(lead);
                         const isInviteAccepted = invitationStatus === "accepted";
                         const isInviteSent = invitationStatus === "sent";
                         const inviteError = inviteErrors[idStr];
-                        const isSent = Boolean(lead.message_sent);
-                        const isPending = !isSent && Boolean(lead.traite);
-                        const isTodo = !isSent && !isPending;
-                        const isConnectedLeft = !isSent && isInviteAccepted;
-                        const statusLabel = isSent
+                        const isSent = statusKey === "sent";
+                        const isPending = statusKey === "pending";
+                        const isTodo = statusKey === "todo";
+                        const isConnectedLeft = statusKey === "connected";
+                        const statusLabel = statusKey === "sent"
                           ? "Envoyé"
-                          : isConnectedLeft
+                          : statusKey === "connected"
                             ? "Connecté"
-                            : isPending
+                            : statusKey === "pending"
                               ? "En attente"
                               : "À faire";
                         const initials =
@@ -1669,13 +2048,7 @@ export default function LeadsPage() {
                             `${lead.FirstName?.[0] ?? ""}${lead.LastName?.[0] ?? ""}`.toUpperCase() ||
                             fullName.slice(0, 2).toUpperCase()
                           ) || "—";
-                        const statusDotClass = isSent
-                          ? "bg-violet-500"
-                          : isConnectedLeft
-                            ? "bg-emerald-500"
-                            : isPending
-                              ? "bg-amber-500"
-                              : "bg-[#6f85a6]";
+                        const statusDotClass = getProspectionStatusDotClass(statusKey);
                         const baseCellClass = "border-y border-[#d7e3f4] px-2.5 py-2 align-middle";
 
                         return (
@@ -1704,20 +2077,25 @@ export default function LeadsPage() {
                               <button
                                 type="button"
                                 onClick={() => handleStatusBadgeClick(lead)}
-                                disabled={isSent || isConnectedLeft || isStatusUpdating}
+                                disabled={isAutomationManaged || isSent || isConnectedLeft || isStatusUpdating}
                                 className={[
                                   "inline-flex h-8 items-center justify-center rounded-full border px-3 text-[11px] font-medium transition focus:outline-none focus:ring-2",
+                                  getProspectionStatusClasses(statusKey, "table"),
                                   isSent
-                                    ? "cursor-default border-violet-200 bg-violet-50 text-violet-700 focus:ring-violet-200"
+                                    ? "cursor-default focus:ring-violet-200"
                                     : isConnectedLeft
-                                      ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-200"
-                                    : isPending
-                                      ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 focus:ring-amber-200"
-                                      : "border-[#9cc0ff] bg-[#f2f7ff] text-[#1f4f96] hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
+                                      ? "cursor-default focus:ring-emerald-200"
+                                      : isAutomationManaged
+                                        ? "cursor-default focus:ring-[#dce8ff]"
+                                        : isPending
+                                          ? "hover:bg-amber-100 focus:ring-amber-200"
+                                          : "hover:border-[#77a6f4] hover:bg-[#e9f1ff] focus:ring-[#dce8ff]",
                                   isStatusUpdating ? "cursor-wait opacity-70" : "",
                                 ].join(" ")}
                                 title={
-                                  isSent
+                                  isAutomationManaged
+                                    ? "Statut pilote automatiquement"
+                                    : isSent
                                     ? "Message déjà envoyé"
                                     : isConnectedLeft
                                       ? "Connexion LinkedIn acceptée"
@@ -1776,7 +2154,7 @@ export default function LeadsPage() {
                                 type="button"
                                 variant="primary"
                                 size="sm"
-                                onClick={() => setOpenLead(lead)}
+                                onClick={() => handleOpenLead(lead)}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 hover:-translate-y-1/2 hover:scale-[1.02] hover:shadow-[0_10px_18px_-16px_rgba(31,94,255,0.75)]"
                               >
                                 Voir
@@ -1902,18 +2280,39 @@ export default function LeadsPage() {
                             </td>
                           </tr>
                         );
-                      })
+                        })}
+                        {(() => {
+                          const items = rowVirtualizer.getVirtualItems();
+                          const paddingBottom = items.length > 0 ? rowVirtualizer.getTotalSize() - items[items.length - 1].end : 0;
+                          return paddingBottom > 0 ? <tr><td colSpan={colCount} style={{ height: paddingBottom }} /></tr> : null;
+                        })()}
+                      </>
                     )}
                   </tbody>
                 </table>
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#d7e3f4] bg-[#f8fbff] px-6 py-3 text-[11px] text-[#51627b]">
-                <div>Passez “À faire” en “En attente”, puis “Voir” pour traiter le lead.</div>
+                <div>
+                  {isAutomationManaged
+                    ? "Les statuts LinkedIn se mettent a jour automatiquement depuis l'automatisation."
+                    : "Passez “À faire” en “En attente”, puis “Voir” pour traiter le lead."}
+                </div>
                 <div className="tabular-nums">
                   {treatedCount} traité(s) • {remainingToTreat} à traiter
                 </div>
               </div>
+
+              <ProspectionPaginationControls
+                page={pagination.page}
+                totalPages={pagination.totalPages}
+                pageSize={pageSize}
+                total={filteredCount}
+                isFetching={paginatedLeadsQuery.isFetching}
+                onPageChange={setPage}
+                onPageSizeChange={handlePageSizeChange}
+                className="border-t border-[#d7e3f4] bg-white px-6 py-3"
+              />
             </section>
           </div>
 
@@ -1939,9 +2338,17 @@ export default function LeadsPage() {
                       <X className="h-3.5 w-3.5" />
                       Fermer
                     </button>
-                    <span className="rounded-full border border-[#dbe5f3] bg-[#f8fbff] px-3 py-1 text-[11px] text-[#64748b] whitespace-nowrap">
-                      {plan || "essential"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {isLeadDetailsLoading ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-[#dbe5f3] bg-white px-3 py-1 text-[11px] text-[#64748b] whitespace-nowrap">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Chargement
+                        </span>
+                      ) : null}
+                      <span className="rounded-full border border-[#dbe5f3] bg-[#f8fbff] px-3 py-1 text-[11px] text-[#64748b] whitespace-nowrap">
+                        {plan || "essential"}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Identité prospect */}
@@ -1958,17 +2365,34 @@ export default function LeadsPage() {
                       </p>
                     </div>
                     <div className="shrink-0">
-                      {openLead.message_sent ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 whitespace-nowrap">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          Envoyé
+                      {openLeadStatus && openLeadStatusLabel ? (
+                        <span
+                          className={[
+                            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium whitespace-nowrap",
+                            getProspectionStatusClasses(openLeadStatus, "sidebar"),
+                          ].join(" ")}
+                        >
+                          <span
+                            className={[
+                              "h-1.5 w-1.5 rounded-full",
+                              openLeadStatus === "sent"
+                                ? "bg-violet-500"
+                                : openLeadStatus === "connected"
+                                  ? "bg-emerald-500"
+                                  : openLeadStatus === "pending"
+                                    ? "bg-amber-500"
+                                    : "bg-[#94a3b8]",
+                            ].join(" ")}
+                          />
+                          {openLeadStatus === "sent"
+                            ? "Envoyé"
+                            : openLeadStatus === "connected"
+                              ? "Connecté"
+                              : openLeadStatus === "pending"
+                                ? "En attente"
+                                : "À faire"}
                         </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#dbe5f3] bg-[#f8fbff] px-2.5 py-1 text-[11px] text-[#64748b] whitespace-nowrap">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#94a3b8]" />
-                          À faire
-                        </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -2057,23 +2481,24 @@ export default function LeadsPage() {
                     </div>
 
                     <textarea
-                      value={openLead.internal_message ?? ""}
+                      value={linkedInDraft}
                       onChange={(e) => {
-                        const newMsg = e.target.value;
-                        setOpenLead({ ...openLead, internal_message: newMsg });
-                        setSafeLeads((prev: Lead[]) =>
-                          prev.map((l) =>
-                            l.id === openLead.id ? { ...l, internal_message: newMsg } : l
-                          )
-                        );
+                        linkedInDraftDirtyRef.current = true;
+                        setLinkedInDraft(e.target.value);
                       }}
                       placeholder="Écrivez votre message LinkedIn…"
                       className="mt-3 min-h-[176px] w-full resize-y overflow-y-auto rounded-xl border border-[#dbe5f3] bg-white p-4 text-sm text-[#0F172A] placeholder-[#94a3b8] transition focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
                     />
 
                     <div className="mt-3 space-y-2">
-                      {/* Invitation non acceptée */}
-                      {openLead.linkedin_invitation_status !== "accepted" && !openLead.message_sent && (
+                      {openLeadStatus === "todo" && (
+                        <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] px-4 py-3 text-sm text-[#64748b]">
+                          <Linkedin className="h-4 w-4 text-[#0A66C2]" />
+                          A faire
+                        </div>
+                      )}
+
+                      {openLeadStatus === "pending" && (
                         <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#dbe5f3] bg-[#f8fbff] px-4 py-3 text-sm text-[#64748b]">
                           <Linkedin className="h-4 w-4 text-[#0A66C2]" />
                           En attente d&apos;acceptation
@@ -2081,7 +2506,7 @@ export default function LeadsPage() {
                       )}
 
                       {/* Bouton envoyer — invitation acceptée, pas encore envoyé, plan essential uniquement */}
-                      {openLead.linkedin_invitation_status === "accepted" && !openLead.message_sent && plan !== "full" && (
+                      {openLeadStatus === "connected" && plan !== "full" && (
                         <button
                           type="button"
                           onClick={handleSendLinkedInMessage}
@@ -2104,11 +2529,17 @@ export default function LeadsPage() {
                         </button>
                       )}
 
+                      {openLeadStatus === "connected" && plan === "full" && (
+                        <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                          Connexion acceptee
+                        </div>
+                      )}
+
                       {/* Message envoyé + voir la conversation */}
-                      {openLead.message_sent && (
+                      {openLeadStatus === "sent" && (
                         <>
-                          <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-                            Message envoyé ✅
+                          <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-violet-700">
+                            Message envoye ✅
                           </div>
                           <button
                             type="button"
@@ -2168,13 +2599,10 @@ export default function LeadsPage() {
                     </div>
 
                     <textarea
-                      value={openLead.message_mail ?? ""}
+                      value={mailDraft}
                       onChange={(e) => {
-                        const newMsg = e.target.value;
-                        setOpenLead({ ...openLead, message_mail: newMsg });
-                        setSafeLeads((prev: Lead[]) =>
-                          prev.map((l) => (l.id === openLead.id ? { ...l, message_mail: newMsg } : l))
-                        );
+                        mailDraftDirtyRef.current = true;
+                        setMailDraft(e.target.value);
                       }}
                       placeholder="Écrivez votre message email…"
                       className="mt-3 min-h-[176px] w-full resize-y overflow-y-auto rounded-xl border border-[#dbe5f3] bg-white p-4 text-sm text-[#0F172A] placeholder-[#94a3b8] transition focus:outline-none focus:ring-2 focus:ring-[#bfdbfe]"
@@ -2389,6 +2817,87 @@ function Metric({
       </div>
       <div className={["hub-kpi-number mt-1 truncate whitespace-nowrap text-4xl leading-none tabular-nums", valueColor].join(" ")}>
         {value}
+      </div>
+    </div>
+  );
+}
+
+function ProspectionPaginationControls({
+  page,
+  totalPages,
+  pageSize,
+  total,
+  isFetching,
+  onPageChange,
+  onPageSizeChange,
+  className = "",
+}: {
+  page: number;
+  totalPages: number;
+  pageSize: (typeof PAGE_SIZE_OPTIONS)[number];
+  total: number;
+  isFetching: boolean;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: (typeof PAGE_SIZE_OPTIONS)[number]) => void;
+  className?: string;
+}) {
+  return (
+    <div className={["flex flex-wrap items-center justify-between gap-3 text-[11px] text-[#51627b]", className].join(" ")}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="whitespace-nowrap">Par page</span>
+        <div className="flex items-center gap-1">
+          {PAGE_SIZE_OPTIONS.map((option) => {
+            const active = pageSize === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => onPageSizeChange(option)}
+                className={[
+                  "inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs transition",
+                  active
+                    ? "border-[#1f5eff] bg-[#1f5eff] text-white"
+                    : "border-[#c8d6ea] bg-white text-[#3f587a] hover:bg-[#f3f8ff]",
+                ].join(" ")}
+              >
+                {option}
+              </button>
+            );
+          })}
+        </div>
+        <span className="rounded-full border border-[#dbe5f3] bg-[#f8fbff] px-3 py-1 tabular-nums">
+          {total} résultat(s)
+        </span>
+        {isFetching ? (
+          <span className="inline-flex items-center gap-1 text-[#64748b]">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Chargement
+          </span>
+        ) : null}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#c8d6ea] bg-white text-[#3f587a] transition hover:bg-[#f3f8ff] disabled:cursor-not-allowed disabled:opacity-45"
+          aria-label="Page précédente"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="rounded-full border border-[#dbe5f3] bg-[#f8fbff] px-3 py-1 tabular-nums">
+          Page {page}/{Math.max(totalPages, 1)}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#c8d6ea] bg-white text-[#3f587a] transition hover:bg-[#f3f8ff] disabled:cursor-not-allowed disabled:opacity-45"
+          aria-label="Page suivante"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );

@@ -42,12 +42,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "thread_has_no_lead" }, { status: 400 });
     }
 
-    const { data: invitation, error: invitationErr } = await supabase
+    let invitationQuery = supabase
       .from("linkedin_invitations")
       .select("id, dm_draft_text, dm_draft_status, unipile_account_id")
       .eq("client_id", clientId)
       .eq("lead_id", leadId)
-      .eq("dm_draft_status", "draft")
+      .eq("dm_draft_status", "draft");
+
+    const threadAccountId = String(thread.unipile_account_id ?? "").trim();
+    if (threadAccountId) {
+      invitationQuery = invitationQuery.eq("unipile_account_id", threadAccountId);
+    }
+
+    const { data: invitation, error: invitationErr } = await invitationQuery
       .order("accepted_at", { ascending: false, nullsFirst: false })
       .order("sent_at", { ascending: false, nullsFirst: false })
       .limit(1)
@@ -58,7 +65,6 @@ export async function POST(req: Request) {
     }
 
     const expectedAccountId = String(invitation.unipile_account_id ?? "").trim();
-    const threadAccountId = String(thread.unipile_account_id ?? "").trim();
     if (expectedAccountId && threadAccountId && expectedAccountId !== threadAccountId) {
       return NextResponse.json({ error: "draft_thread_account_mismatch" }, { status: 409 });
     }

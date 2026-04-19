@@ -170,7 +170,7 @@ export async function POST(req: Request) {
           supabase,
           clientId,
           unipileAccountId,
-          delayMs: 2000,
+          delayMs: 60000,
           todayOnly: true,
           includeRecentRetryables: true,
           retryableLookbackDays: 3,
