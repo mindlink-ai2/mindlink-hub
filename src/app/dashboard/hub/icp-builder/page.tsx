@@ -973,33 +973,128 @@ export default function IcpBuilderPage() {
 
       {/* ── Écran : ciblage validé ── */}
       {screen === "submitted" && (
-        <div className="max-w-2xl mx-auto px-4 py-16">
+        <div className="max-w-2xl mx-auto px-4 py-12">
           <div className="bg-white rounded-2xl border border-[#c8d6ea] p-10 text-center">
             <CheckCircle2 className="w-14 h-14 text-[#22c55e] mx-auto mb-5" />
             <h2 className="text-xl font-bold text-[#0b1c33] mb-2">Ciblage validé !</h2>
             <p className="text-[#51627b] mb-8 max-w-sm mx-auto">
-              Votre ciblage a été transmis à notre équipe. Nous vous contacterons très
-              prochainement pour lancer votre prospection.
+              Vos leads ont été ajoutés à votre liste. Que souhaitez-vous faire maintenant&nbsp;?
             </p>
-            {creditsRemaining !== null && creditsRemaining > 0 ? (
-              <HubButton
-                variant="secondary"
-                onClick={handleReopen}
-                disabled={reopening}
-                className="gap-2"
+
+            <div className="flex flex-col gap-3 max-w-md mx-auto text-left">
+              {/* Option 1 — modifier le ciblage (consomme 1 crédit) */}
+              <button
+                type="button"
+                onClick={async () => {
+                  if (reopening) return;
+                  setReopening(true);
+                  try {
+                    const cr = await fetch("/api/icp/consume-credit", { method: "POST" });
+                    if (!cr.ok) {
+                      const data = await cr.json().catch(() => ({}));
+                      console.error("[consume-credit]", data.error);
+                      setReopening(false);
+                      return;
+                    }
+                    const res = await fetch("/api/icp/reopen", { method: "POST" });
+                    if (res.ok) {
+                      setIcpStatus("draft");
+                      setProfiles([]);
+                      setTotalResults(null);
+                      setSearchError(null);
+                      setSubmitError(null);
+                      setScreen("questionnaire");
+                      setCurrentStep(0);
+                      // refresh credits
+                      try {
+                        const c = await fetch("/api/icp/credits");
+                        if (c.ok) {
+                          const cd = await c.json();
+                          setCreditsRemaining(cd.credits_remaining ?? null);
+                        }
+                      } catch {
+                        // silent
+                      }
+                    }
+                  } finally {
+                    setReopening(false);
+                  }
+                }}
+                disabled={reopening || (creditsRemaining !== null && creditsRemaining <= 0)}
+                className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {reopening ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Pencil className="w-4 h-4" />
-                )}
-                {reopening ? "Réouverture…" : "Modifier mon ciblage"}
-              </HubButton>
-            ) : creditsRemaining === 0 ? (
-              <p className="text-sm text-[#a0b0c0]">
-                Plus de crédits de recherche disponibles.
-              </p>
-            ) : null}
+                <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-[#0b1c33]">Modifier mon ciblage</p>
+                  <p className="mt-0.5 text-xs text-[#51627b]">
+                    Recommencer le questionnaire. Consomme 1 crédit de recherche.
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 2 — sélectionner le reste du quota */}
+              {selectedCount < monthlyQuota && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScreen("browse");
+                  }}
+                  className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF]"
+                >
+                  <Search className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-[#0b1c33]">Sélectionner d&apos;autres leads</p>
+                    <p className="mt-0.5 text-xs text-[#51627b]">
+                      Il vous reste {Math.max(0, monthlyQuota - selectedCount)} leads dans votre quota. Pas de crédit consommé.
+                    </p>
+                  </div>
+                </button>
+              )}
+
+              {/* Option 3 — sélectionner au-delà du quota (consomme 1 crédit) */}
+              <button
+                type="button"
+                onClick={async () => {
+                  if (reopening) return;
+                  setReopening(true);
+                  try {
+                    const cr = await fetch("/api/icp/consume-credit", { method: "POST" });
+                    if (!cr.ok) {
+                      const data = await cr.json().catch(() => ({}));
+                      console.error("[consume-credit]", data.error);
+                      return;
+                    }
+                    const cd = await cr.json().catch(() => ({}));
+                    if (typeof cd.credits_remaining === "number") {
+                      setCreditsRemaining(cd.credits_remaining);
+                    }
+                    // Bump quota locally so the client can select more (~5 extra business days)
+                    const bump = Math.max(10, Math.round(monthlyQuota / 22) * 5);
+                    setQuotaRemaining((prev) => prev + bump);
+                    setMonthlyQuota((prev) => prev + bump);
+                    setScreen("browse");
+                  } finally {
+                    setReopening(false);
+                  }
+                }}
+                disabled={reopening || (creditsRemaining !== null && creditsRemaining <= 0)}
+                className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-[#0b1c33]">Sélectionner au-delà du quota</p>
+                  <p className="mt-0.5 text-xs text-[#51627b]">
+                    Débloquer une tranche supplémentaire de leads. Consomme 1 crédit.
+                  </p>
+                </div>
+              </button>
+
+              {creditsRemaining === 0 && (
+                <p className="mt-2 text-center text-xs text-[#a0b0c0]">
+                  Plus de crédits disponibles — certaines actions sont désactivées.
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
