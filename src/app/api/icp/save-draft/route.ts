@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
+import { logClientActivity } from "@/lib/client-activity";
 
 export const runtime = "nodejs";
 
@@ -77,6 +78,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Erreur lors de la sauvegarde" }, { status: 500 });
     }
     console.log("[icp/save-draft] inserted new row for org_id:", orgId);
+  }
+
+  // Log activity only if modifying an already-submitted targeting
+  const wasSubmitted =
+    existing?.status === "submitted" ||
+    existing?.status === "reviewed" ||
+    existing?.status === "active";
+  if (wasSubmitted) {
+    await logClientActivity(supabase, orgId, "icp_modified");
   }
 
   return NextResponse.json({ success: true });

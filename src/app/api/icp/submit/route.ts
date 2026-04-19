@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import { adminClientChangeEmail, sendLidmeoEmail } from "@/lib/email-templates";
+import { logClientActivity } from "@/lib/client-activity";
 
 const ADMIN_NOTIFY_EMAIL = "contact@lidmeo.com";
 
@@ -84,6 +85,8 @@ export async function POST(request: Request) {
     }
     configId = inserted.id;
   }
+
+  await logClientActivity(supabase, orgId, existing?.id ? "icp_modified" : "icp_submitted");
 
   // Notifier les admins (tableau interne)
   await supabase.from("admin_notifications").insert({

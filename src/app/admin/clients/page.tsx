@@ -131,6 +131,115 @@ function IcpBadge({ status }: { status: IcpStatus }) {
   );
 }
 
+// ─── Activity timeline ────────────────────────────────────────────────────────
+
+type ActivityEvent = {
+  id: number;
+  action: string;
+  details: Record<string, unknown> | null;
+  created_at: string;
+};
+
+function actionLabel(action: string, details: Record<string, unknown> | null): string {
+  const d = details ?? {};
+  switch (action) {
+    case "sheet_created":
+      return "Onglet Google Sheet créé";
+    case "leads_extracted": {
+      const count = typeof d.count === "number" ? d.count : "?";
+      const source = typeof d.source === "string" ? d.source : "?";
+      return `Extraction : ${count} leads (source : ${source})`;
+    }
+    case "messages_validated":
+      return "Messages validés";
+    case "messages_updated":
+      return "Messages modifiés";
+    case "workflow_created": {
+      const wf = typeof d.workflow_id === "string" ? d.workflow_id : "?";
+      const trigger = typeof d.trigger === "string" ? ` (trigger : ${d.trigger})` : "";
+      return `Workflow n8n créé (ID : ${wf})${trigger}`;
+    }
+    case "workflow_updated": {
+      const reason = typeof d.reason === "string" ? ` (raison : ${d.reason})` : "";
+      return `Workflow n8n mis à jour${reason}`;
+    }
+    case "icp_submitted":
+      return "Ciblage ICP validé";
+    case "icp_modified":
+      return "Ciblage ICP modifié";
+    case "credits_consumed":
+      return "Crédit de recherche consommé";
+    default:
+      return action;
+  }
+}
+
+function ActivityTab({ orgId }: { orgId: number }) {
+  const [events, setEvents] = useState<ActivityEvent[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/client-activity?org_id=${orgId}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          if (!cancelled) setError("Impossible de charger l'activité.");
+          return;
+        }
+        const data = (await res.json()) as { events: ActivityEvent[] };
+        if (!cancelled) setEvents(data.events ?? []);
+      } catch {
+        if (!cancelled) setError("Impossible de charger l'activité.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId]);
+
+  if (error) {
+    return <p className="text-sm text-red-600">{error}</p>;
+  }
+  if (events === null) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-[#7a9abf]">
+        <Loader2 className="w-4 h-4 animate-spin" /> Chargement…
+      </div>
+    );
+  }
+  if (events.length === 0) {
+    return <p className="text-sm text-[#7a9abf]">Aucun événement pour ce client.</p>;
+  }
+
+  return (
+    <ol className="space-y-2">
+      {events.map((ev) => (
+        <li
+          key={ev.id}
+          className="flex items-start gap-3 rounded-lg border border-[#eef1f8] bg-[#fafbfe] px-3 py-2"
+        >
+          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#1f5eff]" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-[#0b1c33]">{actionLabel(ev.action, ev.details)}</p>
+            <p className="text-xs text-[#9ab0c8]">
+              {new Date(ev.created_at).toLocaleString("fr-FR", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 // ─── Modal ICP ────────────────────────────────────────────────────────────────
 
 function IcpModal({
@@ -140,6 +249,7 @@ function IcpModal({
   client: ClientRow;
   onClose: () => void;
 }) {
+  const [tab, setTab] = useState<"icp" | "activity">("icp");
   const filters = client.icp.filters ?? {};
   // Nouveau format : { questionnaire: {...}, apollo_filters: {...}, commercial_promise: "..." }
   // Ancien format : filtres Apollo directement à la racine
@@ -198,33 +308,68 @@ function IcpModal({
           </button>
         </div>
 
-        <div className="p-5 space-y-3">
-          {filterItems.map((item) => (
-            <div key={item.label} className="flex gap-3">
-              <span className="text-xs font-semibold text-[#7a9abf] w-36 shrink-0 pt-0.5">
-                {item.label}
-              </span>
-              <span className="text-sm text-[#0b1c33]">{item.value}</span>
-            </div>
-          ))}
+        <div className="flex gap-1 border-b border-[#eef1f8] px-5">
+          <button
+            type="button"
+            onClick={() => setTab("icp")}
+            className={cn(
+              "px-3 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors",
+              tab === "icp"
+                ? "border-[#1f5eff] text-[#0b1c33]"
+                : "border-transparent text-[#7a9abf] hover:text-[#0b1c33]"
+            )}
+          >
+            Ciblage
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("activity")}
+            className={cn(
+              "px-3 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors",
+              tab === "activity"
+                ? "border-[#1f5eff] text-[#0b1c33]"
+                : "border-transparent text-[#7a9abf] hover:text-[#0b1c33]"
+            )}
+          >
+            Activité
+          </button>
         </div>
 
-        {commercialPromise && (
-          <div className="mx-5 mb-5 rounded-xl border border-[#e8f0fe] bg-[#f4f8ff] p-4">
-            <p className="text-xs font-semibold text-[#1f5eff] mb-1.5">Promesse commerciale</p>
-            <p className="text-sm text-[#0b1c33] whitespace-pre-wrap">{commercialPromise}</p>
-          </div>
-        )}
+        {tab === "icp" ? (
+          <>
+            <div className="p-5 space-y-3">
+              {filterItems.map((item) => (
+                <div key={item.label} className="flex gap-3">
+                  <span className="text-xs font-semibold text-[#7a9abf] w-36 shrink-0 pt-0.5">
+                    {item.label}
+                  </span>
+                  <span className="text-sm text-[#0b1c33]">{item.value}</span>
+                </div>
+              ))}
+            </div>
 
-        {client.icp.submitted_at && (
-          <p className="px-5 pb-5 text-xs text-[#9ab0c8]">
-            Soumis le{" "}
-            {new Date(client.icp.submitted_at).toLocaleDateString("fr-FR", {
-              day: "2-digit",
-              month: "long",
-              year: "numeric",
-            })}
-          </p>
+            {commercialPromise && (
+              <div className="mx-5 mb-5 rounded-xl border border-[#e8f0fe] bg-[#f4f8ff] p-4">
+                <p className="text-xs font-semibold text-[#1f5eff] mb-1.5">Promesse commerciale</p>
+                <p className="text-sm text-[#0b1c33] whitespace-pre-wrap">{commercialPromise}</p>
+              </div>
+            )}
+
+            {client.icp.submitted_at && (
+              <p className="px-5 pb-5 text-xs text-[#9ab0c8]">
+                Soumis le{" "}
+                {new Date(client.icp.submitted_at).toLocaleDateString("fr-FR", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </p>
+            )}
+          </>
+        ) : (
+          <div className="p-5">
+            <ActivityTab orgId={client.id} />
+          </div>
         )}
       </div>
     </div>

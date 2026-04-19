@@ -1,5 +1,8 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildWorkflowJson, getTomorrowDate } from "@/lib/n8n-workflow-template";
+
 const AGENT_NODE_ID = "ai-enrichment";
 const AGENT_NODE_NAME = "Enrichissement IA";
 
@@ -83,6 +86,115 @@ export async function updateWorkflowSystemPrompt(
   } catch (err) {
     return {
       updated: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export interface CreateWorkflowResult {
+  workflowId: string | null;
+  workflowUrl: string | null;
+  error?: string;
+}
+
+export async function createWorkflowForClient(
+  supabase: SupabaseClient,
+  orgId: number,
+  opts: {
+    systemPrompt: string;
+    googleSheetId: string;
+    tabName: string;
+  }
+): Promise<CreateWorkflowResult> {
+  const n8nApiKey = process.env.N8N_API_KEY;
+  const n8nBaseUrl = process.env.N8N_BASE_URL ?? "https://mindlink2.app.n8n.cloud";
+  if (!n8nApiKey) {
+    return { workflowId: null, workflowUrl: null, error: "N8N_API_KEY missing" };
+  }
+
+  const { data: clientRow, error: clientErr } = await supabase
+    .from("clients")
+    .select("id, company_name, quota")
+    .eq("id", orgId)
+    .single();
+
+  if (clientErr || !clientRow) {
+    return { workflowId: null, workflowUrl: null, error: "client not found" };
+  }
+
+  const { data: unipileRow } = await supabase
+    .from("unipile_accounts")
+    .select("unipile_account_id")
+    .eq("client_id", orgId)
+    .maybeSingle();
+
+  const unipileAccountId = (unipileRow?.unipile_account_id as string | null) ?? "";
+  const clientName = (clientRow.company_name as string | null) || `Client ${orgId}`;
+  const companyName = (clientRow.company_name as string | null) ?? "";
+  const quotaPerDay = Number(clientRow.quota) || 10;
+  const startDate = getTomorrowDate();
+
+  try {
+    const workflowPayload = buildWorkflowJson({
+      clientName,
+      companyName,
+      quotaPerDay,
+      startDate,
+      googleSheetId: opts.googleSheetId,
+      tabName: opts.tabName,
+      clientId: orgId,
+      unipileAccountId,
+      promptSystems: opts.systemPrompt,
+    });
+
+    const workflowRes = await fetch(`${n8nBaseUrl}/api/v1/workflows`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-N8N-API-KEY": n8nApiKey,
+      },
+      body: JSON.stringify(workflowPayload),
+    });
+
+    if (!workflowRes.ok) {
+      const errText = await workflowRes.text().catch(() => "");
+      return {
+        workflowId: null,
+        workflowUrl: null,
+        error: `n8n POST ${workflowRes.status}: ${errText.slice(0, 200)}`,
+      };
+    }
+
+    const workflowData = (await workflowRes.json()) as { id: string };
+    const workflowId = workflowData.id;
+
+    // Best-effort activation
+    try {
+      await fetch(`${n8nBaseUrl}/api/v1/workflows/${workflowId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-N8N-API-KEY": n8nApiKey,
+        },
+        body: JSON.stringify({ active: true }),
+      });
+    } catch (err) {
+      console.warn("[n8n-workflow] activation failed (non-blocking):", err);
+    }
+
+    await supabase
+      .from("clients")
+      .update({ n8n_workflow_id: workflowId })
+      .eq("id", orgId);
+
+    return {
+      workflowId,
+      workflowUrl: `${n8nBaseUrl}/workflow/${workflowId}`,
+    };
+  } catch (err) {
+    return {
+      workflowId: null,
+      workflowUrl: null,
       error: err instanceof Error ? err.message : String(err),
     };
   }

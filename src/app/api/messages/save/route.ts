@@ -11,8 +11,10 @@ import {
   finalizeMessagesFromChat,
   generateSystemPromptFromMessages,
 } from "@/lib/messages-prompt";
-import { updateWorkflowSystemPrompt } from "@/lib/n8n-workflow";
+import { createWorkflowForClient, updateWorkflowSystemPrompt } from "@/lib/n8n-workflow";
 import { adminClientChangeEmail, sendLidmeoEmail } from "@/lib/email-templates";
+import { logClientActivity } from "@/lib/client-activity";
+import { deriveSheetTabName } from "@/lib/sheet-tab-name";
 
 const ADMIN_NOTIFY_EMAIL = "contact@lidmeo.com";
 
@@ -76,6 +78,13 @@ export async function POST(req: Request) {
       .select("id, company_name, email, n8n_workflow_id")
       .eq("id", clientContext.clientId)
       .maybeSingle();
+
+    const { data: existingMessages } = await supabase
+      .from("client_messages")
+      .select("org_id")
+      .eq("org_id", clientContext.clientId)
+      .maybeSingle();
+    const isFirstMessageSave = !existingMessages;
 
     const { data: icpConfig } = await supabase
       .from("icp_configs")
@@ -166,15 +175,30 @@ export async function POST(req: Request) {
       console.error("[messages/save] unable to mark onboarding completed:", stateErr);
     }
 
-    // Push new system prompt to the existing n8n workflow (best-effort)
-    const workflowId = (clientRow?.n8n_workflow_id as string | null) ?? null;
-    if (workflowId && systemPrompt) {
+    // Activity log: messages_validated (first save) or messages_updated
+    await logClientActivity(
+      supabase,
+      clientContext.clientId,
+      isFirstMessageSave ? "messages_validated" : "messages_updated"
+    );
+
+    // n8n workflow: update existing, or auto-create if conditions are met
+    const existingWorkflowId = (clientRow?.n8n_workflow_id as string | null) ?? null;
+    let workflowJustCreated = false;
+
+    if (existingWorkflowId && systemPrompt) {
       try {
-        const res = await updateWorkflowSystemPrompt(workflowId, systemPrompt);
+        const res = await updateWorkflowSystemPrompt(existingWorkflowId, systemPrompt);
         if (res.updated) {
           console.log(
             "[messages/save] n8n workflow updated for org_id:",
             clientContext.clientId
+          );
+          await logClientActivity(
+            supabase,
+            clientContext.clientId,
+            "workflow_updated",
+            { reason: "messages_updated", workflow_id: existingWorkflowId }
           );
         } else {
           console.warn(
@@ -185,6 +209,53 @@ export async function POST(req: Request) {
         }
       } catch (n8nErr) {
         console.error("[messages/save] n8n update error:", n8nErr);
+      }
+    } else if (!existingWorkflowId && systemPrompt) {
+      // Auto-create workflow if an extraction has already happened
+      const { data: extractionLog } = await supabase
+        .from("extraction_logs")
+        .select("google_sheet_id")
+        .eq("org_id", clientContext.clientId)
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const googleSheetId =
+        (extractionLog?.google_sheet_id as string | null) ?? null;
+
+      if (googleSheetId) {
+        const tabName = deriveSheetTabName(
+          (clientRow?.company_name as string | null) ?? null,
+          (clientRow?.email as string | null) ?? null,
+          clientContext.clientId
+        );
+        const result = await createWorkflowForClient(
+          supabase,
+          clientContext.clientId,
+          { systemPrompt, googleSheetId, tabName }
+        );
+        if (result.workflowId) {
+          workflowJustCreated = true;
+          console.log(
+            "[messages/save] Workflow n8n créé automatiquement pour org_id:",
+            clientContext.clientId,
+            "workflow_id:",
+            result.workflowId
+          );
+          await logClientActivity(
+            supabase,
+            clientContext.clientId,
+            "workflow_created",
+            { workflow_id: result.workflowId, trigger: "messages_save" }
+          );
+        } else {
+          console.warn(
+            "[messages/save] Auto workflow creation failed for org_id:",
+            clientContext.clientId,
+            result.error
+          );
+        }
       }
     }
 
@@ -204,6 +275,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       promptGenerated: Boolean(systemPrompt),
+      workflowCreated: workflowJustCreated,
     });
   } catch (err) {
     console.error("[messages/save] error:", err);

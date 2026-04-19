@@ -222,6 +222,7 @@ export default function MessagesSetupPage() {
 
   const [validatedLinkedin, setValidatedLinkedin] = useState<string | null>(null);
   const [validatedRelance, setValidatedRelance] = useState<string | null>(null);
+  const [workflowJustCreated, setWorkflowJustCreated] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -362,6 +363,9 @@ export default function MessagesSetupPage() {
             : "Erreur lors de la sauvegarde."
         );
       }
+      if (data?.workflowCreated === true) {
+        setWorkflowJustCreated(true);
+      }
       if (onboardingPending) {
         router.replace("/onboarding/video");
         return;
@@ -464,6 +468,11 @@ export default function MessagesSetupPage() {
               Tes messages sont prêts. Notre équipe s&apos;en servira pour lancer ta
               prospection.
             </p>
+            {workflowJustCreated && (
+              <p className="mx-auto mt-3 max-w-md text-xs text-[#7a9abf]">
+                Vos leads seront traités automatiquement entre 7h et 8h chaque matin.
+              </p>
+            )}
           </div>
           <div className="mt-6">
             <SavedMessagesPanel messages={existingMessages} onEdit={relaunchChat} />
@@ -479,6 +488,14 @@ export default function MessagesSetupPage() {
 
       {screen === "chat" && (
         <div className="mx-auto flex h-[calc(100vh-180px)] max-w-3xl flex-col px-4 py-6">
+          <div className="mb-3 flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-[#1e3a8a]">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+            <p>
+              L&apos;Assistant Lidmeo vous aide à rédiger deux messages LinkedIn (premier contact
+              et relance). L&apos;email de prospection sera généré automatiquement. Une fois validés,
+              vos messages seront utilisés pour contacter les leads extraits.
+            </p>
+          </div>
           <div
             ref={scrollRef}
             className={cn(

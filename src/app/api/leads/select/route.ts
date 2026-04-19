@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import { google } from "googleapis";
+import { logClientActivity } from "@/lib/client-activity";
+import { createWorkflowForClient } from "@/lib/n8n-workflow";
+import { deriveSheetTabName } from "@/lib/sheet-tab-name";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -29,18 +32,7 @@ function getGoogleAuth() {
   });
 }
 
-/** Derive tab name — format: "CompanyName — email@example.com" */
-function deriveTabName(
-  companyName: string | null,
-  email: string | null,
-  orgId: number
-): string {
-  const name = companyName ?? `Client ${orgId}`;
-  const suffix = email ? ` — ${email}` : "";
-  return `${name}${suffix}`
-    .replace(/[\\/?*[\]:]/g, "-")
-    .slice(0, 100);
-}
+const deriveTabName = deriveSheetTabName;
 
 const SHEET_HEADERS = [
   "First Name", "Last Name", "Title", "Company Name", "Email",
@@ -312,6 +304,7 @@ export async function POST(req: Request) {
   const tabName = deriveTabName(company, clientEmail, orgId);
 
   let sheetUrl = "";
+  let sheetWasCreated = false;
   try {
     const authClient = getGoogleAuth();
     const sheets = google.sheets({ version: "v4", auth: authClient });
@@ -328,6 +321,7 @@ export async function POST(req: Request) {
       : sheetsList.find((s: any) => s.properties?.title === tabName);
 
     if (!existingTab) {
+      sheetWasCreated = true;
       const batchRes = await sheets.spreadsheets.batchUpdate({
         spreadsheetId: MASTER_SHEET_ID,
         requestBody: {
@@ -443,8 +437,76 @@ export async function POST(req: Request) {
     }
   }
 
+  // Activity logs
+  if (sheetWasCreated) {
+    await logClientActivity(supabase, orgId, "sheet_created", {
+      tab_name: tabName,
+      google_sheet_id: MASTER_SHEET_ID,
+    });
+  }
+  await logClientActivity(supabase, orgId, "leads_extracted", {
+    count: enrichedPeople.length,
+    source: "client_selection",
+  });
+
+  // Auto-create n8n workflow if messages are validated and no workflow yet
+  let workflowJustCreated = false;
+  try {
+    const { data: clientWorkflow } = await supabase
+      .from("clients")
+      .select("n8n_workflow_id")
+      .eq("id", orgId)
+      .maybeSingle();
+
+    if (!clientWorkflow?.n8n_workflow_id) {
+      const { data: messagesRow } = await supabase
+        .from("client_messages")
+        .select("message_linkedin, system_prompt")
+        .eq("org_id", orgId)
+        .maybeSingle();
+
+      const hasMessages =
+        typeof messagesRow?.message_linkedin === "string" &&
+        messagesRow.message_linkedin.trim().length > 0;
+      const systemPrompt =
+        typeof messagesRow?.system_prompt === "string" && messagesRow.system_prompt
+          ? messagesRow.system_prompt
+          : null;
+
+      if (hasMessages && systemPrompt) {
+        const result = await createWorkflowForClient(supabase, orgId, {
+          systemPrompt,
+          googleSheetId: MASTER_SHEET_ID,
+          tabName,
+        });
+        if (result.workflowId) {
+          workflowJustCreated = true;
+          console.log(
+            "[leads/select] Workflow n8n créé automatiquement pour org_id:",
+            orgId,
+            "workflow_id:",
+            result.workflowId
+          );
+          await logClientActivity(supabase, orgId, "workflow_created", {
+            workflow_id: result.workflowId,
+            trigger: "leads_select",
+          });
+        } else {
+          console.warn(
+            "[leads/select] Auto workflow creation failed for org_id:",
+            orgId,
+            result.error
+          );
+        }
+      }
+    }
+  } catch (wfErr) {
+    console.error("[leads/select] auto workflow check failed:", wfErr);
+  }
+
   return NextResponse.json({
     success: true,
     leads_written: enrichedPeople.length,
+    workflowCreated: workflowJustCreated,
   });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import { resolveClientContextForUser } from "@/lib/client-onboarding-state";
+import { logClientActivity } from "@/lib/client-activity";
 
 export const runtime = "nodejs";
 
@@ -57,6 +58,11 @@ export async function POST() {
   if (updErr) {
     return NextResponse.json({ error: "Impossible de débiter le crédit." }, { status: 500 });
   }
+
+  await logClientActivity(supabase, ctx.clientId, "credits_consumed", {
+    credits_used_now: credits.credits_used + 1,
+    credits_total: credits.credits_total,
+  });
 
   return NextResponse.json({
     success: true,

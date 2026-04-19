@@ -13,8 +13,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Gem,
+  Home,
   Loader2,
   MessageCircleQuestion,
+  MessageSquare,
   Pencil,
   Search,
   Send,
@@ -356,6 +358,10 @@ export default function IcpBuilderPage() {
   const [validatingSelection, setValidatingSelection] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [autoSelecting, setAutoSelecting] = useState(false);
+  const [skippingLater, setSkippingLater] = useState(false);
+  // Post-batch confirmation state
+  const [justValidatedCount, setJustValidatedCount] = useState(0);
+  const [workflowJustCreated, setWorkflowJustCreated] = useState(false);
 
   const selectedCount = selectedLeadIds.size;
   const canSelectMore = selectedCount < quotaRemaining;
@@ -888,20 +894,57 @@ export default function IcpBuilderPage() {
       }
 
       setIcpStatus("submitted");
+      const validatedCount = leadsToSend.length;
+      setJustValidatedCount(validatedCount);
+      setWorkflowJustCreated(Boolean(data?.workflowCreated));
+      // Update local quota state so the "remaining" counter is correct
+      setQuotaUsed((prev) => prev + validatedCount);
+      setQuotaRemaining((prev) => Math.max(0, prev - validatedCount));
+      setSelectedLeadIds(new Set());
+      setSelectedLeadsMap(new Map());
+
+      if (onboardingPending) {
+        await fetch("/api/onboarding/mark-icp-submitted", {
+          method: "POST",
+        }).catch(() => null);
+      }
+      setScreen("submitted");
+    } catch {
+      setSubmitError("Impossible de valider la sélection.");
+    } finally {
+      setValidatingSelection(false);
+    }
+  }, [selectedLeadsMap, onboardingPending]);
+
+  const handleSkipForLater = useCallback(async () => {
+    if (skippingLater) return;
+    setSkippingLater(true);
+    try {
+      if (generatedFilters) {
+        await fetch("/api/icp/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filters: generatedFilters,
+            preview_profiles: profiles,
+          }),
+        }).catch(() => null);
+      }
+      setIcpStatus("submitted");
       if (onboardingPending) {
         await fetch("/api/onboarding/mark-icp-submitted", {
           method: "POST",
         }).catch(() => null);
         router.replace("/dashboard/hub/messages-setup");
       } else {
+        setJustValidatedCount(0);
+        setWorkflowJustCreated(false);
         setScreen("submitted");
       }
-    } catch {
-      setSubmitError("Impossible de valider la sélection.");
     } finally {
-      setValidatingSelection(false);
+      setSkippingLater(false);
     }
-  }, [selectedLeadsMap, onboardingPending, router]);
+  }, [generatedFilters, profiles, onboardingPending, router, skippingLater]);
 
   // ─── Rendu ────────────────────────────────────────────────────────────────────
 
@@ -941,9 +984,41 @@ export default function IcpBuilderPage() {
         <div className="max-w-2xl mx-auto px-4 py-12">
           <div className="bg-white rounded-2xl border border-[#c8d6ea] p-10 text-center">
             <CheckCircle2 className="w-14 h-14 text-[#22c55e] mx-auto mb-5" />
-            <h2 className="text-xl font-bold text-[#0b1c33] mb-2">Ciblage validé !</h2>
-            <p className="text-[#51627b] mb-8 max-w-sm mx-auto">
-              Vos leads ont été ajoutés à votre liste. Que souhaitez-vous faire maintenant&nbsp;?
+            <h2 className="text-xl font-bold text-[#0b1c33] mb-2">
+              {justValidatedCount > 0
+                ? `${justValidatedCount} lead${justValidatedCount > 1 ? "s" : ""} ajouté${justValidatedCount > 1 ? "s" : ""} à votre liste`
+                : quotaRemaining > 0
+                ? "Vous pouvez continuer votre sélection"
+                : "Quota du mois atteint"}
+            </h2>
+            <p className="text-[#51627b] mb-4 max-w-sm mx-auto">
+              {quotaRemaining > 0
+                ? `Il vous reste ${quotaRemaining.toLocaleString("fr-FR")} lead${quotaRemaining > 1 ? "s" : ""} à sélectionner pour ce mois.`
+                : "Vous pourrez sélectionner de nouveaux leads au prochain renouvellement."}
+            </p>
+            {workflowJustCreated && (
+              <div className="mb-6 max-w-md mx-auto rounded-xl border border-[#d7e3f4] bg-[#f4f8ff] px-4 py-3 text-left">
+                <p className="text-sm font-semibold text-[#0b1c33] mb-1">Votre prospection est configurée.</p>
+                <p className="text-xs text-[#51627b]">
+                  {(() => {
+                    const hour = new Date().getHours();
+                    return hour < 7
+                      ? "Vos premiers leads seront traités ce matin entre 7h et 8h."
+                      : "Vos premiers leads seront traités demain matin entre 7h et 8h.";
+                  })()}
+                </p>
+              </div>
+            )}
+            {!workflowJustCreated && justValidatedCount > 0 && (
+              <p className="text-xs text-[#7a9abf] mb-6 max-w-sm mx-auto">
+                Votre prospection démarrera dès que vos messages seront configurés.
+              </p>
+            )}
+            {justValidatedCount === 0 && quotaRemaining === 0 && (
+              <div className="mb-6" />
+            )}
+            <p className="text-[#51627b] mb-6 max-w-sm mx-auto text-sm">
+              Que souhaitez-vous faire maintenant&nbsp;?
             </p>
 
             <div className="flex flex-col gap-3 max-w-md mx-auto text-left">
@@ -997,24 +1072,56 @@ export default function IcpBuilderPage() {
                 </div>
               </button>
 
-              {/* Option 2 — sélectionner le reste du quota */}
-              {selectedCount < monthlyQuota && (
+              {/* Option 2 — continuer la sélection */}
+              {quotaRemaining > 0 && (
                 <button
                   type="button"
                   onClick={() => {
+                    setJustValidatedCount(0);
+                    setWorkflowJustCreated(false);
                     setScreen("browse");
                   }}
                   className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF]"
                 >
                   <Search className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-[#0b1c33]">Sélectionner d&apos;autres leads</p>
+                    <p className="text-sm font-semibold text-[#0b1c33]">Continuer ma sélection</p>
                     <p className="mt-0.5 text-xs text-[#51627b]">
-                      Il vous reste {Math.max(0, monthlyQuota - selectedCount)} leads dans votre quota. Pas de crédit consommé.
+                      Il vous reste {quotaRemaining.toLocaleString("fr-FR")} leads dans votre quota. Pas de crédit consommé.
                     </p>
                   </div>
                 </button>
               )}
+
+              {/* Option — passer aux messages */}
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard/hub/messages-setup")}
+                className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF]"
+              >
+                <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-[#0b1c33]">Passer aux messages</p>
+                  <p className="mt-0.5 text-xs text-[#51627b]">
+                    Configurer vos messages de prospection.
+                  </p>
+                </div>
+              </button>
+
+              {/* Option — terminé */}
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard")}
+                className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF]"
+              >
+                <Home className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-[#0b1c33]">Terminé pour le moment</p>
+                  <p className="mt-0.5 text-xs text-[#51627b]">
+                    Retour au tableau de bord.
+                  </p>
+                </div>
+              </button>
 
               {/* Option 3 — sélectionner au-delà du quota (consomme 1 crédit) */}
               <button
@@ -1545,6 +1652,15 @@ export default function IcpBuilderPage() {
             </button>
           </div>
 
+          {/* Info — validation en plusieurs fois */}
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-[#1e3a8a]">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+            <p>
+              Sélectionnez les profils à contacter. Vous pouvez valider votre sélection en plusieurs fois —
+              le quota non utilisé reste disponible pour une prochaine sélection.
+            </p>
+          </div>
+
           {browseError && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-sm text-red-700">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -1710,7 +1826,7 @@ export default function IcpBuilderPage() {
               ? "bg-[#2563EB] border-[#1d4ed8]"
               : "bg-white border-[#c8d6ea]"
           )}>
-            <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
               <p className={cn(
                 "text-sm font-medium",
                 selectedCount > 0 ? "text-white" : "text-[#51627b]"
@@ -1719,6 +1835,27 @@ export default function IcpBuilderPage() {
                   ? `${selectedCount} lead${selectedCount > 1 ? "s" : ""} sélectionné${selectedCount > 1 ? "s" : ""}`
                   : "Sélectionnez des leads pour continuer"}
               </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSkipForLater}
+                  disabled={skippingLater || validatingSelection}
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all",
+                    selectedCount > 0
+                      ? "bg-white/10 text-white hover:bg-white/20 border border-white/30"
+                      : "bg-white text-[#51627b] hover:bg-[#f8fafc] border border-[#c8d6ea]"
+                  )}
+                >
+                  {skippingLater ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Enregistrement…
+                    </>
+                  ) : (
+                    "Je reviendrai plus tard"
+                  )}
+                </button>
               <button
                 type="button"
                 onClick={() => setShowConfirmModal(true)}
@@ -1742,6 +1879,7 @@ export default function IcpBuilderPage() {
                   </>
                 )}
               </button>
+              </div>
             </div>
           </div>
 
