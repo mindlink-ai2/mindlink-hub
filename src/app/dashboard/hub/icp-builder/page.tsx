@@ -23,14 +23,6 @@ import {
 } from "lucide-react";
 import { HubButton } from "@/components/ui/hub-button";
 import { cn } from "@/lib/utils";
-import { ackPostTrial, hasAckedPostTrial } from "@/lib/trial-events";
-
-function computeTrialDaysRemaining(trialEndsAtIso: string): number {
-  const end = new Date(trialEndsAtIso).getTime();
-  const diff = end - Date.now();
-  if (diff <= 0) return 0;
-  return Math.max(1, Math.ceil(diff / (24 * 60 * 60 * 1000)));
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -361,10 +353,6 @@ export default function IcpBuilderPage() {
   const [monthlyQuota, setMonthlyQuota] = useState(0);
   const [quotaUsed, setQuotaUsed] = useState(0);
   const [quotaRemaining, setQuotaRemaining] = useState(0);
-  const [isEssential, setIsEssential] = useState(false);
-  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
-  const [isTrialActive, setIsTrialActive] = useState(false);
-  const [showPostTrialBanner, setShowPostTrialBanner] = useState(false);
   const [validatingSelection, setValidatingSelection] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [autoSelecting, setAutoSelecting] = useState(false);
@@ -739,15 +727,6 @@ export default function IcpBuilderPage() {
         setMonthlyQuota(data.monthly_quota ?? 0);
         setQuotaUsed(data.quota_used ?? 0);
         setQuotaRemaining(data.quota_remaining ?? 0);
-        const essential = Boolean(data.is_essential);
-        const trialEnds = typeof data.trial_ends_at === "string" ? data.trial_ends_at : null;
-        const trialActive = Boolean(data.is_trial_active);
-        setIsEssential(essential);
-        setTrialEndsAt(trialEnds);
-        setIsTrialActive(trialActive);
-        setShowPostTrialBanner(
-          essential && !trialActive && !!trialEnds && !hasAckedPostTrial(trialEnds)
-        );
       }
     } catch {
       // silencieux
@@ -801,14 +780,6 @@ export default function IcpBuilderPage() {
     [generatedFilters, answers, fetchQuota, fetchBrowsePage]
   );
 
-  const acknowledgePostTrialOnce = useCallback(() => {
-    if (!isEssential || isTrialActive || !trialEndsAt) return;
-    if (!hasAckedPostTrial(trialEndsAt)) {
-      ackPostTrial(trialEndsAt);
-      setShowPostTrialBanner(false);
-    }
-  }, [isEssential, isTrialActive, trialEndsAt]);
-
   const toggleLeadSelection = useCallback(
     (lead: BrowseProfile) => {
       setSelectedLeadIds((prev) => {
@@ -824,18 +795,12 @@ export default function IcpBuilderPage() {
           if (next.size >= quotaRemaining) return prev;
           next.add(lead.id);
           setSelectedLeadsMap((m) => new Map(m).set(lead.id, lead));
-          acknowledgePostTrialOnce();
         }
         return next;
       });
     },
-    [quotaRemaining, acknowledgePostTrialOnce]
+    [quotaRemaining]
   );
-
-  // Acknowledge post-trial also on bulk select paths
-  useEffect(() => {
-    if (selectedCount > 0) acknowledgePostTrialOnce();
-  }, [selectedCount, acknowledgePostTrialOnce]);
 
   const toggleSelectAll = useCallback(() => {
     if (selectedCount > 0) {
@@ -973,33 +938,128 @@ export default function IcpBuilderPage() {
 
       {/* ── Écran : ciblage validé ── */}
       {screen === "submitted" && (
-        <div className="max-w-2xl mx-auto px-4 py-16">
+        <div className="max-w-2xl mx-auto px-4 py-12">
           <div className="bg-white rounded-2xl border border-[#c8d6ea] p-10 text-center">
             <CheckCircle2 className="w-14 h-14 text-[#22c55e] mx-auto mb-5" />
             <h2 className="text-xl font-bold text-[#0b1c33] mb-2">Ciblage validé !</h2>
             <p className="text-[#51627b] mb-8 max-w-sm mx-auto">
-              Votre ciblage a été transmis à notre équipe. Nous vous contacterons très
-              prochainement pour lancer votre prospection.
+              Vos leads ont été ajoutés à votre liste. Que souhaitez-vous faire maintenant&nbsp;?
             </p>
-            {creditsRemaining !== null && creditsRemaining > 0 ? (
-              <HubButton
-                variant="secondary"
-                onClick={handleReopen}
-                disabled={reopening}
-                className="gap-2"
+
+            <div className="flex flex-col gap-3 max-w-md mx-auto text-left">
+              {/* Option 1 — modifier le ciblage (consomme 1 crédit) */}
+              <button
+                type="button"
+                onClick={async () => {
+                  if (reopening) return;
+                  setReopening(true);
+                  try {
+                    const cr = await fetch("/api/icp/consume-credit", { method: "POST" });
+                    if (!cr.ok) {
+                      const data = await cr.json().catch(() => ({}));
+                      console.error("[consume-credit]", data.error);
+                      setReopening(false);
+                      return;
+                    }
+                    const res = await fetch("/api/icp/reopen", { method: "POST" });
+                    if (res.ok) {
+                      setIcpStatus("draft");
+                      setProfiles([]);
+                      setTotalResults(null);
+                      setSearchError(null);
+                      setSubmitError(null);
+                      setScreen("questionnaire");
+                      setCurrentStep(0);
+                      // refresh credits
+                      try {
+                        const c = await fetch("/api/icp/credits");
+                        if (c.ok) {
+                          const cd = await c.json();
+                          setCreditsRemaining(cd.credits_remaining ?? null);
+                        }
+                      } catch {
+                        // silent
+                      }
+                    }
+                  } finally {
+                    setReopening(false);
+                  }
+                }}
+                disabled={reopening || (creditsRemaining !== null && creditsRemaining <= 0)}
+                className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {reopening ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Pencil className="w-4 h-4" />
-                )}
-                {reopening ? "Réouverture…" : "Modifier mon ciblage"}
-              </HubButton>
-            ) : creditsRemaining === 0 ? (
-              <p className="text-sm text-[#a0b0c0]">
-                Plus de crédits de recherche disponibles.
-              </p>
-            ) : null}
+                <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-[#0b1c33]">Modifier mon ciblage</p>
+                  <p className="mt-0.5 text-xs text-[#51627b]">
+                    Recommencer le questionnaire. Consomme 1 crédit de recherche.
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 2 — sélectionner le reste du quota */}
+              {selectedCount < monthlyQuota && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScreen("browse");
+                  }}
+                  className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF]"
+                >
+                  <Search className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-[#0b1c33]">Sélectionner d&apos;autres leads</p>
+                    <p className="mt-0.5 text-xs text-[#51627b]">
+                      Il vous reste {Math.max(0, monthlyQuota - selectedCount)} leads dans votre quota. Pas de crédit consommé.
+                    </p>
+                  </div>
+                </button>
+              )}
+
+              {/* Option 3 — sélectionner au-delà du quota (consomme 1 crédit) */}
+              <button
+                type="button"
+                onClick={async () => {
+                  if (reopening) return;
+                  setReopening(true);
+                  try {
+                    const cr = await fetch("/api/icp/consume-credit", { method: "POST" });
+                    if (!cr.ok) {
+                      const data = await cr.json().catch(() => ({}));
+                      console.error("[consume-credit]", data.error);
+                      return;
+                    }
+                    const cd = await cr.json().catch(() => ({}));
+                    if (typeof cd.credits_remaining === "number") {
+                      setCreditsRemaining(cd.credits_remaining);
+                    }
+                    // Bump quota locally so the client can select more (~5 extra business days)
+                    const bump = Math.max(10, Math.round(monthlyQuota / 22) * 5);
+                    setQuotaRemaining((prev) => prev + bump);
+                    setMonthlyQuota((prev) => prev + bump);
+                    setScreen("browse");
+                  } finally {
+                    setReopening(false);
+                  }
+                }}
+                disabled={reopening || (creditsRemaining !== null && creditsRemaining <= 0)}
+                className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-[#0b1c33]">Sélectionner au-delà du quota</p>
+                  <p className="mt-0.5 text-xs text-[#51627b]">
+                    Débloquer une tranche supplémentaire de leads. Consomme 1 crédit.
+                  </p>
+                </div>
+              </button>
+
+              {creditsRemaining === 0 && (
+                <p className="mt-2 text-center text-xs text-[#a0b0c0]">
+                  Plus de crédits disponibles — certaines actions sont désactivées.
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1403,50 +1463,23 @@ export default function IcpBuilderPage() {
       {/* ── Écran : navigation et sélection de leads ── */}
       {screen === "browse" && (
         <div className="max-w-4xl mx-auto px-4 py-6 pb-28">
-          {/* Bannière quota sticky — compact */}
+          {/* Bannière quota sticky — compteur + progression uniquement */}
           <div className="sticky top-0 z-10 -mx-4 px-4 pb-4">
             <div className="bg-[#2563EB] rounded-xl px-5 py-3 text-white">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4 text-sm min-w-0">
-                  <span>
-                    <span className="font-bold">{Math.max(0, quotaRemaining - selectedCount).toLocaleString("fr-FR")}</span> restants sur {monthlyQuota.toLocaleString("fr-FR")}
-                  </span>
-                  <span className="text-white/60">|</span>
-                  <span>
-                    <span className="font-bold">{selectedCount}</span> sélectionné{selectedCount > 1 ? "s" : ""}
-                  </span>
-                  {quotaUsed > 0 && (
-                    <>
-                      <span className="text-white/60">|</span>
-                      <span className="text-white/80 text-xs">{quotaUsed.toLocaleString("fr-FR")} déjà extraits</span>
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={toggleSelectAll}
-                    disabled={(!canSelectMore && selectedCount === 0) || browseLoading}
-                    className="text-xs font-medium text-white/90 hover:text-white disabled:text-white/40 transition-colors whitespace-nowrap"
-                  >
-                    {selectedCount > 0 ? "Tout désélectionner" : "Tout sélectionner"}
-                  </button>
-                  {quotaRemaining > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleAutoSelect}
-                      disabled={autoSelecting || selectedCount >= autoSelectTarget}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 disabled:opacity-40 px-3 py-1.5 text-xs font-medium text-white transition-colors whitespace-nowrap"
-                    >
-                      {autoSelecting ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-3.5 h-3.5" />
-                      )}
-                      {autoSelecting ? "Sélection…" : `Auto-sélectionner ${autoSelectTarget.toLocaleString("fr-FR")}`}
-                    </button>
-                  )}
-                </div>
+              <div className="flex items-center gap-4 text-sm min-w-0 flex-wrap">
+                <span>
+                  <span className="font-bold">{Math.max(0, quotaRemaining - selectedCount).toLocaleString("fr-FR")}</span> restants sur {monthlyQuota.toLocaleString("fr-FR")}
+                </span>
+                <span className="text-white/60">|</span>
+                <span>
+                  <span className="font-bold">{selectedCount}</span> sélectionné{selectedCount > 1 ? "s" : ""}
+                </span>
+                {quotaUsed > 0 && (
+                  <>
+                    <span className="text-white/60">|</span>
+                    <span className="text-white/80 text-xs">{quotaUsed.toLocaleString("fr-FR")} déjà extraits</span>
+                  </>
+                )}
               </div>
               <div className="h-1.5 w-full rounded-full bg-white/20 mt-2.5">
                 <div
@@ -1461,44 +1494,44 @@ export default function IcpBuilderPage() {
                 />
               </div>
             </div>
-
-            {/* Message informatif essai — pendant l'essai */}
-            {isEssential && isTrialActive && trialEndsAt && (
-              <div className="mt-2 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
-                <Sparkles className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
-                <p>
-                  <span className="font-semibold">
-                    Période d&apos;essai ({computeTrialDaysRemaining(trialEndsAt)} jour
-                    {computeTrialDaysRemaining(trialEndsAt) > 1 ? "s" : ""} restant
-                    {computeTrialDaysRemaining(trialEndsAt) > 1 ? "s" : ""})
-                  </span>{" "}
-                  — Vous pourrez sélectionner davantage de leads après validation de votre
-                  abonnement.
-                </p>
-              </div>
-            )}
-
-            {/* Bannière post-essai — première visite après fin d'essai */}
-            {isEssential && !isTrialActive && showPostTrialBanner && (
-              <div className="mt-2 flex items-start gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
-                <p className="flex-1">
-                  <span className="font-semibold">Votre abonnement est actif !</span> Vous
-                  pouvez maintenant sélectionner vos leads pour le reste du mois.
-                </p>
-                <button
-                  type="button"
-                  onClick={acknowledgePostTrialOnce}
-                  className="text-emerald-700 hover:text-emerald-900 transition-colors"
-                  aria-label="Fermer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* Retour — lien discret */}
+          {/* Actions — ligne dédiée sous la bannière */}
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            {quotaRemaining > 0 && (
+              <button
+                type="button"
+                onClick={handleAutoSelect}
+                disabled={autoSelecting || selectedCount >= autoSelectTarget}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors"
+              >
+                {autoSelecting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                {autoSelecting ? "Sélection…" : `Auto-sélectionner ${autoSelectTarget.toLocaleString("fr-FR")} leads`}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              disabled={(!canSelectMore && selectedCount === 0) || browseLoading}
+              className="inline-flex items-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed px-6 py-2.5 text-sm font-medium text-gray-700 transition-colors"
+            >
+              {selectedCount > 0 ? "Tout désélectionner" : "Tout sélectionner"}
+            </button>
+          </div>
+
+          {/* Alerte leads insuffisants — une ligne compacte */}
+          {!browseLoading && monthlyQuota > 0 && browseTotalEntries > 0 && browseTotalEntries < monthlyQuota && (
+            <p className="flex items-center gap-1.5 text-sm text-orange-700 mb-2">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-orange-500" />
+              Seulement <span className="font-semibold">{browseTotalEntries.toLocaleString("fr-FR")} leads</span> disponibles pour vos critères (quota&nbsp;: {monthlyQuota.toLocaleString("fr-FR")}).
+            </p>
+          )}
+
+          {/* Retour — lien texte discret */}
           <div className="mb-4">
             <button
               type="button"
@@ -1506,21 +1539,11 @@ export default function IcpBuilderPage() {
                 setScreen("summary");
                 setBrowseLeads([]);
               }}
-              className="text-sm text-[#7a9abf] hover:text-[#2563EB] transition-colors"
+              className="text-xs text-[#7a9abf] hover:text-[#2563EB] transition-colors"
             >
               ← Retour au ciblage
             </button>
           </div>
-
-          {/* Alerte leads insuffisants */}
-          {!browseLoading && monthlyQuota > 0 && browseTotalEntries > 0 && browseTotalEntries < monthlyQuota && (
-            <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mb-4 text-sm text-orange-800">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-orange-500" />
-              <p>
-                Seulement <span className="font-semibold">{browseTotalEntries.toLocaleString("fr-FR")} leads</span> disponibles pour vos critères (quota : {monthlyQuota.toLocaleString("fr-FR")}). Vous pourrez élargir votre ciblage une fois la sélection validée.
-              </p>
-            </div>
-          )}
 
           {browseError && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-sm text-red-700">

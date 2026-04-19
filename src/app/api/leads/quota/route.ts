@@ -15,7 +15,6 @@ function getPrimaryEmail(user: Awaited<ReturnType<typeof currentUser>>): string 
   );
 }
 
-const TRIAL_DAYS = 7;
 const MONTHLY_WORKDAYS = 22;
 
 function getGoogleAuth() {
@@ -95,8 +94,7 @@ export async function GET() {
   const isEssential = plan === "essential";
 
   // ── Anchor date from search_credits.created_at ─────────────────────
-  // Used for trial computation (essentials) and as a period_end fallback
-  // when Stripe data is missing.
+  // Used as a period_end fallback when Stripe data is missing.
   let anchorDate: Date | null = null;
   {
     const { data: creditRow } = await supabase
@@ -109,23 +107,7 @@ export async function GET() {
     }
   }
 
-  // ── Trial computation (Essential only) ─────────────────────────────
   const now = new Date();
-  let trialEndsAtIso: string | null = null;
-  let isTrialActive = false;
-  let trialQuota = 0;
-
-  if (isEssential && anchorDate) {
-    const trialEndsAt = new Date(anchorDate);
-    trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
-    trialEndsAtIso = trialEndsAt.toISOString();
-    isTrialActive = now.getTime() < trialEndsAt.getTime();
-
-    const trialLastDay = new Date(anchorDate);
-    trialLastDay.setDate(trialLastDay.getDate() + TRIAL_DAYS - 1);
-    const trialBusinessDays = countWeekdaysBetween(anchorDate, trialLastDay);
-    trialQuota = quotaPerDay * trialBusinessDays;
-  }
 
   // ── Monthly cap shown to the client ────────────────────────────────
   // Prorate on business days remaining until period_end.
@@ -150,12 +132,7 @@ export async function GET() {
     countWeekdaysBetween(now, periodEndDate)
   );
 
-  let monthlyQuota: number;
-  if (isEssential && isTrialActive) {
-    monthlyQuota = trialQuota;
-  } else {
-    monthlyQuota = quotaPerDay * businessDaysRemaining;
-  }
+  let monthlyQuota = quotaPerDay * businessDaysRemaining;
   if (!monthlyQuota || monthlyQuota <= 0) {
     monthlyQuota = quotaPerDay * MONTHLY_WORKDAYS;
   }
@@ -221,8 +198,5 @@ export async function GET() {
     quota_used: quotaUsed,
     quota_remaining: quotaRemaining,
     is_essential: isEssential,
-    trial_ends_at: trialEndsAtIso,
-    is_trial_active: isTrialActive,
-    trial_quota: trialQuota,
   });
 }

@@ -31,7 +31,6 @@ import {
 } from "@/lib/inbox-events";
 import { queryKeys } from "@/lib/query-keys";
 import { supabase } from "@/lib/supabase";
-import { hasAckedPostTrial, POST_TRIAL_ACK_EVENT } from "@/lib/trial-events";
 
 const STORAGE_KEY = "lidmeo.sidebarOpen";
 const WIDTH_OPEN = 240;
@@ -48,7 +47,7 @@ type NavItem = {
   onClick?: () => void;
   label: string;
   icon: LucideIcon;
-  badge?: "inbox" | "icp";
+  badge?: "inbox";
   key?: string;
 };
 
@@ -160,42 +159,6 @@ function useInboxUnread(): number {
   return totalUnread;
 }
 
-function useIcpTrialBadge(): boolean {
-  const [show, setShow] = useState(false);
-
-  const refresh = useCallback(async () => {
-    try {
-      const res = await fetch("/api/leads/quota", { cache: "no-store" });
-      if (!res.ok) {
-        setShow(false);
-        return;
-      }
-      const data = await res.json().catch(() => ({}));
-      const essential = Boolean(data?.is_essential);
-      const trialActive = Boolean(data?.is_trial_active);
-      const trialEnds =
-        typeof data?.trial_ends_at === "string" ? data.trial_ends_at : null;
-      setShow(
-        essential && !trialActive && !!trialEnds && !hasAckedPostTrial(trialEnds)
-      );
-    } catch {
-      setShow(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  useEffect(() => {
-    const handler = () => setShow(false);
-    window.addEventListener(POST_TRIAL_ACK_EVENT, handler);
-    return () => window.removeEventListener(POST_TRIAL_ACK_EVENT, handler);
-  }, []);
-
-  return show;
-}
-
 type InboxBadgeProps = { count: number; collapsed?: boolean };
 
 function InboxBadge({ count, collapsed }: InboxBadgeProps) {
@@ -297,7 +260,6 @@ export default function Sidebar({
   }, []);
 
   const unread = useInboxUnread();
-  const trialBadge = useIcpTrialBadge();
   const { openUserProfile, signOut } = useClerk();
   const { user: clerkUser } = useUser();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -358,7 +320,6 @@ export default function Sidebar({
           href: "/dashboard/hub/icp-builder",
           label: "Mon ciblage",
           icon: Crosshair,
-          badge: "icp",
         },
         {
           href: "/dashboard/hub/messages-setup",
@@ -422,7 +383,6 @@ export default function Sidebar({
     const active = item.href ? isItemActive(item.href) : false;
 
     const inboxCount = item.badge === "inbox" ? unread : 0;
-    const showIcpBadge = item.badge === "icp" && trialBadge;
     const key = item.key ?? item.href ?? item.label;
 
     const commonClassName = `relative flex items-center gap-3 rounded-lg px-2.5 py-[8px] text-[13px] leading-none cursor-pointer ${
@@ -465,9 +425,6 @@ export default function Sidebar({
               {item.badge === "inbox" ? (
                 <InboxBadge count={inboxCount} collapsed />
               ) : null}
-              {showIcpBadge ? (
-                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#EF4444] ring-2 ring-white" />
-              ) : null}
             </>
           ) : null}
         </span>
@@ -480,11 +437,6 @@ export default function Sidebar({
             <span className="flex-1">{item.label}</span>
             {item.badge === "inbox" ? (
               <InboxBadge count={inboxCount} />
-            ) : null}
-            {showIcpBadge ? (
-              <span className="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF4444] px-1.5 text-[10px] font-bold leading-none text-white">
-                1
-              </span>
             ) : null}
           </span>
         ) : null}
