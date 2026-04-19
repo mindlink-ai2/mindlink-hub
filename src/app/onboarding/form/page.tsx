@@ -97,7 +97,7 @@ function OnboardingForm() {
         }
 
         // Already submitted the form — go to step 3
-        if (state === "form_submitted") {
+        if (state === "icp_submitted") {
           router.replace("/onboarding/video");
           return;
         }

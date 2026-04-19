@@ -48,7 +48,7 @@ export default async function OnboardingVideoPage() {
     redirect("/");
   }
 
-  if (onboarding.state !== "form_submitted") {
+  if (onboarding.state !== "icp_submitted") {
     redirect("/onboarding");
   }
 

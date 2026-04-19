@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import {
-  markClientOnboardingFormSubmitted,
+  markClientOnboardingIcpSubmitted,
   resolveClientContextForUser,
 } from "@/lib/client-onboarding-state";
 
@@ -180,7 +180,7 @@ export async function POST(req: Request) {
     // 7) Email récap interne (Resend)
     await sendNotifyEmail(n8nBody);
 
-    // 7bis) Marque l'onboarding en état "form_submitted" (étape 3 vidéo à venir)
+    // 7bis) Marque l'onboarding en état "icp_submitted" (étape 3 vidéo à venir)
     try {
       const supabase = createServiceSupabase();
       const clientContext = await resolveClientContextForUser(
@@ -189,10 +189,10 @@ export async function POST(req: Request) {
         clerkEmail
       );
       if (clientContext) {
-        await markClientOnboardingFormSubmitted(supabase, clientContext.clientId);
+        await markClientOnboardingIcpSubmitted(supabase, clientContext.clientId);
       }
     } catch (onboardingStateErr) {
-      console.error("Unable to mark onboarding state form_submitted:", onboardingStateErr);
+      console.error("Unable to mark onboarding state icp_submitted:", onboardingStateErr);
     }
 
     return NextResponse.json({ ok: true });

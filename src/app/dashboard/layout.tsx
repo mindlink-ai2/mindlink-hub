@@ -55,7 +55,7 @@ export default async function DashboardLayout({
 
     // Block access if form submitted but step 3 (video) not yet completed
     const onboarding = await getClientOnboardingStateRow(supabase, clientContext.clientId);
-    if (onboarding?.state === "form_submitted") {
+    if (onboarding?.state === "icp_submitted") {
       redirect("/onboarding/video");
     }
   }
