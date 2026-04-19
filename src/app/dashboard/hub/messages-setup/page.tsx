@@ -454,11 +454,6 @@ export default function MessagesSetupPage() {
         )}
       </div>
 
-      {screen === "loading" && (
-        <div className="flex min-h-[60vh] items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
-        </div>
-      )}
 
       {screen === "saved" && existingMessages && (
         <div className="mx-auto max-w-3xl px-4 py-10">

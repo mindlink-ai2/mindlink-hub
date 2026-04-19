@@ -1641,36 +1641,15 @@ export default function LeadsPage() {
     };
   }, [isSidebarOpen]);
 
-  if (!clientLoaded) {
-    if (paginatedLeadsQuery.isError) {
-      return (
-        <SubscriptionGate supportEmail="contact@lidmeo.com">
-          <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
-            <div className="mx-auto max-w-[860px] rounded-3xl border border-red-200 bg-white p-6 text-sm text-red-700 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.4)]">
-              Impossible de charger la prospection pour le moment. Rechargez la page ou réessayez dans quelques instants.
-            </div>
-          </div>
-        </SubscriptionGate>
-      );
-    }
-
+  if (!clientLoaded && paginatedLeadsQuery.isError) {
     return (
-      <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
-        <div className="mx-auto w-full max-w-[1680px]">
-          <div className="hub-card-hero p-6 sm:p-7">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="h-6 w-44 animate-pulse rounded-xl bg-[#e5edf8]" />
-                <div className="mt-3 h-4 w-80 animate-pulse rounded-lg bg-[#edf3fb]" />
-              </div>
-              <div className="h-10 w-28 animate-pulse rounded-xl bg-[#edf3fb]" />
-            </div>
-
-            <div className="mt-6 h-12 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
-            <div className="mt-4 h-72 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
+      <SubscriptionGate supportEmail="contact@lidmeo.com">
+        <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
+          <div className="mx-auto max-w-[860px] rounded-3xl border border-red-200 bg-white p-6 text-sm text-red-700 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.4)]">
+            Impossible de charger la prospection pour le moment. Rechargez la page ou réessayez dans quelques instants.
           </div>
         </div>
-      </div>
+      </SubscriptionGate>
     );
   }
 
@@ -1691,6 +1670,10 @@ export default function LeadsPage() {
     { key: "connected", label: "Connecté", count: segmentCounts.connected },
     { key: "sent", label: "Envoyé", count: segmentCounts.sent },
   ];
+
+  const isInitialLoading =
+    (paginatedLeadsQuery.isPending && !paginatedLeadsQuery.data) ||
+    (summaryQuery.isPending && !summaryQuery.data);
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
@@ -1845,10 +1828,50 @@ export default function LeadsPage() {
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-                  <Metric title="Total leads" value={total} tone="default" />
-                  <Metric title="Traités" value={treatedCount} tone="success" />
-                  <Metric title="En attente" value={pendingCount} tone="info" />
-                  <Metric title="À traiter" value={remainingToTreat} tone="warning" />
+                  <Metric
+                    title="Total leads"
+                    value={
+                      isInitialLoading ? (
+                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+                      ) : (
+                        <span className="inline-block animate-in fade-in duration-200">{total}</span>
+                      )
+                    }
+                    tone="default"
+                  />
+                  <Metric
+                    title="Traités"
+                    value={
+                      isInitialLoading ? (
+                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+                      ) : (
+                        <span className="inline-block animate-in fade-in duration-200">{treatedCount}</span>
+                      )
+                    }
+                    tone="success"
+                  />
+                  <Metric
+                    title="En attente"
+                    value={
+                      isInitialLoading ? (
+                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+                      ) : (
+                        <span className="inline-block animate-in fade-in duration-200">{pendingCount}</span>
+                      )
+                    }
+                    tone="info"
+                  />
+                  <Metric
+                    title="À traiter"
+                    value={
+                      isInitialLoading ? (
+                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+                      ) : (
+                        <span className="inline-block animate-in fade-in duration-200">{remainingToTreat}</span>
+                      )
+                    }
+                    tone="warning"
+                  />
                 </div>
 
                 <div className="mt-3 md:hidden">
@@ -1995,7 +2018,17 @@ export default function LeadsPage() {
                   </thead>
 
                   <tbody>
-                    {filteredLeads.length === 0 ? (
+                    {isInitialLoading ? (
+                      Array.from({ length: 8 }).map((_, i) => (
+                        <tr key={`skeleton-row-${i}`}>
+                          {Array.from({ length: colCount }).map((__, j) => (
+                            <td key={j} className="px-3 py-3">
+                              <span className="block h-3 w-full animate-pulse rounded bg-gray-200" />
+                            </td>
+                          ))}
+                        </tr>
+                      ))
+                    ) : filteredLeads.length === 0 ? (
                       <tr>
                         <td colSpan={colCount} className="py-16 text-center">
                           <div className="mx-auto max-w-md px-6">

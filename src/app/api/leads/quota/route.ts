@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
+import { resolveClientContextForUser } from "@/lib/client-onboarding-state";
 import { google } from "googleapis";
 
 export const runtime = "nodejs";
+
+function getPrimaryEmail(user: Awaited<ReturnType<typeof currentUser>>): string | null {
+  return (
+    user?.emailAddresses?.find((entry) => entry.id === user.primaryEmailAddressId)
+      ?.emailAddress ??
+    user?.emailAddresses?.[0]?.emailAddress ??
+    null
+  );
+}
 
 const TRIAL_DAYS = 7;
 const MONTHLY_WORKDAYS = 22;
@@ -51,22 +61,53 @@ export async function GET() {
   }
 
   const supabase = createServiceSupabase();
+  const user = await currentUser();
+  const primaryEmail = getPrimaryEmail(user);
 
-  const { data: clientRow, error: clientErr } = await supabase
-    .from("clients")
-    .select("id, quota, email, company_name, plan, created_at")
-    .eq("clerk_user_id", userId)
-    .single();
+  const clientContext = await resolveClientContextForUser(supabase, userId, primaryEmail);
+  console.log("[quota] userId:", userId, "email:", primaryEmail, "resolved:", clientContext);
 
-  if (clientErr || !clientRow) {
+  if (!clientContext) {
+    console.log("[quota] no client context — returning 404");
     return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
   }
 
-  const orgId: number = clientRow.id;
+  const orgId: number = clientContext.clientId;
+
+  const { data: clientRow, error: clientErr } = await supabase
+    .from("clients")
+    .select("id, quota, email, company_name, plan, current_period_end")
+    .eq("id", orgId)
+    .single();
+
+  console.log("[quota] org_id:", orgId);
+  console.log("[quota] client:", JSON.stringify(clientRow));
+
+  if (clientErr || !clientRow) {
+    console.log("[quota] client row fetch failed:", clientErr);
+    return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
+  }
+
   const quotaPerDay = Number(clientRow.quota) || 10;
+  console.log("[quota] quota_per_day:", quotaPerDay);
   const clientEmail = clientRow.email as string | null;
   const plan = String(clientRow.plan ?? "").trim().toLowerCase();
   const isEssential = plan === "essential";
+
+  // ── Anchor date from search_credits.created_at ─────────────────────
+  // Used for trial computation (essentials) and as a period_end fallback
+  // when Stripe data is missing.
+  let anchorDate: Date | null = null;
+  {
+    const { data: creditRow } = await supabase
+      .from("search_credits")
+      .select("created_at")
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (creditRow?.created_at) {
+      anchorDate = new Date(creditRow.created_at as string);
+    }
+  }
 
   // ── Trial computation (Essential only) ─────────────────────────────
   const now = new Date();
@@ -74,31 +115,59 @@ export async function GET() {
   let isTrialActive = false;
   let trialQuota = 0;
 
-  if (isEssential && clientRow.created_at) {
-    const createdAt = new Date(clientRow.created_at as string);
-    const trialEndsAt = new Date(createdAt);
+  if (isEssential && anchorDate) {
+    const trialEndsAt = new Date(anchorDate);
     trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
     trialEndsAtIso = trialEndsAt.toISOString();
     isTrialActive = now.getTime() < trialEndsAt.getTime();
 
-    const trialLastDay = new Date(createdAt);
+    const trialLastDay = new Date(anchorDate);
     trialLastDay.setDate(trialLastDay.getDate() + TRIAL_DAYS - 1);
-    const trialBusinessDays = countWeekdaysBetween(createdAt, trialLastDay);
+    const trialBusinessDays = countWeekdaysBetween(anchorDate, trialLastDay);
     trialQuota = quotaPerDay * trialBusinessDays;
   }
 
   // ── Monthly cap shown to the client ────────────────────────────────
-  // Full plan or any non-essential → unchanged behavior (22 workdays).
-  // Essential during trial → trial_quota.
-  // Essential after trial → prorated on remaining workdays in current month.
+  // Prorate on business days remaining until period_end.
+  // Period end resolution order:
+  //   1. clients.current_period_end (written by Stripe webhook)
+  //   2. anchor (search_credits.created_at) + 31 days
+  //   3. end of current calendar month
+  const periodEndRaw = (clientRow.current_period_end as string | null) ?? null;
+  let periodEndDate: Date | null =
+    periodEndRaw ? new Date(periodEndRaw) : null;
+  if (!periodEndDate || Number.isNaN(periodEndDate.getTime())) {
+    if (anchorDate) {
+      periodEndDate = new Date(anchorDate);
+      periodEndDate.setDate(periodEndDate.getDate() + 31);
+    } else {
+      periodEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    }
+  }
+
+  const businessDaysRemaining = Math.max(
+    1,
+    countWeekdaysBetween(now, periodEndDate)
+  );
+
   let monthlyQuota: number;
   if (isEssential && isTrialActive) {
     monthlyQuota = trialQuota;
-  } else if (isEssential) {
-    monthlyQuota = quotaPerDay * workdaysRemainingInMonth(now);
   } else {
+    monthlyQuota = quotaPerDay * businessDaysRemaining;
+  }
+  if (!monthlyQuota || monthlyQuota <= 0) {
     monthlyQuota = quotaPerDay * MONTHLY_WORKDAYS;
   }
+
+  console.log(
+    "[quota] stripe_period_end:",
+    periodEndRaw,
+    "business_days_remaining:",
+    businessDaysRemaining,
+    "monthly_quota:",
+    monthlyQuota
+  );
 
   // ── Count leads already in the client's Google Sheet tab ───────────
   let quotaUsed = 0;
@@ -135,7 +204,16 @@ export async function GET() {
 
   void orgId;
 
-  const quotaRemaining = Math.max(0, monthlyQuota - quotaUsed);
+  let quotaRemaining = Math.max(0, monthlyQuota - quotaUsed);
+
+  // Test accounts — never blocked by quota
+  const TEST_ORG_IDS = new Set<number>([16, 18]);
+  if (TEST_ORG_IDS.has(orgId)) {
+    monthlyQuota = 99999;
+    quotaRemaining = 99999;
+  }
+
+  console.log("[quota] monthly_quota:", monthlyQuota, "quota_used:", quotaUsed, "quota_remaining:", quotaRemaining);
 
   return NextResponse.json({
     quota_per_day: quotaPerDay,

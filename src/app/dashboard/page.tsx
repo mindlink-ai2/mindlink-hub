@@ -667,7 +667,11 @@ function KPI({
         </div>
 
         <div className="hub-kpi-number mt-3 text-4xl">
-          {loading ? <span className="opacity-50">—</span> : value}
+          {loading ? (
+            <span className="inline-block h-9 w-20 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+          ) : (
+            <span className="inline-block animate-in fade-in duration-200">{value}</span>
+          )}
         </div>
 
         <div className="mt-2 text-[12px] text-[#51627b]">
