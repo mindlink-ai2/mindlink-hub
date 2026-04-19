@@ -1834,7 +1834,9 @@ export default function LeadsPage() {
                       isInitialLoading ? (
                         <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
                       ) : (
-                        total
+                        <span className="inline-block animate-in fade-in duration-200">
+                          {total}
+                        </span>
                       )
                     }
                     tone="default"
@@ -1845,7 +1847,9 @@ export default function LeadsPage() {
                       isInitialLoading ? (
                         <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
                       ) : (
-                        treatedCount
+                        <span className="inline-block animate-in fade-in duration-200">
+                          {treatedCount}
+                        </span>
                       )
                     }
                     tone="success"
@@ -1856,7 +1860,9 @@ export default function LeadsPage() {
                       isInitialLoading ? (
                         <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
                       ) : (
-                        pendingCount
+                        <span className="inline-block animate-in fade-in duration-200">
+                          {pendingCount}
+                        </span>
                       )
                     }
                     tone="info"
@@ -1867,7 +1873,9 @@ export default function LeadsPage() {
                       isInitialLoading ? (
                         <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
                       ) : (
-                        remainingToTreat
+                        <span className="inline-block animate-in fade-in duration-200">
+                          {remainingToTreat}
+                        </span>
                       )
                     }
                     tone="warning"

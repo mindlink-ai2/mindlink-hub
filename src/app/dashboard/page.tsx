@@ -670,7 +670,9 @@ function KPI({
           {loading ? (
             <span className="inline-block h-9 w-20 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
           ) : (
-            value
+            <span className="inline-block animate-in fade-in duration-200">
+              {value}
+            </span>
           )}
         </div>
 

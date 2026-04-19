@@ -1152,9 +1152,6 @@ export default function FollowupsPage() {
   // RENDER principal
   // =========================================================================
 
-  const isInitialLoading =
-    !planLoaded || (plan === "full" ? !fullLoaded : !loaded);
-
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <div className="relative h-full min-h-0">
@@ -1272,7 +1269,9 @@ export default function FollowupsPage() {
                           {!loaded ? (
                             <span className="inline-block h-3 w-6 animate-pulse rounded bg-[#E5E7EB] align-middle" />
                           ) : (
-                            totalFollowups
+                            <span className="inline-block animate-in fade-in duration-200">
+                              {totalFollowups}
+                            </span>
                           )}{" "}
                           relance(s)
                         </span>
