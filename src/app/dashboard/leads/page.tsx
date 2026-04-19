@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import LeadsSkeleton from "./loading";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { queryKeys } from "@/lib/query-keys";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -1697,10 +1696,6 @@ export default function LeadsPage() {
     (paginatedLeadsQuery.isPending && !paginatedLeadsQuery.data) ||
     (summaryQuery.isPending && !summaryQuery.data);
 
-  if (isInitialLoading) {
-    return <LeadsSkeleton />;
-  }
-
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
@@ -1854,10 +1849,50 @@ export default function LeadsPage() {
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-                  <Metric title="Total leads" value={total} tone="default" />
-                  <Metric title="Traités" value={treatedCount} tone="success" />
-                  <Metric title="En attente" value={pendingCount} tone="info" />
-                  <Metric title="À traiter" value={remainingToTreat} tone="warning" />
+                  <Metric
+                    title="Total leads"
+                    value={
+                      isInitialLoading ? (
+                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+                      ) : (
+                        total
+                      )
+                    }
+                    tone="default"
+                  />
+                  <Metric
+                    title="Traités"
+                    value={
+                      isInitialLoading ? (
+                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+                      ) : (
+                        treatedCount
+                      )
+                    }
+                    tone="success"
+                  />
+                  <Metric
+                    title="En attente"
+                    value={
+                      isInitialLoading ? (
+                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+                      ) : (
+                        pendingCount
+                      )
+                    }
+                    tone="info"
+                  />
+                  <Metric
+                    title="À traiter"
+                    value={
+                      isInitialLoading ? (
+                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+                      ) : (
+                        remainingToTreat
+                      )
+                    }
+                    tone="warning"
+                  />
                 </div>
 
                 <div className="mt-3 md:hidden">

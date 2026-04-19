@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import InboxSkeleton from "./loading";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { trackBusinessEvent } from "@/lib/analytics/business-client";
 import { HubButton } from "@/components/ui/hub-button";
@@ -785,10 +784,6 @@ export default function InboxPage() {
 
     setSelectedThreadId(threadId);
   };
-
-  if (loadingThreads && threads.length === 0) {
-    return <InboxSkeleton />;
-  }
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">

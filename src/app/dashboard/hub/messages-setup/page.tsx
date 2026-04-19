@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import MessagesSetupSkeleton from "./loading";
 import {
   AlertCircle,
   CheckCircle2,
@@ -409,10 +408,6 @@ export default function MessagesSetupPage() {
   }, [onboardingPending, onboardingState]);
 
   const canFinalize = Boolean(validatedLinkedin && validatedRelance);
-
-  if (screen === "loading") {
-    return <MessagesSetupSkeleton />;
-  }
 
   return (
     <div className="min-h-screen bg-[#eef1f8]">

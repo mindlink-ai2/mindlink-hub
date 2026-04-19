@@ -6,7 +6,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { Check, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
 import MobileLayout from "@/components/mobile/MobileLayout";
 import MobilePageHeader from "@/components/mobile/MobilePageHeader";
-import BillingSkeleton from "./loading";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 type BillingStatus = {
   plan: string | null; // "essential" | "full"
@@ -182,10 +182,6 @@ export default function BillingPage() {
     if (selectedEssentialQuota === 20) return 69;
     return 89; // 30
   }, [selectedEssentialQuota]);
-
-  if (statusLoading) {
-    return <BillingSkeleton />;
-  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">

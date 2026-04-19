@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import DashboardSkeleton from "./loading";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { trackBusinessEvent } from "@/lib/analytics/business-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -231,10 +230,6 @@ export default function DashboardPage() {
       );
     });
   }, [drilldownData, q]);
-
-  if (loadingStats && !statsData) {
-    return <DashboardSkeleton />;
-  }
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
@@ -672,7 +667,11 @@ function KPI({
         </div>
 
         <div className="hub-kpi-number mt-3 text-4xl">
-          {loading ? <span className="opacity-50">—</span> : value}
+          {loading ? (
+            <span className="inline-block h-9 w-20 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+          ) : (
+            value
+          )}
         </div>
 
         <div className="mt-2 text-[12px] text-[#51627b]">
