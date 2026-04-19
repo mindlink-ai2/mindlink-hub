@@ -5,6 +5,9 @@ import { google } from "googleapis";
 
 export const runtime = "nodejs";
 
+const TRIAL_DAYS = 7;
+const MONTHLY_WORKDAYS = 22;
+
 function getGoogleAuth() {
   const raw = process.env.GOOGLE_SHEETS_SERVICE_ACCOUNT_KEY;
   if (!raw) return null;
@@ -14,6 +17,31 @@ function getGoogleAuth() {
     credentials,
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
   });
+}
+
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function countWeekdaysBetween(start: Date, end: Date): number {
+  const s = startOfDay(start);
+  const e = startOfDay(end);
+  if (e < s) return 0;
+  let count = 0;
+  const cur = new Date(s);
+  while (cur.getTime() <= e.getTime()) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
+function workdaysRemainingInMonth(from: Date): number {
+  const last = new Date(from.getFullYear(), from.getMonth() + 1, 0);
+  return countWeekdaysBetween(from, last);
 }
 
 export async function GET() {
@@ -26,7 +54,7 @@ export async function GET() {
 
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id, quota, email, company_name")
+    .select("id, quota, email, company_name, plan, created_at")
     .eq("clerk_user_id", userId)
     .single();
 
@@ -36,22 +64,56 @@ export async function GET() {
 
   const orgId: number = clientRow.id;
   const quotaPerDay = Number(clientRow.quota) || 10;
-  const monthlyQuota = quotaPerDay * 22;
   const clientEmail = clientRow.email as string | null;
+  const plan = String(clientRow.plan ?? "").trim().toLowerCase();
+  const isEssential = plan === "essential";
 
-  // Count leads already in the client's Google Sheet tab
+  // ── Trial computation (Essential only) ─────────────────────────────
+  const now = new Date();
+  let trialEndsAtIso: string | null = null;
+  let isTrialActive = false;
+  let trialQuota = 0;
+
+  if (isEssential && clientRow.created_at) {
+    const createdAt = new Date(clientRow.created_at as string);
+    const trialEndsAt = new Date(createdAt);
+    trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
+    trialEndsAtIso = trialEndsAt.toISOString();
+    isTrialActive = now.getTime() < trialEndsAt.getTime();
+
+    const trialLastDay = new Date(createdAt);
+    trialLastDay.setDate(trialLastDay.getDate() + TRIAL_DAYS - 1);
+    const trialBusinessDays = countWeekdaysBetween(createdAt, trialLastDay);
+    trialQuota = quotaPerDay * trialBusinessDays;
+  }
+
+  // ── Monthly cap shown to the client ────────────────────────────────
+  // Full plan or any non-essential → unchanged behavior (22 workdays).
+  // Essential during trial → trial_quota.
+  // Essential after trial → prorated on remaining workdays in current month.
+  let monthlyQuota: number;
+  if (isEssential && isTrialActive) {
+    monthlyQuota = trialQuota;
+  } else if (isEssential) {
+    monthlyQuota = quotaPerDay * workdaysRemainingInMonth(now);
+  } else {
+    monthlyQuota = quotaPerDay * MONTHLY_WORKDAYS;
+  }
+
+  // ── Count leads already in the client's Google Sheet tab ───────────
   let quotaUsed = 0;
   const MASTER_SHEET_ID = process.env.GOOGLE_MASTER_SHEET_ID;
 
   if (MASTER_SHEET_ID) {
-    const auth = getGoogleAuth();
-    if (auth) {
+    const googleAuth = getGoogleAuth();
+    if (googleAuth) {
       try {
-        const sheets = google.sheets({ version: "v4", auth });
+        const sheets = google.sheets({ version: "v4", auth: googleAuth });
         const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: MASTER_SHEET_ID });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const sheetsList: any[] = spreadsheet.data.sheets ?? [];
         const existingTab = clientEmail
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ? sheetsList.find((s: any) => s.properties?.title?.includes(clientEmail))
           : null;
 
@@ -62,7 +124,7 @@ export async function GET() {
           });
           const rows = readRes.data.values;
           if (rows && rows.length > 1) {
-            quotaUsed = rows.length - 1; // minus header
+            quotaUsed = rows.length - 1;
           }
         }
       } catch {
@@ -71,6 +133,8 @@ export async function GET() {
     }
   }
 
+  void orgId;
+
   const quotaRemaining = Math.max(0, monthlyQuota - quotaUsed);
 
   return NextResponse.json({
@@ -78,5 +142,9 @@ export async function GET() {
     monthly_quota: monthlyQuota,
     quota_used: quotaUsed,
     quota_remaining: quotaRemaining,
+    is_essential: isEssential,
+    trial_ends_at: trialEndsAtIso,
+    is_trial_active: isTrialActive,
+    trial_quota: trialQuota,
   });
 }

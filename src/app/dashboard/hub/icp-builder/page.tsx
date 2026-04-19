@@ -23,6 +23,14 @@ import {
 } from "lucide-react";
 import { HubButton } from "@/components/ui/hub-button";
 import { cn } from "@/lib/utils";
+import { ackPostTrial, hasAckedPostTrial } from "@/lib/trial-events";
+
+function computeTrialDaysRemaining(trialEndsAtIso: string): number {
+  const end = new Date(trialEndsAtIso).getTime();
+  const diff = end - Date.now();
+  if (diff <= 0) return 0;
+  return Math.max(1, Math.ceil(diff / (24 * 60 * 60 * 1000)));
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -353,6 +361,10 @@ export default function IcpBuilderPage() {
   const [monthlyQuota, setMonthlyQuota] = useState(0);
   const [quotaUsed, setQuotaUsed] = useState(0);
   const [quotaRemaining, setQuotaRemaining] = useState(0);
+  const [isEssential, setIsEssential] = useState(false);
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [isTrialActive, setIsTrialActive] = useState(false);
+  const [showPostTrialBanner, setShowPostTrialBanner] = useState(false);
   const [validatingSelection, setValidatingSelection] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [autoSelecting, setAutoSelecting] = useState(false);
@@ -727,6 +739,15 @@ export default function IcpBuilderPage() {
         setMonthlyQuota(data.monthly_quota ?? 0);
         setQuotaUsed(data.quota_used ?? 0);
         setQuotaRemaining(data.quota_remaining ?? 0);
+        const essential = Boolean(data.is_essential);
+        const trialEnds = typeof data.trial_ends_at === "string" ? data.trial_ends_at : null;
+        const trialActive = Boolean(data.is_trial_active);
+        setIsEssential(essential);
+        setTrialEndsAt(trialEnds);
+        setIsTrialActive(trialActive);
+        setShowPostTrialBanner(
+          essential && !trialActive && !!trialEnds && !hasAckedPostTrial(trialEnds)
+        );
       }
     } catch {
       // silencieux
@@ -780,6 +801,14 @@ export default function IcpBuilderPage() {
     [generatedFilters, answers, fetchQuota, fetchBrowsePage]
   );
 
+  const acknowledgePostTrialOnce = useCallback(() => {
+    if (!isEssential || isTrialActive || !trialEndsAt) return;
+    if (!hasAckedPostTrial(trialEndsAt)) {
+      ackPostTrial(trialEndsAt);
+      setShowPostTrialBanner(false);
+    }
+  }, [isEssential, isTrialActive, trialEndsAt]);
+
   const toggleLeadSelection = useCallback(
     (lead: BrowseProfile) => {
       setSelectedLeadIds((prev) => {
@@ -795,12 +824,18 @@ export default function IcpBuilderPage() {
           if (next.size >= quotaRemaining) return prev;
           next.add(lead.id);
           setSelectedLeadsMap((m) => new Map(m).set(lead.id, lead));
+          acknowledgePostTrialOnce();
         }
         return next;
       });
     },
-    [quotaRemaining]
+    [quotaRemaining, acknowledgePostTrialOnce]
   );
+
+  // Acknowledge post-trial also on bulk select paths
+  useEffect(() => {
+    if (selectedCount > 0) acknowledgePostTrialOnce();
+  }, [selectedCount, acknowledgePostTrialOnce]);
 
   const toggleSelectAll = useCallback(() => {
     if (selectedCount > 0) {
@@ -1426,6 +1461,41 @@ export default function IcpBuilderPage() {
                 />
               </div>
             </div>
+
+            {/* Message informatif essai — pendant l'essai */}
+            {isEssential && isTrialActive && trialEndsAt && (
+              <div className="mt-2 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
+                <Sparkles className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+                <p>
+                  <span className="font-semibold">
+                    Période d&apos;essai ({computeTrialDaysRemaining(trialEndsAt)} jour
+                    {computeTrialDaysRemaining(trialEndsAt) > 1 ? "s" : ""} restant
+                    {computeTrialDaysRemaining(trialEndsAt) > 1 ? "s" : ""})
+                  </span>{" "}
+                  — Vous pourrez sélectionner davantage de leads après validation de votre
+                  abonnement.
+                </p>
+              </div>
+            )}
+
+            {/* Bannière post-essai — première visite après fin d'essai */}
+            {isEssential && !isTrialActive && showPostTrialBanner && (
+              <div className="mt-2 flex items-start gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+                <p className="flex-1">
+                  <span className="font-semibold">Votre abonnement est actif !</span> Vous
+                  pouvez maintenant sélectionner vos leads pour le reste du mois.
+                </p>
+                <button
+                  type="button"
+                  onClick={acknowledgePostTrialOnce}
+                  className="text-emerald-700 hover:text-emerald-900 transition-colors"
+                  aria-label="Fermer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Retour — lien discret */}

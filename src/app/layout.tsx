@@ -7,6 +7,7 @@ import DashboardContainer from "@/components/DashboardContainer";
 import InboxBackgroundSync from "@/components/InboxBackgroundSync";
 import RightHitboxDebug from "@/components/dev/RightHitboxDebug";
 import InboxNavLink from "@/components/InboxNavLink";
+import IcpBuilderNavLink from "@/components/IcpBuilderNavLink";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import SupportWidgetLoader from "@/components/support/SupportWidgetLoader";
 import BusinessTracker from "@/components/analytics/BusinessTracker";
@@ -178,12 +179,7 @@ export default async function RootLayout({
                         Relances
                       </Link>
                       <InboxNavLink />
-                      <Link
-                        href="/dashboard/hub/icp-builder"
-                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
-                      >
-                        Mon ciblage
-                      </Link>
+                      <IcpBuilderNavLink />
                       <Link
                         href="/dashboard/hub/messages-setup"
                         className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
