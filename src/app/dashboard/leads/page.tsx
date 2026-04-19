@@ -1641,36 +1641,15 @@ export default function LeadsPage() {
     };
   }, [isSidebarOpen]);
 
-  if (!clientLoaded) {
-    if (paginatedLeadsQuery.isError) {
-      return (
-        <SubscriptionGate supportEmail="contact@lidmeo.com">
-          <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
-            <div className="mx-auto max-w-[860px] rounded-3xl border border-red-200 bg-white p-6 text-sm text-red-700 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.4)]">
-              Impossible de charger la prospection pour le moment. Rechargez la page ou réessayez dans quelques instants.
-            </div>
-          </div>
-        </SubscriptionGate>
-      );
-    }
-
+  if (!clientLoaded && paginatedLeadsQuery.isError) {
     return (
-      <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
-        <div className="mx-auto w-full max-w-[1680px]">
-          <div className="hub-card-hero p-6 sm:p-7">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="h-6 w-44 animate-pulse rounded-xl bg-[#e5edf8]" />
-                <div className="mt-3 h-4 w-80 animate-pulse rounded-lg bg-[#edf3fb]" />
-              </div>
-              <div className="h-10 w-28 animate-pulse rounded-xl bg-[#edf3fb]" />
-            </div>
-
-            <div className="mt-6 h-12 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
-            <div className="mt-4 h-72 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
+      <SubscriptionGate supportEmail="contact@lidmeo.com">
+        <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
+          <div className="mx-auto max-w-[860px] rounded-3xl border border-red-200 bg-white p-6 text-sm text-red-700 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.4)]">
+            Impossible de charger la prospection pour le moment. Rechargez la page ou réessayez dans quelques instants.
           </div>
         </div>
-      </div>
+      </SubscriptionGate>
     );
   }
 
