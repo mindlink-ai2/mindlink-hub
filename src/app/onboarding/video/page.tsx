@@ -44,11 +44,9 @@ export default async function OnboardingVideoPage() {
     redirect("/dashboard");
   }
 
-  if (onboarding.state === "completed") {
-    redirect("/");
-  }
-
-  if (onboarding.state !== "icp_submitted") {
+  // Video is shown after messages-setup (state: completed) or the legacy
+  // post-form step (state: icp_submitted). Earlier states → restart onboarding.
+  if (onboarding.state !== "completed" && onboarding.state !== "icp_submitted") {
     redirect("/onboarding");
   }
 
