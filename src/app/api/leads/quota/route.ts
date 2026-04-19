@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
+import { resolveClientContextForUser } from "@/lib/client-onboarding-state";
 import { google } from "googleapis";
 
 export const runtime = "nodejs";
+
+function getPrimaryEmail(user: Awaited<ReturnType<typeof currentUser>>): string | null {
+  return (
+    user?.emailAddresses?.find((entry) => entry.id === user.primaryEmailAddressId)
+      ?.emailAddress ??
+    user?.emailAddresses?.[0]?.emailAddress ??
+    null
+  );
+}
 
 const TRIAL_DAYS = 7;
 const MONTHLY_WORKDAYS = 22;
@@ -51,19 +61,35 @@ export async function GET() {
   }
 
   const supabase = createServiceSupabase();
+  const user = await currentUser();
+  const primaryEmail = getPrimaryEmail(user);
+
+  const clientContext = await resolveClientContextForUser(supabase, userId, primaryEmail);
+  console.log("[quota] userId:", userId, "email:", primaryEmail, "resolved:", clientContext);
+
+  if (!clientContext) {
+    console.log("[quota] no client context — returning 404");
+    return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
+  }
+
+  const orgId: number = clientContext.clientId;
 
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
     .select("id, quota, email, company_name, plan, created_at")
-    .eq("clerk_user_id", userId)
+    .eq("id", orgId)
     .single();
 
+  console.log("[quota] org_id:", orgId);
+  console.log("[quota] client row:", JSON.stringify(clientRow));
+
   if (clientErr || !clientRow) {
+    console.log("[quota] client row fetch failed:", clientErr);
     return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
   }
 
-  const orgId: number = clientRow.id;
   const quotaPerDay = Number(clientRow.quota) || 10;
+  console.log("[quota] quota_per_day:", quotaPerDay);
   const clientEmail = clientRow.email as string | null;
   const plan = String(clientRow.plan ?? "").trim().toLowerCase();
   const isEssential = plan === "essential";
@@ -136,6 +162,9 @@ export async function GET() {
   void orgId;
 
   const quotaRemaining = Math.max(0, monthlyQuota - quotaUsed);
+  console.log("[quota] monthly_quota:", monthlyQuota);
+  console.log("[quota] quota_used:", quotaUsed);
+  console.log("[quota] quota_remaining:", quotaRemaining);
 
   return NextResponse.json({
     quota_per_day: quotaPerDay,

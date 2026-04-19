@@ -235,37 +235,47 @@ export default function DashboardPage() {
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <div className="h-full min-h-0 w-full bg-[linear-gradient(180deg,#f4f8ff_0%,#eef4ff_45%,#f7faff_100%)] px-4 pb-24 pt-8 sm:px-6">
         <div className="mx-auto w-full max-w-7xl space-y-8">
-          <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-                Pilotage
-              </div>
-              <h1 className="hub-page-title mt-2">Dashboard Lidmeo</h1>
-              <p className="mt-1 text-sm text-gray-500">
-                Suivez vos leads, vos relances et votre messagerie LinkedIn depuis un seul espace.
-              </p>
+          <section className="relative overflow-hidden rounded-3xl border border-[#d8e4f8] bg-white/90 p-6 shadow-[0_30px_60px_-42px_rgba(22,64,128,0.6)] md:p-8">
+            <div className="pointer-events-none absolute inset-0">
+              <div className="absolute -left-28 -top-24 h-72 w-72 rounded-full bg-[#d9e8ff]/80 blur-3xl" />
+              <div className="absolute -right-28 -top-28 h-80 w-80 rounded-full bg-[#d7f1ff]/70 blur-3xl" />
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/dashboard/prospection"
-                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-medium text-white transition hover:bg-blue-700"
-              >
-                Prospection
-              </Link>
-              <Link
-                href="/dashboard/inbox"
-                className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
-              >
-                Messagerie
-              </Link>
-              <Link
-                href="/dashboard/followups"
-                className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
-              >
-                Relances
-              </Link>
+            <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#cbdcf7] bg-[#f7fbff] px-3 py-1 text-xs font-medium text-[#35588a]">
+                  <span className="h-2 w-2 rounded-full bg-[#1f5eff]" />
+                  Pilotage SaaS
+                </div>
+                <h1 className="hub-page-title mt-3">
+                  Dashboard Lidmeo
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm text-[#51627b] md:text-base">
+                  Suivez vos leads, vos relances et votre messagerie LinkedIn depuis un seul
+                  espace.
+                </p>
+              </div>
+
+              <div className="relative z-[90] flex flex-wrap gap-2.5">
+                <Link
+                  href="/dashboard/prospection"
+                  className="inline-flex items-center justify-center rounded-full border border-[#1f5eff] bg-gradient-to-r from-[#1f5eff] to-[#1254ec] px-5 py-2.5 text-xs font-semibold text-white shadow-[0_14px_30px_-18px_rgba(31,94,255,0.9)] transition hover:-translate-y-[1px] md:text-sm"
+                >
+                  Prospection
+                </Link>
+                <Link
+                  href="/dashboard/inbox"
+                  className="inline-flex items-center justify-center rounded-full border border-[#c8d6ea] bg-[#f5f9ff] px-5 py-2.5 text-xs font-semibold text-[#0b1c33] transition hover:-translate-y-[1px] hover:border-[#afc7eb] hover:bg-[#edf4fd] md:text-sm"
+                >
+                  Messagerie
+                </Link>
+                <Link
+                  href="/dashboard/followups"
+                  className="inline-flex items-center justify-center rounded-full border border-[#c8d6ea] bg-[#f5f9ff] px-5 py-2.5 text-xs font-semibold text-[#0b1c33] transition hover:-translate-y-[1px] hover:border-[#afc7eb] hover:bg-[#edf4fd] md:text-sm"
+                >
+                  Relances
+                </Link>
+              </div>
             </div>
           </section>
 
@@ -604,10 +614,10 @@ function SectionHeader({
   return (
     <div className="flex items-end justify-between gap-4">
       <div>
-        <p className="text-sm font-semibold text-gray-900">{title}</p>
-        <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p>
+        <p className="text-base font-semibold text-[#0b1c33]">{title}</p>
+        <p className="mt-0.5 text-[12px] text-[#51627b]">{subtitle}</p>
       </div>
-      <div className="h-px flex-1 bg-gray-100" />
+      <div className="h-px flex-1 bg-[#d7e3f4]" />
     </div>
   );
 }
@@ -615,6 +625,7 @@ function SectionHeader({
 function KPI({
   label,
   value,
+  color,
   onClick,
   clickable = true,
   active = false,
@@ -622,7 +633,7 @@ function KPI({
 }: {
   label: string;
   value: string | number;
-  color?: string;
+  color: string;
   onClick?: () => void;
   clickable?: boolean;
   active?: boolean;
@@ -638,30 +649,29 @@ function KPI({
         if (e.key === "Enter" || e.key === " ") onClick?.();
       }}
       className={[
-        "relative overflow-hidden rounded-xl border bg-white p-4 transition-shadow duration-200",
-        "border-gray-100 shadow-sm",
-        clickable ? "cursor-pointer hover:shadow-md" : "cursor-default",
-        active ? "ring-2 ring-blue-200 border-blue-300" : "",
+        "relative overflow-hidden rounded-2xl border p-5 transition-all duration-200",
+        "border-[#d7e3f4] bg-white shadow-[0_16px_30px_-24px_rgba(14,45,96,0.55)]",
+        clickable
+          ? "cursor-pointer hover:-translate-y-0.5 hover:border-[#bcd1f1]"
+          : "cursor-default",
+        active ? "border-[#8fb5ff] ring-2 ring-[#dce8ff]" : "",
       ].join(" ")}
     >
+      <div className={`absolute inset-0 opacity-[0.14] bg-gradient-to-br ${color}`} />
       <div className="relative z-10">
         <div className="flex items-start justify-between gap-3">
-          <div className="text-xs font-medium uppercase tracking-wider text-gray-500">{label}</div>
-          {clickable ? (
-            <span className="text-[11px] text-gray-400">
-              {active ? "Ouvert" : "Détails"}
-            </span>
-          ) : null}
+          <div className="text-sm text-[#51627b]">{label}</div>
+          <span className="rounded-full border border-[#d7e3f4] bg-[#f8fbff] px-2 py-0.5 text-[11px] text-[#51627b]">
+            {clickable ? (active ? "Ouvert" : "Détails") : "Info"}
+          </span>
         </div>
 
-        <div className="hub-kpi-number mt-2 text-2xl font-bold text-gray-900">
-          {loading ? (
-            <span className="inline-block h-7 w-16 animate-pulse rounded-md bg-gray-200 align-middle" />
-          ) : (
-            <span className="inline-block animate-in fade-in duration-200">
-              {value}
-            </span>
-          )}
+        <div className="hub-kpi-number mt-3 text-4xl">
+          {loading ? <span className="opacity-50">—</span> : value}
+        </div>
+
+        <div className="mt-2 text-[12px] text-[#51627b]">
+          {clickable ? "Cliquez pour afficher la liste." : "Indicateur global en temps réel."}
         </div>
       </div>
     </div>

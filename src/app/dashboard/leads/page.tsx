@@ -1641,15 +1641,36 @@ export default function LeadsPage() {
     };
   }, [isSidebarOpen]);
 
-  if (!clientLoaded && paginatedLeadsQuery.isError) {
+  if (!clientLoaded) {
+    if (paginatedLeadsQuery.isError) {
+      return (
+        <SubscriptionGate supportEmail="contact@lidmeo.com">
+          <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
+            <div className="mx-auto max-w-[860px] rounded-3xl border border-red-200 bg-white p-6 text-sm text-red-700 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.4)]">
+              Impossible de charger la prospection pour le moment. Rechargez la page ou réessayez dans quelques instants.
+            </div>
+          </div>
+        </SubscriptionGate>
+      );
+    }
+
     return (
-      <SubscriptionGate supportEmail="contact@lidmeo.com">
-        <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
-          <div className="mx-auto max-w-[860px] rounded-3xl border border-red-200 bg-white p-6 text-sm text-red-700 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.4)]">
-            Impossible de charger la prospection pour le moment. Rechargez la page ou réessayez dans quelques instants.
+      <div className="h-full min-h-0 w-full px-4 pb-24 pt-10 sm:px-6">
+        <div className="mx-auto w-full max-w-[1680px]">
+          <div className="hub-card-hero p-6 sm:p-7">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="h-6 w-44 animate-pulse rounded-xl bg-[#e5edf8]" />
+                <div className="mt-3 h-4 w-80 animate-pulse rounded-lg bg-[#edf3fb]" />
+              </div>
+              <div className="h-10 w-28 animate-pulse rounded-xl bg-[#edf3fb]" />
+            </div>
+
+            <div className="mt-6 h-12 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
+            <div className="mt-4 h-72 animate-pulse rounded-xl border border-[#dbe5f3] bg-[#f8fbff]" />
           </div>
         </div>
-      </SubscriptionGate>
+      </div>
     );
   }
 
@@ -1670,10 +1691,6 @@ export default function LeadsPage() {
     { key: "connected", label: "Connecté", count: segmentCounts.connected },
     { key: "sent", label: "Envoyé", count: segmentCounts.sent },
   ];
-
-  const isInitialLoading =
-    (paginatedLeadsQuery.isPending && !paginatedLeadsQuery.data) ||
-    (summaryQuery.isPending && !summaryQuery.data);
 
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
@@ -1797,12 +1814,30 @@ export default function LeadsPage() {
               </div>
 
               <div className="relative min-w-0">
-                <h1 className="hub-page-title">Pilotage de la prospection</h1>
-                <p className="mt-1 text-sm text-gray-500">
-                  Centralisez vos leads, priorisez vos actions et suivez votre pipeline.
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] font-medium">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#1f5eff]" />
+                    Espace client Lidmeo
+                  </span>
+
+                  <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] tabular-nums">
+                    {filteredLeads.length}/{filteredCount} affichés
+                  </span>
+
+                  <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] whitespace-nowrap">
+                    {plan || "essential"}
+                  </span>
+                </div>
+
+                <h1 className="hub-page-title mt-2">
+                  Pilotage de la prospection
+                </h1>
+                <p className="mt-2 max-w-3xl text-xs text-[#51627b] sm:text-sm">
+                  Centralisez vos leads, priorisez vos actions et suivez votre pipeline
+                  de manière structurée, avec une vue opérationnelle compacte.
                 </p>
-                <div className="mt-2 inline-flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700">
-                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                <div className="mt-3 inline-flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[11px] text-amber-800 sm:text-xs">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <span>
                     Rappel sécurité: évitez les connexions trop rapides et ne dépassez pas 30
                     invitations LinkedIn par jour.
@@ -1810,58 +1845,10 @@ export default function LeadsPage() {
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-                  <Metric
-                    title="Total leads"
-                    value={
-                      isInitialLoading ? (
-                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
-                      ) : (
-                        <span className="inline-block animate-in fade-in duration-200">
-                          {total}
-                        </span>
-                      )
-                    }
-                    tone="default"
-                  />
-                  <Metric
-                    title="Traités"
-                    value={
-                      isInitialLoading ? (
-                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
-                      ) : (
-                        <span className="inline-block animate-in fade-in duration-200">
-                          {treatedCount}
-                        </span>
-                      )
-                    }
-                    tone="success"
-                  />
-                  <Metric
-                    title="En attente"
-                    value={
-                      isInitialLoading ? (
-                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
-                      ) : (
-                        <span className="inline-block animate-in fade-in duration-200">
-                          {pendingCount}
-                        </span>
-                      )
-                    }
-                    tone="info"
-                  />
-                  <Metric
-                    title="À traiter"
-                    value={
-                      isInitialLoading ? (
-                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
-                      ) : (
-                        <span className="inline-block animate-in fade-in duration-200">
-                          {remainingToTreat}
-                        </span>
-                      )
-                    }
-                    tone="warning"
-                  />
+                  <Metric title="Total leads" value={total} tone="default" />
+                  <Metric title="Traités" value={treatedCount} tone="success" />
+                  <Metric title="En attente" value={pendingCount} tone="info" />
+                  <Metric title="À traiter" value={remainingToTreat} tone="warning" />
                 </div>
 
                 <div className="mt-3 md:hidden">
@@ -2804,13 +2791,31 @@ function Metric({
   value: ReactNode;
   tone: "default" | "success" | "warning" | "info";
 }) {
-  void tone;
+  const valueColor =
+    tone === "success"
+      ? "text-emerald-700"
+      : tone === "warning"
+        ? "text-amber-700"
+        : tone === "info"
+          ? "text-[#1f5eff]"
+          : "text-[#0b1c33]";
+
+  const chipColor =
+    tone === "success"
+      ? "bg-emerald-500"
+      : tone === "warning"
+        ? "bg-amber-500"
+        : tone === "info"
+          ? "bg-[#1f5eff]"
+          : "bg-[#8aa2c2]";
+
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md">
-      <div className="whitespace-nowrap text-xs font-medium uppercase tracking-wider text-gray-500">
+    <div className="overflow-hidden rounded-xl border border-[#d7e3f4] bg-white px-4 py-3 shadow-[0_16px_26px_-24px_rgba(18,43,86,0.75)]">
+      <div className="flex items-center gap-2 whitespace-nowrap text-[10px] uppercase tracking-wide text-[#51627b]">
+        <span className={["h-1.5 w-1.5 rounded-full", chipColor].join(" ")} />
         {title}
       </div>
-      <div className="hub-kpi-number mt-1 truncate whitespace-nowrap text-2xl font-bold leading-none tabular-nums text-gray-900">
+      <div className={["hub-kpi-number mt-1 truncate whitespace-nowrap text-4xl leading-none tabular-nums", valueColor].join(" ")}>
         {value}
       </div>
     </div>
