@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 // Routes publiques (accessibles sans être connecté)
@@ -11,14 +10,10 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  const requestHeaders = new Headers(req.headers);
-  requestHeaders.set("x-pathname", req.nextUrl.pathname);
-
-  if (!isPublicRoute(req)) {
-    await auth.protect();
+  if (isPublicRoute(req)) {
+    return;
   }
-
-  return NextResponse.next({ request: { headers: requestHeaders } });
+  await auth.protect();
 });
 
 export const config = {
