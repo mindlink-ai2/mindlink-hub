@@ -692,23 +692,6 @@ export default function FollowupsPage() {
     );
   };
 
-  const renderSkeleton = () => (
-    <div className="space-y-4">
-      <div className="h-8 w-56 animate-pulse rounded-xl bg-[#e7f0ff]" />
-      <div className="h-4 w-80 animate-pulse rounded-lg bg-[#edf4ff]" />
-      <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <div className="h-20 animate-pulse rounded-xl border border-[#d7e3f4] bg-[#f8fbff]" />
-        <div className="h-20 animate-pulse rounded-xl border border-[#d7e3f4] bg-[#f8fbff]" />
-        <div className="h-20 animate-pulse rounded-xl border border-[#d7e3f4] bg-[#f8fbff]" />
-      </div>
-      <div className="mt-8 space-y-3">
-        <div className="h-28 animate-pulse rounded-xl border border-[#d7e3f4] bg-[#f8fbff]" />
-        <div className="h-28 animate-pulse rounded-xl border border-[#d7e3f4] bg-[#f8fbff]" />
-        <div className="h-28 animate-pulse rounded-xl border border-[#d7e3f4] bg-[#f8fbff]" />
-      </div>
-    </div>
-  );
-
   // =========================================================================
   // PLAN FULL — helpers de rendu
   // =========================================================================
@@ -1274,9 +1257,7 @@ export default function FollowupsPage() {
 
             <div className="hidden md:block">
               <div className="mx-auto h-full min-h-0 w-full max-w-[1680px] px-4 py-6 sm:px-6 sm:py-7">
-                {!loaded ? (
-                  renderSkeleton()
-                ) : (
+                {(
                   <div className="space-y-5">
                     <div className="relative flex flex-col gap-3.5 p-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -1699,9 +1680,7 @@ export default function FollowupsPage() {
             {/* Desktop full plan */}
             <div className="hidden md:block">
               <div className="mx-auto h-full min-h-0 w-full max-w-[1680px] px-4 py-6 sm:px-6 sm:py-7">
-                {!fullLoaded ? (
-                  renderSkeleton()
-                ) : (
+                {(
                   <div className="space-y-5">
                     {/* Header */}
                     <div className="relative flex flex-col gap-3.5 p-0">

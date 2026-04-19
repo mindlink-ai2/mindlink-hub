@@ -76,12 +76,12 @@ export async function GET() {
 
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id, quota, email, company_name, plan, created_at")
+    .select("id, quota, email, company_name, plan")
     .eq("id", orgId)
     .single();
 
   console.log("[quota] org_id:", orgId);
-  console.log("[quota] client row:", JSON.stringify(clientRow));
+  console.log("[quota] client:", JSON.stringify(clientRow));
 
   if (clientErr || !clientRow) {
     console.log("[quota] client row fetch failed:", clientErr);
@@ -94,22 +94,37 @@ export async function GET() {
   const plan = String(clientRow.plan ?? "").trim().toLowerCase();
   const isEssential = plan === "essential";
 
+  // ── Trial anchor date ──────────────────────────────────────────────
+  // clients table has no created_at column. Use search_credits.created_at
+  // (the row anchor) as the trial start date. If missing, skip trial
+  // computation entirely.
+  let anchorDate: Date | null = null;
+  if (isEssential) {
+    const { data: creditRow } = await supabase
+      .from("search_credits")
+      .select("created_at")
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (creditRow?.created_at) {
+      anchorDate = new Date(creditRow.created_at as string);
+    }
+  }
+
   // ── Trial computation (Essential only) ─────────────────────────────
   const now = new Date();
   let trialEndsAtIso: string | null = null;
   let isTrialActive = false;
   let trialQuota = 0;
 
-  if (isEssential && clientRow.created_at) {
-    const createdAt = new Date(clientRow.created_at as string);
-    const trialEndsAt = new Date(createdAt);
+  if (isEssential && anchorDate) {
+    const trialEndsAt = new Date(anchorDate);
     trialEndsAt.setDate(trialEndsAt.getDate() + TRIAL_DAYS);
     trialEndsAtIso = trialEndsAt.toISOString();
     isTrialActive = now.getTime() < trialEndsAt.getTime();
 
-    const trialLastDay = new Date(createdAt);
+    const trialLastDay = new Date(anchorDate);
     trialLastDay.setDate(trialLastDay.getDate() + TRIAL_DAYS - 1);
-    const trialBusinessDays = countWeekdaysBetween(createdAt, trialLastDay);
+    const trialBusinessDays = countWeekdaysBetween(anchorDate, trialLastDay);
     trialQuota = quotaPerDay * trialBusinessDays;
   }
 
@@ -162,9 +177,7 @@ export async function GET() {
   void orgId;
 
   const quotaRemaining = Math.max(0, monthlyQuota - quotaUsed);
-  console.log("[quota] monthly_quota:", monthlyQuota);
-  console.log("[quota] quota_used:", quotaUsed);
-  console.log("[quota] quota_remaining:", quotaRemaining);
+  console.log("[quota] monthly_quota:", monthlyQuota, "quota_used:", quotaUsed, "quota_remaining:", quotaRemaining);
 
   return NextResponse.json({
     quota_per_day: quotaPerDay,
