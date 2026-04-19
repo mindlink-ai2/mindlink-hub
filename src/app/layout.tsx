@@ -137,7 +137,11 @@ export default async function RootLayout({
 
             <div
               className="relative flex min-h-screen flex-col transition-[padding-left] duration-300"
-              style={{ paddingLeft: "var(--app-shell-pl, 0px)" }}
+              style={
+                user && hasAccess
+                  ? { paddingLeft: "var(--app-shell-pl, 240px)" }
+                  : undefined
+              }
             >
               <div className="pointer-events-none absolute inset-0 overflow-hidden">
                 <div className="absolute -top-40 left-1/2 h-[500px] w-[1120px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(31,94,255,0.08),rgba(31,94,255,0.01)_62%,transparent_78%)]" />

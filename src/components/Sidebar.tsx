@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, useClerk } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BookOpen,
@@ -18,6 +18,7 @@ import {
   MessageSquare,
   PenLine,
   RefreshCw,
+  Settings,
   Shield,
   Target,
   X,
@@ -42,10 +43,12 @@ type SidebarProps = {
 };
 
 type NavItem = {
-  href: string;
+  href?: string;
+  onClick?: () => void;
   label: string;
   icon: LucideIcon;
   badge?: "inbox" | "icp";
+  key?: string;
 };
 
 type NavSection = {
@@ -294,6 +297,7 @@ export default function Sidebar({
 
   const unread = useInboxUnread();
   const trialBadge = useIcpTrialBadge();
+  const { openUserProfile } = useClerk();
 
   const sections: NavSection[] = [
     {
@@ -330,6 +334,12 @@ export default function Sidebar({
       label: "Compte",
       items: [
         { href: "/dashboard/hub/billing", label: "Abonnement", icon: CreditCard },
+        {
+          key: "user-profile",
+          onClick: () => openUserProfile(),
+          label: "Mon compte",
+          icon: Settings,
+        },
       ],
     },
   ];
@@ -372,78 +382,101 @@ export default function Sidebar({
     keyPrefix: string
   ) => {
     const Icon = item.icon;
-    const active = isItemActive(item.href);
+    const active = item.href ? isItemActive(item.href) : false;
 
     const inboxCount = item.badge === "inbox" ? unread : 0;
     const showIcpBadge = item.badge === "icp" && trialBadge;
+    const key = item.key ?? item.href ?? item.label;
 
-    return (
-      <li key={`${keyPrefix}:${item.href}`} className="relative group">
-        <motion.div whileTap={{ scale: 0.98 }} transition={{ duration: 0.1 }}>
-          <Link
-            href={item.href}
-            prefetch
-            onClick={() => handleLinkClick(item.href)}
-            className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm cursor-pointer ${
-              collapsed ? "justify-center" : ""
-            } ${
+    const commonClassName = `relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm cursor-pointer ${
+      collapsed ? "justify-center" : ""
+    } ${
+      active
+        ? "text-[#2563EB] font-medium shadow-[inset_0_0_0_1px_rgba(37,99,235,0.06)]"
+        : "text-[#374151] hover:bg-[#F1F5F9] hover:text-[#111827]"
+    }`;
+    const commonStyle = {
+      transition: "color 100ms ease, background-color 100ms ease",
+    };
+
+    const innerContent = (
+      <>
+        {active ? (
+          <motion.span
+            layoutId={activeIndicatorId}
+            transition={{ type: "spring", stiffness: 500, damping: 40 }}
+            className="absolute inset-0 rounded-lg bg-[#EBF5FF]"
+          />
+        ) : null}
+        {active && !collapsed ? (
+          <motion.span
+            layoutId={`${activeIndicatorId}-bar`}
+            transition={{ type: "spring", stiffness: 500, damping: 40 }}
+            className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#2563EB]"
+          />
+        ) : null}
+        <span className="relative z-10 flex-shrink-0">
+          <Icon
+            className={`h-5 w-5 transition-colors duration-100 ${
               active
-                ? "text-[#2563EB] font-medium shadow-[inset_0_0_0_1px_rgba(37,99,235,0.06)]"
-                : "text-[#374151] hover:bg-[#F1F5F9] hover:text-[#111827]"
+                ? "text-[#2563EB]"
+                : "text-[#6B7280] group-hover:text-[#2563EB]"
             }`}
-            style={{ transition: "color 100ms ease, background-color 100ms ease" }}
-          >
-            {active ? (
-              <motion.span
-                layoutId={activeIndicatorId}
-                transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                className="absolute inset-0 rounded-lg bg-[#EBF5FF]"
-              />
-            ) : null}
-            {active && !collapsed ? (
-              <motion.span
-                layoutId={`${activeIndicatorId}-bar`}
-                transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#2563EB]"
-              />
-            ) : null}
-            <span className="relative z-10 flex-shrink-0">
-              <Icon
-                className={`h-5 w-5 transition-colors duration-100 ${
-                  active
-                    ? "text-[#2563EB]"
-                    : "text-[#6B7280] group-hover:text-[#2563EB]"
-                }`}
-              />
-              {collapsed ? (
-                <>
-                  {item.badge === "inbox" ? (
-                    <InboxBadge count={inboxCount} collapsed />
-                  ) : null}
-                  {showIcpBadge ? (
-                    <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#EF4444] ring-2 ring-white" />
-                  ) : null}
-                </>
+          />
+          {collapsed ? (
+            <>
+              {item.badge === "inbox" ? (
+                <InboxBadge count={inboxCount} collapsed />
               ) : null}
-            </span>
-            {!collapsed ? (
-              <span
-                className={`relative z-10 flex flex-1 items-center gap-2 overflow-hidden whitespace-nowrap transition-transform duration-150 ${
-                  active ? "" : "group-hover:translate-x-[2px]"
-                }`}
-              >
-                <span className="flex-1">{item.label}</span>
-                {item.badge === "inbox" ? (
-                  <InboxBadge count={inboxCount} />
-                ) : null}
-                {showIcpBadge ? (
-                  <span className="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF4444] px-1.5 text-[10px] font-bold leading-none text-white">
-                    1
-                  </span>
-                ) : null}
+              {showIcpBadge ? (
+                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#EF4444] ring-2 ring-white" />
+              ) : null}
+            </>
+          ) : null}
+        </span>
+        {!collapsed ? (
+          <span
+            className={`relative z-10 flex flex-1 items-center gap-2 overflow-hidden whitespace-nowrap text-left transition-transform duration-150 ${
+              active ? "" : "group-hover:translate-x-[2px]"
+            }`}
+          >
+            <span className="flex-1">{item.label}</span>
+            {item.badge === "inbox" ? (
+              <InboxBadge count={inboxCount} />
+            ) : null}
+            {showIcpBadge ? (
+              <span className="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF4444] px-1.5 text-[10px] font-bold leading-none text-white">
+                1
               </span>
             ) : null}
-          </Link>
+          </span>
+        ) : null}
+      </>
+    );
+
+    return (
+      <li key={`${keyPrefix}:${key}`} className="relative group">
+        <motion.div whileTap={{ scale: 0.98 }} transition={{ duration: 0.1 }}>
+          {item.href ? (
+            <Link
+              href={item.href}
+              prefetch
+              onClick={() => handleLinkClick(item.href!)}
+              className={commonClassName}
+              style={commonStyle}
+            >
+              {innerContent}
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => item.onClick?.()}
+              className={`${commonClassName} w-full text-left`}
+              style={commonStyle}
+            >
+              {innerContent}
+            </button>
+          )}
         </motion.div>
         {collapsed ? (
           <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 opacity-0 transition-opacity duration-[80ms] group-hover:opacity-100">

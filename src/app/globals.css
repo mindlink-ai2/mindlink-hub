@@ -3,7 +3,6 @@
 @import "shadcn/tailwind.css";
 
 :root { --app-shell-pl: 0px; }
-@media (min-width: 768px) { :root { --app-shell-pl: 240px; } }
 
 @custom-variant dark (&:is(.dark *));
 
