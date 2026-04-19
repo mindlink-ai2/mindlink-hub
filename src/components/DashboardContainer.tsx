@@ -26,7 +26,9 @@ export default function DashboardContainer({ children }: { children: React.React
       pathname.startsWith("/onboarding") ||
       pathname.startsWith("/onboarding/form") ||
       pathname.startsWith("/sign-in") ||
-      pathname.startsWith("/sign-up")
+      pathname.startsWith("/sign-up") ||
+      pathname.startsWith("/dashboard/hub/icp-builder") ||
+      pathname.startsWith("/dashboard/hub/messages-setup")
     ) {
       return;
     }
