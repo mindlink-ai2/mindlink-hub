@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { UserButton, useClerk } from "@clerk/nextjs";
+import { useClerk, useUser } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BookOpen,
@@ -13,6 +13,7 @@ import {
   Crosshair,
   Headphones,
   LayoutDashboard,
+  LogOut,
   LucideIcon,
   Menu,
   MessageSquare,
@@ -297,7 +298,43 @@ export default function Sidebar({
 
   const unread = useInboxUnread();
   const trialBadge = useIcpTrialBadge();
-  const { openUserProfile } = useClerk();
+  const { openUserProfile, signOut } = useClerk();
+  const { user: clerkUser } = useUser();
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!profileMenuRef.current) return;
+      if (!profileMenuRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [profileMenuOpen]);
+
+  const displayName =
+    clerkUser?.fullName ||
+    [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ") ||
+    clerkUser?.username ||
+    "Mon compte";
+  const displayEmail =
+    clerkUser?.primaryEmailAddress?.emailAddress ||
+    clerkUser?.emailAddresses?.[0]?.emailAddress ||
+    "";
+  const initials = (() => {
+    const base =
+      [clerkUser?.firstName, clerkUser?.lastName]
+        .filter(Boolean)
+        .map((s) => (s as string).charAt(0))
+        .join("") ||
+      displayName.slice(0, 2) ||
+      "?";
+    return base.toUpperCase().slice(0, 2);
+  })();
+  const avatarUrl = clerkUser?.imageUrl;
 
   const sections: NavSection[] = [
     {
@@ -388,11 +425,11 @@ export default function Sidebar({
     const showIcpBadge = item.badge === "icp" && trialBadge;
     const key = item.key ?? item.href ?? item.label;
 
-    const commonClassName = `relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm cursor-pointer ${
+    const commonClassName = `relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm cursor-pointer ${
       collapsed ? "justify-center" : ""
     } ${
       active
-        ? "text-[#2563EB] font-medium shadow-[inset_0_0_0_1px_rgba(37,99,235,0.06)]"
+        ? "text-[#2563EB] font-medium"
         : "text-[#374151] hover:bg-[#F1F5F9] hover:text-[#111827]"
     }`;
     const commonStyle = {
@@ -405,14 +442,14 @@ export default function Sidebar({
           <motion.span
             layoutId={activeIndicatorId}
             transition={{ type: "spring", stiffness: 500, damping: 40 }}
-            className="absolute inset-0 rounded-lg bg-[#EBF5FF]"
+            className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#EBF5FF] to-[#F2F8FF] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_0_0_1px_rgba(37,99,235,0.08)]"
           />
         ) : null}
         {active && !collapsed ? (
           <motion.span
             layoutId={`${activeIndicatorId}-bar`}
             transition={{ type: "spring", stiffness: 500, damping: 40 }}
-            className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#2563EB]"
+            className="absolute left-[-8px] top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-[2px] bg-[#2563EB]"
           />
         ) : null}
         <span className="relative z-10 flex-shrink-0">
@@ -494,7 +531,7 @@ export default function Sidebar({
     <>
       {/* Header */}
       <div
-        className={`flex h-16 items-center border-b border-[#E5E7EB] px-3 ${
+        className={`group/header flex h-16 items-center border-b border-[#E5E7EB] px-3 ${
           isOpen ? "justify-between" : "justify-center"
         }`}
       >
@@ -550,7 +587,7 @@ export default function Sidebar({
             type="button"
             onClick={toggle}
             aria-label="Réduire le menu"
-            className="hidden rounded-lg p-1.5 text-[#6B7280] transition hover:bg-[#F3F4F6] hover:text-[#111827] md:inline-flex cursor-pointer"
+            className="hidden rounded-lg p-1.5 text-[#6B7280] opacity-0 transition-opacity duration-150 hover:bg-[#F3F4F6] hover:text-[#111827] group-hover/header:opacity-100 focus-visible:opacity-100 md:inline-flex cursor-pointer"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -582,30 +619,74 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className="flex flex-col gap-2 border-t border-[#E5E7EB] p-3">
-        <div
-          className={`flex items-center gap-3 ${
-            isOpen ? "" : "justify-center"
-          }`}
-        >
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{
-              elements: { avatarBox: "h-9 w-9 ring-2 ring-[#E5E7EB]" },
-            }}
-          />
-          {isOpen ? (
-            <motion.div
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "auto" }}
-              transition={{ duration: 0.2 }}
-              className="flex min-w-0 flex-1 flex-col overflow-hidden"
-            >
-              <span className="truncate text-xs font-semibold text-[#111827]">
-                Mon compte
-              </span>
-              <span className="text-[10px] text-[#6B7280]">Connecté</span>
-            </motion.div>
-          ) : null}
+        <div className="relative" ref={profileMenuRef}>
+          <button
+            type="button"
+            onClick={() => setProfileMenuOpen((v) => !v)}
+            className={`flex w-full items-center gap-3 rounded-lg p-2 text-left transition hover:bg-[#F1F5F9] cursor-pointer ${
+              isOpen ? "" : "justify-center"
+            }`}
+          >
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt=""
+                className="h-9 w-9 flex-shrink-0 rounded-full object-cover ring-2 ring-[#E5E7EB]"
+              />
+            ) : (
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-[#1f5eff] to-[#1254ec] text-[11px] font-semibold text-white ring-2 ring-[#E5E7EB]">
+                {initials}
+              </div>
+            )}
+            {isOpen ? (
+              <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <span className="truncate text-xs font-semibold text-[#111827]">
+                  {displayName}
+                </span>
+                {displayEmail ? (
+                  <span className="truncate text-[10px] text-[#6B7280]">
+                    {displayEmail}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+          </button>
+          <AnimatePresence>
+            {profileMenuOpen ? (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+                transition={{ duration: 0.12 }}
+                className={`absolute bottom-full z-50 mb-2 ${
+                  isOpen ? "left-0 right-0" : "left-full ml-2 w-52"
+                } overflow-hidden rounded-lg border border-[#E5E7EB] bg-white shadow-lg`}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    openUserProfile();
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#374151] hover:bg-[#F1F5F9] cursor-pointer"
+                >
+                  <Settings className="h-4 w-4 text-[#6B7280]" />
+                  <span>Mon compte</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    void signOut({ redirectUrl: "/" });
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#DC2626] hover:bg-[#FEF2F2] cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Déconnexion</span>
+                </button>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
         {!isOpen ? (
           <button
@@ -699,16 +780,52 @@ export default function Sidebar({
                   </div>
                 ))}
               </nav>
-              <div className="flex items-center gap-3 border-t border-[#E5E7EB] p-3">
-                <UserButton
-                  afterSignOutUrl="/"
-                  appearance={{
-                    elements: { avatarBox: "h-9 w-9 ring-2 ring-[#E5E7EB]" },
+              <div className="flex flex-col gap-1 border-t border-[#E5E7EB] p-3">
+                <div className="flex items-center gap-3 rounded-lg p-2">
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt=""
+                      className="h-9 w-9 flex-shrink-0 rounded-full object-cover ring-2 ring-[#E5E7EB]"
+                    />
+                  ) : (
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-[#1f5eff] to-[#1254ec] text-[11px] font-semibold text-white ring-2 ring-[#E5E7EB]">
+                      {initials}
+                    </div>
+                  )}
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-xs font-semibold text-[#111827]">
+                      {displayName}
+                    </span>
+                    {displayEmail ? (
+                      <span className="truncate text-[10px] text-[#6B7280]">
+                        {displayEmail}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    openUserProfile();
                   }}
-                />
-                <span className="text-xs font-semibold text-[#111827]">
-                  Mon compte
-                </span>
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[#374151] hover:bg-[#F1F5F9] cursor-pointer"
+                >
+                  <Settings className="h-4 w-4 text-[#6B7280]" />
+                  <span>Mon compte</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    void signOut({ redirectUrl: "/" });
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[#DC2626] hover:bg-[#FEF2F2] cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Déconnexion</span>
+                </button>
               </div>
             </motion.aside>
           </>
