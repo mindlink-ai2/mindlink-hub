@@ -1285,7 +1285,14 @@ export default function FollowupsPage() {
                           Relances Lidmeo
                         </span>
                         <span className="hub-chip border-[#c8d6ea] bg-[#f7fbff] tabular-nums">
-                          {totalFollowups} relance(s)
+                          {!loaded ? (
+                            <span className="inline-block h-3 w-6 animate-pulse rounded bg-[#E5E7EB] align-middle" />
+                          ) : (
+                            <span className="inline-block animate-in fade-in duration-200">
+                              {totalFollowups}
+                            </span>
+                          )}{" "}
+                          relance(s)
                         </span>
                       </div>
 

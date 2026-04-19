@@ -1692,6 +1692,10 @@ export default function LeadsPage() {
     { key: "sent", label: "Envoyé", count: segmentCounts.sent },
   ];
 
+  const isInitialLoading =
+    (paginatedLeadsQuery.isPending && !paginatedLeadsQuery.data) ||
+    (summaryQuery.isPending && !summaryQuery.data);
+
   return (
     <SubscriptionGate supportEmail="contact@lidmeo.com">
       <>
@@ -1845,10 +1849,50 @@ export default function LeadsPage() {
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-                  <Metric title="Total leads" value={total} tone="default" />
-                  <Metric title="Traités" value={treatedCount} tone="success" />
-                  <Metric title="En attente" value={pendingCount} tone="info" />
-                  <Metric title="À traiter" value={remainingToTreat} tone="warning" />
+                  <Metric
+                    title="Total leads"
+                    value={
+                      isInitialLoading ? (
+                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+                      ) : (
+                        <span className="inline-block animate-in fade-in duration-200">{total}</span>
+                      )
+                    }
+                    tone="default"
+                  />
+                  <Metric
+                    title="Traités"
+                    value={
+                      isInitialLoading ? (
+                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+                      ) : (
+                        <span className="inline-block animate-in fade-in duration-200">{treatedCount}</span>
+                      )
+                    }
+                    tone="success"
+                  />
+                  <Metric
+                    title="En attente"
+                    value={
+                      isInitialLoading ? (
+                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+                      ) : (
+                        <span className="inline-block animate-in fade-in duration-200">{pendingCount}</span>
+                      )
+                    }
+                    tone="info"
+                  />
+                  <Metric
+                    title="À traiter"
+                    value={
+                      isInitialLoading ? (
+                        <span className="inline-block h-8 w-14 animate-pulse rounded-md bg-[#E5E7EB] align-middle" />
+                      ) : (
+                        <span className="inline-block animate-in fade-in duration-200">{remainingToTreat}</span>
+                      )
+                    }
+                    tone="warning"
+                  />
                 </div>
 
                 <div className="mt-3 md:hidden">
