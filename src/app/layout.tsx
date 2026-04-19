@@ -1,17 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ClerkProvider, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { ClerkProvider, SignedIn, SignedOut } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
 import "./globals.css";
 import DashboardContainer from "@/components/DashboardContainer";
-import PrefetchNavLink from "@/components/PrefetchNavLink";
 import InboxBackgroundSync from "@/components/InboxBackgroundSync";
 import RightHitboxDebug from "@/components/dev/RightHitboxDebug";
-import InboxNavLink from "@/components/InboxNavLink";
-import IcpBuilderNavLink from "@/components/IcpBuilderNavLink";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import SupportWidgetLoader from "@/components/support/SupportWidgetLoader";
 import BusinessTracker from "@/components/analytics/BusinessTracker";
+import Sidebar from "@/components/Sidebar";
 import { getSupportAdminContext } from "@/lib/support-admin-auth";
 import { PLAYBOOK_ALLOWED_CLIENT_IDS } from "@/lib/playbook-auth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
@@ -27,7 +25,6 @@ export const metadata: Metadata = {
 function PaywallOverlay() {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#081123]/45 p-6 backdrop-blur-sm">
-      {/* Glow */}
       <div className="absolute inset-0 opacity-40">
         <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl bg-gradient-to-tr from-[#3b6ff6]/22 via-[#97b4fb]/12 to-[#e3e7ef]/20" />
       </div>
@@ -97,7 +94,6 @@ export default async function RootLayout({
   let hasAccess = false;
   let showSupportAdminLink = false;
   let showPlaybookLink = false;
-
   let isFullActivePlanClient = false;
 
   if (user && email) {
@@ -129,120 +125,44 @@ export default async function RootLayout({
   return (
     <ClerkProvider>
       <html lang="fr">
-        <body className="bg-[#ecf2fa] text-[#0f213c]">
+        <body className="bg-[#F8FAFC] text-[#111827]">
           <QueryProvider>
-          <div className="min-h-screen flex flex-col relative">
-            <div className="pointer-events-none absolute inset-0 overflow-hidden">
-              <div className="absolute -top-40 left-1/2 h-[500px] w-[1120px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(31,94,255,0.14),rgba(31,94,255,0.01)_62%,transparent_78%)]" />
-              <div className="absolute -left-24 top-20 h-80 w-80 rounded-full bg-[#dfeaff]/80 blur-3xl" />
-              <div className="absolute -right-24 top-12 h-96 w-96 rounded-full bg-[#d8f0ff]/70 blur-3xl" />
-            </div>
+            <SignedIn>
+              <Sidebar
+                dashboardHref={dashboardHref}
+                showSupportAdminLink={showSupportAdminLink}
+                showPlaybookLink={showPlaybookLink}
+              />
+            </SignedIn>
 
-            {/* 🔵 HEADER */}
-            <header className="sticky top-0 z-20 border-b border-[#c8d6ea] bg-[#f4f8ff]/92 backdrop-blur-xl">
-              {/* ✅ élargi pour laisser respirer les pages data-heavy */}
-              <div className="mx-auto flex max-w-[1480px] items-center justify-between px-4 py-3">
-                {/* 🔹 Logo + titre */}
-                <div className="flex items-center gap-2">
-                  <Link href="/" className="flex items-center gap-2">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#1f5eff] bg-gradient-to-tr from-[#1f5eff] to-[#1254ec] text-xs font-bold tracking-tight text-white shadow-[0_14px_24px_-16px_rgba(31,94,255,0.92)]">
-                      LM
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-semibold leading-tight text-[#0b1c33]">
-                        Lidmeo Hub
-                      </span>
-                      <span className="text-xs leading-tight text-[#51627b]">
-                        Espace client
-                      </span>
-                    </div>
-                  </Link>
-                </div>
+            <div
+              className="relative flex min-h-screen flex-col transition-[padding-left] duration-300"
+              style={{ paddingLeft: "var(--app-shell-pl, 0px)" }}
+            >
+              <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                <div className="absolute -top-40 left-1/2 h-[500px] w-[1120px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(31,94,255,0.08),rgba(31,94,255,0.01)_62%,transparent_78%)]" />
+              </div>
 
-                {/* 🔹 Navigation + User */}
-                <div className="flex items-center gap-4 text-xs">
-                  <SignedIn>
-                    <nav className="hidden items-center gap-2 text-[11px] text-[#51627b] sm:flex">
-                      <PrefetchNavLink
-                        href={dashboardHref}
-                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
-                      >
-                        Dashboard
-                      </PrefetchNavLink>
-                      <PrefetchNavLink
-                        href="/dashboard/leads"
-                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
-                      >
-                        Prospection
-                      </PrefetchNavLink>
-                      <PrefetchNavLink
-                        href="/dashboard/followups"
-                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
-                      >
-                        Relances
-                      </PrefetchNavLink>
-                      <InboxNavLink />
-                      <IcpBuilderNavLink />
-                      <Link
-                        href="/dashboard/hub/messages-setup"
-                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
-                      >
-                        Mes messages
-                      </Link>
-                      <PrefetchNavLink
-                        href="/dashboard/hub/billing"
-                        className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
-                      >
-                        Abonnement
-                      </PrefetchNavLink>
-                      {showSupportAdminLink ? (
-                        <>
-                          <Link
-                            href="/admin/clients"
-                            className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
-                          >
-                            Panel Admin
-                          </Link>
-                          <Link
-                            href="/admin/support"
-                            className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
-                          >
-                            Support Admin
-                          </Link>
-                        </>
-                      ) : null}
-                      {showPlaybookLink ? (
-                        <Link
-                          href="/playbook"
-                          className="rounded-full border border-transparent px-3 py-1.5 transition hover:border-[#d7e3f4] hover:bg-[#f3f8ff] hover:text-[#0b1c33]"
-                        >
-                          Playbook
-                        </Link>
-                      ) : null}
-                    </nav>
-
-                    <div className="flex items-center gap-3">
-                      <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] text-emerald-700 sm:inline">
-                        Connecté
-                      </span>
-
-                      <UserButton
-                        afterSignOutUrl="/"
-                        appearance={{
-                          elements: {
-                            avatarBox:
-                              "h-8 w-8 ring-2 ring-[#d7e3f4] shadow-sm",
-                          },
-                        }}
-                      />
-                    </div>
-                  </SignedIn>
-
-                  <SignedOut>
+              <SignedOut>
+                <header className="sticky top-0 z-20 border-b border-[#E5E7EB] bg-white/92 backdrop-blur-xl">
+                  <div className="mx-auto flex max-w-[1480px] items-center justify-between px-4 py-3">
+                    <Link href="/" className="flex items-center gap-2">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-[#1f5eff] to-[#1254ec] text-xs font-bold text-white shadow-[0_14px_24px_-16px_rgba(31,94,255,0.92)]">
+                        LM
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold leading-tight text-[#111827]">
+                          Lidmeo Hub
+                        </span>
+                        <span className="text-xs leading-tight text-[#6B7280]">
+                          Espace client
+                        </span>
+                      </div>
+                    </Link>
                     <div className="flex items-center gap-3">
                       <Link
                         href="/sign-in"
-                        className="rounded-full border border-[#d7e3f4] bg-white px-3 py-1 text-xs text-[#2c466d] transition hover:bg-[#f3f8ff]"
+                        className="rounded-full border border-[#E5E7EB] bg-white px-3 py-1 text-xs text-[#374151] transition hover:bg-[#F3F4F6]"
                       >
                         Se connecter
                       </Link>
@@ -253,41 +173,22 @@ export default async function RootLayout({
                         Créer un compte
                       </Link>
                     </div>
-                  </SignedOut>
-                </div>
-              </div>
-            </header>
+                  </div>
+                </header>
+              </SignedOut>
 
-            {/* 🔵 PAGE CONTENT */}
-            <main className="flex min-h-0 flex-1">
-              <DashboardContainer>{children}</DashboardContainer>
-            </main>
+              <main className="flex min-h-0 flex-1">
+                <DashboardContainer>{children}</DashboardContainer>
+              </main>
 
-            <MobileBottomNav dashboardHref={dashboardHref} />
-            <InboxBackgroundSync />
-            <SupportWidgetLoader />
-            <BusinessTracker />
-            {process.env.NODE_ENV === "development" ? <RightHitboxDebug /> : null}
+              <MobileBottomNav dashboardHref={dashboardHref} />
+              <InboxBackgroundSync />
+              <SupportWidgetLoader />
+              <BusinessTracker />
+              {process.env.NODE_ENV === "development" ? <RightHitboxDebug /> : null}
+            </div>
 
-            {/* 🔵 FOOTER */}
-            <footer className="hidden border-t border-[#c8d6ea] bg-[#f4f8ff]/75 text-xs text-[#3f5470] md:block">
-              {/* ✅ aligné avec le header */}
-              <div className="mx-auto flex max-w-[1480px] items-center justify-between px-4 py-4">
-                <span>© Lidmeo</span>
-                <div className="flex gap-4">
-                  <button className="transition hover:text-[#0b1c33]">
-                    Statut
-                  </button>
-                  <button className="transition hover:text-[#0b1c33]">
-                    Mentions légales
-                  </button>
-                </div>
-              </div>
-            </footer>
-          </div>
-
-          {/* ✅ PAYWALL : si connecté mais email absent dans public.clients */}
-          {user && !hasAccess ? <PaywallOverlay /> : null}
+            {user && !hasAccess ? <PaywallOverlay /> : null}
           </QueryProvider>
         </body>
       </html>
