@@ -76,7 +76,7 @@ export async function GET() {
 
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id, quota, email, company_name, plan")
+    .select("id, quota, email, company_name, plan, current_period_end")
     .eq("id", orgId)
     .single();
 
@@ -129,17 +129,36 @@ export async function GET() {
   }
 
   // ── Monthly cap shown to the client ────────────────────────────────
-  // Full plan or any non-essential → unchanged behavior (22 workdays).
-  // Essential during trial → trial_quota.
-  // Essential after trial → prorated on remaining workdays in current month.
+  // Prorate on business days remaining until Stripe current_period_end.
+  // Fallbacks:
+  //   - essential during trial → trial_quota
+  //   - no current_period_end   → full month (22 workdays)
+  const periodEndRaw = (clientRow.current_period_end as string | null) ?? null;
+  const periodEndDate = periodEndRaw ? new Date(periodEndRaw) : null;
+  const businessDaysRemaining =
+    periodEndDate && !Number.isNaN(periodEndDate.getTime())
+      ? countWeekdaysBetween(now, periodEndDate)
+      : null;
+
   let monthlyQuota: number;
   if (isEssential && isTrialActive) {
     monthlyQuota = trialQuota;
+  } else if (businessDaysRemaining !== null) {
+    monthlyQuota = quotaPerDay * businessDaysRemaining;
   } else if (isEssential) {
     monthlyQuota = quotaPerDay * workdaysRemainingInMonth(now);
   } else {
     monthlyQuota = quotaPerDay * MONTHLY_WORKDAYS;
   }
+
+  console.log(
+    "[quota] stripe_period_end:",
+    periodEndRaw,
+    "business_days_remaining:",
+    businessDaysRemaining,
+    "monthly_quota:",
+    monthlyQuota
+  );
 
   // ── Count leads already in the client's Google Sheet tab ───────────
   let quotaUsed = 0;

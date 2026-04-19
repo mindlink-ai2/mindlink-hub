@@ -587,7 +587,7 @@ export default function Sidebar({
             type="button"
             onClick={toggle}
             aria-label="Réduire le menu"
-            className="hidden rounded-lg p-1.5 text-[#6B7280] opacity-0 transition-opacity duration-150 hover:bg-[#F3F4F6] hover:text-[#111827] group-hover/header:opacity-100 focus-visible:opacity-100 md:inline-flex cursor-pointer"
+            className="hidden rounded-lg p-1.5 text-[#6B7280] transition-colors duration-150 hover:bg-[#F3F4F6] hover:text-[#111827] md:inline-flex cursor-pointer"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
