@@ -363,7 +363,7 @@ export default function MessagesSetupPage() {
         );
       }
       if (onboardingPending) {
-        router.replace("/");
+        router.replace("/onboarding/video");
         return;
       }
       setScreen("saved");
