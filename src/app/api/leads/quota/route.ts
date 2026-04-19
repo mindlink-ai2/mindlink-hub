@@ -94,12 +94,11 @@ export async function GET() {
   const plan = String(clientRow.plan ?? "").trim().toLowerCase();
   const isEssential = plan === "essential";
 
-  // ── Trial anchor date ──────────────────────────────────────────────
-  // clients table has no created_at column. Use search_credits.created_at
-  // (the row anchor) as the trial start date. If missing, skip trial
-  // computation entirely.
+  // ── Anchor date from search_credits.created_at ─────────────────────
+  // Used for trial computation (essentials) and as a period_end fallback
+  // when Stripe data is missing.
   let anchorDate: Date | null = null;
-  if (isEssential) {
+  {
     const { data: creditRow } = await supabase
       .from("search_credits")
       .select("created_at")
@@ -129,25 +128,35 @@ export async function GET() {
   }
 
   // ── Monthly cap shown to the client ────────────────────────────────
-  // Prorate on business days remaining until Stripe current_period_end.
-  // Fallbacks:
-  //   - essential during trial → trial_quota
-  //   - no current_period_end   → full month (22 workdays)
+  // Prorate on business days remaining until period_end.
+  // Period end resolution order:
+  //   1. clients.current_period_end (written by Stripe webhook)
+  //   2. anchor (search_credits.created_at) + 31 days
+  //   3. end of current calendar month
   const periodEndRaw = (clientRow.current_period_end as string | null) ?? null;
-  const periodEndDate = periodEndRaw ? new Date(periodEndRaw) : null;
-  const businessDaysRemaining =
-    periodEndDate && !Number.isNaN(periodEndDate.getTime())
-      ? countWeekdaysBetween(now, periodEndDate)
-      : null;
+  let periodEndDate: Date | null =
+    periodEndRaw ? new Date(periodEndRaw) : null;
+  if (!periodEndDate || Number.isNaN(periodEndDate.getTime())) {
+    if (anchorDate) {
+      periodEndDate = new Date(anchorDate);
+      periodEndDate.setDate(periodEndDate.getDate() + 31);
+    } else {
+      periodEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    }
+  }
+
+  const businessDaysRemaining = Math.max(
+    1,
+    countWeekdaysBetween(now, periodEndDate)
+  );
 
   let monthlyQuota: number;
   if (isEssential && isTrialActive) {
     monthlyQuota = trialQuota;
-  } else if (businessDaysRemaining !== null) {
-    monthlyQuota = quotaPerDay * businessDaysRemaining;
-  } else if (isEssential) {
-    monthlyQuota = quotaPerDay * workdaysRemainingInMonth(now);
   } else {
+    monthlyQuota = quotaPerDay * businessDaysRemaining;
+  }
+  if (!monthlyQuota || monthlyQuota <= 0) {
     monthlyQuota = quotaPerDay * MONTHLY_WORKDAYS;
   }
 
@@ -195,7 +204,15 @@ export async function GET() {
 
   void orgId;
 
-  const quotaRemaining = Math.max(0, monthlyQuota - quotaUsed);
+  let quotaRemaining = Math.max(0, monthlyQuota - quotaUsed);
+
+  // Test accounts — never blocked by quota
+  const TEST_ORG_IDS = new Set<number>([16, 18]);
+  if (TEST_ORG_IDS.has(orgId)) {
+    monthlyQuota = 99999;
+    quotaRemaining = 99999;
+  }
+
   console.log("[quota] monthly_quota:", monthlyQuota, "quota_used:", quotaUsed, "quota_remaining:", quotaRemaining);
 
   return NextResponse.json({
