@@ -11,6 +11,10 @@ import {
   finalizeMessagesFromChat,
   generateSystemPromptFromMessages,
 } from "@/lib/messages-prompt";
+import { updateWorkflowSystemPrompt } from "@/lib/n8n-workflow";
+import { adminClientChangeEmail, sendLidmeoEmail } from "@/lib/email-templates";
+
+const ADMIN_NOTIFY_EMAIL = "contact@lidmeo.com";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -69,7 +73,7 @@ export async function POST(req: Request) {
 
     const { data: clientRow } = await supabase
       .from("clients")
-      .select("id, company_name")
+      .select("id, company_name, email, n8n_workflow_id")
       .eq("id", clientContext.clientId)
       .maybeSingle();
 
@@ -160,6 +164,41 @@ export async function POST(req: Request) {
       await markClientOnboardingCompleted(supabase, clientContext.clientId);
     } catch (stateErr) {
       console.error("[messages/save] unable to mark onboarding completed:", stateErr);
+    }
+
+    // Push new system prompt to the existing n8n workflow (best-effort)
+    const workflowId = (clientRow?.n8n_workflow_id as string | null) ?? null;
+    if (workflowId && systemPrompt) {
+      try {
+        const res = await updateWorkflowSystemPrompt(workflowId, systemPrompt);
+        if (res.updated) {
+          console.log(
+            "[messages/save] n8n workflow updated for org_id:",
+            clientContext.clientId
+          );
+        } else {
+          console.warn(
+            "[messages/save] n8n workflow NOT updated for org_id:",
+            clientContext.clientId,
+            res.error
+          );
+        }
+      } catch (n8nErr) {
+        console.error("[messages/save] n8n update error:", n8nErr);
+      }
+    }
+
+    // Notify admin by email (best-effort)
+    try {
+      const { subject, html } = adminClientChangeEmail({
+        kind: "messages",
+        clientName: (clientRow?.company_name as string | null) ?? null,
+        clientEmail: (clientRow?.email as string | null) ?? null,
+        orgId: clientContext.clientId,
+      });
+      await sendLidmeoEmail({ to: ADMIN_NOTIFY_EMAIL, subject, html });
+    } catch (emailErr) {
+      console.error("[messages/save] admin email failed:", emailErr);
     }
 
     return NextResponse.json({

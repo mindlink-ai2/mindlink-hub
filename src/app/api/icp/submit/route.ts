@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
+import { adminClientChangeEmail, sendLidmeoEmail } from "@/lib/email-templates";
+
+const ADMIN_NOTIFY_EMAIL = "contact@lidmeo.com";
 
 export const runtime = "nodejs";
 
@@ -25,7 +28,7 @@ export async function POST(request: Request) {
 
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id, email")
+    .select("id, email, company_name")
     .eq("clerk_user_id", userId)
     .single();
 
@@ -82,13 +85,26 @@ export async function POST(request: Request) {
     configId = inserted.id;
   }
 
-  // Notifier les admins
+  // Notifier les admins (tableau interne)
   await supabase.from("admin_notifications").insert({
     type: "icp_submitted",
     org_id: orgId,
     message: `Le client ${clientRow.email ?? `org #${orgId}`} a validé son ciblage ICP.`,
     read: false,
   });
+
+  // Notifier les admins par email
+  try {
+    const { subject, html } = adminClientChangeEmail({
+      kind: "icp",
+      clientName: (clientRow.company_name as string | null) ?? null,
+      clientEmail: (clientRow.email as string | null) ?? null,
+      orgId,
+    });
+    await sendLidmeoEmail({ to: ADMIN_NOTIFY_EMAIL, subject, html });
+  } catch (emailErr) {
+    console.error("[icp/submit] admin email failed:", emailErr);
+  }
 
   return NextResponse.json({ success: true, config_id: configId });
 }

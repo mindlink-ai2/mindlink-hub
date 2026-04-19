@@ -158,19 +158,62 @@ export function reminderEmail(clientName: string | null, daysLeft: number): {
   const dayLabel = daysLeft <= 1 ? "1 jour" : `${daysLeft} jours`;
   const body = `
     Bonjour <strong>${escapeHtml(name)}</strong>,<br /><br />
-    Votre mois de prospection se termine dans <strong>${dayLabel}</strong>.<br /><br />
+    Votre liste de prospects se termine dans <strong>${dayLabel}</strong>.<br /><br />
     Dès le début de votre prochain mois, vous pourrez soit sélectionner vos nouveaux prospects manuellement, soit nous laisser faire automatiquement pour vous.
   `;
   return {
-    subject: `Votre mois se termine dans ${dayLabel} — Lidmeo`,
+    subject: `Votre liste de prospects se termine dans ${dayLabel} — Lidmeo`,
     html: layout({
       badgeLabel: "⏰ Rappel",
       badgeTone: "orange",
-      headline: "Votre mois se termine",
-      highlight: `dans ${dayLabel}.`,
+      headline: "Votre liste de prospects",
+      highlight: `se termine dans ${dayLabel}.`,
       body,
     }),
   };
+}
+
+// ─── Admin notification (ciblage/messages client) ──────────────────────────────
+
+type AdminChangeKind = "icp" | "messages";
+
+export function adminClientChangeEmail(params: {
+  kind: AdminChangeKind;
+  clientName: string | null;
+  clientEmail: string | null;
+  orgId: number;
+}): { subject: string; html: string } {
+  const { kind, clientName, clientEmail, orgId } = params;
+  const nameLabel = (clientName ?? "").trim() || `org #${orgId}`;
+  const changeLabel = kind === "icp" ? "Ciblage modifié" : "Messages modifiés";
+  const changeDetail = kind === "icp" ? "son ciblage (ICP)" : "ses messages de prospection";
+  const subject = `🔔 [Lidmeo Hub] ${changeLabel} par ${nameLabel}`;
+  const whenIso = new Date().toISOString();
+  const whenLabel = new Date().toLocaleString("fr-FR", {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: "Europe/Paris",
+  });
+  const adminUrl = `https://hub.lidmeo.com/admin/clients?org=${orgId}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="fr">
+  <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0b1c33;padding:16px;">
+    <p><strong>${escapeHtml(nameLabel)}</strong> vient de valider ${escapeHtml(changeDetail)}.</p>
+    <ul>
+      <li><strong>Client :</strong> ${escapeHtml(nameLabel)}</li>
+      <li><strong>Email :</strong> ${escapeHtml(clientEmail ?? "—")}</li>
+      <li><strong>Org ID :</strong> ${orgId}</li>
+      <li><strong>Modification :</strong> ${escapeHtml(changeDetail)}</li>
+      <li><strong>Date :</strong> ${escapeHtml(whenLabel)} (<code>${escapeHtml(whenIso)}</code>)</li>
+    </ul>
+    <p>
+      <a href="${escapeHtml(adminUrl)}" style="color:#2563EB;">Ouvrir le panel admin →</a>
+    </p>
+  </body>
+</html>`;
+
+  return { subject, html };
 }
 
 // ─── Resend sender ─────────────────────────────────────────────────────────────

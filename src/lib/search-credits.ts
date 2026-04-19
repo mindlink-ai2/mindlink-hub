@@ -2,7 +2,7 @@
  * Search credits: 31-day auto-reset logic.
  *
  * Credits per period depend on the client plan:
- *   - Essential → 1 credit
+ *   - Essential → 2 credits
  *   - Full      → 4 credits
  *
  * The period anchor is search_credits.created_at (when the credits
@@ -12,9 +12,15 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const CREDITS_DEFAULT = 4;
-const CREDITS_ESSENTIAL = 1;
+const CREDITS_FULL = 4;
+const CREDITS_ESSENTIAL = 2;
 const PERIOD_DAYS = 31;
+
+function creditsForPlan(plan?: string | null): number {
+  const normalized = String(plan ?? "").trim().toLowerCase();
+  if (normalized === "essential") return CREDITS_ESSENTIAL;
+  return CREDITS_FULL;
+}
 const PERIOD_MS = PERIOD_DAYS * 24 * 60 * 60 * 1000;
 
 export interface CreditPeriod {
@@ -51,10 +57,18 @@ export interface ResolvedCredits {
 export async function resolveCredits(
   supabase: SupabaseClient,
   orgId: number,
-  plan?: string
+  plan?: string | null
 ): Promise<ResolvedCredits> {
-  const total =
-    plan?.toLowerCase() === "essential" ? CREDITS_ESSENTIAL : CREDITS_DEFAULT;
+  let resolvedPlan = plan ?? null;
+  if (resolvedPlan == null) {
+    const { data: clientRow } = await supabase
+      .from("clients")
+      .select("plan")
+      .eq("id", orgId)
+      .maybeSingle();
+    resolvedPlan = (clientRow?.plan as string | null) ?? null;
+  }
+  const total = creditsForPlan(resolvedPlan);
 
   const { data: creditRow } = await supabase
     .from("search_credits")

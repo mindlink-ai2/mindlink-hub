@@ -1,0 +1,89 @@
+import "server-only";
+
+const AGENT_NODE_ID = "ai-enrichment";
+const AGENT_NODE_NAME = "Enrichissement IA";
+
+const READ_ONLY_KEYS = [
+  "id",
+  "createdAt",
+  "updatedAt",
+  "active",
+  "tags",
+  "versionId",
+  "triggerCount",
+  "sharedWithProjects",
+  "homeProject",
+  "usedCredentials",
+];
+
+export async function updateWorkflowSystemPrompt(
+  workflowId: string,
+  systemPrompt: string
+): Promise<{ updated: boolean; error?: string }> {
+  const n8nApiKey = process.env.N8N_API_KEY;
+  const n8nBaseUrl = process.env.N8N_BASE_URL ?? "https://mindlink2.app.n8n.cloud";
+  if (!n8nApiKey) {
+    return { updated: false, error: "N8N_API_KEY missing" };
+  }
+
+  try {
+    const getRes = await fetch(`${n8nBaseUrl}/api/v1/workflows/${workflowId}`, {
+      headers: { "X-N8N-API-KEY": n8nApiKey },
+    });
+    if (!getRes.ok) {
+      const body = await getRes.text().catch(() => "");
+      return {
+        updated: false,
+        error: `GET ${getRes.status}: ${body.slice(0, 200)}`,
+      };
+    }
+
+    const workflow = (await getRes.json()) as Record<string, unknown>;
+    const nodes = workflow.nodes as Array<Record<string, unknown>> | undefined;
+    if (!Array.isArray(nodes)) {
+      return { updated: false, error: "workflow has no nodes" };
+    }
+
+    let patched = false;
+    for (const node of nodes) {
+      if (node.id !== AGENT_NODE_ID && node.name !== AGENT_NODE_NAME) continue;
+      const params = (node.parameters as Record<string, unknown>) ?? {};
+      const options = (params.options as Record<string, unknown>) ?? {};
+      options.systemMessage = systemPrompt;
+      params.options = options;
+      node.parameters = params;
+      patched = true;
+      break;
+    }
+
+    if (!patched) {
+      return { updated: false, error: "agent node not found" };
+    }
+
+    for (const key of READ_ONLY_KEYS) delete workflow[key];
+
+    const putRes = await fetch(`${n8nBaseUrl}/api/v1/workflows/${workflowId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-N8N-API-KEY": n8nApiKey,
+      },
+      body: JSON.stringify(workflow),
+    });
+
+    if (!putRes.ok) {
+      const body = await putRes.text().catch(() => "");
+      return {
+        updated: false,
+        error: `PUT ${putRes.status}: ${body.slice(0, 200)}`,
+      };
+    }
+
+    return { updated: true };
+  } catch (err) {
+    return {
+      updated: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
