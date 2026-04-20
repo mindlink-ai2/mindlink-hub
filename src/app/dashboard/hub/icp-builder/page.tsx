@@ -13,10 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Gem,
-  Home,
   Loader2,
   MessageCircleQuestion,
-  MessageSquare,
   Pencil,
   Search,
   Send,
@@ -479,7 +477,49 @@ export default function IcpBuilderPage() {
           }
           setIcpStatus(configData.status ?? "none");
           if (configData.status === "submitted") {
-            setScreen("submitted");
+            // Fetch quota to decide: if remaining > 0, drop the user directly in
+            // browse mode; otherwise show the "quota atteint" screen.
+            try {
+              const qRes = await fetch("/api/leads/quota");
+              if (qRes.ok) {
+                const qData = await qRes.json();
+                const remaining = qData.quota_remaining ?? 0;
+                setMonthlyQuota(qData.monthly_quota ?? 0);
+                setQuotaUsed(qData.quota_used ?? 0);
+                setQuotaRemaining(remaining);
+                if (remaining > 0 && mounted) {
+                  setScreen("browse");
+                  // Fetch first browse page inline to avoid referencing a
+                  // callback defined later in the component body.
+                  setBrowseLoading(true);
+                  fetch(`/api/apollo/browse?page=1`)
+                    .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+                    .then(({ ok, d }) => {
+                      if (!mounted) return;
+                      if (!ok) {
+                        setBrowseError(d.error ?? "Erreur lors du chargement.");
+                      } else {
+                        setBrowseLeads(d.people ?? []);
+                        setBrowsePage(d.page ?? 1);
+                        setBrowseTotalPages(d.total_pages ?? 1);
+                        setBrowseTotalEntries(d.total_entries ?? 0);
+                      }
+                    })
+                    .catch(() => {
+                      if (mounted) setBrowseError("Impossible de contacter le serveur.");
+                    })
+                    .finally(() => {
+                      if (mounted) setBrowseLoading(false);
+                    });
+                } else if (mounted) {
+                  setScreen("submitted");
+                }
+              } else if (mounted) {
+                setScreen("submitted");
+              }
+            } catch {
+              if (mounted) setScreen("submitted");
+            }
           } else if (
             configData.status === "draft" &&
             configData.filters?.questionnaire
@@ -698,6 +738,41 @@ export default function IcpBuilderPage() {
       setSubmitError("Impossible de valider. Veuillez réessayer.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleModifyTargeting = async () => {
+    if (reopening) return;
+    setReopening(true);
+    try {
+      const cr = await fetch("/api/icp/consume-credit", { method: "POST" });
+      if (!cr.ok) {
+        const data = await cr.json().catch(() => ({}));
+        console.error("[consume-credit]", data.error);
+        setReopening(false);
+        return;
+      }
+      const res = await fetch("/api/icp/reopen", { method: "POST" });
+      if (res.ok) {
+        setIcpStatus("draft");
+        setProfiles([]);
+        setTotalResults(null);
+        setSearchError(null);
+        setSubmitError(null);
+        setScreen("questionnaire");
+        setCurrentStep(0);
+        try {
+          const c = await fetch("/api/icp/credits");
+          if (c.ok) {
+            const cd = await c.json();
+            setCreditsRemaining(cd.credits_remaining ?? null);
+          }
+        } catch {
+          // silent
+        }
+      }
+    } finally {
+      setReopening(false);
     }
   };
 
@@ -1025,41 +1100,7 @@ export default function IcpBuilderPage() {
               {/* Option 1 — modifier le ciblage (consomme 1 crédit) */}
               <button
                 type="button"
-                onClick={async () => {
-                  if (reopening) return;
-                  setReopening(true);
-                  try {
-                    const cr = await fetch("/api/icp/consume-credit", { method: "POST" });
-                    if (!cr.ok) {
-                      const data = await cr.json().catch(() => ({}));
-                      console.error("[consume-credit]", data.error);
-                      setReopening(false);
-                      return;
-                    }
-                    const res = await fetch("/api/icp/reopen", { method: "POST" });
-                    if (res.ok) {
-                      setIcpStatus("draft");
-                      setProfiles([]);
-                      setTotalResults(null);
-                      setSearchError(null);
-                      setSubmitError(null);
-                      setScreen("questionnaire");
-                      setCurrentStep(0);
-                      // refresh credits
-                      try {
-                        const c = await fetch("/api/icp/credits");
-                        if (c.ok) {
-                          const cd = await c.json();
-                          setCreditsRemaining(cd.credits_remaining ?? null);
-                        }
-                      } catch {
-                        // silent
-                      }
-                    }
-                  } finally {
-                    setReopening(false);
-                  }
-                }}
+                onClick={handleModifyTargeting}
                 disabled={reopening || (creditsRemaining !== null && creditsRemaining <= 0)}
                 className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF] disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -1092,74 +1133,6 @@ export default function IcpBuilderPage() {
                   </div>
                 </button>
               )}
-
-              {/* Option — passer aux messages */}
-              <button
-                type="button"
-                onClick={() => router.push("/dashboard/hub/messages-setup")}
-                className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF]"
-              >
-                <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#0b1c33]">Passer aux messages</p>
-                  <p className="mt-0.5 text-xs text-[#51627b]">
-                    Configurer vos messages de prospection.
-                  </p>
-                </div>
-              </button>
-
-              {/* Option — terminé */}
-              <button
-                type="button"
-                onClick={() => router.push("/dashboard")}
-                className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF]"
-              >
-                <Home className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#0b1c33]">Terminé pour le moment</p>
-                  <p className="mt-0.5 text-xs text-[#51627b]">
-                    Retour au tableau de bord.
-                  </p>
-                </div>
-              </button>
-
-              {/* Option 3 — sélectionner au-delà du quota (consomme 1 crédit) */}
-              <button
-                type="button"
-                onClick={async () => {
-                  if (reopening) return;
-                  setReopening(true);
-                  try {
-                    const cr = await fetch("/api/icp/consume-credit", { method: "POST" });
-                    if (!cr.ok) {
-                      const data = await cr.json().catch(() => ({}));
-                      console.error("[consume-credit]", data.error);
-                      return;
-                    }
-                    const cd = await cr.json().catch(() => ({}));
-                    if (typeof cd.credits_remaining === "number") {
-                      setCreditsRemaining(cd.credits_remaining);
-                    }
-                    // Bump quota locally so the client can select more (~5 extra business days)
-                    const bump = Math.max(10, Math.round(monthlyQuota / 22) * 5);
-                    setQuotaRemaining((prev) => prev + bump);
-                    setMonthlyQuota((prev) => prev + bump);
-                    setScreen("browse");
-                  } finally {
-                    setReopening(false);
-                  }
-                }}
-                disabled={reopening || (creditsRemaining !== null && creditsRemaining <= 0)}
-                className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#0b1c33]">Sélectionner au-delà du quota</p>
-                  <p className="mt-0.5 text-xs text-[#51627b]">
-                    Débloquer une tranche supplémentaire de leads. Consomme 1 crédit.
-                  </p>
-                </div>
-              </button>
 
               {creditsRemaining === 0 && (
                 <p className="mt-2 text-center text-xs text-[#a0b0c0]">
@@ -1640,16 +1613,27 @@ export default function IcpBuilderPage() {
 
           {/* Retour — lien texte discret */}
           <div className="mb-4">
-            <button
-              type="button"
-              onClick={() => {
-                setScreen("summary");
-                setBrowseLeads([]);
-              }}
-              className="text-xs text-[#7a9abf] hover:text-[#2563EB] transition-colors"
-            >
-              ← Retour au ciblage
-            </button>
+            {icpStatus === "submitted" ? (
+              <button
+                type="button"
+                onClick={handleModifyTargeting}
+                disabled={reopening || (creditsRemaining !== null && creditsRemaining <= 0)}
+                className="text-xs text-[#7a9abf] hover:text-[#2563EB] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                ← Modifier mon ciblage
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setScreen("summary");
+                  setBrowseLeads([]);
+                }}
+                className="text-xs text-[#7a9abf] hover:text-[#2563EB] transition-colors"
+              >
+                ← Retour au ciblage
+              </button>
+            )}
           </div>
 
           {/* Info — validation en plusieurs fois */}
