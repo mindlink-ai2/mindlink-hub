@@ -569,6 +569,38 @@ export default function Sidebar({
         ))}
       </nav>
 
+      {/* Documentation (external) */}
+      <div className={`border-t border-[#E5E7EB] ${isOpen ? "px-2 py-2" : "px-2 py-2"}`}>
+        <div className="relative group">
+          <a
+            href="https://docs.lidmeo.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`relative flex items-center gap-3 rounded-lg px-2.5 py-[8px] text-[13px] leading-none text-[#374151] font-normal hover:bg-[#F1F5F9] hover:text-[#111827] cursor-pointer ${
+              isOpen ? "" : "justify-center"
+            }`}
+            style={{ transition: "color 100ms ease, background-color 100ms ease" }}
+          >
+            <span className="relative z-10 flex-shrink-0">
+              <BookOpen className="h-[18px] w-[18px] text-[#6B7280] group-hover:text-[#2563EB] transition-colors duration-100" />
+            </span>
+            {isOpen ? (
+              <span className="relative z-10 flex flex-1 items-center gap-2 overflow-hidden whitespace-nowrap text-left transition-transform duration-150 group-hover:translate-x-[2px]">
+                <span className="flex-1">Documentation</span>
+              </span>
+            ) : null}
+          </a>
+          {!isOpen ? (
+            <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 opacity-0 transition-opacity duration-[80ms] group-hover:opacity-100">
+              <div className="relative rounded-md bg-[#1F2937] px-3 py-1.5 text-xs font-medium text-white shadow-lg whitespace-nowrap">
+                Documentation
+                <span className="absolute left-0 top-1/2 -ml-1 h-0 w-0 -translate-y-1/2 border-y-4 border-r-4 border-y-transparent border-r-[#1F2937]" />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
       {/* Footer */}
       <div className="flex flex-col gap-2 border-t border-[#E5E7EB] p-3">
         <div className="relative" ref={profileMenuRef}>
@@ -732,6 +764,19 @@ export default function Sidebar({
                   </div>
                 ))}
               </nav>
+              <div className="border-t border-[#E5E7EB] px-2 py-2">
+                <a
+                  href="https://docs.lidmeo.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setMobileOpen(false)}
+                  className="group flex items-center gap-3 rounded-lg px-2.5 py-[8px] text-[13px] leading-none text-[#374151] font-normal hover:bg-[#F1F5F9] hover:text-[#111827]"
+                  style={{ transition: "color 100ms ease, background-color 100ms ease" }}
+                >
+                  <BookOpen className="h-[18px] w-[18px] text-[#6B7280] group-hover:text-[#2563EB] transition-colors duration-100" />
+                  <span>Documentation</span>
+                </a>
+              </div>
               <div className="flex flex-col gap-1 border-t border-[#E5E7EB] p-3">
                 <div className="flex items-center gap-3 rounded-lg p-2">
                   {avatarUrl ? (
