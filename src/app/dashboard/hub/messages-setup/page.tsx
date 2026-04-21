@@ -110,7 +110,7 @@ function ReadOnlyMessageCard({
         </p>
       </div>
       <p className="mt-2 text-[11px] text-[#a0b8d0]">
-        Utilisée automatiquement quand un post pertinent est détecté chez le prospect.
+        Cette version sera utilisée automatiquement quand notre IA détecte un post pertinent. Tu peux demander un ajustement dans le chat si besoin.
       </p>
     </div>
   );
@@ -217,7 +217,7 @@ function MessagePair({
   canValidate,
 }: MessagePairProps) {
   return (
-    <div className="flex flex-col gap-2 sm:grid sm:grid-cols-2">
+    <div className="flex flex-col gap-2">
       {avecPostContent ? (
         <ReadOnlyMessageCard
           label={avecPostLabel}
