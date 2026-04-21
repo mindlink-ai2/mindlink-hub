@@ -15,6 +15,7 @@ const COL_TITLE = 2;
 const COL_COMPANY = 3;
 const COL_EMAIL = 4;
 const COL_LINKEDIN = 14; // "Person Linkedin Url"
+// COL_EMAIL kept for Supabase matching only; not returned to client
 
 const FR_DAY_NAMES = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
@@ -43,12 +44,12 @@ function maskLastName(raw: string): string {
   return s.charAt(0).toUpperCase() + "***";
 }
 
-function maskEmail(raw: string): string {
-  const s = raw.trim();
-  if (!s) return "";
-  const at = s.indexOf("@");
-  if (at <= 0) return s.charAt(0) + "***";
-  return s.charAt(0) + "***@" + s.slice(at + 1);
+function maskLinkedIn(url: string): string {
+  const s = url.trim();
+  if (!s) return "Non disponible";
+  const match = s.match(/linkedin\.com\/in\/([^/?#\s]+)/i);
+  if (!match?.[1]) return "Non disponible";
+  return `linkedin.com/in/${match[1].charAt(0).toLowerCase()}***`;
 }
 
 function nextWorkingDays(from: Date, count: number): Date[] {
@@ -274,7 +275,7 @@ export async function GET() {
           last_name_masked: maskLastName(String(row[COL_LAST_NAME] ?? "")),
           title: String(row[COL_TITLE] ?? "").trim(),
           company: String(row[COL_COMPANY] ?? "").trim(),
-          email_masked: maskEmail(String(row[COL_EMAIL] ?? "")),
+          linkedin_masked: maskLinkedIn(String(row[COL_LINKEDIN] ?? "")),
         })),
       };
     })

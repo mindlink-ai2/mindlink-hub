@@ -9,7 +9,7 @@ type QueueLead = {
   last_name_masked: string;
   title: string;
   company: string;
-  email_masked: string;
+  linkedin_masked: string;
 };
 
 type QueueDay = {
@@ -106,14 +106,27 @@ export default function LeadsQueue() {
                   Nouveau
                 </span>
               </div>
-              <p className="mt-0.5 text-xs text-[#51627b]">
-                <span className="font-medium text-[#0b1c33]">{data.total_in_queue} prospects</span>{" "}
-                sélectionnés seront contactés au prochain import :{" "}
-                <span className="font-medium text-blue-700">
-                  {data.next_send}
-                  {countdown ? ` (${countdown})` : ""}
-                </span>
-              </p>
+              {data.days.length === 1 ? (
+                <p className="mt-0.5 text-xs text-[#51627b]">
+                  <span className="font-medium text-[#0b1c33]">{data.total_in_queue} prospects</span>{" "}
+                  seront contactés{" "}
+                  <span className="font-medium text-blue-700">
+                    {data.next_send}
+                    {countdown ? ` (${countdown})` : ""}
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-0.5 text-xs text-[#51627b]">
+                  <span className="font-medium text-[#0b1c33]">{data.total_in_queue} prospects</span>{" "}
+                  en file d&apos;attente pour les{" "}
+                  <span className="font-medium text-[#0b1c33]">{data.days.length} prochains jours ouvrés</span>.{" "}
+                  Prochain envoi :{" "}
+                  <span className="font-medium text-blue-700">
+                    {data.next_send}
+                    {countdown ? ` (${countdown})` : ""}
+                  </span>
+                </p>
+              )}
             </div>
           </div>
 
@@ -166,7 +179,7 @@ export default function LeadsQueue() {
                   <th className="pb-2 pr-3 text-left">Nom</th>
                   <th className="pb-2 pr-3 text-left">Poste</th>
                   <th className="pb-2 pr-3 text-left">Entreprise</th>
-                  <th className="pb-2 text-left">Email</th>
+                  <th className="pb-2 text-left">LinkedIn</th>
                 </tr>
               </thead>
               <tbody>
@@ -195,7 +208,7 @@ export default function LeadsQueue() {
                         style={{ filter: "blur(2.5px)" }}
                         aria-hidden="true"
                       >
-                        {lead.email_masked || "—"}
+                        {lead.linkedin_masked || "Non disponible"}
                       </span>
                     </td>
                   </tr>
