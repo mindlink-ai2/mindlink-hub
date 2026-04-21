@@ -10,6 +10,7 @@ import {
   Mail,
   MessageSquare,
   Pencil,
+  RotateCcw,
   Send,
 } from "lucide-react";
 import { HubButton } from "@/components/ui/hub-button";
@@ -59,6 +60,52 @@ function stripTags(raw: string): string {
     .trim();
 }
 
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 2) return "il y a quelques instants";
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "hier";
+  return `il y a ${days} jours`;
+}
+
+function restoreValidatedState(history: ChatMessage[]): {
+  validatedLinkedin: string | null;
+  validatedRelance: string | null;
+} {
+  let validatedLinkedin: string | null = null;
+  let validatedRelance: string | null = null;
+
+  const linkedinValIdx = history.findLastIndex(
+    (m) => m.role === "user" && m.content.includes("je valide la version sans post")
+  );
+  if (linkedinValIdx > 0) {
+    for (let i = linkedinValIdx - 1; i >= 0; i--) {
+      if (history[i].role === "assistant") {
+        const tag = extractTag(history[i].content, "MESSAGE_LINKEDIN_SANS_POST");
+        if (tag) { validatedLinkedin = tag; break; }
+      }
+    }
+  }
+
+  const relanceValIdx = history.findLastIndex(
+    (m) => m.role === "user" && m.content.includes("la relance me va aussi")
+  );
+  if (relanceValIdx > 0) {
+    for (let i = relanceValIdx - 1; i >= 0; i--) {
+      if (history[i].role === "assistant") {
+        const tag = extractTag(history[i].content, "RELANCE_LINKEDIN_SANS_POST");
+        if (tag) { validatedRelance = tag; break; }
+      }
+    }
+  }
+
+  return { validatedLinkedin, validatedRelance };
+}
+
 function AssistantAvatar() {
   return (
     <div
@@ -85,23 +132,12 @@ function ReadOnlyMessageCard({
   content: string;
   maxChars: number;
 }) {
-  const overLimit = content.length > maxChars;
   return (
     <div className="rounded-2xl rounded-tl-sm border border-[#dde6f5] bg-[#f8faff] p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Eye className="h-4 w-4 text-[#7a9abf]" />
-          <span className="text-xs font-semibold uppercase tracking-wide text-[#7a9abf]">
-            {label}
-          </span>
-        </div>
-        <span
-          className={cn(
-            "text-[11px]",
-            overLimit ? "font-semibold text-red-500" : "text-[#a0b8d0]"
-          )}
-        >
-          {content.length}/{maxChars} car.
+      <div className="mb-2 flex items-center gap-1.5">
+        <Eye className="h-4 w-4 text-[#7a9abf]" />
+        <span className="text-xs font-semibold uppercase tracking-wide text-[#7a9abf]">
+          {label}
         </span>
       </div>
       <div className="rounded-xl border border-[#e8eef8] bg-white/70 p-3">
@@ -136,29 +172,18 @@ function ValidatableMessageCard({
   canValidate: boolean;
 }) {
   const isValidated = validatedText === content;
-  const overLimit = content.length > maxChars;
 
   return (
     <div className="rounded-2xl rounded-tl-sm border border-[#c8d6ea] bg-white p-4 shadow-sm">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <MessageSquare
-            className={cn(
-              "h-4 w-4",
-              kind === "linkedin_sans_post" ? "text-[#2563EB]" : "text-[#7c3aed]"
-            )}
-          />
-          <span className="text-xs font-semibold uppercase tracking-wide text-[#51627b]">
-            {label}
-          </span>
-        </div>
-        <span
+      <div className="mb-2 flex items-center gap-1.5">
+        <MessageSquare
           className={cn(
-            "text-[11px]",
-            overLimit ? "font-semibold text-red-600" : "text-[#7a9abf]"
+            "h-4 w-4",
+            kind === "linkedin_sans_post" ? "text-[#2563EB]" : "text-[#7c3aed]"
           )}
-        >
-          {content.length}/{maxChars} car.
+        />
+        <span className="text-xs font-semibold uppercase tracking-wide text-[#51627b]">
+          {label}
         </span>
       </div>
       <div className="rounded-xl border border-[#eef1f8] bg-[#fafcff] p-3">
@@ -347,6 +372,11 @@ export default function MessagesSetupPage() {
   const [validatedRelance, setValidatedRelance] = useState<string | null>(null);
   const [workflowJustCreated, setWorkflowJustCreated] = useState(false);
 
+  const [draftDialog, setDraftDialog] = useState(false);
+  const [draftHistory, setDraftHistory] = useState<ChatMessage[] | null>(null);
+  const [draftUpdatedAt, setDraftUpdatedAt] = useState<string | null>(null);
+  const [confirmRestart, setConfirmRestart] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -378,7 +408,35 @@ export default function MessagesSetupPage() {
 
         if (existing && existing.status === "submitted") {
           setScreen("existing");
-        } else {
+          return;
+        }
+
+        // Check for an in-progress draft to offer resumption
+        try {
+          const draftRes = await fetch("/api/messages/draft", { cache: "no-store" });
+          if (mounted && draftRes.ok) {
+            const draftData = await draftRes.json();
+            const draft = draftData?.draft as {
+              conversation_history: ChatMessage[];
+              updated_at: string;
+            } | null;
+            if (
+              draft &&
+              Array.isArray(draft.conversation_history) &&
+              draft.conversation_history.length > 1
+            ) {
+              setDraftHistory(draft.conversation_history);
+              setDraftUpdatedAt(draft.updated_at ?? null);
+              setDraftDialog(true);
+              setScreen("chat");
+              return;
+            }
+          }
+        } catch {
+          // silent — fall through to fresh start
+        }
+
+        if (mounted) {
           setHistory([{ role: "assistant", content: WELCOME_MESSAGE }]);
           setScreen("chat");
         }
@@ -512,6 +570,31 @@ export default function MessagesSetupPage() {
     }
   }, [validatedLinkedin, validatedRelance, saving, onboardingPending, history, router]);
 
+  const handleResumeDraft = useCallback(() => {
+    if (!draftHistory) return;
+    const { validatedLinkedin: vl, validatedRelance: vr } = restoreValidatedState(draftHistory);
+    setHistory(draftHistory);
+    if (vl) setValidatedLinkedin(vl);
+    if (vr) setValidatedRelance(vr);
+    setDraftDialog(false);
+  }, [draftHistory]);
+
+  const handleDiscardDraft = useCallback(async () => {
+    setDraftDialog(false);
+    void fetch("/api/messages/draft", { method: "DELETE" });
+    setHistory([{ role: "assistant", content: WELCOME_MESSAGE }]);
+  }, []);
+
+  const handleConfirmRestart = useCallback(async () => {
+    setConfirmRestart(false);
+    void fetch("/api/messages/draft", { method: "DELETE" });
+    setHistory([{ role: "assistant", content: WELCOME_MESSAGE }]);
+    setInput("");
+    setError(null);
+    setValidatedLinkedin(null);
+    setValidatedRelance(null);
+  }, []);
+
   const relaunchChat = useCallback(() => {
     setHistory([{ role: "assistant", content: WELCOME_MESSAGE }]);
     setInput("");
@@ -557,6 +640,16 @@ export default function MessagesSetupPage() {
               <CheckCircle2 className="h-3.5 w-3.5" />
               Validés
             </span>
+          )}
+          {screen === "chat" && (
+            <button
+              type="button"
+              onClick={() => setConfirmRestart(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#c8d6ea] bg-white px-3 py-1.5 text-xs text-[#51627b] hover:border-[#a0b8d0] hover:text-[#0b1c33] transition-colors"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Recommencer
+            </button>
           )}
         </div>
 
@@ -605,6 +698,48 @@ export default function MessagesSetupPage() {
       {screen === "existing" && existingMessages && (
         <div className="mx-auto max-w-3xl px-4 py-8">
           <SavedMessagesPanel messages={existingMessages} onEdit={relaunchChat} />
+        </div>
+      )}
+
+      {/* Draft resume dialog */}
+      {draftDialog && draftHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[#c8d6ea] bg-white p-6 shadow-xl">
+            <h2 className="text-base font-bold text-[#0b1c33]">Conversation en cours</h2>
+            <p className="mt-2 text-sm text-[#51627b]">
+              Tu as un brouillon en cours
+              {draftUpdatedAt ? ` (${formatRelativeTime(draftUpdatedAt)})` : ""}.
+              Tu veux reprendre là où tu étais, ou recommencer depuis le début ?
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <HubButton variant="primary" onClick={handleResumeDraft} className="w-full justify-center">
+                Reprendre
+              </HubButton>
+              <HubButton variant="secondary" onClick={() => void handleDiscardDraft()} className="w-full justify-center">
+                Recommencer depuis le début
+              </HubButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm restart dialog */}
+      {confirmRestart && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[#c8d6ea] bg-white p-6 shadow-xl">
+            <h2 className="text-base font-bold text-[#0b1c33]">Recommencer ?</h2>
+            <p className="mt-2 text-sm text-[#51627b]">
+              Tu vas perdre la conversation en cours. Cette action est irréversible.
+            </p>
+            <div className="mt-5 flex gap-2">
+              <HubButton variant="secondary" onClick={() => setConfirmRestart(false)} className="flex-1 justify-center">
+                Annuler
+              </HubButton>
+              <HubButton variant="primary" onClick={() => void handleConfirmRestart()} className="flex-1 justify-center">
+                Oui, recommencer
+              </HubButton>
+            </div>
+          </div>
         </div>
       )}
 
@@ -690,13 +825,13 @@ export default function MessagesSetupPage() {
                 onKeyDown={handleKeyDown}
                 placeholder="Écris ta réponse…"
                 rows={2}
-                disabled={sending}
+                disabled={sending || draftDialog}
                 className="flex-1 resize-none rounded-2xl border border-[#c8d6ea] bg-white px-4 py-3 text-sm text-[#0b1c33] placeholder:text-[#a0b0c0] focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
               />
               <button
                 type="button"
                 onClick={() => void sendMessage(input)}
-                disabled={sending || !input.trim()}
+                disabled={sending || draftDialog || !input.trim()}
                 className="shrink-0 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2563EB] text-white disabled:opacity-40 hover:bg-[#1d4ed8] transition-colors"
                 aria-label="Envoyer"
               >

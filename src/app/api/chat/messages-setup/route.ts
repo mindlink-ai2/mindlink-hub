@@ -339,6 +339,38 @@ export async function POST(req: Request) {
     const data = await res.json();
     const reply: string = data.content?.[0]?.text ?? "";
 
+    // Draft persistence — non-blocking, never overwrites submitted records
+    try {
+      const fullHistory = [
+        ...messages,
+        { role: "assistant" as const, content: reply },
+      ];
+      const { data: currentRow } = await supabase
+        .from("client_messages")
+        .select("status")
+        .eq("org_id", clientContext.clientId)
+        .maybeSingle();
+
+      if (!currentRow) {
+        await supabase.from("client_messages").insert({
+          org_id: clientContext.clientId,
+          conversation_history: fullHistory,
+          status: "draft",
+          updated_at: new Date().toISOString(),
+        });
+      } else if (currentRow.status === "draft") {
+        await supabase
+          .from("client_messages")
+          .update({
+            conversation_history: fullHistory,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("org_id", clientContext.clientId);
+      }
+    } catch (draftErr) {
+      console.error("[chat/messages-setup] draft save failed:", draftErr);
+    }
+
     return NextResponse.json({ reply });
   } catch (err) {
     console.error("[chat/messages-setup] error:", err);
