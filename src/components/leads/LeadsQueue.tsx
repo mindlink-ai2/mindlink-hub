@@ -109,7 +109,7 @@ export default function LeadsQueue() {
               {data.days.length === 1 ? (
                 <p className="mt-0.5 text-xs text-[#51627b]">
                   <span className="font-medium text-[#0b1c33]">{data.total_in_queue} prospects</span>{" "}
-                  seront contactés{" "}
+                  seront importés{" "}
                   <span className="font-medium text-blue-700">
                     {data.next_send}
                     {countdown ? ` (${countdown})` : ""}
