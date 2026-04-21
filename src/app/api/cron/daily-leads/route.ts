@@ -3,7 +3,6 @@ import Stripe from "stripe";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import { autoExtractLeads } from "@/lib/auto-extract";
 import {
-  renewalLeadsEmail,
   completionLeadsEmail,
   reminderEmail,
   sendLidmeoEmail,
@@ -193,50 +192,6 @@ export async function GET(req: Request) {
       continue;
     }
 
-    // ── Task 1: J+0 renewal auto-select ──
-    if (isSameDay(now, periodStart)) {
-      // Count leads already extracted (manual or auto) since the period start
-      // so J+0 completes up to the target rather than blindly adding a block.
-      const { data: logs } = await supabase
-        .from("extraction_logs")
-        .select("leads_count")
-        .eq("org_id", client.id)
-        .eq("status", "completed")
-        .gte("created_at", periodStart.toISOString());
-
-      const alreadyExtracted = (logs ?? []).reduce(
-        (sum: number, row: { leads_count: number | null }) => sum + (row.leads_count ?? 0),
-        0
-      );
-
-      const targetQuota = quotaPerDay * BUSINESS_DAYS_AT_RENEWAL;
-      const missing = targetQuota - alreadyExtracted;
-
-      if (missing <= 0) {
-        report.push({
-          orgId: client.id,
-          action: "skip_renewal_quota_met",
-          alreadyExtracted,
-        });
-        continue;
-      }
-
-      const result = await autoExtractLeads(supabase, client.id, missing, "auto_renewal");
-      if (result.leadsCount > 0 && client.email) {
-        const tmpl = renewalLeadsEmail(clientName, result.leadsCount);
-        await sendLidmeoEmail({ to: client.email, subject: tmpl.subject, html: tmpl.html });
-      }
-      report.push({
-        orgId: client.id,
-        action: "auto_renewal",
-        leads: result.leadsCount,
-        missing,
-        alreadyExtracted,
-        error: result.error,
-      });
-      continue;
-    }
-
     // ── Task 2: J+5 business days after renewal ──
     const j5 = addBusinessDays(periodStart, BUSINESS_DAYS_AT_RENEWAL);
     if (isSameDay(now, j5)) {
@@ -268,6 +223,20 @@ export async function GET(req: Request) {
 
       if (missing <= 0) {
         report.push({ orgId: client.id, action: "skip_quota_met", alreadyExtracted });
+        continue;
+      }
+
+      // Anti-doublon : éviter une double extraction si le cron tourne plusieurs fois dans la journée
+      const { data: todayLogs } = await supabase
+        .from("extraction_logs")
+        .select("id")
+        .eq("org_id", client.id)
+        .in("source", ["auto_renewal", "auto_completion"])
+        .gte("created_at", startOfDay(now).toISOString())
+        .limit(1);
+
+      if (todayLogs && todayLogs.length > 0) {
+        report.push({ orgId: client.id, action: "skip_already_processed_today" });
         continue;
       }
 
