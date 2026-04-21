@@ -17,6 +17,7 @@ import {
 } from "@/lib/prospection-status";
 import DeleteLeadButton from "./DeleteLeadButton";
 import SubscriptionGate from "@/components/SubscriptionGate";
+import LeadsQueue from "@/components/leads/LeadsQueue";
 import dynamic from "next/dynamic";
 import LeadsCards, { type MobileLeadsViewMode } from "@/components/leads/LeadsCards";
 import LeadsMobileFilters, {
@@ -1826,6 +1827,8 @@ export default function LeadsPage() {
                     invitations LinkedIn par jour.
                   </span>
                 </div>
+
+                <LeadsQueue />
 
                 <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
                   <Metric
