@@ -110,7 +110,7 @@ function ReadOnlyMessageCard({
         </p>
       </div>
       <p className="mt-2 text-[11px] text-[#a0b8d0]">
-        Cette version sera utilisée automatiquement quand notre IA détecte un post pertinent. Tu peux demander un ajustement dans le chat si besoin.
+        Cette version se déclenche automatiquement quand notre IA détecte un post récent pertinent chez le prospect. Tu la valides en validant la version 2 (les 2 vont ensemble).
       </p>
     </div>
   );
@@ -166,10 +166,11 @@ function ValidatableMessageCard({
           {content}
         </p>
       </div>
-      <div className="mt-2.5 flex items-center justify-between">
+      <div className="mt-2.5 flex flex-col gap-2">
         <p className="text-[11px] text-[#7a9abf]">
-          Version de référence principale.
+          En validant ce message, tu valides aussi la version du dessus. Les 2 versions partagent le même positionnement.
         </p>
+        <div className="flex items-center justify-end">
         {isValidated ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
             <CheckCircle2 className="h-3.5 w-3.5" />
@@ -186,6 +187,7 @@ function ValidatableMessageCard({
             Je valide ce message
           </HubButton>
         ) : null}
+        </div>
       </div>
     </div>
   );
@@ -297,8 +299,8 @@ function MessageRow({
           <MessagePair
             avecPostContent={linkedinAvecPost}
             sansPostContent={linkedinSansPost}
-            avecPostLabel="Version 1 — Si le prospect a posté un contenu pertinent"
-            sansPostLabel="Version 2 — Si le prospect n'a rien posté d'exploitable"
+            avecPostLabel="Version utilisée si le prospect a un post pertinent"
+            sansPostLabel="Version principale — à valider"
             maxChars={250}
             kind="linkedin_sans_post"
             validatedText={validatedLinkedin}
