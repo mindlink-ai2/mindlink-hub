@@ -140,6 +140,7 @@ export async function POST(req: Request) {
         relanceLinkedin: finalizedRelance,
         messageEmail: finalizedEmail,
         conversationDigest,
+        conversationHistory: history,
         icpDigest: buildIcpDigest(
           (icpConfig?.filters ?? null) as Record<string, unknown> | null
         ),

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   CheckCircle2,
+  Eye,
   Loader2,
   Mail,
   MessageSquare,
@@ -30,7 +31,9 @@ type SavedMessages = {
 
 type Screen = "loading" | "existing" | "chat" | "saved";
 
-type MessageKind = "linkedin" | "relance";
+// "sans_post" versions are the ones the client validates.
+// "avec_post" versions are display-only.
+type MessageKind = "linkedin_sans_post" | "relance_sans_post";
 
 const ASSISTANT_NAME = "Assistant Lidmeo";
 
@@ -45,6 +48,11 @@ function extractTag(raw: string, tag: string): string {
 
 function stripTags(raw: string): string {
   return raw
+    .replace(/\[MESSAGE_LINKEDIN_AVEC_POST\][\s\S]*?\[\/MESSAGE_LINKEDIN_AVEC_POST\]/gi, "")
+    .replace(/\[MESSAGE_LINKEDIN_SANS_POST\][\s\S]*?\[\/MESSAGE_LINKEDIN_SANS_POST\]/gi, "")
+    .replace(/\[RELANCE_LINKEDIN_AVEC_POST\][\s\S]*?\[\/RELANCE_LINKEDIN_AVEC_POST\]/gi, "")
+    .replace(/\[RELANCE_LINKEDIN_SANS_POST\][\s\S]*?\[\/RELANCE_LINKEDIN_SANS_POST\]/gi, "")
+    // Legacy tags kept for backward compatibility
     .replace(/\[MESSAGE_LINKEDIN\][\s\S]*?\[\/MESSAGE_LINKEDIN\]/gi, "")
     .replace(/\[RELANCE_LINKEDIN\][\s\S]*?\[\/RELANCE_LINKEDIN\]/gi, "")
     .replace(/\[EMAIL\][\s\S]*?\[\/EMAIL\]/gi, "")
@@ -65,6 +73,177 @@ function AssistantAvatar() {
     </div>
   );
 }
+
+// ── Read-only card (version avec post) ──────────────────────────────────────
+
+function ReadOnlyMessageCard({
+  label,
+  content,
+  maxChars,
+}: {
+  label: string;
+  content: string;
+  maxChars: number;
+}) {
+  const overLimit = content.length > maxChars;
+  return (
+    <div className="rounded-2xl rounded-tl-sm border border-[#dde6f5] bg-[#f8faff] p-4">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Eye className="h-4 w-4 text-[#7a9abf]" />
+          <span className="text-xs font-semibold uppercase tracking-wide text-[#7a9abf]">
+            {label}
+          </span>
+        </div>
+        <span
+          className={cn(
+            "text-[11px]",
+            overLimit ? "font-semibold text-red-500" : "text-[#a0b8d0]"
+          )}
+        >
+          {content.length}/{maxChars} car.
+        </span>
+      </div>
+      <div className="rounded-xl border border-[#e8eef8] bg-white/70 p-3">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#3a5070]">
+          {content}
+        </p>
+      </div>
+      <p className="mt-2 text-[11px] text-[#a0b8d0]">
+        Utilisée automatiquement quand un post pertinent est détecté chez le prospect.
+      </p>
+    </div>
+  );
+}
+
+// ── Validatable card (version sans post) ────────────────────────────────────
+
+function ValidatableMessageCard({
+  kind,
+  label,
+  content,
+  maxChars,
+  validatedText,
+  onValidate,
+  canValidate,
+}: {
+  kind: MessageKind;
+  label: string;
+  content: string;
+  maxChars: number;
+  validatedText: string | null;
+  onValidate: (kind: MessageKind, text: string) => void;
+  canValidate: boolean;
+}) {
+  const isValidated = validatedText === content;
+  const overLimit = content.length > maxChars;
+
+  return (
+    <div className="rounded-2xl rounded-tl-sm border border-[#c8d6ea] bg-white p-4 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <MessageSquare
+            className={cn(
+              "h-4 w-4",
+              kind === "linkedin_sans_post" ? "text-[#2563EB]" : "text-[#7c3aed]"
+            )}
+          />
+          <span className="text-xs font-semibold uppercase tracking-wide text-[#51627b]">
+            {label}
+          </span>
+        </div>
+        <span
+          className={cn(
+            "text-[11px]",
+            overLimit ? "font-semibold text-red-600" : "text-[#7a9abf]"
+          )}
+        >
+          {content.length}/{maxChars} car.
+        </span>
+      </div>
+      <div className="rounded-xl border border-[#eef1f8] bg-[#fafcff] p-3">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#0b1c33]">
+          {content}
+        </p>
+      </div>
+      <div className="mt-2.5 flex items-center justify-between">
+        <p className="text-[11px] text-[#7a9abf]">
+          Version de référence principale.
+        </p>
+        {isValidated ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Validé
+          </span>
+        ) : canValidate ? (
+          <HubButton
+            variant="primary"
+            size="sm"
+            onClick={() => onValidate(kind, content)}
+            className="gap-1.5"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Je valide ce message
+          </HubButton>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ── Message pair (avec post + sans post) ────────────────────────────────────
+
+type MessagePairProps = {
+  avecPostContent: string;
+  sansPostContent: string;
+  avecPostLabel: string;
+  sansPostLabel: string;
+  maxChars: number;
+  kind: MessageKind;
+  validatedText: string | null;
+  onValidate: (kind: MessageKind, text: string) => void;
+  canValidate: boolean;
+};
+
+function MessagePair({
+  avecPostContent,
+  sansPostContent,
+  avecPostLabel,
+  sansPostLabel,
+  maxChars,
+  kind,
+  validatedText,
+  onValidate,
+  canValidate,
+}: MessagePairProps) {
+  return (
+    <div className="flex flex-col gap-2 sm:grid sm:grid-cols-2">
+      {avecPostContent ? (
+        <ReadOnlyMessageCard
+          label={avecPostLabel}
+          content={avecPostContent}
+          maxChars={maxChars}
+        />
+      ) : (
+        // Placeholder column when avec-post is missing (keeps grid balanced)
+        <div />
+      )}
+      {sansPostContent ? (
+        <ValidatableMessageCard
+          kind={kind}
+          label={sansPostLabel}
+          content={sansPostContent}
+          maxChars={maxChars}
+          validatedText={validatedText}
+          onValidate={onValidate}
+          canValidate={canValidate}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// ── Full message row ─────────────────────────────────────────────────────────
 
 type MessageRowProps = {
   message: ChatMessage;
@@ -95,40 +274,47 @@ function MessageRow({
     );
   }
 
-  const linkedinText = extractTag(message.content, "MESSAGE_LINKEDIN");
-  const relanceText = extractTag(message.content, "RELANCE_LINKEDIN");
+  const linkedinAvecPost = extractTag(message.content, "MESSAGE_LINKEDIN_AVEC_POST");
+  const linkedinSansPost = extractTag(message.content, "MESSAGE_LINKEDIN_SANS_POST");
+  const relanceAvecPost = extractTag(message.content, "RELANCE_LINKEDIN_AVEC_POST");
+  const relanceSansPost = extractTag(message.content, "RELANCE_LINKEDIN_SANS_POST");
   const preamble = stripTags(message.content);
+
+  const hasLinkedinPair = linkedinAvecPost || linkedinSansPost;
+  const hasRelancePair = relanceAvecPost || relanceSansPost;
 
   return (
     <div className="flex items-start gap-2.5">
       <AssistantAvatar />
-      <div className="flex max-w-[85%] flex-col gap-2">
+      <div className="flex w-full max-w-[calc(100%-2.5rem)] flex-col gap-3">
         {preamble ? (
           <div className="rounded-2xl border border-[#e1e8f5] bg-white px-4 py-2.5 text-sm text-[#0b1c33] shadow-sm whitespace-pre-wrap">
             {preamble}
           </div>
         ) : null}
 
-        {linkedinText ? (
-          <MessagePreviewCard
-            kind="linkedin"
-            label="Message LinkedIn"
-            icon={<MessageSquare className="h-4 w-4 text-[#2563EB]" />}
-            content={linkedinText}
+        {hasLinkedinPair ? (
+          <MessagePair
+            avecPostContent={linkedinAvecPost}
+            sansPostContent={linkedinSansPost}
+            avecPostLabel="Version 1 — Si le prospect a posté un contenu pertinent"
+            sansPostLabel="Version 2 — Si le prospect n'a rien posté d'exploitable"
             maxChars={250}
+            kind="linkedin_sans_post"
             validatedText={validatedLinkedin}
             onValidate={onValidate}
             canValidate={isLatestAssistant && !sending}
           />
         ) : null}
 
-        {relanceText ? (
-          <MessagePreviewCard
-            kind="relance"
-            label="Relance LinkedIn"
-            icon={<MessageSquare className="h-4 w-4 text-[#7c3aed]" />}
-            content={relanceText}
+        {hasRelancePair ? (
+          <MessagePair
+            avecPostContent={relanceAvecPost}
+            sansPostContent={relanceSansPost}
+            avecPostLabel="Relance V1 — Si le prospect a posté"
+            sansPostLabel="Relance V2 — Sans post exploitable"
             maxChars={150}
+            kind="relance_sans_post"
             validatedText={validatedRelance}
             onValidate={onValidate}
             canValidate={isLatestAssistant && !sending}
@@ -139,72 +325,7 @@ function MessageRow({
   );
 }
 
-function MessagePreviewCard({
-  kind,
-  label,
-  icon,
-  content,
-  maxChars,
-  validatedText,
-  onValidate,
-  canValidate,
-}: {
-  kind: MessageKind;
-  label: string;
-  icon: React.ReactNode;
-  content: string;
-  maxChars: number;
-  validatedText: string | null;
-  onValidate: (kind: MessageKind, text: string) => void;
-  canValidate: boolean;
-}) {
-  const isValidated = validatedText === content;
-  const overLimit = content.length > maxChars;
-
-  return (
-    <div className="rounded-2xl rounded-tl-sm border border-[#c8d6ea] bg-white p-4 shadow-sm">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          {icon}
-          <span className="text-xs font-semibold uppercase tracking-wide text-[#51627b]">
-            {label}
-          </span>
-        </div>
-        <span
-          className={cn(
-            "text-[11px]",
-            overLimit ? "font-semibold text-red-600" : "text-[#7a9abf]"
-          )}
-        >
-          {content.length}/{maxChars} car.
-        </span>
-      </div>
-      <div className="rounded-xl border border-[#eef1f8] bg-[#fafcff] p-3">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#0b1c33]">
-          {content}
-        </p>
-      </div>
-      <div className="mt-2.5 flex items-center justify-end">
-        {isValidated ? (
-          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Validé
-          </span>
-        ) : canValidate ? (
-          <HubButton
-            variant="primary"
-            size="sm"
-            onClick={() => onValidate(kind, content)}
-            className="gap-1.5"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Je valide ce message
-          </HubButton>
-        ) : null}
-      </div>
-    </div>
-  );
-}
+// ── Main page ────────────────────────────────────────────────────────────────
 
 export default function MessagesSetupPage() {
   const router = useRouter();
@@ -328,10 +449,10 @@ export default function MessagesSetupPage() {
 
   const handleValidateMessage = useCallback(
     (kind: MessageKind, text: string) => {
-      if (kind === "linkedin") {
+      if (kind === "linkedin_sans_post") {
         setValidatedLinkedin(text);
         void sendMessage(
-          "Parfait, ce message LinkedIn me va. Génère maintenant la relance LinkedIn."
+          "Parfait, je valide la version sans post. Génère maintenant la relance."
         );
       } else {
         setValidatedRelance(text);
@@ -457,7 +578,6 @@ export default function MessagesSetupPage() {
           </div>
         )}
       </div>
-
 
       {screen === "saved" && existingMessages && (
         <div className="mx-auto max-w-3xl px-4 py-10">
@@ -594,6 +714,8 @@ export default function MessagesSetupPage() {
     </div>
   );
 }
+
+// ── Saved messages display ───────────────────────────────────────────────────
 
 function SavedMessagesPanel({
   messages,
