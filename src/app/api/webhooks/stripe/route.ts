@@ -58,7 +58,8 @@ export async function POST(req: Request) {
   if (TEST_ORG_IDS.has(client.id)) return new Response("ok", { status: 200 });
 
   // Résoudre la période depuis la ligne d'abonnement de la facture
-  const subLine = invoice.lines?.data?.find((l) => l.type === "subscription");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subLine = invoice.lines?.data?.find((l: any) => l.type === "subscription");
   const periodStart = subLine?.period?.start
     ? new Date(subLine.period.start * 1000)
     : null;
