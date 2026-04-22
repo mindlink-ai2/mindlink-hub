@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
-import { resolveCredits } from "@/lib/search-credits";
 
 export const runtime = "nodejs";
 
@@ -23,7 +22,7 @@ export async function POST(request: Request) {
   // Résoudre l'org_id depuis le clerk_user_id
   const { data: clientRow, error: clientErr } = await supabase
     .from("clients")
-    .select("id, plan")
+    .select("id")
     .eq("clerk_user_id", userId)
     .single();
 
@@ -33,32 +32,6 @@ export async function POST(request: Request) {
   }
   const orgId: number = clientRow.id;
 
-  // ── ÉTAPE 1 : Vérifier les crédits (auto-reset par période de 31 jours) ──
-  const credits = await resolveCredits(
-    supabase,
-    orgId,
-    (clientRow.plan as string) ?? undefined
-  );
-  const creditsUsedBefore = credits.creditsUsed;
-  const creditsTotal = credits.creditsTotal;
-  const creditsBeforeSearch = credits.creditsRemaining;
-  console.log(`[search] org_id=${orgId} crédits avant=${creditsBeforeSearch}/${creditsTotal}`);
-
-  if (creditsBeforeSearch <= 0) {
-    const isEssential =
-      ((clientRow.plan as string) ?? "").toLowerCase() === "essential";
-    return NextResponse.json(
-      {
-        error: isEssential
-          ? "Vous avez utilisé votre crédit de prévisualisation. Pour sélectionner plus de leads, contactez-nous."
-          : "Vous n'avez plus de crédits de recherche. Contactez-nous pour en obtenir davantage.",
-        credits_remaining: 0,
-      },
-      { status: 402 }
-    );
-  }
-
-  // ── ÉTAPE 2 : Appel à la base de données de profils (AVANT décrémentation) ──
   const apiKey = process.env.APOLLO_API_KEY;
   if (!apiKey) {
     console.error("[search] APOLLO_API_KEY non configurée");
@@ -103,7 +76,6 @@ export async function POST(request: Request) {
       httpStatus = searchRes.status;
     } catch (err) {
       console.error("[search] erreur réseau:", err);
-      // Erreur réseau — NE PAS décrémenter les crédits
       return NextResponse.json(
         { error: "Impossible de contacter le service de recherche. Veuillez réessayer." },
         { status: 502 }
@@ -115,7 +87,6 @@ export async function POST(request: Request) {
     );
 
     if (!httpOk) {
-      // Erreur HTTP — NE PAS décrémenter les crédits
       return NextResponse.json(
         { error: "Erreur lors de la recherche. Veuillez réessayer." },
         { status: 502 }
@@ -159,23 +130,6 @@ export async function POST(request: Request) {
     attemptIndex++;
   }
 
-  // ── ÉTAPE 3 : Décrémentation des crédits (un seul crédit, même après retries) ──
-  const { error: decrementErr, count: decrementCount } = await supabase
-    .from("search_credits")
-    .update({ credits_used: creditsUsedBefore + 1 })
-    .eq("org_id", orgId)
-    .eq("credits_used", creditsUsedBefore); // optimistic lock
-
-  if (decrementErr) {
-    console.error("[search] échec décrémentation crédits:", decrementErr.message);
-  } else {
-    console.log(
-      `[search] org_id=${orgId} crédits après=${creditsBeforeSearch - 1}/${creditsTotal} (rows updated: ${decrementCount ?? "?"})`
-    );
-  }
-
-  const creditsRemaining = creditsBeforeSearch - 1;
-
   // Aucun résultat après tous les retries
   if (!searchData) {
     await supabase.from("search_logs").insert({
@@ -186,7 +140,6 @@ export async function POST(request: Request) {
     return NextResponse.json({
       profiles: [],
       total_results: 0,
-      credits_remaining: creditsRemaining,
       error: "Aucun profil trouvé. Essayez de reformuler vos réponses.",
     });
   }
@@ -235,7 +188,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     profiles,
     total_results: totalResults,
-    credits_remaining: creditsRemaining,
   });
 }
 

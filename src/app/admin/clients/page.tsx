@@ -50,7 +50,6 @@ type ClientRow = {
     status: string;
   } | null;
   extractions_count: number;
-  credits: { total: number; used: number; remaining: number };
   extraction_history: Array<{
     date: string | null;
     leads_count: number;
@@ -167,8 +166,6 @@ function actionLabel(action: string, details: Record<string, unknown> | null): s
       return "Ciblage ICP validé";
     case "icp_modified":
       return "Ciblage ICP modifié";
-    case "credits_consumed":
-      return "Crédit de recherche consommé";
     default:
       return action;
   }
@@ -1509,12 +1506,6 @@ function ClientTableRow({
               <div>
                 <p className="text-xs font-semibold text-[#9ab0c8] mb-1">Email</p>
                 <p className="text-[#0b1c33]">{client.email ?? "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-[#9ab0c8] mb-1">Crédits restants</p>
-                <p className="text-[#0b1c33] font-semibold">
-                  {client.credits.remaining}/{client.credits.total}
-                </p>
               </div>
               <div>
                 <p className="text-xs font-semibold text-[#9ab0c8] mb-1">Extractions réalisées</p>

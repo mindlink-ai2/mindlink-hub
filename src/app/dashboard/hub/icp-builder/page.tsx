@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Gem,
   Loader2,
   MessageCircleQuestion,
   Pencil,
@@ -328,8 +327,6 @@ export default function IcpBuilderPage() {
   const [generatedFilters, setGeneratedFilters] = useState<ApolloFilters | null>(null);
   const [profiles, setProfiles] = useState<ApolloProfile[]>([]);
   const [totalResults, setTotalResults] = useState<number | null>(null);
-  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
-  const [loadingCredits, setLoadingCredits] = useState(true);
   const [icpStatus, setIcpStatus] = useState<IcpStatus>("none");
   // true si le client arrive depuis le wizard d'onboarding (step 2 non complété)
   const [onboardingPending, setOnboardingPending] = useState(false);
@@ -455,14 +452,13 @@ export default function IcpBuilderPage() {
     closeHelpChat();
   }, [currentStep, closeHelpChat]);
 
-  // Charger la config existante + crédits + statut onboarding au montage
+  // Charger la config existante + statut onboarding au montage
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const [configRes, creditsRes, onboardingRes] = await Promise.all([
+        const [configRes, onboardingRes] = await Promise.all([
           fetch("/api/icp/config"),
-          fetch("/api/icp/credits"),
           fetch("/api/onboarding/status", { cache: "no-store" }),
         ]);
         if (!mounted) return;
@@ -528,11 +524,6 @@ export default function IcpBuilderPage() {
           }
         }
 
-        if (creditsRes.ok) {
-          const creditsData = await creditsRes.json();
-          setCreditsRemaining(creditsData.credits_remaining ?? null);
-        }
-
         if (onboardingRes.ok) {
           const onboardingData = await onboardingRes.json();
           // Onboarding en cours si LinkedIn connecté mais pas encore complété
@@ -543,26 +534,12 @@ export default function IcpBuilderPage() {
         }
       } catch {
         // silencieux
-      } finally {
-        if (mounted) setLoadingCredits(false);
       }
     })();
     return () => {
       mounted = false;
     };
   }, []);
-
-  const refreshCredits = async () => {
-    try {
-      const res = await fetch("/api/icp/credits");
-      if (res.ok) {
-        const data = await res.json();
-        setCreditsRemaining(data.credits_remaining ?? null);
-      }
-    } catch {
-      // silencieux
-    }
-  };
 
   const currentStepDef = STEPS[currentStep];
 
@@ -653,18 +630,13 @@ export default function IcpBuilderPage() {
         setSearchError(
           searchData.error ?? "Une erreur est survenue lors de la recherche."
         );
-        await refreshCredits();
       } else {
         setProfiles(searchData.profiles ?? []);
         setTotalResults(searchData.total_results ?? null);
-        if (searchData.credits_remaining !== undefined) {
-          setCreditsRemaining(searchData.credits_remaining);
-        }
       }
       setScreen("results");
     } catch {
       setSearchError("Impossible de contacter le serveur. Veuillez réessayer.");
-      await refreshCredits();
       setScreen("results");
     } finally {
       setGeneratingFilters(false);
@@ -687,17 +659,12 @@ export default function IcpBuilderPage() {
       const data = await res.json();
       if (!res.ok) {
         setSearchError(data.error ?? "Une erreur est survenue.");
-        await refreshCredits();
         return;
       }
       setProfiles(data.profiles ?? []);
       setTotalResults(data.total_results ?? null);
-      if (data.credits_remaining !== undefined) {
-        setCreditsRemaining(data.credits_remaining);
-      }
     } catch {
       setSearchError("Impossible de contacter le serveur. Veuillez réessayer.");
-      await refreshCredits();
     } finally {
       setSearching(false);
     }
@@ -745,13 +712,6 @@ export default function IcpBuilderPage() {
     if (reopening) return;
     setReopening(true);
     try {
-      const cr = await fetch("/api/icp/consume-credit", { method: "POST" });
-      if (!cr.ok) {
-        const data = await cr.json().catch(() => ({}));
-        console.error("[consume-credit]", data.error);
-        setReopening(false);
-        return;
-      }
       const res = await fetch("/api/icp/reopen", { method: "POST" });
       if (res.ok) {
         setIcpStatus("draft");
@@ -761,15 +721,6 @@ export default function IcpBuilderPage() {
         setSubmitError(null);
         setScreen("questionnaire");
         setCurrentStep(0);
-        try {
-          const c = await fetch("/api/icp/credits");
-          if (c.ok) {
-            const cd = await c.json();
-            setCreditsRemaining(cd.credits_remaining ?? null);
-          }
-        } catch {
-          // silent
-        }
       }
     } finally {
       setReopening(false);
@@ -1027,30 +978,11 @@ export default function IcpBuilderPage() {
     <div className="min-h-screen bg-[#eef1f8]">
       {/* Header */}
       <div className="bg-white border-b border-[#c8d6ea] px-6 py-4">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-[#0b1c33]">Définir mon ciblage</h1>
-            <p className="text-sm text-[#51627b] mt-0.5">
-              Répondez aux questions pour configurer votre prospection.
-            </p>
-          </div>
-          {loadingCredits ? (
-            <div className="h-7 w-16 animate-pulse rounded-full bg-[#eef1f8]" />
-          ) : (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
-                creditsRemaining === 0
-                  ? "bg-red-50 text-red-600 border border-red-200"
-                  : creditsRemaining === 1
-                  ? "bg-orange-50 text-orange-600 border border-orange-200"
-                  : "bg-[#eef1f8] text-[#2563EB] border border-[#c8d6ea]"
-              )}
-            >
-              <Gem className="w-3.5 h-3.5" />
-              {creditsRemaining ?? "—"} crédit{(creditsRemaining ?? 0) > 1 ? "s" : ""}
-            </span>
-          )}
+        <div className="max-w-2xl mx-auto">
+          <h1 className="text-lg font-bold text-[#0b1c33]">Définir mon ciblage</h1>
+          <p className="text-sm text-[#51627b] mt-0.5">
+            Répondez aux questions pour configurer votre prospection.
+          </p>
         </div>
       </div>
 
@@ -1097,18 +1029,18 @@ export default function IcpBuilderPage() {
             </p>
 
             <div className="flex flex-col gap-3 max-w-md mx-auto text-left">
-              {/* Option 1 — modifier le ciblage (consomme 1 crédit) */}
+              {/* Option 1 — modifier le ciblage */}
               <button
                 type="button"
                 onClick={handleModifyTargeting}
-                disabled={reopening || (creditsRemaining !== null && creditsRemaining <= 0)}
+                disabled={reopening}
                 className="flex items-start gap-3 rounded-xl border border-[#c8d6ea] bg-white px-4 py-3 text-left transition-colors hover:border-[#2563EB] hover:bg-[#F5F8FF] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-[#0b1c33]">Modifier mon ciblage</p>
                   <p className="mt-0.5 text-xs text-[#51627b]">
-                    Recommencer le questionnaire. Consomme 1 crédit de recherche.
+                    Recommencer le questionnaire.
                   </p>
                 </div>
               </button>
@@ -1128,16 +1060,10 @@ export default function IcpBuilderPage() {
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-[#0b1c33]">Continuer ma sélection</p>
                     <p className="mt-0.5 text-xs text-[#51627b]">
-                      Il vous reste {quotaRemaining.toLocaleString("fr-FR")} leads dans votre quota. Pas de crédit consommé.
+                      Il vous reste {quotaRemaining.toLocaleString("fr-FR")} leads dans votre quota.
                     </p>
                   </div>
                 </button>
-              )}
-
-              {creditsRemaining === 0 && (
-                <p className="mt-2 text-center text-xs text-[#a0b0c0]">
-                  Plus de crédits disponibles — certaines actions sont désactivées.
-                </p>
               )}
             </div>
           </div>
@@ -1442,21 +1368,6 @@ export default function IcpBuilderPage() {
       {/* ── Écran : résultats ── */}
       {screen === "results" && (
         <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-          {/* Crédits restants */}
-          <div className="bg-white rounded-2xl border border-[#c8d6ea] px-6 py-5">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-[#51627b]">Crédits restants</p>
-              <p
-                className={cn(
-                  "text-xl font-bold",
-                  creditsRemaining === 0 ? "text-red-500" : "text-[#2563EB]"
-                )}
-              >
-                {creditsRemaining ?? "—"}
-              </p>
-            </div>
-          </div>
-
           {/* Erreur recherche */}
           {searchError && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
@@ -1525,7 +1436,7 @@ export default function IcpBuilderPage() {
               <HubButton
                 variant="secondary"
                 onClick={handleSearchAgain}
-                disabled={searching || creditsRemaining === 0}
+                disabled={searching}
                 className="flex-1 gap-2 justify-center"
               >
                 {searching ? (
@@ -1617,7 +1528,7 @@ export default function IcpBuilderPage() {
               <button
                 type="button"
                 onClick={handleModifyTargeting}
-                disabled={reopening || (creditsRemaining !== null && creditsRemaining <= 0)}
+                disabled={reopening}
                 className="text-xs text-[#7a9abf] hover:text-[#2563EB] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 ← Modifier mon ciblage

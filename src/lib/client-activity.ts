@@ -10,8 +10,7 @@ export type ClientActivityAction =
   | "workflow_created"
   | "workflow_updated"
   | "icp_submitted"
-  | "icp_modified"
-  | "credits_consumed";
+  | "icp_modified";
 
 export async function logClientActivity(
   supabase: SupabaseClient,

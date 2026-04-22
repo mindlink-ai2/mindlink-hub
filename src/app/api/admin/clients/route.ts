@@ -51,12 +51,6 @@ export async function GET() {
     .in("org_id", orgIds)
     .order("started_at", { ascending: false });
 
-  // Récupérer les crédits de recherche
-  const { data: searchCredits } = await supabase
-    .from("search_credits")
-    .select("org_id, credits_total, credits_used")
-    .in("org_id", orgIds);
-
   // Indexer par org_id
   const icpByOrg = new Map<number, Record<string, unknown>>();
   for (const icp of icpConfigs ?? []) {
@@ -71,16 +65,10 @@ export async function GET() {
     extractionsByOrg.get(log.org_id)!.push(log);
   }
 
-  const creditsByOrg = new Map<number, Record<string, unknown>>();
-  for (const c of searchCredits ?? []) {
-    creditsByOrg.set(c.org_id, c);
-  }
-
   const result = (clients as Array<Record<string, unknown>>).map((client) => {
     const clientId = client.id as number;
     const icp = icpByOrg.get(clientId);
     const extractions = extractionsByOrg.get(clientId) ?? [];
-    const credits = creditsByOrg.get(clientId);
 
     const lastExtraction = extractions[0] ?? null;
 
@@ -128,16 +116,6 @@ export async function GET() {
           leads_count: e.leads_count as number,
           google_sheet_url: e.google_sheet_url as string,
         })),
-
-      credits: credits
-        ? {
-            total: (credits as Record<string, unknown>).credits_total,
-            used: (credits as Record<string, unknown>).credits_used,
-            remaining:
-              ((credits as Record<string, unknown>).credits_total as number) -
-              ((credits as Record<string, unknown>).credits_used as number),
-          }
-        : { total: 15, used: 0, remaining: 15 },
     };
   });
 

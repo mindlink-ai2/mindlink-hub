@@ -23,24 +23,6 @@ export async function POST() {
   }
   const orgId: number = clientRow.id;
 
-  // Vérifier que le client a des crédits restants avant d'autoriser la réouverture
-  const { data: credits } = await supabase
-    .from("search_credits")
-    .select("credits_total, credits_used")
-    .eq("org_id", orgId)
-    .maybeSingle();
-
-  const creditsRemaining = credits
-    ? credits.credits_total - credits.credits_used
-    : 15; // pas encore initialisé → créédits disponibles
-
-  if (creditsRemaining <= 0) {
-    return NextResponse.json(
-      { error: "Vous n'avez plus de crédits de recherche disponibles." },
-      { status: 402 }
-    );
-  }
-
   // Repasser l'ICP en brouillon
   const { data: existing } = await supabase
     .from("icp_configs")
@@ -66,5 +48,5 @@ export async function POST() {
     return NextResponse.json({ error: "Impossible de rouvrir le ciblage." }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, credits_remaining: creditsRemaining });
+  return NextResponse.json({ success: true });
 }
