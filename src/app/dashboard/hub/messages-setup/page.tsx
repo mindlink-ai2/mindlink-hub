@@ -1157,8 +1157,8 @@ function ManualEditor({
           {canSubmit
             ? "Tes deux messages sont prêts. L'email sera généré automatiquement."
             : !messageReady
-            ? "Rédige ton message d'ouverture pour activer la validation."
-            : "Rédige ta relance (ou génère-la depuis ton message)."}
+            ? `Ton message d'ouverture doit faire au moins 30 caractères (actuellement ${message.trim().length}).`
+            : `Ta relance doit faire au moins 10 caractères (actuellement ${relance.trim().length}). Tu peux aussi cliquer sur "Générer ma relance".`}
         </p>
         <HubButton
           variant="primary"
