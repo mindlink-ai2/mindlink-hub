@@ -292,49 +292,38 @@ function buildMissingStepsBlock(missing: SetupMissing): string {
 
 function buildReminderCopy(missing: SetupMissing): {
   subject: string;
+  heroLineOne: string;
   heroLineTwo: string;
   introSentence: string;
   sectionTitle: string;
   pillLabel: string;
 } {
-  const order: Array<keyof SetupMissing> = ["linkedin", "icp", "message"];
-  const pending = order.filter((k) => missing[k]);
-  const count = pending.length;
+  // L'onboarding est strictement séquentiel : LinkedIn → ICP → Message.
+  // Un client ne peut pas valider une étape sans avoir validé les précédentes,
+  // donc seuls 3 états "missing" sont possibles :
+  //   - juste message  (LinkedIn + ICP faits)
+  //   - ICP + message  (LinkedIn fait)
+  //   - les 3          (rien fait, ou état incohérent qu'on traite par défaut)
 
-  if (count === 1) {
-    const only = pending[0];
-    if (only === "linkedin") {
-      return {
-        subject: "Plus qu'une étape : connectez votre LinkedIn 👋",
-        heroLineTwo: `<span style="color:#2563EB;" class="c-blue">connecter votre LinkedIn.</span>`,
-        introSentence: "Votre ciblage et votre message sont prêts. Il ne manque plus que la connexion à votre LinkedIn pour que vos premiers messages partent.",
-        sectionTitle: "Plus qu'une étape, 2 minutes",
-        pillLabel: "Plus qu'une étape",
-      };
-    }
-    if (only === "icp") {
-      return {
-        subject: "Plus qu'une étape : définissez votre ciblage 👋",
-        heroLineTwo: `<span style="color:#2563EB;" class="c-blue">définir votre ciblage.</span>`,
-        introSentence: "Votre LinkedIn est connecté et votre message est prêt. Il ne manque plus que votre ciblage (ICP) pour que nous puissions sélectionner vos prospects.",
-        sectionTitle: "Plus qu'une étape, 3 minutes",
-        pillLabel: "Plus qu'une étape",
-      };
-    }
+  if (!missing.linkedin && !missing.icp && missing.message) {
     return {
       subject: "Plus qu'une étape : validez votre message 👋",
+      heroLineOne: "Il vous reste à",
       heroLineTwo: `<span style="color:#2563EB;" class="c-blue">valider votre message.</span>`,
-      introSentence: "Votre LinkedIn est connecté et votre ciblage est défini. Il ne manque plus que votre message de prospection, à rédiger avec notre assistant IA.",
+      introSentence:
+        "Votre LinkedIn est connecté et votre ciblage est défini. Il ne manque plus que votre message de prospection, à rédiger avec notre assistant IA.",
       sectionTitle: "Plus qu'une étape, 3 minutes",
       pillLabel: "Plus qu'une étape",
     };
   }
 
-  if (count === 2) {
+  if (!missing.linkedin && missing.icp && missing.message) {
     return {
       subject: "Plus que 2 étapes pour démarrer votre prospection 👋",
+      heroLineOne: "Votre prospection est",
       heroLineTwo: `<span style="color:#2563EB;" class="c-blue">presque prête. 👋</span>`,
-      introSentence: "Vous avez bien avancé. Il reste 2 étapes rapides à compléter pour que nous puissions lancer votre prospection.",
+      introSentence:
+        "Votre LinkedIn est connecté. Il reste 2 étapes rapides — votre ciblage et votre message — pour que nous puissions lancer votre prospection.",
       sectionTitle: "2 étapes restantes",
       pillLabel: "Presque prêt",
     };
@@ -342,8 +331,10 @@ function buildReminderCopy(missing: SetupMissing): {
 
   return {
     subject: "On vous attend pour démarrer votre prospection 👋",
+    heroLineOne: "Votre prospection",
     heroLineTwo: `<span style="color:#2563EB;" class="c-blue">vous attend. 👋</span>`,
-    introSentence: "Pour que nous puissions extraire vos prospects et démarrer votre prospection, il faut compléter les 3 étapes de configuration. Sans elles, votre quota mensuel court sans rien produire.",
+    introSentence:
+      "Pour que nous puissions extraire vos prospects et démarrer votre prospection, il faut compléter les 3 étapes de configuration. Sans elles, votre quota mensuel court sans rien produire.",
     sectionTitle: "3 étapes, 5 minutes",
     pillLabel: "Petit rappel amical",
   };
@@ -376,7 +367,7 @@ ${commonHead("Lidmeo — Configurez votre prospection")}
           <td align="center" style="background-color:#edf2ff;padding:52px 40px 48px;background-image:linear-gradient(170deg,#f5f7ff 0%,#edf2ff 100%);" class="hero-td">
             ${pillBadge(copy.pillLabel)}
             <h1 style="font-family:'Inter',Arial,sans-serif;font-size:40px;font-weight:900;line-height:1.1;letter-spacing:-1.5px;color:#0f1728;margin:0 0 20px 0;text-align:center;" class="c-dark">
-              Il vous reste à<br/>
+              ${copy.heroLineOne}<br/>
               ${copy.heroLineTwo}
             </h1>
             <p style="font-family:'Inter',Arial,sans-serif;font-size:17px;font-weight:400;line-height:1.7;color:#6b7280;margin:0 0 38px 0;text-align:center;max-width:480px;" class="c-body">

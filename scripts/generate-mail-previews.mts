@@ -35,23 +35,18 @@ const previews = [
   },
   {
     file: "2a-reminder-j3-all-missing.html",
-    label: "Mail #2a — Rappel J+3 (tout manque)",
+    label: "Mail #2a — Rappel J+3 (rien fait : 3 étapes manquent)",
     payload: setupReminderJ3Email(PRENOM, { linkedin: true, icp: true, message: true }),
   },
   {
     file: "2b-reminder-j3-icp-and-message.html",
-    label: "Mail #2b — Rappel J+3 (LinkedIn OK, ICP + message manquent)",
+    label: "Mail #2b — Rappel J+3 (LinkedIn OK, ICP + message restent)",
     payload: setupReminderJ3Email(PRENOM, { linkedin: false, icp: true, message: true }),
   },
   {
     file: "2c-reminder-j3-message-only.html",
-    label: "Mail #2c — Rappel J+3 (LinkedIn + ICP OK, juste message manquant)",
+    label: "Mail #2c — Rappel J+3 (LinkedIn + ICP OK, juste message restant)",
     payload: setupReminderJ3Email(PRENOM, { linkedin: false, icp: false, message: true }),
-  },
-  {
-    file: "2d-reminder-j3-linkedin-only.html",
-    label: "Mail #2d — Rappel J+3 (ICP + message OK, juste LinkedIn manquant)",
-    payload: setupReminderJ3Email(PRENOM, { linkedin: true, icp: false, message: false }),
   },
   {
     file: "3-first-prospects.html",
