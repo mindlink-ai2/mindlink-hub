@@ -94,6 +94,8 @@ export async function updateWorkflowSystemPrompt(
 export interface CreateWorkflowResult {
   workflowId: string | null;
   workflowUrl: string | null;
+  activated?: boolean;
+  activationError?: string | null;
   error?: string;
 }
 
@@ -168,18 +170,35 @@ export async function createWorkflowForClient(
     const workflowData = (await workflowRes.json()) as { id: string };
     const workflowId = workflowData.id;
 
-    // Best-effort activation
+    let activated = false;
+    let activationError: string | null = null;
     try {
-      await fetch(`${n8nBaseUrl}/api/v1/workflows/${workflowId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-N8N-API-KEY": n8nApiKey,
-        },
-        body: JSON.stringify({ active: true }),
-      });
+      const activateRes = await fetch(
+        `${n8nBaseUrl}/api/v1/workflows/${workflowId}/activate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-N8N-API-KEY": n8nApiKey,
+          },
+        }
+      );
+      if (activateRes.ok) {
+        activated = true;
+      } else {
+        const body = await activateRes.text().catch(() => "");
+        activationError = `activate ${activateRes.status}: ${body.slice(0, 200)}`;
+      }
     } catch (err) {
-      console.warn("[n8n-workflow] activation failed (non-blocking):", err);
+      activationError = err instanceof Error ? err.message : String(err);
+    }
+
+    if (!activated) {
+      console.warn(
+        "[n8n-workflow] activation failed (non-blocking) for workflow",
+        workflowId,
+        activationError
+      );
     }
 
     await supabase
@@ -190,6 +209,8 @@ export async function createWorkflowForClient(
     return {
       workflowId,
       workflowUrl: `${n8nBaseUrl}/workflow/${workflowId}`,
+      activated,
+      activationError,
     };
   } catch (err) {
     return {

@@ -248,7 +248,12 @@ export async function POST(req: Request) {
             supabase,
             clientContext.clientId,
             "workflow_created",
-            { workflow_id: result.workflowId, trigger: "messages_save" }
+            {
+              workflow_id: result.workflowId,
+              trigger: "messages_save",
+              activated: result.activated ?? false,
+              activation_error: result.activationError ?? null,
+            }
           );
         } else {
           console.warn(
