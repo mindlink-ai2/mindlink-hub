@@ -9,9 +9,11 @@ import {
   Loader2,
   Mail,
   MessageSquare,
+  PenLine,
   Pencil,
   RotateCcw,
   Send,
+  Sparkles,
 } from "lucide-react";
 import { HubButton } from "@/components/ui/hub-button";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,18 @@ type SavedMessages = {
 };
 
 type Screen = "loading" | "existing" | "chat" | "saved";
+
+type SetupMode = "chat" | "manual";
+
+const MANUAL_MESSAGE_PLACEHOLDER = `Hello "Claire",
+
+Vous évoquiez récemment l'activation de votre partenariat sportif. La production du contenu autour de ce type de projet, c'est souvent ce qui fait la différence entre une activation qui marque et une qui passe inaperçue.
+
+WHEESPER Prod. accompagne depuis 15 ans des marques comme Red Bull, Betclic et Renault dans la production de leurs contenus sportifs. De la stratégie à la post-production.
+
+Ouvert à en parler 10 min ?`;
+
+const MANUAL_RELANCE_PLACEHOLDER = `Hello "Claire", on m'a confirmé qu'aucune réponse n'était passée. Toujours pertinent d'en discuter 10 min ?`;
 
 // "sans_post" versions are the ones the client validates.
 // "avec_post" versions are display-only.
@@ -377,6 +391,14 @@ export default function MessagesSetupPage() {
   const [validatedRelance, setValidatedRelance] = useState<string | null>(null);
   const [workflowJustCreated, setWorkflowJustCreated] = useState(false);
 
+  // Manual mode state — kept independently of the chat state so that
+  // switching tabs doesn't lose the work in progress in either mode.
+  const [mode, setMode] = useState<SetupMode>("chat");
+  const [manualMessage, setManualMessage] = useState("");
+  const [manualRelance, setManualRelance] = useState("");
+  const [generatingRelance, setGeneratingRelance] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+
   const [draftDialog, setDraftDialog] = useState(false);
   const [draftHistory, setDraftHistory] = useState<ChatMessage[] | null>(null);
   const [draftUpdatedAt, setDraftUpdatedAt] = useState<string | null>(null);
@@ -539,6 +561,7 @@ export default function MessagesSetupPage() {
           messageLinkedin: validatedLinkedin,
           relanceLinkedin: validatedRelance,
           history,
+          mode: "chat",
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -608,6 +631,89 @@ export default function MessagesSetupPage() {
     setValidatedRelance(null);
     setScreen("chat");
   }, []);
+
+  const handleGenerateRelance = useCallback(async () => {
+    const trimmed = manualMessage.trim();
+    if (trimmed.length < 30 || generatingRelance) return;
+    setGeneratingRelance(true);
+    setManualError(null);
+    try {
+      const res = await fetch("/api/messages/generate-relance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageLinkedin: trimmed }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.error === "string"
+            ? data.error
+            : "Erreur lors de la génération."
+        );
+      }
+      const relance: string = typeof data?.relance === "string" ? data.relance : "";
+      if (!relance) throw new Error("Relance vide.");
+      setManualRelance(relance);
+    } catch (err) {
+      setManualError(
+        err instanceof Error ? err.message : "Impossible de générer la relance."
+      );
+    } finally {
+      setGeneratingRelance(false);
+    }
+  }, [manualMessage, generatingRelance]);
+
+  const handleFinalizeManual = useCallback(async () => {
+    const m = manualMessage.trim();
+    const r = manualRelance.trim();
+    if (!m || !r || saving) return;
+    setSaving(true);
+    setManualError(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/messages/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageLinkedin: m,
+          relanceLinkedin: r,
+          history: [],
+          mode: "manual",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.error === "string"
+            ? data.error
+            : "Erreur lors de la sauvegarde."
+        );
+      }
+      if (data?.workflowCreated === true) {
+        setWorkflowJustCreated(true);
+      }
+      if (onboardingPending) {
+        router.replace("/onboarding/video");
+        return;
+      }
+      setScreen("saved");
+      try {
+        const refreshed = await fetch("/api/messages/get", { cache: "no-store" });
+        if (refreshed.ok) {
+          const d = await refreshed.json();
+          setExistingMessages((d?.messages ?? null) as SavedMessages | null);
+        }
+      } catch {
+        // silent
+      }
+    } catch (err) {
+      setManualError(
+        err instanceof Error ? err.message : "Impossible de valider les messages."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }, [manualMessage, manualRelance, saving, onboardingPending, router]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -750,109 +856,377 @@ export default function MessagesSetupPage() {
 
       {screen === "chat" && (
         <div className="mx-auto flex h-[calc(100vh-180px)] max-w-3xl flex-col px-4 py-6">
-          <div className="mb-3 flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-[#1e3a8a]">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
-            <p>
-              L&apos;Assistant Lidmeo vous aide à rédiger deux messages LinkedIn (premier contact
-              et relance). L&apos;email de prospection sera généré automatiquement. Une fois validés,
-              vos messages seront utilisés pour contacter les leads extraits.
-            </p>
-          </div>
-          <div
-            ref={scrollRef}
-            className={cn(
-              "flex-1 overflow-y-auto rounded-2xl border border-[#c8d6ea] bg-[#f8fafc] p-5",
-              history.length <= 3 && !sending
-                ? "flex flex-col justify-center space-y-4"
-                : "space-y-4"
-            )}
-          >
-            {history.map((m, i) => (
-              <MessageRow
-                key={i}
-                message={m}
-                onValidate={handleValidateMessage}
-                validatedLinkedin={validatedLinkedin}
-                validatedRelance={validatedRelance}
-                isLatestAssistant={i === latestAssistantIndex}
-                sending={sending}
-              />
-            ))}
-            {sending && (
-              <div className="flex items-start gap-2.5">
-                <AssistantAvatar />
-                <div className="rounded-2xl border border-[#e1e8f5] bg-white px-4 py-3 text-sm text-[#51627b] shadow-sm">
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    {ASSISTANT_NAME} rédige…
-                  </span>
-                </div>
+          <ModeTabs mode={mode} onChange={setMode} />
+
+          {mode === "chat" ? (
+            <>
+              <div className="mb-3 flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-[#1e3a8a]">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+                <p>
+                  L&apos;Assistant Lidmeo vous aide à rédiger deux messages LinkedIn (premier contact
+                  et relance). L&apos;email de prospection sera généré automatiquement. Une fois validés,
+                  vos messages seront utilisés pour contacter les leads extraits.
+                </p>
               </div>
-            )}
-          </div>
-
-          {error && (
-            <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              {error}
-            </div>
-          )}
-
-          {canFinalize && !saving && (
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[#9cc0ff] bg-[#edf4ff] px-4 py-3">
-              <p className="text-sm text-[#1f4f96]">
-                Tes deux messages sont validés. L&apos;email sera généré automatiquement.
-              </p>
-              <HubButton
-                variant="primary"
-                onClick={() => void handleFinalize()}
-                className="gap-2 whitespace-nowrap"
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                Valider mes messages
-              </HubButton>
-            </div>
-          )}
-
-          {saving && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#9cc0ff] bg-[#edf4ff] px-4 py-3 text-sm text-[#1f4f96]">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Enregistrement, génération de l&apos;email et du prompt technique en cours…
-            </div>
-          )}
-
-          <div className="mt-3">
-            <div className="flex items-end gap-2">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Écris ta réponse…"
-                rows={2}
-                disabled={sending || draftDialog}
-                className="flex-1 resize-none rounded-2xl border border-[#c8d6ea] bg-white px-4 py-3 text-sm text-[#0b1c33] placeholder:text-[#a0b0c0] focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
-              />
-              <button
-                type="button"
-                onClick={() => void sendMessage(input)}
-                disabled={sending || draftDialog || !input.trim()}
-                className="shrink-0 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2563EB] text-white disabled:opacity-40 hover:bg-[#1d4ed8] transition-colors"
-                aria-label="Envoyer"
-              >
-                {sending ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <Send className="h-5 w-5" />
+              <div
+                ref={scrollRef}
+                className={cn(
+                  "flex-1 overflow-y-auto rounded-2xl border border-[#c8d6ea] bg-[#f8fafc] p-5",
+                  history.length <= 3 && !sending
+                    ? "flex flex-col justify-center space-y-4"
+                    : "space-y-4"
                 )}
-              </button>
-            </div>
-            <p className="mt-1.5 text-center text-[11px] text-[#a0b0c0]">
-              Appuyez sur Entrée pour envoyer
-            </p>
-          </div>
+              >
+                {history.map((m, i) => (
+                  <MessageRow
+                    key={i}
+                    message={m}
+                    onValidate={handleValidateMessage}
+                    validatedLinkedin={validatedLinkedin}
+                    validatedRelance={validatedRelance}
+                    isLatestAssistant={i === latestAssistantIndex}
+                    sending={sending}
+                  />
+                ))}
+                {sending && (
+                  <div className="flex items-start gap-2.5">
+                    <AssistantAvatar />
+                    <div className="rounded-2xl border border-[#e1e8f5] bg-white px-4 py-3 text-sm text-[#51627b] shadow-sm">
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        {ASSISTANT_NAME} rédige…
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {error && (
+                <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              {canFinalize && !saving && (
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[#9cc0ff] bg-[#edf4ff] px-4 py-3">
+                  <p className="text-sm text-[#1f4f96]">
+                    Tes deux messages sont validés. L&apos;email sera généré automatiquement.
+                  </p>
+                  <HubButton
+                    variant="primary"
+                    onClick={() => void handleFinalize()}
+                    className="gap-2 whitespace-nowrap"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Valider mes messages
+                  </HubButton>
+                </div>
+              )}
+
+              {saving && (
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#9cc0ff] bg-[#edf4ff] px-4 py-3 text-sm text-[#1f4f96]">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Enregistrement, génération de l&apos;email et du prompt technique en cours…
+                </div>
+              )}
+
+              <div className="mt-3">
+                <div className="flex items-end gap-2">
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Écris ta réponse…"
+                    rows={2}
+                    disabled={sending || draftDialog}
+                    className="flex-1 resize-none rounded-2xl border border-[#c8d6ea] bg-white px-4 py-3 text-sm text-[#0b1c33] placeholder:text-[#a0b0c0] focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void sendMessage(input)}
+                    disabled={sending || draftDialog || !input.trim()}
+                    className="shrink-0 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2563EB] text-white disabled:opacity-40 hover:bg-[#1d4ed8] transition-colors"
+                    aria-label="Envoyer"
+                  >
+                    {sending ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Send className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+                <p className="mt-1.5 text-center text-[11px] text-[#a0b0c0]">
+                  Appuyez sur Entrée pour envoyer
+                </p>
+              </div>
+            </>
+          ) : (
+            <ManualEditor
+              message={manualMessage}
+              relance={manualRelance}
+              onChangeMessage={setManualMessage}
+              onChangeRelance={setManualRelance}
+              onGenerateRelance={handleGenerateRelance}
+              onSubmit={handleFinalizeManual}
+              generatingRelance={generatingRelance}
+              saving={saving}
+              error={manualError}
+            />
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Mode tabs ────────────────────────────────────────────────────────────────
+
+function ModeTabs({
+  mode,
+  onChange,
+}: {
+  mode: SetupMode;
+  onChange: (m: SetupMode) => void;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Mode de configuration des messages"
+      className="mb-3 inline-flex items-center gap-1 rounded-2xl border border-[#c8d6ea] bg-white p-1 shadow-sm self-start"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "chat"}
+        onClick={() => onChange("chat")}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all",
+          mode === "chat"
+            ? "bg-[#2563EB] text-white shadow-sm"
+            : "text-[#51627b] hover:bg-[#f1f5fb]"
+        )}
+      >
+        <MessageSquare className="h-4 w-4" />
+        Avec l&apos;assistant
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "manual"}
+        onClick={() => onChange("manual")}
+        className={cn(
+          "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all",
+          mode === "manual"
+            ? "bg-[#2563EB] text-white shadow-sm"
+            : "text-[#51627b] hover:bg-[#f1f5fb]"
+        )}
+      >
+        <PenLine className="h-4 w-4" />
+        J&apos;écris moi-même
+      </button>
+    </div>
+  );
+}
+
+// ── Manual editor ────────────────────────────────────────────────────────────
+
+const MANUAL_MESSAGE_MAX = 350;
+const MANUAL_RELANCE_MAX = 200;
+
+function ManualEditor({
+  message,
+  relance,
+  onChangeMessage,
+  onChangeRelance,
+  onGenerateRelance,
+  onSubmit,
+  generatingRelance,
+  saving,
+  error,
+}: {
+  message: string;
+  relance: string;
+  onChangeMessage: (v: string) => void;
+  onChangeRelance: (v: string) => void;
+  onGenerateRelance: () => void;
+  onSubmit: () => void;
+  generatingRelance: boolean;
+  saving: boolean;
+  error: string | null;
+}) {
+  const messageReady = message.trim().length >= 30;
+  const relanceReady = relance.trim().length >= 10;
+  const canSubmit = messageReady && relanceReady && !saving;
+  const messageOver = message.length > MANUAL_MESSAGE_MAX;
+  const relanceOver = relance.length > MANUAL_RELANCE_MAX;
+
+  return (
+    <div className="flex flex-1 flex-col gap-4 overflow-y-auto pr-1">
+      <div className="flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-[#1e3a8a]">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#2563EB]" />
+        <p>
+          Écris toi-même ton message LinkedIn d&apos;ouverture et ta relance. Utilise un prénom
+          et une entreprise concrets dans le texte (ex : <em>Hello &quot;Claire&quot;, chez
+          &quot;Decathlon&quot;…</em>) — nous remplacerons automatiquement par les variables
+          côté technique. L&apos;email sera généré pour toi.
+        </p>
+      </div>
+
+      <ManualCard
+        label="Message LinkedIn d'ouverture"
+        sub="Premier contact envoyé au prospect."
+        icon={<MessageSquare className="h-4 w-4 text-[#2563EB]" />}
+        value={message}
+        onChange={onChangeMessage}
+        placeholder={MANUAL_MESSAGE_PLACEHOLDER}
+        max={MANUAL_MESSAGE_MAX}
+        rows={9}
+        disabled={saving}
+        warning={
+          messageOver
+            ? `Trop long (${message.length}/${MANUAL_MESSAGE_MAX} car. recommandés)`
+            : null
+        }
+      />
+
+      <ManualCard
+        label="Relance LinkedIn"
+        sub="Envoyée après le premier message si pas de réponse."
+        icon={<MessageSquare className="h-4 w-4 text-[#7c3aed]" />}
+        value={relance}
+        onChange={onChangeRelance}
+        placeholder={MANUAL_RELANCE_PLACEHOLDER}
+        max={MANUAL_RELANCE_MAX}
+        rows={4}
+        disabled={saving}
+        warning={
+          relanceOver
+            ? `Trop long (${relance.length}/${MANUAL_RELANCE_MAX} car. recommandés)`
+            : null
+        }
+        rightAction={
+          <button
+            type="button"
+            onClick={onGenerateRelance}
+            disabled={!messageReady || generatingRelance || saving}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all",
+              !messageReady
+                ? "border-[#e1e8f5] bg-[#f8fafc] text-[#a0b0c0] cursor-not-allowed"
+                : "border-[#c8d6ea] bg-white text-[#2563EB] hover:border-[#2563EB] hover:bg-[#edf4ff]"
+            )}
+            title={
+              !messageReady
+                ? "Écris d'abord ton message d'ouverture"
+                : "Générer une relance cohérente avec ton message"
+            }
+          >
+            {generatingRelance ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Génération…
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5" />
+                Générer ma relance
+              </>
+            )}
+          </button>
+        }
+      />
+
+      {error && (
+        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {saving && (
+        <div className="flex items-center gap-2 rounded-xl border border-[#9cc0ff] bg-[#edf4ff] px-4 py-3 text-sm text-[#1f4f96]">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Enregistrement, génération de l&apos;email et du prompt technique en cours…
+        </div>
+      )}
+
+      <div className="sticky bottom-0 -mx-1 mt-1 flex items-center justify-between gap-3 rounded-xl border border-[#9cc0ff] bg-[#edf4ff] px-4 py-3">
+        <p className="text-sm text-[#1f4f96]">
+          {canSubmit
+            ? "Tes deux messages sont prêts. L'email sera généré automatiquement."
+            : !messageReady
+            ? "Rédige ton message d'ouverture pour activer la validation."
+            : "Rédige ta relance (ou génère-la depuis ton message)."}
+        </p>
+        <HubButton
+          variant="primary"
+          onClick={onSubmit}
+          className="gap-2 whitespace-nowrap"
+          disabled={!canSubmit}
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          Valider mes messages
+        </HubButton>
+      </div>
+    </div>
+  );
+}
+
+function ManualCard({
+  label,
+  sub,
+  icon,
+  value,
+  onChange,
+  placeholder,
+  max,
+  rows,
+  disabled,
+  warning,
+  rightAction,
+}: {
+  label: string;
+  sub: string;
+  icon: React.ReactNode;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  max: number;
+  rows: number;
+  disabled: boolean;
+  warning: string | null;
+  rightAction?: React.ReactNode;
+}) {
+  const count = value.length;
+  const overshoot = count > max;
+  return (
+    <div className="rounded-2xl border border-[#c8d6ea] bg-white p-5 shadow-sm">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          {icon}
+          <div>
+            <p className="text-sm font-bold text-[#0b1c33]">{label}</p>
+            <p className="text-xs text-[#7a9abf]">{sub}</p>
+          </div>
+        </div>
+        {rightAction}
+      </div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        disabled={disabled}
+        className="w-full resize-y rounded-xl border border-[#e1e8f5] bg-[#fafcff] px-4 py-3 text-sm leading-relaxed text-[#0b1c33] placeholder:text-[#a0b0c0] focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 disabled:opacity-60"
+      />
+      <div className="mt-2 flex items-center justify-between text-[11px]">
+        <span className={overshoot ? "text-amber-600" : "text-[#7a9abf]"}>
+          {count} / {max} car. recommandés
+        </span>
+        {warning && <span className="text-amber-600">{warning}</span>}
+      </div>
     </div>
   );
 }
