@@ -375,14 +375,16 @@ type GeneratePromptInput = {
   conversationDigest: string;  // kept for backward compat (still used in fallback)
   icpDigest: string;
   conversationHistory?: ChatEntry[];  // raw history for DAPS extraction (preferred)
+  preComputedDaps?: DapsAnswers;  // provided by the manual mode, skips history extraction
 };
 
 export async function generateSystemPromptFromMessages(
   apiKey: string,
   input: GeneratePromptInput
 ): Promise<string> {
-  // 1) Extract DAPS from raw history if available; fall back to ICP questionnaire
+  // 1) Use pre-computed DAPS (manual mode) > extract from history (chat mode) > ICP fallback
   const daps: DapsAnswers =
+    input.preComputedDaps ??
     (input.conversationHistory
       ? extractDapsFromHistory(input.conversationHistory)
       : null) ??

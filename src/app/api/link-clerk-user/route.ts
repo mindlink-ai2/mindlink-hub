@@ -5,6 +5,8 @@ import {
   ensureClientOnboardingStateRow,
   resolveClientContextForUser,
 } from "@/lib/client-onboarding-state";
+import { hasSentEmail, sendAndLogEmail } from "@/lib/email-tracking";
+import { welcomeSetupEmail } from "@/lib/email-templates-onboarding";
 
 export async function POST() {
   const { userId } = await auth();
@@ -43,6 +45,22 @@ export async function POST() {
     }
 
     await ensureClientOnboardingStateRow(supabase, context.clientId);
+
+    if (context.linkedNow) {
+      const alreadySent = await hasSentEmail(supabase, context.clientId, "welcome");
+      if (!alreadySent) {
+        const prenom = (user.firstName ?? "").trim();
+        const tmpl = welcomeSetupEmail(prenom);
+        await sendAndLogEmail(supabase, {
+          orgId: context.clientId,
+          kind: "welcome",
+          to: email,
+          subject: tmpl.subject,
+          html: tmpl.html,
+          metadata: { trigger: "first_clerk_login", prenom: prenom || null },
+        });
+      }
+    }
 
     return NextResponse.json({
       ok: true,

@@ -10,11 +10,19 @@ import {
   buildIcpDigest,
   finalizeMessagesFromChat,
   generateSystemPromptFromMessages,
+  type DapsAnswers,
 } from "@/lib/messages-prompt";
+import { extractDapsFromManualMessages } from "@/lib/messages-manual-daps";
 import { createWorkflowForClient, updateWorkflowSystemPrompt } from "@/lib/n8n-workflow";
 import { adminClientChangeEmail, sendLidmeoEmail } from "@/lib/email-templates";
 import { logClientActivity } from "@/lib/client-activity";
 import { deriveSheetTabName } from "@/lib/sheet-tab-name";
+
+type SetupMode = "chat" | "manual";
+
+function sanitizeMode(input: unknown): SetupMode {
+  return input === "manual" ? "manual" : "chat";
+}
 
 const ADMIN_NOTIFY_EMAIL = "contact@lidmeo.com";
 
@@ -64,7 +72,9 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
     const validatedLinkedin = safeString(body?.messageLinkedin, 2000);
     const validatedRelance = safeString(body?.relanceLinkedin, 2000);
-    const history = sanitizeHistory(body?.history);
+    const mode = sanitizeMode(body?.mode);
+    // In manual mode the chat history is empty by design.
+    const history = mode === "manual" ? [] : sanitizeHistory(body?.history);
 
     if (!validatedLinkedin || !validatedRelance) {
       return NextResponse.json(
@@ -132,6 +142,29 @@ export async function POST(req: Request) {
     }
 
     // 2) Génère le prompt technique (best-effort)
+    const icpDigest = buildIcpDigest(
+      (icpConfig?.filters ?? null) as Record<string, unknown> | null
+    );
+
+    // Manual mode: pre-compute DAPS via the dedicated extractor so the
+    // n8n prompt is rich even without a chat history.
+    let preComputedDaps: DapsAnswers | undefined;
+    if (mode === "manual") {
+      try {
+        preComputedDaps = await extractDapsFromManualMessages(apiKey, {
+          messageLinkedin: validatedLinkedin,
+          relanceLinkedin: validatedRelance,
+          icpDigest,
+          companyName,
+        });
+      } catch (extractErr) {
+        console.warn(
+          "[messages/save] manual DAPS extract failed, falling back to ICP:",
+          extractErr
+        );
+      }
+    }
+
     let systemPrompt: string | null = null;
     try {
       systemPrompt = await generateSystemPromptFromMessages(apiKey, {
@@ -140,10 +173,9 @@ export async function POST(req: Request) {
         relanceLinkedin: finalizedRelance,
         messageEmail: finalizedEmail,
         conversationDigest,
-        conversationHistory: history,
-        icpDigest: buildIcpDigest(
-          (icpConfig?.filters ?? null) as Record<string, unknown> | null
-        ),
+        conversationHistory: mode === "chat" ? history : undefined,
+        preComputedDaps,
+        icpDigest,
       });
     } catch (promptErr) {
       console.error("[messages/save] prompt generation failed:", promptErr);
@@ -157,6 +189,7 @@ export async function POST(req: Request) {
       message_email: finalizedEmail,
       system_prompt: systemPrompt,
       status: "submitted" as const,
+      mode,
       conversation_history: history,
       updated_at: nowIso,
     };
@@ -180,7 +213,8 @@ export async function POST(req: Request) {
     await logClientActivity(
       supabase,
       clientContext.clientId,
-      isFirstMessageSave ? "messages_validated" : "messages_updated"
+      isFirstMessageSave ? "messages_validated" : "messages_updated",
+      { mode }
     );
 
     // n8n workflow: update existing, or auto-create if conditions are met
@@ -193,13 +227,21 @@ export async function POST(req: Request) {
         if (res.updated) {
           console.log(
             "[messages/save] n8n workflow updated for org_id:",
-            clientContext.clientId
+            clientContext.clientId,
+            "activated:",
+            res.activated ?? false
           );
           await logClientActivity(
             supabase,
             clientContext.clientId,
             "workflow_updated",
-            { reason: "messages_updated", workflow_id: existingWorkflowId }
+            {
+              reason: "messages_updated",
+              workflow_id: existingWorkflowId,
+              mode,
+              activated: res.activated ?? false,
+              activation_error: res.activationError ?? null,
+            }
           );
         } else {
           console.warn(
@@ -248,7 +290,12 @@ export async function POST(req: Request) {
             supabase,
             clientContext.clientId,
             "workflow_created",
-            { workflow_id: result.workflowId, trigger: "messages_save" }
+            {
+              workflow_id: result.workflowId,
+              trigger: "messages_save",
+              activated: result.activated ?? false,
+              activation_error: result.activationError ?? null,
+            }
           );
         } else {
           console.warn(

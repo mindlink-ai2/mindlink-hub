@@ -7,12 +7,23 @@ import {
   reminderEmail,
   sendLidmeoEmail,
 } from "@/lib/email-templates";
+import {
+  setupReminderJ3Email,
+  firstProspectsEmail,
+} from "@/lib/email-templates-onboarding";
+import {
+  hasSentEmail,
+  recordEmailSent,
+  sendAndLogEmail,
+} from "@/lib/email-tracking";
+import { loadSetupState, setupMissingFromState } from "@/lib/setup-state";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const TEST_ORG_IDS = new Set<number>([16, 18]);
 const BUSINESS_DAYS_AT_RENEWAL = 5;
+const SETUP_REMINDER_BUSINESS_DAYS = 3;
 
 function startOfDay(d: Date): Date {
   const x = new Date(d);
@@ -63,6 +74,7 @@ type ClientRow = {
   stripe_subscription_id: string | null;
   current_period_end: string | null;
   subscription_status: string | null;
+  created_at: string | null;
 };
 
 async function resolvePeriod(
@@ -121,7 +133,7 @@ export async function GET(req: Request) {
 
   const { data: clients, error: clientsErr } = await supabase
     .from("clients")
-    .select("id, email, company_name, quota, stripe_customer_id, stripe_subscription_id, current_period_end, subscription_status");
+    .select("id, email, company_name, quota, stripe_customer_id, stripe_subscription_id, current_period_end, subscription_status, created_at");
 
   if (clientsErr || !clients) {
     return NextResponse.json({ error: "clients fetch failed" }, { status: 500 });
@@ -147,6 +159,91 @@ export async function GET(req: Request) {
     if (!hasActiveSub) {
       report.push({ orgId: client.id, action: "skip_inactive", status });
       continue;
+    }
+
+    // ── Task 4: J+3 setup reminder ──
+    // Sent once, in a 1-business-day window starting at created_at + 3 BD,
+    // only if at least one of LinkedIn/ICP/message is still missing.
+    if (client.email && client.created_at) {
+      const createdAt = new Date(client.created_at);
+      const j3 = addBusinessDays(createdAt, SETUP_REMINDER_BUSINESS_DAYS);
+      const j4 = addBusinessDays(j3, 1);
+      const inWindow =
+        now.getTime() >= startOfDay(j3).getTime() &&
+        now.getTime() < startOfDay(j4).getTime();
+      if (inWindow) {
+        const alreadySent = await hasSentEmail(supabase, client.id, "setup_reminder_j3");
+        if (!alreadySent) {
+          const setupState = await loadSetupState(supabase, client.id);
+          const missing = setupMissingFromState(setupState);
+          const anyMissing = missing.linkedin || missing.icp || missing.message;
+          if (anyMissing) {
+            const tmpl = setupReminderJ3Email("", missing);
+            const result = await sendAndLogEmail(supabase, {
+              orgId: client.id,
+              kind: "setup_reminder_j3",
+              to: client.email,
+              subject: tmpl.subject,
+              html: tmpl.html,
+              metadata: { missing, setup_state: setupState },
+            });
+            report.push({
+              orgId: client.id,
+              action: "setup_reminder_j3",
+              missing,
+              sent: result.sent,
+              error: result.error,
+            });
+          } else {
+            await recordEmailSent(supabase, {
+              orgId: client.id,
+              kind: "setup_reminder_j3",
+              recipient: client.email,
+              subject: null,
+              status: "skipped",
+              metadata: { reason: "setup_complete", setup_state: setupState },
+            });
+            report.push({ orgId: client.id, action: "skip_setup_complete" });
+          }
+        }
+      }
+    }
+
+    // ── Task 5: First prospects email (once per client, lifetime) ──
+    if (client.email) {
+      const alreadySent = await hasSentEmail(supabase, client.id, "first_prospects");
+      if (!alreadySent) {
+        const { count: totalCount } = await supabase
+          .from("leads")
+          .select("id", { count: "exact", head: true })
+          .eq("client_id", client.id);
+        if (typeof totalCount === "number" && totalCount > 0) {
+          const todayStart = startOfDay(now);
+          const { count: todayCount } = await supabase
+            .from("leads")
+            .select("id", { count: "exact", head: true })
+            .eq("client_id", client.id)
+            .gte("created_at", todayStart.toISOString());
+          const dayCount = typeof todayCount === "number" && todayCount > 0 ? todayCount : totalCount;
+          const tmpl = firstProspectsEmail("", dayCount);
+          const result = await sendAndLogEmail(supabase, {
+            orgId: client.id,
+            kind: "first_prospects",
+            to: client.email,
+            subject: tmpl.subject,
+            html: tmpl.html,
+            metadata: { day_count: dayCount, total_count: totalCount },
+          });
+          report.push({
+            orgId: client.id,
+            action: "first_prospects",
+            day_count: dayCount,
+            total_count: totalCount,
+            sent: result.sent,
+            error: result.error,
+          });
+        }
+      }
     }
 
     const period = await resolvePeriod(stripe, supabase, client);
