@@ -38,8 +38,13 @@ type MessageKind = "linkedin_sans_post" | "relance_sans_post";
 
 const ASSISTANT_NAME = "Assistant Lidmeo";
 
-const WELCOME_MESSAGE =
-  "Bonjour ! Je vais t'aider à créer tes messages de prospection LinkedIn. On commence ?";
+const WELCOME_MESSAGE = `Bonjour ! Je vais t'aider à créer tes messages de prospection LinkedIn.
+
+Question 1 — Douleur
+
+Quel est le problème concret et précis que vivent tes clients idéaux en ce moment, et qui les pousserait à te répondre si tu leur en parlais ?
+
+Prends quelques secondes, et essaie de me le formuler avec un moment précis, un chiffre, ou une situation que ton client pourrait raconter lui-même.`;
 
 function extractTag(raw: string, tag: string): string {
   const re = new RegExp(`\\[${tag}\\]([\\s\\S]*?)\\[/${tag}\\]`, "i");
