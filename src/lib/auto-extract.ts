@@ -8,6 +8,7 @@ type ApolloPersonRaw = Record<string, unknown>;
 export type AutoExtractSource =
   | "auto_renewal"
   | "auto_completion"
+  | "auto_daily"
   | "admin"
   | "client_selection";
 

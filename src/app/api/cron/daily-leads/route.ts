@@ -10,13 +10,13 @@ import {
 import {
   setupReminderJ3Email,
   firstProspectsEmail,
-  type SetupMissing,
 } from "@/lib/email-templates-onboarding";
 import {
   hasSentEmail,
   recordEmailSent,
   sendAndLogEmail,
 } from "@/lib/email-tracking";
+import { loadSetupState, setupMissingFromState } from "@/lib/setup-state";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -24,59 +24,6 @@ export const maxDuration = 300;
 const TEST_ORG_IDS = new Set<number>([16, 18]);
 const BUSINESS_DAYS_AT_RENEWAL = 5;
 const SETUP_REMINDER_BUSINESS_DAYS = 3;
-
-type SetupState = {
-  linkedin: boolean;
-  icp: boolean;
-  message: boolean;
-};
-
-async function loadSetupState(
-  supabase: ReturnType<typeof createServiceSupabase>,
-  orgId: number
-): Promise<SetupState> {
-  const [unipileRes, icpRes, msgRes] = await Promise.all([
-    supabase
-      .from("unipile_accounts")
-      .select("unipile_account_id")
-      .eq("client_id", orgId)
-      .maybeSingle(),
-    supabase
-      .from("icp_configs")
-      .select("filters, status")
-      .eq("org_id", orgId)
-      .in("status", ["submitted", "reviewed", "active"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("client_messages")
-      .select("status")
-      .eq("org_id", orgId)
-      .maybeSingle(),
-  ]);
-
-  const linkedin = !!(unipileRes.data?.unipile_account_id);
-
-  const filters = (icpRes.data?.filters ?? {}) as Record<string, unknown>;
-  const apolloFilters = filters.apollo_filters ?? filters;
-  const icp =
-    !!apolloFilters &&
-    typeof apolloFilters === "object" &&
-    Object.keys(apolloFilters as Record<string, unknown>).length > 0;
-
-  const message = msgRes.data?.status === "submitted";
-
-  return { linkedin, icp, message };
-}
-
-function setupMissingFromState(state: SetupState): SetupMissing {
-  return {
-    linkedin: !state.linkedin,
-    icp: !state.icp,
-    message: !state.message,
-  };
-}
 
 function startOfDay(d: Date): Date {
   const x = new Date(d);
