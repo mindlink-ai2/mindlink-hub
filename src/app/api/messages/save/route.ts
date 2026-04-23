@@ -227,13 +227,21 @@ export async function POST(req: Request) {
         if (res.updated) {
           console.log(
             "[messages/save] n8n workflow updated for org_id:",
-            clientContext.clientId
+            clientContext.clientId,
+            "activated:",
+            res.activated ?? false
           );
           await logClientActivity(
             supabase,
             clientContext.clientId,
             "workflow_updated",
-            { reason: "messages_updated", workflow_id: existingWorkflowId }
+            {
+              reason: "messages_updated",
+              workflow_id: existingWorkflowId,
+              mode,
+              activated: res.activated ?? false,
+              activation_error: res.activationError ?? null,
+            }
           );
         } else {
           console.warn(
