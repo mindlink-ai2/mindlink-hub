@@ -544,8 +544,8 @@ export async function finalizeMessagesFromChat(
     throw new Error("finalize_missing_tags");
   }
   return {
-    message_linkedin: stripEmDashes(parsed.message_linkedin),
-    relance_linkedin: stripEmDashes(parsed.relance_linkedin),
+    message_linkedin: ensureLineBreaks(stripEmDashes(parsed.message_linkedin)),
+    relance_linkedin: ensureLineBreaks(stripEmDashes(parsed.relance_linkedin)),
     message_email: stripEmDashes(parsed.message_email),
   };
 }
@@ -554,6 +554,17 @@ export async function finalizeMessagesFromChat(
 
 export function stripEmDashes(text: string): string {
   return text.replace(/[—–]/g, "-");
+}
+
+export function ensureLineBreaks(message: string): string {
+  if (!message) return message;
+  const trimmed = message.trim();
+  if (trimmed.includes("\n")) return trimmed;
+  const segments = trimmed.match(/[^.?!]+[.?!]+\s*/g);
+  if (!segments) return trimmed;
+  const cleanSegments = segments.map((s) => s.trim()).filter(Boolean);
+  if (cleanSegments.length < 3) return trimmed;
+  return cleanSegments.join("\n\n");
 }
 
 export function extractTag(raw: string, tag: string): string {
