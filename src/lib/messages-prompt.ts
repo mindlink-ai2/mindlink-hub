@@ -6,6 +6,9 @@ export const GENERATE_PROMPT_SYSTEM = `Tu es un expert en prospection B2B et en 
 
 TA SORTIE DOIT ÊTRE LE PROMPT LUI-MÊME, rien d'autre. Pas de préambule, pas d'explication, pas de commentaire, pas de balise markdown. Le premier caractère de ta réponse est la première ligne du prompt généré.
 
+RÈGLE ABSOLUE DE PONCTUATION (prime sur toute autre consigne)
+AUCUN tiret long (—, —, –, —, dits "em dash" ou "en dash") dans ta sortie, ni dans les exemples, ni dans le prompt lui-même, ni dans les titres de sections, ni dans les listes. Utilise uniquement le tiret court ASCII (-) ou reformule la phrase. Si tu t'apprêtes à écrire "phrase — autre phrase", écris "phrase. Autre phrase" ou "phrase, autre phrase" à la place. Cette règle s'applique partout, sans exception.
+
 INPUTS QUE TU VAS RECEVOIR DANS LE USER MESSAGE
 
 1. MESSAGES_VALIDES : les 2 messages validés par le client (message LinkedIn version sans post + relance LinkedIn version sans post). Ces messages contiennent déjà les variables \${firstName}, \${company}, {{prenom}}, {{company}}.
@@ -441,13 +444,18 @@ export async function generateSystemPromptFromMessages(
 
   const data = await res.json();
   const text: string = data.content?.[0]?.text ?? "";
-  return text;
+  return stripEmDashes(text);
 }
 
 // ── FINALIZE_MESSAGES_SYSTEM ──────────────────────────────────────────────────
 // Not modified in this livrable.
 
-const FINALIZE_MESSAGES_SYSTEM = `Tu reçois deux messages de prospection validés par un client (message LinkedIn d'ouverture + relance LinkedIn) contenant des exemples concrets (un prénom et une entreprise de démonstration). Ta mission :
+const FINALIZE_MESSAGES_SYSTEM = `Tu reçois deux messages de prospection validés par un client (message LinkedIn d'ouverture + relance LinkedIn) contenant des exemples concrets (un prénom et une entreprise de démonstration).
+
+RÈGLE ABSOLUE DE PONCTUATION (prime sur toute autre consigne)
+AUCUN tiret long (—, —, –) dans ta sortie. Ni dans les messages, ni dans l'email, ni dans la signature. Uniquement tiret court ASCII (-) ou reformule. Si tu vois un tiret long dans l'entrée, remplace-le par un tiret court ou par une ponctuation équivalente dans la sortie.
+
+Ta mission :
 
 1. Remplace le prénom concret utilisé dans le MESSAGE_LINKEDIN par la variable \${firstName} et l'entreprise concrète par \${company}. Garde le reste du message identique au mot près.
 2. Remplace le prénom concret utilisé dans la RELANCE_LINKEDIN par la variable {{prenom}}. Si une entreprise apparaît dans la relance, remplace-la par {{company}}. Garde le reste identique.
@@ -523,10 +531,18 @@ export async function finalizeMessagesFromChat(
   if (!parsed.message_linkedin || !parsed.relance_linkedin || !parsed.message_email) {
     throw new Error("finalize_missing_tags");
   }
-  return parsed;
+  return {
+    message_linkedin: stripEmDashes(parsed.message_linkedin),
+    relance_linkedin: stripEmDashes(parsed.relance_linkedin),
+    message_email: stripEmDashes(parsed.message_email),
+  };
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
+
+export function stripEmDashes(text: string): string {
+  return text.replace(/[—–]/g, "-");
+}
 
 export function extractTag(raw: string, tag: string): string {
   const re = new RegExp(`\\[${tag}\\]([\\s\\S]*?)\\[/${tag}\\]`, "i");
