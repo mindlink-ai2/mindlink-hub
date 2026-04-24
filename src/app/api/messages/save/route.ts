@@ -14,7 +14,11 @@ import {
 } from "@/lib/messages-prompt";
 import { extractDapsFromManualMessages } from "@/lib/messages-manual-daps";
 import { createWorkflowForClient, updateWorkflowSystemPrompt } from "@/lib/n8n-workflow";
-import { adminClientChangeEmail, sendLidmeoEmail } from "@/lib/email-templates";
+import {
+  adminClientChangeEmail,
+  adminClientWorkflowEmail,
+  sendLidmeoEmail,
+} from "@/lib/email-templates";
 import { logClientActivity } from "@/lib/client-activity";
 import { deriveSheetTabName } from "@/lib/sheet-tab-name";
 
@@ -243,6 +247,23 @@ export async function POST(req: Request) {
               activation_error: res.activationError ?? null,
             }
           );
+          try {
+            const { subject, html } = adminClientWorkflowEmail({
+              kind: "updated",
+              clientName: (clientRow?.company_name as string | null) ?? null,
+              clientEmail: (clientRow?.email as string | null) ?? null,
+              orgId: clientContext.clientId,
+              workflowId: existingWorkflowId,
+              trigger: "messages_updated",
+              activated: res.activated ?? null,
+            });
+            await sendLidmeoEmail({ to: ADMIN_NOTIFY_EMAIL, subject, html });
+          } catch (emailErr) {
+            console.error(
+              "[messages/save] admin workflow-updated email failed:",
+              emailErr
+            );
+          }
         } else {
           console.warn(
             "[messages/save] n8n workflow NOT updated for org_id:",
@@ -297,6 +318,23 @@ export async function POST(req: Request) {
               activation_error: result.activationError ?? null,
             }
           );
+          try {
+            const { subject, html } = adminClientWorkflowEmail({
+              kind: "created",
+              clientName: (clientRow?.company_name as string | null) ?? null,
+              clientEmail: (clientRow?.email as string | null) ?? null,
+              orgId: clientContext.clientId,
+              workflowId: result.workflowId,
+              trigger: "messages_save",
+              activated: result.activated ?? null,
+            });
+            await sendLidmeoEmail({ to: ADMIN_NOTIFY_EMAIL, subject, html });
+          } catch (emailErr) {
+            console.error(
+              "[messages/save] admin workflow-created email failed:",
+              emailErr
+            );
+          }
         } else {
           console.warn(
             "[messages/save] Auto workflow creation failed for org_id:",

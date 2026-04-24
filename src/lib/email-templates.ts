@@ -216,6 +216,97 @@ export function adminClientChangeEmail(params: {
   return { subject, html };
 }
 
+// ─── Admin notification (workflow n8n) ────────────────────────────────────────
+
+type AdminWorkflowKind = "created" | "updated";
+
+export function adminClientWorkflowEmail(params: {
+  kind: AdminWorkflowKind;
+  clientName: string | null;
+  clientEmail: string | null;
+  orgId: number;
+  workflowId: string | null;
+  trigger?: string | null;
+  activated?: boolean | null;
+}): { subject: string; html: string } {
+  const { kind, clientName, clientEmail, orgId, workflowId, trigger, activated } = params;
+  const nameLabel = (clientName ?? "").trim() || `org #${orgId}`;
+  const eventLabel = kind === "created" ? "Workflow n8n créé" : "Workflow n8n mis à jour";
+  const subject = `🤖 [Lidmeo Hub] ${eventLabel} — ${nameLabel}`;
+  const whenLabel = new Date().toLocaleString("fr-FR", {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: "Europe/Paris",
+  });
+  const adminUrl = `https://hub.lidmeo.com/admin/clients?org=${orgId}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="fr">
+  <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0b1c33;padding:16px;">
+    <p><strong>${escapeHtml(nameLabel)}</strong> — ${escapeHtml(eventLabel.toLowerCase())}.</p>
+    <ul>
+      <li><strong>Client :</strong> ${escapeHtml(nameLabel)}</li>
+      <li><strong>Email :</strong> ${escapeHtml(clientEmail ?? "—")}</li>
+      <li><strong>Org ID :</strong> ${orgId}</li>
+      <li><strong>Workflow ID :</strong> ${escapeHtml(workflowId ?? "—")}</li>
+      <li><strong>Déclencheur :</strong> ${escapeHtml(trigger ?? "—")}</li>
+      <li><strong>Activé :</strong> ${activated == null ? "—" : activated ? "oui" : "non"}</li>
+      <li><strong>Date :</strong> ${escapeHtml(whenLabel)}</li>
+    </ul>
+    <p>
+      <a href="${escapeHtml(adminUrl)}" style="color:#2563EB;">Ouvrir le panel admin →</a>
+    </p>
+  </body>
+</html>`;
+
+  return { subject, html };
+}
+
+// ─── Admin notification (export Google Sheet) ─────────────────────────────────
+
+export function adminClientSheetExportEmail(params: {
+  clientName: string | null;
+  clientEmail: string | null;
+  orgId: number;
+  leadsCount: number;
+  source: string;
+  tabName?: string | null;
+  sheetCreated?: boolean;
+}): { subject: string; html: string } {
+  const { clientName, clientEmail, orgId, leadsCount, source, tabName, sheetCreated } = params;
+  const nameLabel = (clientName ?? "").trim() || `org #${orgId}`;
+  const subject = `📄 [Lidmeo Hub] Export Sheet (${leadsCount} leads) — ${nameLabel}`;
+  const whenLabel = new Date().toLocaleString("fr-FR", {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: "Europe/Paris",
+  });
+  const adminUrl = `https://hub.lidmeo.com/admin/clients?org=${orgId}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="fr">
+  <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0b1c33;padding:16px;">
+    <p><strong>${escapeHtml(nameLabel)}</strong> — ${leadsCount} leads écrits dans le Google Sheet${
+    sheetCreated ? " (onglet créé)" : ""
+  }.</p>
+    <ul>
+      <li><strong>Client :</strong> ${escapeHtml(nameLabel)}</li>
+      <li><strong>Email :</strong> ${escapeHtml(clientEmail ?? "—")}</li>
+      <li><strong>Org ID :</strong> ${orgId}</li>
+      <li><strong>Leads exportés :</strong> ${leadsCount}</li>
+      <li><strong>Source :</strong> ${escapeHtml(source)}</li>
+      <li><strong>Onglet :</strong> ${escapeHtml(tabName ?? "—")}</li>
+      <li><strong>Date :</strong> ${escapeHtml(whenLabel)}</li>
+    </ul>
+    <p>
+      <a href="${escapeHtml(adminUrl)}" style="color:#2563EB;">Ouvrir le panel admin →</a>
+    </p>
+  </body>
+</html>`;
+
+  return { subject, html };
+}
+
 // ─── Resend sender ─────────────────────────────────────────────────────────────
 
 function getResendFrom(): string {

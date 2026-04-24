@@ -3,6 +3,9 @@ import { createServiceSupabase } from "@/lib/inbox-server";
 import { autoExtractLeads } from "@/lib/auto-extract";
 import { loadSetupState, isSetupComplete } from "@/lib/setup-state";
 import { logClientActivity } from "@/lib/client-activity";
+import { adminClientSheetExportEmail, sendLidmeoEmail } from "@/lib/email-templates";
+
+const ADMIN_NOTIFY_EMAIL = "contact@lidmeo.com";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -100,6 +103,24 @@ export async function GET(req: Request) {
       quota_per_day: quotaPerDay,
       error: result.error ?? null,
     });
+
+    if (result.leadsCount > 0) {
+      try {
+        const { subject, html } = adminClientSheetExportEmail({
+          clientName: client.company_name,
+          clientEmail: client.email,
+          orgId: client.id,
+          leadsCount: result.leadsCount,
+          source: "auto_daily",
+        });
+        await sendLidmeoEmail({ to: ADMIN_NOTIFY_EMAIL, subject, html });
+      } catch (emailErr) {
+        console.error(
+          "[cron/daily-extraction] admin sheet-export email failed:",
+          emailErr
+        );
+      }
+    }
 
     report.push({
       orgId: client.id,

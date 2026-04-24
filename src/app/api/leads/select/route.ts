@@ -5,6 +5,13 @@ import { google } from "googleapis";
 import { logClientActivity } from "@/lib/client-activity";
 import { createWorkflowForClient } from "@/lib/n8n-workflow";
 import { deriveSheetTabName } from "@/lib/sheet-tab-name";
+import {
+  adminClientSheetExportEmail,
+  adminClientWorkflowEmail,
+  sendLidmeoEmail,
+} from "@/lib/email-templates";
+
+const ADMIN_NOTIFY_EMAIL = "contact@lidmeo.com";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -449,6 +456,21 @@ export async function POST(req: Request) {
     source: "client_selection",
   });
 
+  try {
+    const { subject, html } = adminClientSheetExportEmail({
+      clientName: company,
+      clientEmail,
+      orgId,
+      leadsCount: enrichedPeople.length,
+      source: "client_selection",
+      tabName,
+      sheetCreated: sheetWasCreated,
+    });
+    await sendLidmeoEmail({ to: ADMIN_NOTIFY_EMAIL, subject, html });
+  } catch (emailErr) {
+    console.error("[leads/select] admin sheet-export email failed:", emailErr);
+  }
+
   // Auto-create n8n workflow if messages are validated and no workflow yet
   let workflowJustCreated = false;
   try {
@@ -491,6 +513,23 @@ export async function POST(req: Request) {
             workflow_id: result.workflowId,
             trigger: "leads_select",
           });
+          try {
+            const { subject, html } = adminClientWorkflowEmail({
+              kind: "created",
+              clientName: company,
+              clientEmail,
+              orgId,
+              workflowId: result.workflowId,
+              trigger: "leads_select",
+              activated: result.activated ?? null,
+            });
+            await sendLidmeoEmail({ to: ADMIN_NOTIFY_EMAIL, subject, html });
+          } catch (emailErr) {
+            console.error(
+              "[leads/select] admin workflow-created email failed:",
+              emailErr
+            );
+          }
         } else {
           console.warn(
             "[leads/select] Auto workflow creation failed for org_id:",

@@ -2,8 +2,14 @@ import Stripe from "stripe";
 import { headers } from "next/headers";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import { autoExtractLeads } from "@/lib/auto-extract";
-import { renewalLeadsEmail, sendLidmeoEmail } from "@/lib/email-templates";
+import {
+  adminClientSheetExportEmail,
+  renewalLeadsEmail,
+  sendLidmeoEmail,
+} from "@/lib/email-templates";
 import { logClientActivity } from "@/lib/client-activity";
+
+const ADMIN_NOTIFY_EMAIL = "contact@lidmeo.com";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -155,6 +161,24 @@ export async function POST(req: Request) {
     period_end: periodEnd.toISOString(),
     error: result.error ?? null,
   });
+
+  if (result.leadsCount > 0) {
+    try {
+      const { subject, html } = adminClientSheetExportEmail({
+        clientName: client.company_name,
+        clientEmail: client.email,
+        orgId: client.id,
+        leadsCount: result.leadsCount,
+        source: "auto_renewal",
+      });
+      await sendLidmeoEmail({ to: ADMIN_NOTIFY_EMAIL, subject, html });
+    } catch (emailErr) {
+      console.error(
+        "[webhook/leads] admin sheet-export email failed:",
+        emailErr
+      );
+    }
+  }
 
   console.log(
     "[webhook/leads] J+0 done for org",
