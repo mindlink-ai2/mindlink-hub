@@ -161,15 +161,27 @@ Un seul message LinkedIn par prospect (pas 2 versions — tu choisis la bonne ve
 
 [SECTION 10 : EXEMPLES]
 
-Produis 2 exemples concrets adaptés au business du client :
-- Exemple 1 : message LinkedIn AVEC post exploitable. Contexte fictif mais réaliste (décrire en 1 ligne le post du prospect), puis le message complet avec \${firstName} et \${company}.
-- Exemple 2 : message LinkedIn SANS post exploitable. Contexte fictif (rôle + entreprise du prospect), puis le message complet.
+Produis 2 exemples qui réutilisent MOT POUR MOT le MESSAGE DE BASE LINKEDIN (injecté en SECTION 3A) et ne changent QUE l'accroche (Beat 1).
+
+Règles strictes :
+- Le corps du message (Beat 2 : tension, Beat 3 : position/angle/preuve, Beat 4 : invitation/CTA/signature) est rigoureusement identique au MESSAGE DE BASE LINKEDIN, à la lettre, à la ponctuation, aux sauts de ligne près.
+- Seul le Beat 1 (accroche, 1 à 2 lignes maximum) est réécrit pour s'enchaîner fluidement avec le reste du message.
+- Les variables \${firstName} et \${company} restent aux mêmes emplacements que dans le MESSAGE DE BASE.
+
+Exemple 1 (AVEC post exploitable) :
+- Contexte fictif en 1 ligne : décrire le post du prospect (sujet, angle).
+- Nouveau Beat 1 : reformule en 1 phrase l'idée du post de manière à enchaîner fluidement sur le Beat 2 existant. Ne jamais citer le post mot pour mot, ne jamais écrire "j'ai vu ton/votre post".
+- Puis colle le reste du MESSAGE DE BASE LINKEDIN tel quel.
+
+Exemple 2 (SANS post exploitable) :
+- Contexte fictif en 1 ligne : rôle + entreprise du prospect.
+- Nouveau Beat 1 : 1 phrase liée au rôle, à l'entreprise ou au secteur du prospect, formulée pour enchaîner fluidement sur le Beat 2 existant. Ne jamais écrire "j'ai vu ton/votre profil".
+- Puis colle le reste du MESSAGE DE BASE LINKEDIN tel quel.
 
 Ces exemples doivent :
-- Suivre le framework 4 beats
-- Injecter l'angle et 1 preuve max par message
-- Respecter le ton choisi
-- Ne JAMAIS contenir une formulation interdite
+- Respecter la règle absolue ponctuation (aucun tiret long).
+- Ne JAMAIS contenir une formulation interdite.
+- Garder le reste du message VERBATIM : si tu modifies autre chose que le Beat 1, tu violes la consigne.
 
 [SECTION 11 : CONTRAINTES PAR CHAMP DE SORTIE]
 
