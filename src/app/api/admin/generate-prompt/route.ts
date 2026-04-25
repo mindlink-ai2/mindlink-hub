@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupportAdminContext } from "@/lib/support-admin-auth";
+import { getAdminContext } from "@/lib/platform-auth";
 import { createServiceSupabase } from "@/lib/inbox-server";
 
 export const runtime = "nodejs";
@@ -154,7 +154,7 @@ INSTRUCTIONS POUR GÉNÉRER LE PROMPT DU NOUVEAU CLIENT :
 IMPORTANT : Le prompt généré doit être complet et prêt à être utilisé tel quel. Il doit sonner naturel et humain. Retourne UNIQUEMENT le prompt, rien d'autre.`;
 
 export async function POST(request: Request) {
-  const adminCtx = await getSupportAdminContext();
+  const adminCtx = await getAdminContext();
   if (!adminCtx) {
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }

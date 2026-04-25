@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupportAdminContext } from "@/lib/support-admin-auth";
+import { getAdminContext } from "@/lib/platform-auth";
 
 export const runtime = "nodejs";
 
@@ -40,7 +40,7 @@ type StripeInvoice = {
 };
 
 export async function GET() {
-  const adminCtx = await getSupportAdminContext();
+  const adminCtx = await getAdminContext();
   if (!adminCtx) {
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }

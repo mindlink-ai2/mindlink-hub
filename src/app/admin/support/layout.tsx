@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
-import { getSupportAdminContext } from "@/lib/support-admin-auth";
+import { getAdminContext } from "@/lib/platform-auth";
 
 export default async function AdminSupportLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const adminContext = await getSupportAdminContext();
+  const adminContext = await getAdminContext();
   if (!adminContext) {
     redirect("/dashboard");
   }

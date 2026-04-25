@@ -1,10 +1,7 @@
 import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
-import { resolveClientIdForClerkUserId } from "@/lib/support-admin-auth";
-
-export const ANALYTICS_ADMIN_CLIENT_IDS = [16, 18] as const;
-const ANALYTICS_ADMIN_SET = new Set<number>(ANALYTICS_ADMIN_CLIENT_IDS);
+import { resolveClientIdForClerkUserId } from "@/lib/platform-auth";
 
 export type AnalyticsClientContext = {
   userId: string;
@@ -13,11 +10,6 @@ export type AnalyticsClientContext = {
 
 export function isAnalyticsEnabled(): boolean {
   return process.env.ANALYTICS_ENABLED === "true";
-}
-
-export function isAnalyticsAdminClientId(clientId: number | null): boolean {
-  if (clientId === null) return false;
-  return ANALYTICS_ADMIN_SET.has(clientId);
 }
 
 export async function getAuthenticatedAnalyticsClientContext(): Promise<AnalyticsClientContext | null> {
@@ -31,11 +23,4 @@ export async function getAuthenticatedAnalyticsClientContext(): Promise<Analytic
     userId,
     clientId,
   };
-}
-
-export async function getAnalyticsAdminContext(): Promise<AnalyticsClientContext | null> {
-  const context = await getAuthenticatedAnalyticsClientContext();
-  if (!context) return null;
-  if (!isAnalyticsAdminClientId(context.clientId)) return null;
-  return context;
 }

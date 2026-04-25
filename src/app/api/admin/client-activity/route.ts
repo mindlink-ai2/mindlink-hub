@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
-import { getSupportAdminContext } from "@/lib/support-admin-auth";
+import { getAdminContext } from "@/lib/platform-auth";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const adminCtx = await getSupportAdminContext();
+  const adminCtx = await getAdminContext();
   if (!adminCtx) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServiceSupabase } from "@/lib/inbox-server";
-import { getSupportAdminContext } from "@/lib/support-admin-auth";
+import { getAdminContext } from "@/lib/platform-auth";
 
 export const runtime = "nodejs";
 
@@ -34,7 +34,7 @@ function isMissingReadBySupportColumn(error: { code?: string; message?: string }
 
 export async function GET(request: Request) {
   try {
-    const adminContext = await getSupportAdminContext();
+    const adminContext = await getAdminContext();
     if (!adminContext) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }

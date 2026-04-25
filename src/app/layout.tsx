@@ -10,8 +10,8 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import SupportWidgetLoader from "@/components/support/SupportWidgetLoader";
 import BusinessTracker from "@/components/analytics/BusinessTracker";
 import Sidebar from "@/components/Sidebar";
-import { getSupportAdminContext } from "@/lib/support-admin-auth";
-import { PLAYBOOK_ALLOWED_CLIENT_IDS } from "@/lib/playbook-auth";
+import { getAdminContext } from "@/lib/platform-auth";
+import { isPlaybookEnabled } from "@/lib/playbook-auth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import QueryProvider from "@/components/QueryProvider";
 
@@ -111,14 +111,14 @@ export default async function RootLayout({
       isFullActivePlanClient = plan === "full" && subscriptionStatus === "active";
 
       const clientId = Number(data.id);
-      showPlaybookLink = (PLAYBOOK_ALLOWED_CLIENT_IDS as readonly number[]).includes(clientId);
+      showPlaybookLink = await isPlaybookEnabled(clientId);
     }
   }
 
   const dashboardHref = isFullActivePlanClient ? "/dashboard/automation" : "/dashboard";
 
   if (user) {
-    const adminContext = await getSupportAdminContext();
+    const adminContext = await getAdminContext();
     showSupportAdminLink = Boolean(adminContext);
   }
 

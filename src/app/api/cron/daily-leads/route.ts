@@ -21,6 +21,8 @@ import { loadSetupState, setupMissingFromState } from "@/lib/setup-state";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+// TODO: replace with clients.is_test once retention_tracking migration
+// is applied. Currently kept hardcoded to avoid scope creep on Phase 0.
 const TEST_ORG_IDS = new Set<number>([16, 18]);
 const BUSINESS_DAYS_AT_RENEWAL = 5;
 const SETUP_REMINDER_BUSINESS_DAYS = 3;

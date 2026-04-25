@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceSupabase } from "@/lib/inbox-server";
-import { getAnalyticsAdminContext } from "@/lib/analytics/server";
+import { getAdminContext } from "@/lib/platform-auth";
 
 export const runtime = "nodejs";
 
@@ -17,7 +17,7 @@ function daysAgo(n: number): Date {
 
 export async function GET() {
   try {
-    const adminContext = await getAnalyticsAdminContext();
+    const adminContext = await getAdminContext();
     if (!adminContext) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }

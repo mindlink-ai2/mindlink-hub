@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupportAdminContext } from "@/lib/support-admin-auth";
+import { getAdminContext } from "@/lib/platform-auth";
 import { createServiceSupabase } from "@/lib/inbox-server";
 
 export const runtime = "nodejs";
@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 type RouteContext = { params: Promise<{ orgId: string }> };
 
 export async function GET(_req: Request, context: RouteContext) {
-  const adminCtx = await getSupportAdminContext();
+  const adminCtx = await getAdminContext();
   if (!adminCtx) {
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
@@ -49,7 +49,7 @@ function safeStr(v: unknown, max: number): string | null {
 }
 
 export async function PATCH(req: Request, context: RouteContext) {
-  const adminCtx = await getSupportAdminContext();
+  const adminCtx = await getAdminContext();
   if (!adminCtx) {
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }

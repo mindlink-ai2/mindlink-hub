@@ -184,6 +184,8 @@ export async function GET() {
   let quotaRemaining = Math.max(0, monthlyQuota - quotaUsed);
 
   // Test accounts — never blocked by quota
+  // TODO: replace with clients.is_test once retention_tracking migration
+  // is applied. Currently kept hardcoded to avoid scope creep on Phase 0.
   const TEST_ORG_IDS = new Set<number>([16, 18]);
   if (TEST_ORG_IDS.has(orgId)) {
     monthlyQuota = 99999;

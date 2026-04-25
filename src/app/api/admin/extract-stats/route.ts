@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupportAdminContext } from "@/lib/support-admin-auth";
+import { getAdminContext } from "@/lib/platform-auth";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import { google } from "googleapis";
 import { computePeriod, countBusinessDays } from "@/lib/search-credits";
@@ -64,7 +64,7 @@ function buildApolloPayload(rawFilters: Record<string, unknown>): Record<string,
 }
 
 export async function GET(request: Request) {
-  const adminCtx = await getSupportAdminContext();
+  const adminCtx = await getAdminContext();
   if (!adminCtx) {
     return NextResponse.json({ error: "Acces refuse" }, { status: 403 });
   }

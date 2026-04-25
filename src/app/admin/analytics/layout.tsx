@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
-import { getAnalyticsAdminContext } from "@/lib/analytics/server";
+import { getAdminContext } from "@/lib/platform-auth";
 
 export default async function AdminAnalyticsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const adminContext = await getAnalyticsAdminContext();
+  const adminContext = await getAdminContext();
   if (!adminContext) {
     redirect("/dashboard");
   }

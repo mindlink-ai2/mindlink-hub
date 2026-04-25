@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupportAdminContext } from "@/lib/support-admin-auth";
+import { getAdminContext } from "@/lib/platform-auth";
 import { createServiceSupabase } from "@/lib/inbox-server";
 import { google } from "googleapis";
 
@@ -330,7 +330,7 @@ function isDuplicate(person: ApolloPersonRaw, existingIds: Set<string>): boolean
 // ── Handler principal ─────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
-  const adminCtx = await getSupportAdminContext();
+  const adminCtx = await getAdminContext();
   if (!adminCtx) {
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }

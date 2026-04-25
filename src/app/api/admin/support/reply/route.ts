@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createServiceSupabase } from "@/lib/inbox-server";
-import { getSupportAdminContext } from "@/lib/support-admin-auth";
+import { getAdminContext } from "@/lib/platform-auth";
 import { notifyClientSupportReply } from "@/lib/support-email";
 
 export const runtime = "nodejs";
@@ -43,7 +43,7 @@ function isMissingTicketNumberColumn(error: { code?: string; message?: string } 
 
 export async function POST(request: Request) {
   try {
-    const adminContext = await getSupportAdminContext();
+    const adminContext = await getAdminContext();
     if (!adminContext) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
